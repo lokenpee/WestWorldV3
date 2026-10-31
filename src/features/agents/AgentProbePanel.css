@@ -1,0 +1,8 @@
+.agent-probe-panel { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12px; overflow-wrap: anywhere; }
+.agent-probe-heading { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.agent-probe-heading h3 { margin: 0 auto 0 0; font-size: 14px; }
+.agent-probe-panel > p { color: var(--muted); margin: 8px 0; }
+.agent-probe-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-height: min(280px, 35dvh); overflow: auto; }
+.agent-probe-results article { padding: 10px; border: 1px solid var(--border); border-radius: 5px; }
+.agent-probe-results p { margin: 6px 0; }
+@media(max-width: 767px) { .agent-probe-results { grid-template-columns: 1fr; } }

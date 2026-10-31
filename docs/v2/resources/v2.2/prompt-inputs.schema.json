@@ -1,0 +1,651 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "WorkRef": {
+      "type": "object",
+      "properties": {
+        "workItemId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "character",
+            "location",
+            "node",
+            "eventLine",
+            "note",
+            "chapter"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "章节无revision时固定0"
+        },
+        "factFingerprint": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "workItemId",
+        "kind",
+        "id",
+        "revision",
+        "factFingerprint"
+      ],
+      "additionalProperties": false
+    },
+    "ResumeInfo": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "enum": [
+            "initial",
+            "continuation",
+            "interrupted",
+            "conflict"
+          ]
+        },
+        "appliedCommitIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "nextOperationKey": {
+          "type": "string",
+          "description": "应用建议的下一命令键；模型可用其他未使用非空键，但不能换旧键的payload",
+          "minLength": 1
+        },
+        "remainingWorkIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "reason",
+        "appliedCommitIds",
+        "nextOperationKey",
+        "remainingWorkIds"
+      ],
+      "additionalProperties": false
+    },
+    "TaskIdentity": {
+      "type": "object",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planVersion": {
+          "const": "2.2"
+        },
+        "remainingCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeInfo"
+        }
+      },
+      "required": [
+        "bookId",
+        "runId",
+        "taskId",
+        "planVersion",
+        "remainingCount",
+        "resume"
+      ],
+      "additionalProperties": false
+    },
+    "ChapterTask": {
+      "type": "object",
+      "properties": {
+        "chapterIndex": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chapterName": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "chapterIndex",
+        "chapterName",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "IdentityTask": {
+      "type": "object",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planVersion": {
+          "const": "2.2"
+        },
+        "remainingCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeInfo"
+        },
+        "stage": {
+          "const": "P2"
+        },
+        "phase": {
+          "const": "ai_identity"
+        },
+        "kind": {
+          "enum": [
+            "character",
+            "location"
+          ]
+        },
+        "scope": {
+          "const": "fullBook"
+        },
+        "workItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WorkRef"
+          },
+          "minItems": 1,
+          "maxItems": 180
+        },
+        "afterId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pageLimit": {
+          "const": 100
+        }
+      },
+      "required": [
+        "bookId",
+        "runId",
+        "taskId",
+        "planVersion",
+        "remainingCount",
+        "resume",
+        "stage",
+        "phase",
+        "kind",
+        "scope",
+        "workItems",
+        "afterId",
+        "pageLimit"
+      ],
+      "additionalProperties": false
+    },
+    "LineDigest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "nodeIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "chapters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lineStatus": {
+          "enum": [
+            "open",
+            "closed"
+          ]
+        },
+        "cause": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "result": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "nodeIds",
+        "chapters",
+        "lineStatus",
+        "cause",
+        "result",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "Window": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chapterIndices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "chapterIndices"
+      ],
+      "additionalProperties": false
+    },
+    "StoryTask": {
+      "type": "object",
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planVersion": {
+          "const": "2.2"
+        },
+        "remainingCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeInfo"
+        },
+        "stage": {
+          "const": "P3"
+        },
+        "phase": {
+          "enum": [
+            "window_link",
+            "global_review"
+          ]
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "queue": {
+          "enum": [
+            "window_nodes",
+            "orphans",
+            "event_lines",
+            "review_notes"
+          ]
+        },
+        "window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Window"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WorkRef"
+          },
+          "minItems": 1,
+          "maxItems": 100
+        },
+        "existingLines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/LineDigest"
+          },
+          "maxItems": 50
+        },
+        "memory": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "bookId",
+            "revision",
+            "workingSummary",
+            "dataFingerprint",
+            "updatedAt"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "bookId": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "workingSummary": {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            "dataFingerprint": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          }
+        },
+        "afterWorkItemId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "bookId",
+        "runId",
+        "taskId",
+        "planVersion",
+        "remainingCount",
+        "resume",
+        "stage",
+        "phase",
+        "sessionId",
+        "queue",
+        "window",
+        "workItems",
+        "existingLines",
+        "memory",
+        "afterWorkItemId"
+      ],
+      "additionalProperties": false
+    },
+    "Fact": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "field": {
+          "enum": [
+            "identity",
+            "appearance",
+            "personality",
+            "background",
+            "description"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "field",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "CharacterOptimizationItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "previous": {
+          "type": "object",
+          "properties": {
+            "identity": {
+              "type": "string"
+            },
+            "appearance": {
+              "type": "string"
+            },
+            "personality": {
+              "type": "string"
+            },
+            "background": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Fact"
+          },
+          "minItems": 1
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "aliases",
+        "revision",
+        "reason",
+        "previous",
+        "facts",
+        "conflicts"
+      ],
+      "additionalProperties": false
+    },
+    "CharacterOptimizationTask": {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "const": "P2"
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CharacterOptimizationItem"
+          },
+          "minItems": 1,
+          "maxItems": 3
+        }
+      },
+      "required": [
+        "stage",
+        "entities"
+      ],
+      "additionalProperties": false
+    },
+    "LocationOptimizationTask": {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "const": "P2"
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Fact"
+          },
+          "minItems": 1
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "stage",
+        "id",
+        "name",
+        "revision",
+        "description",
+        "facts",
+        "conflicts"
+      ],
+      "additionalProperties": false
+    },
+    "CompactionTask": {
+      "type": "object",
+      "properties": {
+        "previousSummary": {
+          "type": "string"
+        },
+        "transcript": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "previousSummary",
+        "transcript"
+      ],
+      "additionalProperties": false
+    },
+    "DirectProbeTask": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "AgentProbeTask": {
+      "type": "object",
+      "properties": {
+        "suite": {
+          "enum": [
+            "asset",
+            "story"
+          ]
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operationKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "suite",
+        "taskId",
+        "operationKey"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

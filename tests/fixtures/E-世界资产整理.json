@@ -1,0 +1,334 @@
+{
+  "tables": {
+    "chapters": [
+      {
+        "bookId": "world-fixture",
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "order": 0,
+        "charCount": 78
+      }
+    ],
+    "chapterTexts": [
+      {
+        "bookId": "world-fixture",
+        "chapterIndex": "1",
+        "text": "沈青是青石镇的船夫。老沈就是船夫沈青。药师陆川与镖师陆川是两个人，彼此并不认识。青石客栈也叫青石栈。青石客栈后院是客栈内的一处院子。张三与张三丰是不同的人。"
+      }
+    ],
+    "characters": [
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [
+          "老沈"
+        ],
+        "id": "C1-P001",
+        "name": "沈青",
+        "identity": "船夫"
+      },
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "id": "C1-P002",
+        "name": "沈青",
+        "identity": "青石镇的船夫"
+      },
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "id": "C1-P003",
+        "name": "老沈",
+        "identity": "船夫沈青的别名"
+      },
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "id": "C1-P004",
+        "name": "陆川",
+        "identity": "药师"
+      },
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "id": "C1-P005",
+        "name": "陆川",
+        "identity": "镖师"
+      },
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "id": "C1-P006",
+        "name": "张三"
+      },
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "id": "C1-P007",
+        "name": "张三丰"
+      }
+    ],
+    "locations": [
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [
+          "青石栈"
+        ],
+        "id": "C1-L001",
+        "name": "青石客栈",
+        "description": "镇上的客栈"
+      },
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "id": "C1-L002",
+        "name": "青石栈",
+        "description": "青石客栈的别名"
+      },
+      {
+        "bookId": "world-fixture",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "chapterIndex": "1",
+        "chapterName": "第一章 镇上来客",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "id": "C1-L003",
+        "name": "青石客栈后院",
+        "description": "客栈内的院子"
+      }
+    ],
+    "assetLifecycle": [
+      {
+        "key": "character:C1-P001",
+        "bookId": "world-fixture",
+        "kind": "character",
+        "originId": "C1-P001",
+        "currentId": "C1-P001",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "character:C1-P002",
+        "bookId": "world-fixture",
+        "kind": "character",
+        "originId": "C1-P002",
+        "currentId": "C1-P002",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "character:C1-P003",
+        "bookId": "world-fixture",
+        "kind": "character",
+        "originId": "C1-P003",
+        "currentId": "C1-P003",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "character:C1-P004",
+        "bookId": "world-fixture",
+        "kind": "character",
+        "originId": "C1-P004",
+        "currentId": "C1-P004",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "character:C1-P005",
+        "bookId": "world-fixture",
+        "kind": "character",
+        "originId": "C1-P005",
+        "currentId": "C1-P005",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "character:C1-P006",
+        "bookId": "world-fixture",
+        "kind": "character",
+        "originId": "C1-P006",
+        "currentId": "C1-P006",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "character:C1-P007",
+        "bookId": "world-fixture",
+        "kind": "character",
+        "originId": "C1-P007",
+        "currentId": "C1-P007",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "location:C1-L001",
+        "bookId": "world-fixture",
+        "kind": "location",
+        "originId": "C1-L001",
+        "currentId": "C1-L001",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "location:C1-L002",
+        "bookId": "world-fixture",
+        "kind": "location",
+        "originId": "C1-L002",
+        "currentId": "C1-L002",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      },
+      {
+        "key": "location:C1-L003",
+        "bookId": "world-fixture",
+        "kind": "location",
+        "originId": "C1-L003",
+        "currentId": "C1-L003",
+        "state": "live",
+        "revision": 1,
+        "updatedAt": "2026-10-29T00:00:00.000Z",
+        "sourceChapterIndex": "1"
+      }
+    ],
+    "extractionReceipts": [
+      {
+        "key": "1:worldAssets",
+        "bookId": "world-fixture",
+        "chapterIndex": "1",
+        "substep": "worldAssets",
+        "inputFingerprint": "fixture-world-input",
+        "originIds": [
+          "C1-P001",
+          "C1-P002",
+          "C1-P003",
+          "C1-P004",
+          "C1-P005",
+          "C1-P006",
+          "C1-P007",
+          "C1-L001",
+          "C1-L002",
+          "C1-L003"
+        ],
+        "committedAt": "2026-10-29T00:00:00.000Z",
+        "runId": "fixture-world-extraction"
+      },
+      {
+        "key": "1:narrativeAssets",
+        "bookId": "world-fixture",
+        "chapterIndex": "1",
+        "substep": "narrativeAssets",
+        "inputFingerprint": "fixture-world-input",
+        "originIds": [],
+        "committedAt": "2026-10-29T00:00:00.000Z",
+        "runId": "fixture-world-extraction"
+      }
+    ],
+    "compileProgress": [
+      {
+        "bookId": "world-fixture",
+        "stage": "P1",
+        "status": "completed",
+        "totalChapters": 1,
+        "completedChapters": [
+          "1"
+        ],
+        "failedChapters": [],
+        "updatedAt": "2026-10-29T00:00:00.000Z"
+      }
+    ]
+  }
+}

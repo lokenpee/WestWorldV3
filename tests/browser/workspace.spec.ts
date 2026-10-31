@@ -1,0 +1,88 @@
+import { expect, test } from '@playwright/test'
+
+test('浏览器拒绝 IndexedDB 时显示真实错误，不伪造空库成功', async ({ page }) => {
+  await page.addInitScript(() => {
+    IDBFactory.prototype.open = () => { throw new DOMException('浏览器拒绝存储访问', 'SecurityError') }
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: '无法读取书架' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '导入第一本小说' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '重新读取书架' })).toBeVisible()
+})
+
+test('正常空库、三个入口和刷新回资产，不自动生成样本', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: '资产书架 0' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '导入第一本小说' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '选择小说文件' })).toBeEnabled()
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '模型与存储设置' })).toBeVisible()
+  await page.getByRole('button', { name: '游玩', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '故事尚未启程' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: '玩家行动' })).toBeDisabled()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '资产书架 0' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '装载两本样本' })).toHaveCount(0)
+})
+
+test('样本持久化、选最新、切书隔离、导入引导和快速切换', async ({ page }) => {
+  await page.goto('/?acceptance=stage1')
+  await page.getByRole('button', { name: '装载两本样本' }).click()
+  await expect(page.getByRole('heading', { name: '资产书架 2' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '山城来客', exact: true })).toBeVisible()
+  await expect(page.getByText('第一章 山城清晨', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '进入 青石镇来信' }).click()
+  await expect(page.getByRole('heading', { name: '青石镇来信', exact: true })).toBeVisible()
+  await expect(page.getByText('第一章 码头交信', { exact: true })).toBeVisible()
+  await expect(page.getByText('第一章 山城清晨', { exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  await page.getByRole('button', { name: '资产', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '青石镇来信', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '导入小说', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '导入另一本小说' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '资产书架 2' })).toBeVisible()
+  await page.getByRole('button', { name: '进入 山城来客' }).click()
+  await page.getByRole('button', { name: '进入 青石镇来信' }).click()
+  await expect(page.getByText('第一章 码头交信', { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: '山城来客', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '装载两本样本' }).click()
+  await expect(page.getByRole('heading', { name: '资产书架 2' })).toBeVisible()
+  // Normal workspace uses a different database, even on the same origin.
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: '资产书架 0' })).toBeVisible()
+})
+
+test('同源第二标签实时看到新书；清空样本后回到空态', async ({ page, context }) => {
+  await page.goto('/?acceptance=stage1')
+  const second = await context.newPage()
+  await second.goto('/?acceptance=stage1')
+  await expect(second.getByRole('heading', { name: '资产书架 0' })).toBeVisible()
+  await page.getByRole('button', { name: '装载两本样本' }).click()
+  await expect(second.getByRole('heading', { name: '资产书架 2' })).toBeVisible()
+  await expect(second.getByRole('heading', { name: '山城来客', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '清空验收样本' }).click()
+  await expect(second.getByRole('heading', { name: '资产书架 0' })).toBeVisible()
+  await expect(second.getByRole('heading', { name: '导入第一本小说' })).toBeVisible()
+})
+
+test('读取失败明确报错；恢复后重试，不将失败冒充空书架', async ({ page }) => {
+  await page.goto('/?acceptance=stage1')
+  await page.getByRole('button', { name: '装载两本样本' }).click()
+  await expect(page.getByRole('heading', { name: '资产书架 2' })).toBeVisible()
+  await page.getByRole('button', { name: '模拟读取失败' }).click()
+  await expect(page.getByRole('alert').filter({ hasText: '无法读取书架' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '导入第一本小说' })).toHaveCount(0)
+  await page.getByRole('button', { name: '恢复存储' }).click()
+  await page.getByRole('button', { name: '重新读取书架' }).click()
+  await expect(page.getByRole('heading', { name: '资产书架 2' })).toBeVisible()
+})
+
+test('375px 下顶层入口和样本操作可达，没有水平页面溢出', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/?acceptance=stage1')
+  await page.getByRole('button', { name: '装载两本样本' }).click()
+  await page.getByRole('button', { name: '进入 青石镇来信' }).click()
+  await expect(page.getByRole('heading', { name: '青石镇来信', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})

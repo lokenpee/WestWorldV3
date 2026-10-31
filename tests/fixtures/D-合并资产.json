@@ -1,0 +1,231 @@
+{
+  "book": {
+    "id": "merge-fixture",
+    "title": "渡口人物资料",
+    "sourceFileName": "合并样本.txt",
+    "createdAt": "2026-10-25T00:00:00.000Z"
+  },
+  "tables": {
+    "chapters": [
+      {
+        "bookId": "merge-fixture",
+        "chapterIndex": "1",
+        "chapterName": "第一章 渡口会面",
+        "order": 0,
+        "charCount": 43
+      },
+      {
+        "bookId": "merge-fixture",
+        "chapterIndex": "2",
+        "chapterName": "第二章 交信",
+        "order": 1,
+        "charCount": 17
+      }
+    ],
+    "chapterTexts": [
+      {
+        "bookId": "merge-fixture",
+        "chapterIndex": "1",
+        "text": "第一章 渡口会面\n张三与李四在青石码头会面。张清是张三曾用的名字。青石码头也叫码头。\n"
+      },
+      {
+        "bookId": "merge-fixture",
+        "chapterIndex": "2",
+        "text": "第二章 交信\n张清把信交给李四。\n"
+      }
+    ],
+    "characters": [
+      {
+        "id": "M-P001",
+        "bookId": "merge-fixture",
+        "name": "张三",
+        "chapterIndex": "1",
+        "chapterName": "第一章 渡口会面",
+        "sourceChapters": [
+          "1"
+        ],
+        "confidence": 1,
+        "revision": 1,
+        "createdBy": "P1",
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "aliases": [
+          "三哥"
+        ],
+        "identity": "船夫；摆渡人",
+        "background": "住在河边",
+        "profile": {
+          "age": 34,
+          "gender": "男",
+          "ageText": "三十多岁"
+        },
+        "roleWeight": "重要配角",
+        "roleWeightSource": "manual"
+      },
+      {
+        "id": "M-P002",
+        "bookId": "merge-fixture",
+        "name": "张清",
+        "chapterIndex": "2",
+        "chapterName": "第二章 交信",
+        "sourceChapters": [
+          "2"
+        ],
+        "confidence": 1,
+        "revision": 1,
+        "createdBy": "P1",
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "aliases": [
+          "阿清"
+        ],
+        "identity": "船夫",
+        "appearance": "穿青衣",
+        "profile": {
+          "age": 35,
+          "gender": "男"
+        },
+        "roleWeight": "NPC",
+        "roleWeightSource": "frequency"
+      },
+      {
+        "id": "M-P003",
+        "bookId": "merge-fixture",
+        "name": "李四",
+        "chapterIndex": "1",
+        "chapterName": "第一章 渡口会面",
+        "sourceChapters": [
+          "1"
+        ],
+        "confidence": 1,
+        "revision": 1,
+        "createdBy": "P1",
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "aliases": [],
+        "identity": "信使",
+        "roleWeight": "NPC"
+      }
+    ],
+    "locations": [
+      {
+        "id": "M-L001",
+        "bookId": "merge-fixture",
+        "name": "青石码头",
+        "aliases": [
+          "青石渡口"
+        ],
+        "description": "临河",
+        "chapterIndex": "1",
+        "chapterName": "第一章 渡口会面",
+        "sourceChapters": [
+          "1"
+        ],
+        "confidence": 1,
+        "revision": 1,
+        "createdBy": "P1"
+      },
+      {
+        "id": "M-L002",
+        "bookId": "merge-fixture",
+        "name": "码头",
+        "aliases": [],
+        "description": "临河；有石阶",
+        "chapterIndex": "2",
+        "chapterName": "第二章 交信",
+        "sourceChapters": [
+          "2"
+        ],
+        "confidence": 1,
+        "revision": 1,
+        "createdBy": "P1"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "M-N001",
+        "bookId": "merge-fixture",
+        "name": "渡口会面",
+        "summary": "张三与李四会面",
+        "chapterIndex": "1",
+        "chapterName": "第一章 渡口会面",
+        "quote": "张三与李四在青石码头会面。",
+        "actors": [
+          "张三",
+          "李四"
+        ],
+        "actorIds": [
+          "M-P001",
+          "M-P003"
+        ],
+        "targets": [
+          "张清"
+        ],
+        "targetCharacterIds": [
+          "M-P002"
+        ],
+        "order": 0,
+        "confidence": 1,
+        "revision": 1,
+        "createdBy": "P1",
+        "eventLineIds": [
+          "M-E001"
+        ],
+        "quoteStatus": "matched",
+        "offset": 9
+      },
+      {
+        "id": "M-N002",
+        "bookId": "merge-fixture",
+        "name": "交付信件",
+        "summary": "张清将信交给李四",
+        "chapterIndex": "2",
+        "chapterName": "第二章 交信",
+        "quote": "张清把信交给李四。",
+        "actors": [
+          "张清",
+          "张三",
+          "李四"
+        ],
+        "actorIds": [
+          "M-P002",
+          "M-P001",
+          "M-P003"
+        ],
+        "targets": [],
+        "targetCharacterIds": [],
+        "order": 0,
+        "confidence": 1,
+        "revision": 1,
+        "createdBy": "P1",
+        "eventLineIds": [
+          "M-E001"
+        ],
+        "quoteStatus": "matched",
+        "offset": 7
+      }
+    ],
+    "eventLines": [
+      {
+        "id": "M-E001",
+        "bookId": "merge-fixture",
+        "title": "渡口交信",
+        "nodeIds": [
+          "M-N001",
+          "M-N002"
+        ],
+        "chapters": [
+          "1",
+          "2"
+        ],
+        "cause": "送达信件",
+        "process": "会面后交信",
+        "result": "李四收到信",
+        "lineStatus": "closed",
+        "revision": 1,
+        "createdBy": "P3",
+        "updatedAt": "2026-10-25T00:00:00.000Z"
+      }
+    ]
+  }
+}

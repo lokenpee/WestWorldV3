@@ -1,0 +1,51 @@
+{
+  "normalization": {
+    "suffixReplacements": [
+      {
+        "regex": "/[_\\-\\s]*第?[零一二三四五六七八九十百千万\\d]+[卷章回部篇节]$/giu",
+        "replacement": ""
+      },
+      {
+        "regex": "/[_\\-\\s]*卷[零一二三四五六七八九十百千万\\d]+$/giu",
+        "replacement": ""
+      },
+      {
+        "regex": "/[(_\\-\\s]*[Vv][Ee]?[Rr]?[\\s._-]*\\d+$/g",
+        "replacement": ""
+      },
+      {
+        "regex": "/[(_\\-\\s]*(新版|旧版|重做版|重制版|修订版|临时版|备份|草稿|重复|改)$/giu",
+        "replacement": ""
+      },
+      {
+        "regex": "/[（(]\\s*第?[零一二三四五六七八九十百千万\\d]+[卷章回部篇节]\\s*[）)]$/giu",
+        "replacement": ""
+      },
+      {
+        "regex": "/[（(]\\s*(新版|旧版|重做版|重制版|修订版|临时版|备份|草稿|重复|改)\\s*[）)]$/giu",
+        "replacement": ""
+      }
+    ],
+    "whitespaceRegex": "/\\s+/g",
+    "whitespaceReplacement": " ",
+    "lowerCaseBeforePunctuationStrip": true,
+    "punctuationRegex": "/[\\s`~!@#$%^&*()_+\\-=[\\]{};':\"\\\\|,.<>/?！￥…（）【】、；：‘’“”，。？《》·]/g",
+    "punctuationReplacement": "",
+    "legacyQualityHeuristicExcluded": "/[\\u4e00-\\u9fa5a-zA-Z0-9]{2,}/"
+  },
+  "defaultChapterRegex": "/(?:^|[。！？!?：:；;])([\\s\\u3000\\uFEFF]*第\\s*(?:[零一二三四五六七八九十百千万0-9]\\s*)+[章回卷节部篇][^\\n\\r]{0,80})/gm",
+  "numericDefaults": {
+    "chunkChars": 10000,
+    "fallbackChars": 4000,
+    "windowSize": 100,
+    "overlap": 20,
+    "aliasThresholdStrictlyGreater": 0.9,
+    "aliasBatchSize": 180,
+    "aliasStride": 160,
+    "nodeBatch": 400,
+    "reviewBatch": 30,
+    "maxSteps": 6,
+    "timeoutMs": 180000,
+    "toolMaxBytes": 65536
+  }
+}

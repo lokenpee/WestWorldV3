@@ -1,0 +1,347 @@
+{
+  "kind": "manual-acceptance-seed",
+  "book": {
+    "id": "fixture-c",
+    "title": "人工验收固定资产",
+    "createdAt": "2026-10-24T00:00:00.000Z",
+    "sourceFileName": "A-三章短篇.txt"
+  },
+  "tables": {
+    "chapters": [
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "0",
+        "chapterName": "序文",
+        "charCount": 22,
+        "order": 0
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头交信",
+        "charCount": 74,
+        "order": 1
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "2",
+        "chapterName": "第二章 客栈约定",
+        "charCount": 76,
+        "order": 2
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "3",
+        "chapterName": "第三章 信件归还",
+        "charCount": 44,
+        "order": 3
+      }
+    ],
+    "chapterTexts": [
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "0",
+        "text": "这封信的去向，后来成为青石镇的一段旧事。\n\n"
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "1",
+        "text": "第一章 码头交信\n船夫沈青在青石码头收到顾衡的来信。顾衡说：“老沈，请把信送到青石客栈。”老沈就是船夫沈青。\n药师陆川路过码头，到镇上采买药材。\n\n"
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "2",
+        "text": "第二章 客栈约定\n船夫沈青来到青石客栈。掌柜说：“这家店也叫青石栈。”船夫沈青把信交给掌柜，请他明晨转交顾衡。\n药师陆川在药铺晒药，与送信一事无关。\n\n"
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "3",
+        "text": "第三章 信件归还\n次日清晨，掌柜在青石客栈把信还给顾衡。顾衡确认信封完好，向掌柜道谢。\n"
+      }
+    ],
+    "characters": [
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头交信",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [
+          "老沈"
+        ],
+        "roleWeight": "NPC",
+        "id": "C1-P001",
+        "name": "沈青",
+        "identity": "船夫"
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头交信",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "roleWeight": "NPC",
+        "id": "C1-P002",
+        "name": "陆川",
+        "identity": "药师"
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头交信",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": [],
+        "roleWeight": "NPC",
+        "id": "C1-P003",
+        "name": "顾衡",
+        "identity": "信件主人"
+      },
+      {
+        "bookId": "fixture-c",
+        "chapterIndex": "2",
+        "chapterName": "第二章 客栈约定",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "sourceChapters": [
+          "2"
+        ],
+        "aliases": [],
+        "roleWeight": "NPC",
+        "id": "C2-P001",
+        "name": "掌柜",
+        "identity": "青石客栈掌柜"
+      }
+    ],
+    "locations": [
+      {
+        "bookId": "fixture-c",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "id": "C1-L001",
+        "name": "青石码头",
+        "description": "船夫收信处",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头交信",
+        "sourceChapters": [
+          "1"
+        ],
+        "aliases": []
+      },
+      {
+        "bookId": "fixture-c",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "nameSource": "extracted",
+        "manualKeep": false,
+        "id": "C2-L001",
+        "name": "青石客栈",
+        "description": "也叫青石栈",
+        "chapterIndex": "2",
+        "chapterName": "第二章 客栈约定",
+        "sourceChapters": [
+          "2"
+        ],
+        "aliases": [
+          "青石栈"
+        ]
+      }
+    ],
+    "nodes": [
+      {
+        "id": "C1-N001",
+        "chapterIndex": "1",
+        "name": "码头收信",
+        "quote": "船夫沈青在青石码头收到顾衡的来信。",
+        "actors": [
+          "沈青",
+          "顾衡"
+        ],
+        "eventLineIds": [
+          "L01",
+          "L02"
+        ],
+        "bookId": "fixture-c",
+        "chapterName": "第一章 码头交信",
+        "order": 0,
+        "summary": "码头收信",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "actorIds": [
+          "C1-P001",
+          "C1-P003"
+        ],
+        "targetCharacterIds": [],
+        "quoteStatus": "matched",
+        "offset": 9
+      },
+      {
+        "id": "C2-N001",
+        "chapterIndex": "2",
+        "name": "转交掌柜",
+        "quote": "船夫沈青把信交给掌柜，请他明晨转交顾衡。",
+        "actors": [
+          "沈青",
+          "掌柜"
+        ],
+        "eventLineIds": [
+          "L01"
+        ],
+        "bookId": "fixture-c",
+        "chapterName": "第二章 客栈约定",
+        "order": 0,
+        "summary": "转交掌柜",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "actorIds": [
+          "C1-P001",
+          "C2-P001"
+        ],
+        "targetCharacterIds": [],
+        "quoteStatus": "matched",
+        "offset": 35
+      },
+      {
+        "id": "C2-N002",
+        "chapterIndex": "2",
+        "name": "药师晒药",
+        "quote": "药师陆川在药铺晒药，与送信一事无关。",
+        "actors": [
+          "陆川"
+        ],
+        "eventLineIds": [],
+        "bookId": "fixture-c",
+        "chapterName": "第二章 客栈约定",
+        "order": 1,
+        "summary": "药师晒药",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "actorIds": [
+          "C1-P002"
+        ],
+        "targetCharacterIds": [],
+        "quoteStatus": "matched",
+        "offset": 56
+      },
+      {
+        "id": "C3-N001",
+        "chapterIndex": "3",
+        "name": "信件归还",
+        "quote": "次日清晨，掌柜在青石客栈把信还给顾衡。",
+        "actors": [
+          "掌柜",
+          "顾衡"
+        ],
+        "eventLineIds": [
+          "L01",
+          "L02"
+        ],
+        "bookId": "fixture-c",
+        "chapterName": "第三章 信件归还",
+        "order": 0,
+        "summary": "信件归还",
+        "revision": 1,
+        "createdBy": "P1",
+        "confidence": 1,
+        "actorIds": [
+          "C2-P001",
+          "C1-P003"
+        ],
+        "targetCharacterIds": [],
+        "quoteStatus": "matched",
+        "offset": 9
+      }
+    ],
+    "eventLines": [
+      {
+        "id": "L01",
+        "title": "书信传递",
+        "nodeIds": [
+          "C1-N001",
+          "C2-N001",
+          "C3-N001"
+        ],
+        "chapters": [
+          "1",
+          "2",
+          "3"
+        ],
+        "bookId": "fixture-c",
+        "lineStatus": "closed",
+        "revision": 1,
+        "createdBy": "P3",
+        "updatedAt": "2026-10-24T00:00:00.000Z",
+        "cause": "顾衡托船夫沈青送信",
+        "process": "沈青收信后交给掌柜，掌柜次日归还顾衡",
+        "result": "顾衡确认信封完好"
+      },
+      {
+        "id": "L02",
+        "title": "顾衡的来信与收信",
+        "nodeIds": [
+          "C1-N001",
+          "C3-N001"
+        ],
+        "chapters": [
+          "1",
+          "3"
+        ],
+        "bookId": "fixture-c",
+        "lineStatus": "closed",
+        "revision": 1,
+        "createdBy": "P3",
+        "updatedAt": "2026-10-24T00:00:00.000Z",
+        "cause": "顾衡发出送信委托",
+        "process": "顾衡交信后再次收回信件",
+        "result": "顾衡收到完好信封"
+      }
+    ]
+  },
+  "expected": {
+    "characters": 4,
+    "locations": 2,
+    "nodes": 4,
+    "eventLines": 2,
+    "orphanNodeIds": [
+      "C2-N002"
+    ],
+    "sharedNodeIds": [
+      "C1-N001",
+      "C3-N001"
+    ],
+    "mergeAllowed": [],
+    "mustRemainSeparate": [
+      "C1-P001",
+      "C1-P002"
+    ]
+  }
+}

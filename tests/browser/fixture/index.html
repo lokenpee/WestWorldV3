@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8"><title>阶段 0 · 隔离 Pi 验证</title></head>
+  <body>
+    <h1>阶段 0 · 隔离 Pi 验证</h1>
+    <p>测试页面，不连接真实模型、不读取书库。由浏览器测试拦截模拟服务请求。</p>
+    <button id="run">运行隔离 Pi 探针</button>
+    <button id="abort" disabled>取消探针请求</button>
+    <pre data-testid="result" data-state="idle">等待运行</pre>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

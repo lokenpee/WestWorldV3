@@ -1,0 +1,8 @@
+.chapter-dialog { width: min(900px, calc(100% - 40px)); max-height: calc(100dvh - 48px); padding: 0; color: var(--ink); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 16px 60px #0002; }
+.chapter-dialog::backdrop { background: #0005; }
+.chapter-dialog header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.chapter-dialog h2 { font-size: 16px; margin: 0; overflow-wrap: anywhere; }
+.chapter-dialog header p { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
+.chapter-dialog header button { flex-shrink: 0; }
+.chapter-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 14px; line-height: 2; padding: 24px; margin: 0; max-height: calc(100dvh - 180px); overflow-y: auto; }
+@media(max-width:767px) { .chapter-dialog { width: calc(100% - 24px); }.chapter-dialog header, .chapter-dialog pre { padding: 16px; } }

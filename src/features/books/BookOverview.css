@@ -1,0 +1,32 @@
+.book-overview { max-width: 960px; margin: 0 auto; }
+.page-heading { margin-bottom: 32px; }
+.page-heading h1 { margin: 0 0 10px; font-size: 28px; font-weight: 650; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.page-heading > p:last-child { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.asset-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 18px; }
+.metric-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border: 1px solid var(--border); background: white; border-radius: 8px; }
+.metric-card > span { color: var(--muted); font-size: 12px; }
+.metric-card strong { font-size: 22px; line-height: 1.2; font-weight: 550; font-variant-numeric: tabular-nums; }
+.metric-card small { display: none; }
+.chapter-card { background: white; padding: 24px; border-radius: 8px; border: 1px solid var(--border); }
+.section-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; gap: 12px; }
+.section-heading h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.section-heading > span { color: var(--muted); font-size: 11px; }
+.chapter-list { list-style: none; padding: 0; margin: 0; }
+.chapter-list li { display: flex; align-items: baseline; gap: 16px; border-top: 1px solid #f0f0f0; padding: 15px 0; font-size: 13px; }
+.chapter-list li > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.chapter-number { width: 20px; flex-shrink: 0; font-size: 11px; color: #a3a3a3; font-variant-numeric: tabular-nums; }
+.chapter-list small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.chapter-scroll { max-height: min(320px, 35dvh); overflow-y: auto; }
+.chapter-open { flex: 1; min-width: 0; padding: 0; background: transparent; border: 0; text-align: left; color: var(--ink); font-size: 13px; overflow-wrap: anywhere; }
+.chapter-open:hover { text-decoration: underline; }
+.chapter-help { margin: 16px 0 0; font-size: 11px; }
+.next-stage-note { display: flex; align-items: flex-start; gap: 12px; margin: 26px 0; color: var(--muted); }
+.next-stage-note > span { font-size: 20px; }
+.next-stage-note strong { font-size: 12px; font-weight: 500; }
+.next-stage-note p { font-size: 12px; line-height: 1.8; margin: 5px 0 0; }
+@media (max-width: 767px) {
+  .asset-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .metric-card { padding: 10px 12px; }
+  .chapter-card { padding: 16px; }
+  .page-heading h1 { font-size: 24px; }
+}

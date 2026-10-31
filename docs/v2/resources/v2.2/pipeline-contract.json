@@ -1,0 +1,280 @@
+{
+  "version": "2.2",
+  "status": "target-not-implemented",
+  "scope": "fullBook",
+  "timezone": "Asia/Shanghai",
+  "stages": {
+    "P1": {
+      "purpose": "逐章提取世界/叙事资产",
+      "order": "Chapter.order",
+      "chaptersInFlight": 1,
+      "substeps": [
+        "worldAssets",
+        "narrativeAssets"
+      ],
+      "commit": "each-successful-substep-atomically-with-receipt-and-progress",
+      "uiRefresh": "after-each-successful-commit-no-later-than-chapter-end",
+      "onComplete": "unlock-P2-and-P3-without-auto-start",
+      "resume": "missing-success-receipts-only",
+      "migrationCollisionPolicy": "allocate-unused-chapter-kind-sequence-check-current-origin-and-tombstone; never-overwrite-unreceipted-legacy-record",
+      "aiMode": "direct",
+      "requestBudgetRef": "ai-runtime-contract.json#/requestBudget"
+    },
+    "P2": {
+      "purpose": "世界资产整理",
+      "requires": "all-P1-substeps-committed-for-full-book",
+      "resource": "world",
+      "phases": [
+        "mechanical",
+        "ai_identity",
+        "optimize",
+        "report"
+      ],
+      "canRunWith": [
+        "P3"
+      ],
+      "storySession": false,
+      "identityInput": "paginated-summary-tools",
+      "detailRead": "on-demand-for-verification-or-optimization",
+      "onEnd": "persist-report-for-every-terminal-status",
+      "scanPagination": "after_id-stable-ID-cursor; final inventory catches inserts before cursor",
+      "logicalCandidateBatch": {
+        "size": 180,
+        "stride": 160,
+        "queryMaxResults": 100
+      },
+      "aiModes": {
+        "ai_identity": "agent",
+        "optimize": "direct"
+      },
+      "entryPoints": {
+        "code": {
+          "callsAi": false,
+          "steps": [
+            "find-candidates",
+            "user-select-confirm",
+            "mechanical-fusion",
+            "report"
+          ],
+          "optionalPreview": true
+        },
+        "ai": {
+          "callsAi": true,
+          "steps": [
+            "ai_identity",
+            "optimize",
+            "report"
+          ],
+          "requiresCodeEntry": false
+        }
+      }
+    },
+    "P3": {
+      "purpose": "叙事节点串联与全书复核",
+      "requires": "all-P1-substeps-committed-for-full-book",
+      "resource": "narrative",
+      "phases": [
+        "window_link",
+        "global_review"
+      ],
+      "canRunWith": [
+        "P2"
+      ],
+      "session": "one-active-logical-story-editor-per-book",
+      "newSessionOnRecheck": false,
+      "window": {
+        "unit": "rootChapter",
+        "interval": "zero-based-half-open",
+        "size": 100,
+        "overlap": 20,
+        "stride": 80,
+        "stopAtBookEnd": true
+      },
+      "firstPass": {
+        "minConfidence": 0.85,
+        "requiredOperationFields": [
+          "confidence",
+          "reason",
+          "evidenceNodeIds"
+        ],
+        "lowConfidence": "review-note-not-line-write"
+      },
+      "globalReview": {
+        "queues": [
+          "all-orphan-nodes",
+          "all-event-lines",
+          "active-or-stale-review-items"
+        ],
+        "includeNewObjects": true,
+        "toolsCanReadAllBook": true,
+        "mayReadOriginal": true,
+        "requiresOrphanCountZero": false
+      },
+      "checkpointDependencies": "actual-read-set-and-narrative-facts-not-global-world-fingerprint",
+      "aiMode": "agent",
+      "writeTool": "commit_story_changes"
+    }
+  },
+  "manualMerge": {
+    "types": [
+      "character",
+      "location"
+    ],
+    "minimumSelection": 2,
+    "sameTypeOnly": true,
+    "keepId": "user-select-from-selected",
+    "canonicalName": "select-member-name-or-alias-or-enter-nonempty",
+    "differentNamesRequireExplicitChoice": true,
+    "algorithm": "same-mechanical-fusion-as-P2",
+    "callsAi": false,
+    "requiresAllExpectedRevisions": true,
+    "missingMember": "CONFLICT",
+    "result": "keep-id-plus-origin-redirects",
+    "undo": false,
+    "requiresWorldDomainUnlocked": true
+  },
+  "mechanicalPolicy": {
+    "sameNormalizedName": "candidate-only-no-automatic-merge",
+    "characterNameContainment": "candidate-only-no-automatic-merge",
+    "locationNameContainment": false,
+    "aliasSimilarity": "maximum-one-to-one-weighted-Levenshtein-set-score",
+    "strictlyGreaterThan": 0.9,
+    "semanticCompression": false,
+    "manualNamePriority": true,
+    "manualTargetPriority": "one manualKeep preferred; multiple protected targets conflict",
+    "aliasSimilarityAction": "candidate-only",
+    "automaticIdentityMerge": "same-origin-idempotent-replay-only",
+    "aiIdentityMinimumConfidence": 0.9,
+    "aiIdentityEvidenceRequired": true
+  },
+  "optimization": {
+    "detailTokenThresholdStrictlyGreater": 1200,
+    "detailCharacterThresholdStrictlyGreater": 1800,
+    "factsPerFieldThresholdAtLeast": 8,
+    "nearDuplicateThresholdAtLeast": 0.85,
+    "nearDuplicateMetric": "per-field-whitespace-stripped-character-3gram-Jaccard-on-nonidentical-fragments",
+    "minimumFragmentChars": 20,
+    "retainsExistingConflictAndImportantCharacterTriggers": true,
+    "allFactIdsMustBeCovered": true,
+    "preserveRawFacts": true,
+    "includesLocations": true
+  },
+  "taskIsolation": {
+    "key": [
+      "bookId",
+      "stage",
+      "runId"
+    ],
+    "sameStageReentry": false,
+    "P1ExclusiveWith": [
+      "P2",
+      "P3"
+    ],
+    "leaseMs": 300000,
+    "leaseStoredIn": "pipelineRuns",
+    "ownerCheck": "live-owner-cannot-be-stolen",
+    "noBroadcastChannel": "wait-until-lease-expiry",
+    "deleteResources": [
+      "extraction",
+      "world",
+      "narrative"
+    ],
+    "taskId": "persistent UUID; resumed task keeps taskId/runId",
+    "manualEditPolicy": {
+      "revision": "2026-10-24.stage0",
+      "scope": "bookId",
+      "enforceIn": [
+        "ui",
+        "command-transaction"
+      ],
+      "errorCode": "ASSET_DOMAIN_LOCKED",
+      "matrix": {
+        "idle": {
+          "world": true,
+          "narrative": true
+        },
+        "P1": {
+          "world": true,
+          "narrative": true
+        },
+        "P2": {
+          "world": false,
+          "narrative": true
+        },
+        "P3": {
+          "world": true,
+          "narrative": false
+        },
+        "P2+P3": {
+          "world": false,
+          "narrative": false
+        }
+      },
+      "acquire": "stage-start-transaction",
+      "release": "after-inflight-settled-and-owner-lease-released",
+      "sameDomainTaskWrites": true,
+      "readAndBackupAllowed": true,
+      "dirtyForm": "preserve-input-and-revalidate-revision-after-unlock",
+      "crash": "owner-liveness-and-existing-lease-recovery-no-blind-unlock",
+      "crossDomainDependencies": "retain-actual-read-set-checks"
+    }
+  },
+  "completion": {
+    "P1": "all-chapter-substep-success-receipts",
+    "P2": "all-current-world-assets-covered-and-no-unresolved-failures-or-stale-inputs",
+    "P3": "all-windows-and-global-work-items-covered-with-valid-dependencies",
+    "pendingReviewNotesCanRemain": true,
+    "finalInventoryRecheck": true,
+    "coverageAuthority": "pipelineRuns.coverageItems; counts derived only",
+    "maxInvalidationsPerWorkItem": 3
+  },
+  "backup": {
+    "targetFormatVersion": 5,
+    "additionalFiles": [
+      "data/extractionReceipts.json",
+      "data/assetLifecycle.json",
+      "data/pipelineRuns.json"
+    ],
+    "excludeLeaseRecords": true,
+    "serializeRunningAs": "paused",
+    "v4Import": "existing snapshot file is authoritative even when empty; otherwise fallback to old published entities; preserve IDs and resolve old derived refs",
+    "retiredFiles": [
+      "data/characterSnapshots.json",
+      "data/locationSnapshots.json"
+    ]
+  },
+  "legacy": {
+    "resourcesRoot": "2.1-frozen-contracts-unless-explicitly-reused",
+    "acceptanceSuite": "2.1-only",
+    "historicalPassedCases": 51,
+    "newWorkflowVerified": false
+  },
+  "reports": {
+    "externalChanges": "separate-from-automatic-reductions"
+  },
+  "directStorage": {
+    "authoritativeTables": [
+      "characters",
+      "locations",
+      "nodes",
+      "eventLines"
+    ],
+    "writes": "P1-success-and-all-later-CRUD-merge-write-same-current-records",
+    "draftLayer": false,
+    "publishAction": false,
+    "requiresP2P3ForDataToTakeEffect": false,
+    "recordIds": "stable-no-publish-renumbering",
+    "actorIds": "persistent-stable-character-links; character-delete-rename-merge-update-associated-nodes-atomically",
+    "stageValidity": "organization-coverage-only-never-data-activation"
+  },
+  "aiRuntimeContract": "ai-runtime-contract.json",
+  "contractRevision": "2026-10-24",
+  "bugfixPolicyRevision": "2026-10-24.fix-first",
+  "importPolicy": {
+    "preservePreamble": true,
+    "preserveNormalizedText": true,
+    "unifiedFileValidation": true,
+    "crossDatabaseRecovery": "appSettings book.lifecycle journal"
+  },
+  "nodeReferenceContract": "node-reference-contract.json"
+}

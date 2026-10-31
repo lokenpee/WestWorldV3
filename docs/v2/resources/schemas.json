@@ -1,0 +1,4250 @@
+{
+  "AliasGroupSchema": {
+    "additionalProperties": false,
+    "description": "一组同人的称呼。",
+    "type": "object",
+    "required": [
+      "canonicalName",
+      "names"
+    ],
+    "properties": {
+      "canonicalName": {
+        "description": "从 names 中选择一个本批档案主名，不能使用仅存在于 aliases 中的称呼。",
+        "type": "string"
+      },
+      "names": {
+        "description": "需要合并的至少两份档案的主名。仅填输入 name，已有别名无需再列，代码会保留。",
+        "minItems": 2,
+        "uniqueItems": true,
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "AliasGroupsSchema": {
+    "additionalProperties": false,
+    "description": "AI 别名识别结果。",
+    "type": "object",
+    "required": [
+      "groups"
+    ],
+    "properties": {
+      "groups": {
+        "description": "识别出的同人分组。单人不用输出，没有就返回空数组。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "description": "一组同人的称呼。",
+          "type": "object",
+          "required": [
+            "canonicalName",
+            "names"
+          ],
+          "properties": {
+            "canonicalName": {
+              "description": "从 names 中选择一个本批档案主名，不能使用仅存在于 aliases 中的称呼。",
+              "type": "string"
+            },
+            "names": {
+              "description": "需要合并的至少两份档案的主名。仅填输入 name，已有别名无需再列，代码会保留。",
+              "minItems": 2,
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "AssetFrequencySchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "chapters",
+      "mentions",
+      "scopeChapters",
+      "percentile"
+    ],
+    "properties": {
+      "chapters": {
+        "type": "integer"
+      },
+      "mentions": {
+        "type": "integer"
+      },
+      "scopeChapters": {
+        "type": "integer"
+      },
+      "percentile": {
+        "type": "number"
+      }
+    }
+  },
+  "BookSchema": {
+    "additionalProperties": false,
+    "description": "一本书。",
+    "type": "object",
+    "required": [
+      "id",
+      "title",
+      "createdAt"
+    ],
+    "properties": {
+      "id": {
+        "description": "书籍唯一 id。例：bk_001",
+        "type": "string"
+      },
+      "title": {
+        "description": "书名。默认取文件名。",
+        "type": "string"
+      },
+      "author": {
+        "description": "作者。原文没写就留空。",
+        "type": "string"
+      },
+      "sourceFileName": {
+        "description": "导入时的原始文件名。",
+        "type": "string"
+      },
+      "createdAt": {
+        "description": "导入时间，ISO 8601 字符串。",
+        "type": "string"
+      }
+    }
+  },
+  "ChapterSchema": {
+    "additionalProperties": false,
+    "description": "一章的元信息（不含正文）。",
+    "type": "object",
+    "required": [
+      "bookId",
+      "chapterIndex",
+      "chapterName",
+      "charCount",
+      "order"
+    ],
+    "properties": {
+      "bookId": {
+        "description": "所属书籍 id。",
+        "type": "string"
+      },
+      "chapterIndex": {
+        "description": "章节标识，字符串。超长章节切块后形如 \"101.1\"。用于排序与区间计算。",
+        "type": "string"
+      },
+      "chapterName": {
+        "description": "章节名，导入预处理后的结果。",
+        "type": "string"
+      },
+      "charCount": {
+        "description": "本章字数。",
+        "type": "number"
+      },
+      "order": {
+        "description": "在书中的顺序，从 0 开始。",
+        "type": "number"
+      }
+    }
+  },
+  "ChapterTextSchema": {
+    "additionalProperties": false,
+    "description": "一章的正文。",
+    "type": "object",
+    "required": [
+      "bookId",
+      "chapterIndex",
+      "text"
+    ],
+    "properties": {
+      "bookId": {
+        "description": "所属书籍 id。",
+        "type": "string"
+      },
+      "chapterIndex": {
+        "description": "章节标识。",
+        "type": "string"
+      },
+      "text": {
+        "description": "本章正文。",
+        "type": "string"
+      }
+    }
+  },
+  "CharacterMergeFactSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "id",
+      "field",
+      "text",
+      "chapters"
+    ],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "field": {
+        "type": "string"
+      },
+      "text": {
+        "type": "string"
+      },
+      "chapters": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "CharacterMergeStateSchema": {
+    "type": "object",
+    "properties": {
+      "mergeFacts": {
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "field",
+            "text",
+            "chapters"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "field": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "chapters": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "optimizedFactIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "optimizationFingerprint": {
+        "type": "string"
+      },
+      "roleWeightSource": {
+        "anyOf": [
+          {
+            "const": "frequency",
+            "type": "string"
+          },
+          {
+            "const": "manual",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  },
+  "CharacterOptimizationBatchSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "entities"
+    ],
+    "properties": {
+      "entities": {
+        "description": "以输入人物 ID 为键的整理结果；人物必须全部覆盖。",
+        "type": "object",
+        "patternProperties": {
+          "^(.*)$": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "entity",
+              "covered_fact_ids",
+              "merge_notes"
+            ],
+            "properties": {
+              "entity": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "aliases"
+                ],
+                "properties": {
+                  "name": {
+                    "description": "融合后的主名",
+                    "type": "string"
+                  },
+                  "aliases": {
+                    "description": "所有已知称呼（不含主名）",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "identity": {
+                    "description": "身份 / 职务 / 归属",
+                    "type": "string"
+                  },
+                  "appearance": {
+                    "description": "外貌",
+                    "type": "string"
+                  },
+                  "personality": {
+                    "description": "性格。多条用「；」分隔。**不得遗漏任何快照里的独有信息**",
+                    "type": "string"
+                  },
+                  "background": {
+                    "description": "背景 / 来历",
+                    "type": "string"
+                  }
+                }
+              },
+              "covered_fact_ids": {
+                "description": "本次输入 facts 中已完整保留的信息 ID，不能漏掉或新增。",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "merge_notes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "CharacterProfileSchema": {
+    "additionalProperties": false,
+    "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+    "type": "object",
+    "properties": {
+      "age": {
+        "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
+        "type": "number"
+      },
+      "ageText": {
+        "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+        "type": "string"
+      },
+      "gender": {
+        "description": "原文写明的性别，不知道则省略或填 null。",
+        "type": "string"
+      }
+    }
+  },
+  "CharacterSchema": {
+    "additionalProperties": false,
+    "description": "人物实体（入库后的固定资产）。",
+    "type": "object",
+    "required": [
+      "id",
+      "bookId",
+      "name",
+      "aliases",
+      "roleWeight",
+      "relations",
+      "confidence"
+    ],
+    "properties": {
+      "id": {
+        "description": "入库时重新编码的 id。例：P001",
+        "type": "string"
+      },
+      "bookId": {
+        "description": "所属书籍 id。",
+        "type": "string"
+      },
+      "chapterIndex": {
+        "type": "string"
+      },
+      "name": {
+        "description": "主名",
+        "type": "string"
+      },
+      "aliases": {
+        "description": "所有已知称呼（不含主名）",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "roleWeight": {
+        "description": "出场频次分位数计算的默认层级，可由用户手动覆盖。",
+        "anyOf": [
+          {
+            "const": "主要人物",
+            "type": "string"
+          },
+          {
+            "const": "重要配角",
+            "type": "string"
+          },
+          {
+            "const": "NPC",
+            "type": "string"
+          },
+          {
+            "const": "路人",
+            "type": "string"
+          }
+        ]
+      },
+      "identity": {
+        "description": "身份 / 职务 / 归属",
+        "type": "string"
+      },
+      "profile": {
+        "additionalProperties": false,
+        "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+        "type": "object",
+        "properties": {
+          "age": {
+            "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
+            "type": "number"
+          },
+          "ageText": {
+            "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+            "type": "string"
+          },
+          "gender": {
+            "description": "原文写明的性别，不知道则省略或填 null。",
+            "type": "string"
+          }
+        }
+      },
+      "appearance": {
+        "description": "外貌",
+        "type": "string"
+      },
+      "personality": {
+        "description": "性格",
+        "type": "string"
+      },
+      "background": {
+        "description": "背景 / 来历",
+        "type": "string"
+      },
+      "speechStyleSample": {
+        "description": "原话片段（说话味道）",
+        "type": "string"
+      },
+      "relations": {
+        "description": "关系（目标用人物名，检索时再解析）",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "description": "一条人物关系。",
+          "type": "object",
+          "required": [
+            "target",
+            "relation_type"
+          ],
+          "properties": {
+            "target": {
+              "description": "关系指向的人。用本章原文的称呼，还没归并。",
+              "type": "string"
+            },
+            "relation_type": {
+              "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
+              "type": "string"
+            },
+            "relation_label": {
+              "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
+              "type": "string"
+            },
+            "direction": {
+              "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+              "anyOf": [
+                {
+                  "const": "bidirectional",
+                  "type": "string"
+                },
+                {
+                  "const": "directed",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "confidence": {
+        "minimum": 0,
+        "maximum": 1,
+        "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+        "type": "number"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    }
+  },
+  "CharacterSnapshotSchema": {
+    "additionalProperties": false,
+    "description": "人物快照（P1 产出，未归并、未分层的原始观察）。",
+    "type": "object",
+    "required": [
+      "name",
+      "confidence"
+    ],
+    "properties": {
+      "name": {
+        "description": "本章主要使用的称呼。可能是别名，例：琏二爷。",
+        "type": "string"
+      },
+      "aliases_mentioned": {
+        "description": "本章出现过的其他称呼，用于后续归并同一个人。例：[\"琏二哥哥\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "identity": {
+        "description": "身份 / 职务 / 归属。例：荣国府长孙。原文没写就留空。",
+        "type": "string"
+      },
+      "profile": {
+        "additionalProperties": false,
+        "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+        "type": "object",
+        "properties": {
+          "age": {
+            "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
+            "type": "number"
+          },
+          "ageText": {
+            "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+            "type": "string"
+          },
+          "gender": {
+            "description": "原文写明的性别，不知道则省略或填 null。",
+            "type": "string"
+          }
+        }
+      },
+      "appearance": {
+        "description": "外貌。**仅当原文写到**，不要推断。",
+        "type": "string"
+      },
+      "personality": {
+        "description": "性格。**必须能从原文找到依据**，不要凭印象概括。多条用「；」分隔。",
+        "type": "string"
+      },
+      "background": {
+        "description": "背景 / 来历。仅当原文写到。",
+        "type": "string"
+      },
+      "speech_style_sample": {
+        "description": "本章这个人的**原话片段**（直接摘录），用于后续学习他的说话味道。",
+        "type": "string"
+      },
+      "relations": {
+        "description": "本章观察到的关系。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "description": "一条人物关系。",
+          "type": "object",
+          "required": [
+            "target",
+            "relation_type"
+          ],
+          "properties": {
+            "target": {
+              "description": "关系指向的人。用本章原文的称呼，还没归并。",
+              "type": "string"
+            },
+            "relation_type": {
+              "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
+              "type": "string"
+            },
+            "relation_label": {
+              "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
+              "type": "string"
+            },
+            "direction": {
+              "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+              "anyOf": [
+                {
+                  "const": "bidirectional",
+                  "type": "string"
+                },
+                {
+                  "const": "directed",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "confidence": {
+        "minimum": 0,
+        "maximum": 1,
+        "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+        "type": "number"
+      }
+    }
+  },
+  "CompileProgressSchema": {
+    "additionalProperties": false,
+    "description": "编译进度。",
+    "type": "object",
+    "required": [
+      "bookId",
+      "stage",
+      "status",
+      "totalChapters",
+      "completedChapters",
+      "failedChapters",
+      "updatedAt"
+    ],
+    "properties": {
+      "bookId": {
+        "description": "所属书籍 id。",
+        "type": "string"
+      },
+      "stage": {
+        "description": "编译阶段。P1 = 逐章提取；P2 = 每 100 章滚动归并；P3 = 全书收尾。",
+        "anyOf": [
+          {
+            "const": "P1",
+            "type": "string"
+          },
+          {
+            "const": "P2",
+            "type": "string"
+          },
+          {
+            "const": "P3",
+            "type": "string"
+          }
+        ]
+      },
+      "status": {
+        "description": "任务状态，见 ADR-008 的状态机。",
+        "anyOf": [
+          {
+            "const": "idle",
+            "type": "string"
+          },
+          {
+            "const": "running",
+            "type": "string"
+          },
+          {
+            "const": "paused",
+            "type": "string"
+          },
+          {
+            "const": "cancelling",
+            "type": "string"
+          },
+          {
+            "const": "cancelled",
+            "type": "string"
+          },
+          {
+            "const": "failed",
+            "type": "string"
+          },
+          {
+            "const": "completed",
+            "type": "string"
+          }
+        ]
+      },
+      "totalChapters": {
+        "description": "总章节数。",
+        "type": "number"
+      },
+      "completedChapters": {
+        "description": "已完成的章节标识。",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "failedChapters": {
+        "description": "重试后仍失败的章节标识。",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "lastWindowIndex": {
+        "description": "P2 已完成的窗口序号，从 0 开始。",
+        "type": "number"
+      },
+      "planKey": {
+        "description": "窗口配置及编译版本签名；不匹配时重新检查窗口。",
+        "type": "string"
+      },
+      "editorSessionId": {
+        "type": "string"
+      },
+      "testScope": {
+        "description": "临时分阶段测试的已提取章节范围；不代表全书流水线已完成。",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "partialChapters": {
+        "description": "部分提取成功章节尚缺的子步骤；恢复时只重试缺失部分。",
+        "type": "object",
+        "patternProperties": {
+          "^(.*)$": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "const": "worldAssets",
+                  "type": "string"
+                },
+                {
+                  "const": "narrativeAssets",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "updatedAt": {
+        "description": "最后更新时间，ISO 8601 字符串。",
+        "type": "string"
+      }
+    }
+  },
+  "CompileStageSchema": {
+    "description": "编译阶段。P1 = 逐章提取；P2 = 每 100 章滚动归并；P3 = 全书收尾。",
+    "anyOf": [
+      {
+        "const": "P1",
+        "type": "string"
+      },
+      {
+        "const": "P2",
+        "type": "string"
+      },
+      {
+        "const": "P3",
+        "type": "string"
+      }
+    ]
+  },
+  "CompileStatusSchema": {
+    "description": "任务状态，见 ADR-008 的状态机。",
+    "anyOf": [
+      {
+        "const": "idle",
+        "type": "string"
+      },
+      {
+        "const": "running",
+        "type": "string"
+      },
+      {
+        "const": "paused",
+        "type": "string"
+      },
+      {
+        "const": "cancelling",
+        "type": "string"
+      },
+      {
+        "const": "cancelled",
+        "type": "string"
+      },
+      {
+        "const": "failed",
+        "type": "string"
+      },
+      {
+        "const": "completed",
+        "type": "string"
+      }
+    ]
+  },
+  "ConfidenceSchema": {
+    "minimum": 0,
+    "maximum": 1,
+    "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+    "type": "number"
+  },
+  "EditorEvidenceSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "chapterIndex",
+      "quote"
+    ],
+    "properties": {
+      "chapterIndex": {
+        "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+        "type": "string"
+      },
+      "quote": {
+        "minLength": 1,
+        "maxLength": 1000,
+        "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+        "type": "string"
+      }
+    }
+  },
+  "EditorMemoryUpdateSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "workingSummary",
+      "notes"
+    ],
+    "properties": {
+      "workingSummary": {
+        "minLength": 1,
+        "maxLength": 2000,
+        "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
+        "type": "string"
+      },
+      "notes": {
+        "maxItems": 20,
+        "description": "本批新增、修正或已解决的判断与复核事项；无变更用空数组。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "key",
+            "kind",
+            "status",
+            "statement",
+            "nodeIds",
+            "lineIds",
+            "evidence"
+          ],
+          "properties": {
+            "key": {
+              "minLength": 1,
+              "maxLength": 120,
+              "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+              "type": "string"
+            },
+            "kind": {
+              "anyOf": [
+                {
+                  "const": "decision",
+                  "type": "string"
+                },
+                {
+                  "const": "review",
+                  "type": "string"
+                }
+              ]
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "const": "active",
+                  "type": "string"
+                },
+                {
+                  "const": "resolved",
+                  "type": "string"
+                }
+              ]
+            },
+            "statement": {
+              "minLength": 1,
+              "maxLength": 1000,
+              "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+              "type": "string"
+            },
+            "nodeIds": {
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "maxLength": 128,
+                "type": "string"
+              }
+            },
+            "lineIds": {
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "maxLength": 128,
+                "type": "string"
+              }
+            },
+            "evidence": {
+              "maxItems": 5,
+              "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapterIndex",
+                  "quote"
+                ],
+                "properties": {
+                  "chapterIndex": {
+                    "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+                    "type": "string"
+                  },
+                  "quote": {
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "EditorNoteDraftSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "key",
+      "kind",
+      "status",
+      "statement",
+      "nodeIds",
+      "lineIds",
+      "evidence"
+    ],
+    "properties": {
+      "key": {
+        "minLength": 1,
+        "maxLength": 120,
+        "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+        "type": "string"
+      },
+      "kind": {
+        "anyOf": [
+          {
+            "const": "decision",
+            "type": "string"
+          },
+          {
+            "const": "review",
+            "type": "string"
+          }
+        ]
+      },
+      "status": {
+        "anyOf": [
+          {
+            "const": "active",
+            "type": "string"
+          },
+          {
+            "const": "resolved",
+            "type": "string"
+          }
+        ]
+      },
+      "statement": {
+        "minLength": 1,
+        "maxLength": 1000,
+        "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+        "type": "string"
+      },
+      "nodeIds": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "maxLength": 128,
+          "type": "string"
+        }
+      },
+      "lineIds": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "maxLength": 128,
+          "type": "string"
+        }
+      },
+      "evidence": {
+        "maxItems": 5,
+        "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "chapterIndex",
+            "quote"
+          ],
+          "properties": {
+            "chapterIndex": {
+              "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+              "type": "string"
+            },
+            "quote": {
+              "minLength": 1,
+              "maxLength": 1000,
+              "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "EventLineOpAppendSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "op",
+      "line_id",
+      "node_ids",
+      "cause",
+      "process",
+      "result",
+      "line_status"
+    ],
+    "properties": {
+      "op": {
+        "description": "追加到已有的那条事件线",
+        "const": "append",
+        "type": "string"
+      },
+      "line_id": {
+        "description": "已有事件线的 id，例：L05",
+        "type": "string"
+      },
+      "node_ids": {
+        "description": "要追加进来的节点 id",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "cause": {
+        "description": "补充后的起因",
+        "type": "string"
+      },
+      "process": {
+        "description": "补充后的经过",
+        "type": "string"
+      },
+      "result": {
+        "description": "补充后的结果",
+        "type": "string"
+      },
+      "line_status": {
+        "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+        "anyOf": [
+          {
+            "const": "open",
+            "type": "string"
+          },
+          {
+            "const": "closed",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  },
+  "EventLineOpCreateSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "op",
+      "title",
+      "node_ids",
+      "cause",
+      "process",
+      "result",
+      "line_status"
+    ],
+    "properties": {
+      "op": {
+        "description": "新建一条事件线",
+        "const": "create",
+        "type": "string"
+      },
+      "title": {
+        "description": "这条线的名字，例：贾赦父子走私案",
+        "type": "string"
+      },
+      "node_ids": {
+        "description": "这条线包含的节点 id",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "cause": {
+        "description": "起因",
+        "type": "string"
+      },
+      "process": {
+        "description": "经过",
+        "type": "string"
+      },
+      "result": {
+        "description": "结果",
+        "type": "string"
+      },
+      "line_status": {
+        "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+        "anyOf": [
+          {
+            "const": "open",
+            "type": "string"
+          },
+          {
+            "const": "closed",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  },
+  "EventLineOpMergeSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "op",
+      "keep_line_id",
+      "merge_line_ids",
+      "node_ids",
+      "cause",
+      "process",
+      "result",
+      "line_status"
+    ],
+    "properties": {
+      "op": {
+        "const": "merge",
+        "type": "string"
+      },
+      "keep_line_id": {
+        "type": "string"
+      },
+      "merge_line_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "node_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "cause": {
+        "type": "string"
+      },
+      "process": {
+        "type": "string"
+      },
+      "result": {
+        "type": "string"
+      },
+      "line_status": {
+        "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+        "anyOf": [
+          {
+            "const": "open",
+            "type": "string"
+          },
+          {
+            "const": "closed",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  },
+  "EventLineOpSchema": {
+    "anyOf": [
+      {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "line_id",
+          "node_ids",
+          "cause",
+          "process",
+          "result",
+          "line_status"
+        ],
+        "properties": {
+          "op": {
+            "description": "追加到已有的那条事件线",
+            "const": "append",
+            "type": "string"
+          },
+          "line_id": {
+            "description": "已有事件线的 id，例：L05",
+            "type": "string"
+          },
+          "node_ids": {
+            "description": "要追加进来的节点 id",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cause": {
+            "description": "补充后的起因",
+            "type": "string"
+          },
+          "process": {
+            "description": "补充后的经过",
+            "type": "string"
+          },
+          "result": {
+            "description": "补充后的结果",
+            "type": "string"
+          },
+          "line_status": {
+            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+            "anyOf": [
+              {
+                "const": "open",
+                "type": "string"
+              },
+              {
+                "const": "closed",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "title",
+          "node_ids",
+          "cause",
+          "process",
+          "result",
+          "line_status"
+        ],
+        "properties": {
+          "op": {
+            "description": "新建一条事件线",
+            "const": "create",
+            "type": "string"
+          },
+          "title": {
+            "description": "这条线的名字，例：贾赦父子走私案",
+            "type": "string"
+          },
+          "node_ids": {
+            "description": "这条线包含的节点 id",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cause": {
+            "description": "起因",
+            "type": "string"
+          },
+          "process": {
+            "description": "经过",
+            "type": "string"
+          },
+          "result": {
+            "description": "结果",
+            "type": "string"
+          },
+          "line_status": {
+            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+            "anyOf": [
+              {
+                "const": "open",
+                "type": "string"
+              },
+              {
+                "const": "closed",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "line_id",
+          "node_ids",
+          "cause",
+          "process",
+          "result",
+          "line_status"
+        ],
+        "properties": {
+          "op": {
+            "const": "update",
+            "type": "string"
+          },
+          "line_id": {
+            "type": "string"
+          },
+          "node_ids": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cause": {
+            "type": "string"
+          },
+          "process": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "line_status": {
+            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+            "anyOf": [
+              {
+                "const": "open",
+                "type": "string"
+              },
+              {
+                "const": "closed",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "keep_line_id",
+          "merge_line_ids",
+          "node_ids",
+          "cause",
+          "process",
+          "result",
+          "line_status"
+        ],
+        "properties": {
+          "op": {
+            "const": "merge",
+            "type": "string"
+          },
+          "keep_line_id": {
+            "type": "string"
+          },
+          "merge_line_ids": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "node_ids": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cause": {
+            "type": "string"
+          },
+          "process": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          },
+          "line_status": {
+            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+            "anyOf": [
+              {
+                "const": "open",
+                "type": "string"
+              },
+              {
+                "const": "closed",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "EventLineOpUpdateSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "op",
+      "line_id",
+      "node_ids",
+      "cause",
+      "process",
+      "result",
+      "line_status"
+    ],
+    "properties": {
+      "op": {
+        "const": "update",
+        "type": "string"
+      },
+      "line_id": {
+        "type": "string"
+      },
+      "node_ids": {
+        "minItems": 1,
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "cause": {
+        "type": "string"
+      },
+      "process": {
+        "type": "string"
+      },
+      "result": {
+        "type": "string"
+      },
+      "line_status": {
+        "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+        "anyOf": [
+          {
+            "const": "open",
+            "type": "string"
+          },
+          {
+            "const": "closed",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  },
+  "EventLineSchema": {
+    "additionalProperties": false,
+    "description": "事件线（P2/P3 聚合产物）",
+    "type": "object",
+    "required": [
+      "id",
+      "bookId",
+      "title",
+      "nodeIds",
+      "chapters",
+      "cause",
+      "process",
+      "result",
+      "lineStatus",
+      "characterIds",
+      "updatedAt"
+    ],
+    "properties": {
+      "id": {
+        "description": "事件线 id，例：L01",
+        "type": "string"
+      },
+      "bookId": {
+        "description": "所属书籍 id",
+        "type": "string"
+      },
+      "title": {
+        "description": "这条线的名字，例：贾赦父子走私案",
+        "type": "string"
+      },
+      "nodeIds": {
+        "description": "涉及的事件节点 id（多对多）",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "chapters": {
+        "description": "涉及章节（代码生成）",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "timeRange": {
+        "description": "虚构时间区间 [最早, 最晚]（代码生成）",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "cause": {
+        "description": "起因",
+        "type": "string"
+      },
+      "process": {
+        "description": "经过",
+        "type": "string"
+      },
+      "result": {
+        "description": "结果",
+        "type": "string"
+      },
+      "lineStatus": {
+        "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+        "anyOf": [
+          {
+            "const": "open",
+            "type": "string"
+          },
+          {
+            "const": "closed",
+            "type": "string"
+          }
+        ]
+      },
+      "characterIds": {
+        "description": "涉及人物。draft 阶段为空；**入库时由代码**把成员节点的 actors 映射成人物实体 id 后写入。重新入库会整体重算。",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "updatedAt": {
+        "description": "ISO 8601",
+        "type": "string"
+      }
+    }
+  },
+  "LineStatusSchema": {
+    "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+    "anyOf": [
+      {
+        "const": "open",
+        "type": "string"
+      },
+      {
+        "const": "closed",
+        "type": "string"
+      }
+    ]
+  },
+  "LinkEventLinesResultSchema": {
+    "additionalProperties": false,
+    "description": "事件线串联结果。",
+    "type": "object",
+    "required": [
+      "event_line_ops",
+      "new_nodes",
+      "memory_update"
+    ],
+    "properties": {
+      "event_line_ops": {
+        "description": "对事件线的增量操作。空数组表示本批节点没有归属到任何线。",
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "op",
+                "line_id",
+                "node_ids",
+                "cause",
+                "process",
+                "result",
+                "line_status"
+              ],
+              "properties": {
+                "op": {
+                  "description": "追加到已有的那条事件线",
+                  "const": "append",
+                  "type": "string"
+                },
+                "line_id": {
+                  "description": "已有事件线的 id，例：L05",
+                  "type": "string"
+                },
+                "node_ids": {
+                  "description": "要追加进来的节点 id",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cause": {
+                  "description": "补充后的起因",
+                  "type": "string"
+                },
+                "process": {
+                  "description": "补充后的经过",
+                  "type": "string"
+                },
+                "result": {
+                  "description": "补充后的结果",
+                  "type": "string"
+                },
+                "line_status": {
+                  "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                  "anyOf": [
+                    {
+                      "const": "open",
+                      "type": "string"
+                    },
+                    {
+                      "const": "closed",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "op",
+                "title",
+                "node_ids",
+                "cause",
+                "process",
+                "result",
+                "line_status"
+              ],
+              "properties": {
+                "op": {
+                  "description": "新建一条事件线",
+                  "const": "create",
+                  "type": "string"
+                },
+                "title": {
+                  "description": "这条线的名字，例：贾赦父子走私案",
+                  "type": "string"
+                },
+                "node_ids": {
+                  "description": "这条线包含的节点 id",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cause": {
+                  "description": "起因",
+                  "type": "string"
+                },
+                "process": {
+                  "description": "经过",
+                  "type": "string"
+                },
+                "result": {
+                  "description": "结果",
+                  "type": "string"
+                },
+                "line_status": {
+                  "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                  "anyOf": [
+                    {
+                      "const": "open",
+                      "type": "string"
+                    },
+                    {
+                      "const": "closed",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "op",
+                "line_id",
+                "node_ids",
+                "cause",
+                "process",
+                "result",
+                "line_status"
+              ],
+              "properties": {
+                "op": {
+                  "const": "update",
+                  "type": "string"
+                },
+                "line_id": {
+                  "type": "string"
+                },
+                "node_ids": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cause": {
+                  "type": "string"
+                },
+                "process": {
+                  "type": "string"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "line_status": {
+                  "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                  "anyOf": [
+                    {
+                      "const": "open",
+                      "type": "string"
+                    },
+                    {
+                      "const": "closed",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "op",
+                "keep_line_id",
+                "merge_line_ids",
+                "node_ids",
+                "cause",
+                "process",
+                "result",
+                "line_status"
+              ],
+              "properties": {
+                "op": {
+                  "const": "merge",
+                  "type": "string"
+                },
+                "keep_line_id": {
+                  "type": "string"
+                },
+                "merge_line_ids": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "node_ids": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cause": {
+                  "type": "string"
+                },
+                "process": {
+                  "type": "string"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "line_status": {
+                  "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                  "anyOf": [
+                    {
+                      "const": "open",
+                      "type": "string"
+                    },
+                    {
+                      "const": "closed",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "new_nodes": {
+        "description": "补断点时新建的节点。没有就返回空数组。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "description": "有原文依据的补充草稿节点，正式 id 由代码分配。",
+          "type": "object",
+          "required": [
+            "name",
+            "summary",
+            "actors",
+            "quote",
+            "client_id",
+            "chapterIndex"
+          ],
+          "properties": {
+            "name": {
+              "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+              "type": "string"
+            },
+            "summary": {
+              "description": "事件概述，一到两句。",
+              "type": "string"
+            },
+            "process": {
+              "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+              "type": "string"
+            },
+            "actors": {
+              "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "targets": {
+              "description": "对象 / 承受者。例：[\"王熙凤\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "world_delta": {
+              "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "new_facts": {
+              "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "started_actions": {
+              "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "time_text": {
+              "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+              "type": "string"
+            },
+            "time_hint": {
+              "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+              "type": "string"
+            },
+            "quote": {
+              "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+              "type": "string"
+            },
+            "offset": {
+              "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+              "type": "number"
+            },
+            "client_id": {
+              "description": "本次输出内的临时节点编号；操作中的 node_ids 可引用它。",
+              "type": "string"
+            },
+            "chapterIndex": {
+              "description": "原文所在的章节标识，必须真实存在。",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "memory_update": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "workingSummary",
+          "notes"
+        ],
+        "properties": {
+          "workingSummary": {
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
+            "type": "string"
+          },
+          "notes": {
+            "maxItems": 20,
+            "description": "本批新增、修正或已解决的判断与复核事项；无变更用空数组。",
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "key",
+                "kind",
+                "status",
+                "statement",
+                "nodeIds",
+                "lineIds",
+                "evidence"
+              ],
+              "properties": {
+                "key": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                  "type": "string"
+                },
+                "kind": {
+                  "anyOf": [
+                    {
+                      "const": "decision",
+                      "type": "string"
+                    },
+                    {
+                      "const": "review",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "const": "active",
+                      "type": "string"
+                    },
+                    {
+                      "const": "resolved",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "statement": {
+                  "minLength": 1,
+                  "maxLength": 1000,
+                  "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+                  "type": "string"
+                },
+                "nodeIds": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string"
+                  }
+                },
+                "lineIds": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string"
+                  }
+                },
+                "evidence": {
+                  "maxItems": 5,
+                  "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "chapterIndex",
+                      "quote"
+                    ],
+                    "properties": {
+                      "chapterIndex": {
+                        "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+                        "type": "string"
+                      },
+                      "quote": {
+                        "minLength": 1,
+                        "maxLength": 1000,
+                        "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "LocationSnapshotSchema": {
+    "additionalProperties": false,
+    "description": "地点快照（P1 产出，未合并）。",
+    "type": "object",
+    "required": [
+      "name",
+      "confidence"
+    ],
+    "properties": {
+      "name": {
+        "description": "地点名称，用原文的叫法。例：荣国府 / 县一中。",
+        "type": "string"
+      },
+      "description": {
+        "description": "一句话描述。原文没写就留空。",
+        "type": "string"
+      },
+      "confidence": {
+        "minimum": 0,
+        "maximum": 1,
+        "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+        "type": "number"
+      }
+    }
+  },
+  "MergeMetadataSchema": {
+    "type": "object",
+    "properties": {
+      "frequency": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chapters",
+          "mentions",
+          "scopeChapters",
+          "percentile"
+        ],
+        "properties": {
+          "chapters": {
+            "type": "integer"
+          },
+          "mentions": {
+            "type": "integer"
+          },
+          "scopeChapters": {
+            "type": "integer"
+          },
+          "percentile": {
+            "type": "number"
+          }
+        }
+      },
+      "sourceChapters": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "mergeNotes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "MergedEntitySchema": {
+    "additionalProperties": false,
+    "description": "AI 字段级融合结果。",
+    "type": "object",
+    "required": [
+      "entity",
+      "merge_notes"
+    ],
+    "properties": {
+      "entity": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "aliases",
+          "roleWeight",
+          "relations"
+        ],
+        "properties": {
+          "name": {
+            "description": "融合后的主名",
+            "type": "string"
+          },
+          "aliases": {
+            "description": "所有已知称呼（不含主名）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "roleWeight": {
+            "description": "人物层级。判定依据：① 剧情推动能力（有没有主动制造事件）② 因果影响范围 ③ 是否拥有自己的事件线 ④ 移除测试（删掉他，哪些重要事件会无法发生）",
+            "anyOf": [
+              {
+                "const": "主要人物",
+                "type": "string"
+              },
+              {
+                "const": "重要配角",
+                "type": "string"
+              },
+              {
+                "const": "NPC",
+                "type": "string"
+              },
+              {
+                "const": "路人",
+                "type": "string"
+              }
+            ]
+          },
+          "identity": {
+            "description": "身份 / 职务 / 归属",
+            "type": "string"
+          },
+          "profile": {
+            "additionalProperties": false,
+            "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+            "type": "object",
+            "properties": {
+              "age": {
+                "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
+                "type": "number"
+              },
+              "ageText": {
+                "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+                "type": "string"
+              },
+              "gender": {
+                "description": "原文写明的性别，不知道则省略或填 null。",
+                "type": "string"
+              }
+            }
+          },
+          "appearance": {
+            "description": "外貌",
+            "type": "string"
+          },
+          "personality": {
+            "description": "性格。多条用「；」分隔。**不得遗漏任何快照里的独有信息**",
+            "type": "string"
+          },
+          "background": {
+            "description": "背景 / 来历",
+            "type": "string"
+          },
+          "speechStyleSample": {
+            "description": "原话片段（直接摘录，用于学这个人的说话味道）",
+            "type": "string"
+          },
+          "relations": {
+            "description": "融合后的关系列表",
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "target",
+                "relationType"
+              ],
+              "properties": {
+                "target": {
+                  "description": "关系指向的人，用原文称呼",
+                  "type": "string"
+                },
+                "relationType": {
+                  "description": "英文类型标记",
+                  "type": "string"
+                },
+                "relationLabel": {
+                  "description": "中文说法",
+                  "type": "string"
+                },
+                "direction": {
+                  "anyOf": [
+                    {
+                      "const": "bidirectional",
+                      "type": "string"
+                    },
+                    {
+                      "const": "directed",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "merge_notes": {
+        "description": "记录**无法融合的矛盾**（原文本身就冲突，或两次抽取结果冲突）。例：「C037 写瘦削，C041 写富态，已保留两说」。没有矛盾就返回空数组。",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "MergedLocationSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "entity",
+      "merge_notes"
+    ],
+    "properties": {
+      "entity": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "aliases"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "merge_notes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "NarrativeAssetsExtractionSchema": {
+    "additionalProperties": false,
+    "description": "P1-B：叙事资产提取结果。",
+    "type": "object",
+    "required": [
+      "nodes"
+    ],
+    "properties": {
+      "nodes": {
+        "description": "本章相对完整的独立事件；同一目标下的连续行动合成一个节点，过程细节写 process。普通章节约 2～5 条供参考，复杂章节不设硬上限。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "description": "事件节点（P1 产出，未归类到事件线）。",
+          "type": "object",
+          "required": [
+            "name",
+            "summary",
+            "actors",
+            "quote",
+            "confidence"
+          ],
+          "properties": {
+            "name": {
+              "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+              "type": "string"
+            },
+            "summary": {
+              "description": "事件概述，一到两句。",
+              "type": "string"
+            },
+            "process": {
+              "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+              "type": "string"
+            },
+            "actors": {
+              "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "targets": {
+              "description": "对象 / 承受者。例：[\"王熙凤\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "world_delta": {
+              "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "new_facts": {
+              "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "started_actions": {
+              "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "time_text": {
+              "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+              "type": "string"
+            },
+            "time_hint": {
+              "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+              "type": "string"
+            },
+            "quote": {
+              "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+              "type": "string"
+            },
+            "offset": {
+              "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+              "type": "number"
+            },
+            "confidence": {
+              "minimum": 0,
+              "maximum": 1,
+              "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  },
+  "NativeMessageSchema": {
+    "additionalProperties": true,
+    "type": "object",
+    "required": [
+      "role"
+    ],
+    "properties": {
+      "role": {
+        "anyOf": [
+          {
+            "const": "system",
+            "type": "string"
+          },
+          {
+            "const": "user",
+            "type": "string"
+          },
+          {
+            "const": "assistant",
+            "type": "string"
+          },
+          {
+            "const": "toolResult",
+            "type": "string"
+          }
+        ]
+      },
+      "content": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "array",
+            "items": {}
+          }
+        ]
+      },
+      "timestamp": {
+        "type": "number"
+      }
+    }
+  },
+  "NewNodeDraftSchema": {
+    "additionalProperties": false,
+    "description": "有原文依据的补充草稿节点，正式 id 由代码分配。",
+    "type": "object",
+    "required": [
+      "name",
+      "summary",
+      "actors",
+      "quote",
+      "client_id",
+      "chapterIndex"
+    ],
+    "properties": {
+      "name": {
+        "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+        "type": "string"
+      },
+      "summary": {
+        "description": "事件概述，一到两句。",
+        "type": "string"
+      },
+      "process": {
+        "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+        "type": "string"
+      },
+      "actors": {
+        "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "targets": {
+        "description": "对象 / 承受者。例：[\"王熙凤\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "world_delta": {
+        "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "new_facts": {
+        "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "started_actions": {
+        "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "time_text": {
+        "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+        "type": "string"
+      },
+      "time_hint": {
+        "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+        "type": "string"
+      },
+      "quote": {
+        "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+        "type": "string"
+      },
+      "offset": {
+        "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+        "type": "number"
+      },
+      "client_id": {
+        "description": "本次输出内的临时节点编号；操作中的 node_ids 可引用它。",
+        "type": "string"
+      },
+      "chapterIndex": {
+        "description": "原文所在的章节标识，必须真实存在。",
+        "type": "string"
+      }
+    }
+  },
+  "NodeSchema": {
+    "additionalProperties": false,
+    "description": "事件节点（P1 产出，未归类到事件线）。",
+    "type": "object",
+    "required": [
+      "name",
+      "summary",
+      "actors",
+      "quote",
+      "confidence"
+    ],
+    "properties": {
+      "name": {
+        "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+        "type": "string"
+      },
+      "summary": {
+        "description": "事件概述，一到两句。",
+        "type": "string"
+      },
+      "process": {
+        "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+        "type": "string"
+      },
+      "actors": {
+        "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "targets": {
+        "description": "对象 / 承受者。例：[\"王熙凤\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "world_delta": {
+        "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "new_facts": {
+        "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "started_actions": {
+        "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "time_text": {
+        "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+        "type": "string"
+      },
+      "time_hint": {
+        "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+        "type": "string"
+      },
+      "quote": {
+        "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+        "type": "string"
+      },
+      "offset": {
+        "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+        "type": "number"
+      },
+      "confidence": {
+        "minimum": 0,
+        "maximum": 1,
+        "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+        "type": "number"
+      }
+    }
+  },
+  "OptimizedCharacterSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "id",
+      "entity",
+      "covered_fact_ids",
+      "merge_notes"
+    ],
+    "properties": {
+      "id": {
+        "description": "输入的人物 ID，原样返回，不能新增。",
+        "type": "string"
+      },
+      "entity": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "aliases"
+        ],
+        "properties": {
+          "name": {
+            "description": "融合后的主名",
+            "type": "string"
+          },
+          "aliases": {
+            "description": "所有已知称呼（不含主名）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "identity": {
+            "description": "身份 / 职务 / 归属",
+            "type": "string"
+          },
+          "appearance": {
+            "description": "外貌",
+            "type": "string"
+          },
+          "personality": {
+            "description": "性格。多条用「；」分隔。**不得遗漏任何快照里的独有信息**",
+            "type": "string"
+          },
+          "background": {
+            "description": "背景 / 来历",
+            "type": "string"
+          }
+        }
+      },
+      "covered_fact_ids": {
+        "description": "本次输入 facts 中已完整保留的信息 ID，不能漏掉或新增。",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "merge_notes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "RelationDirectionSchema": {
+    "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+    "anyOf": [
+      {
+        "const": "bidirectional",
+        "type": "string"
+      },
+      {
+        "const": "directed",
+        "type": "string"
+      }
+    ]
+  },
+  "RelationSchema": {
+    "additionalProperties": false,
+    "description": "一条人物关系。",
+    "type": "object",
+    "required": [
+      "target",
+      "relation_type"
+    ],
+    "properties": {
+      "target": {
+        "description": "关系指向的人。用本章原文的称呼，还没归并。",
+        "type": "string"
+      },
+      "relation_type": {
+        "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
+        "type": "string"
+      },
+      "relation_label": {
+        "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
+        "type": "string"
+      },
+      "direction": {
+        "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+        "anyOf": [
+          {
+            "const": "bidirectional",
+            "type": "string"
+          },
+          {
+            "const": "directed",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  },
+  "RoleWeightSchema": {
+    "description": "出场频次分位数计算的默认层级，可由用户手动覆盖。",
+    "anyOf": [
+      {
+        "const": "主要人物",
+        "type": "string"
+      },
+      {
+        "const": "重要配角",
+        "type": "string"
+      },
+      {
+        "const": "NPC",
+        "type": "string"
+      },
+      {
+        "const": "路人",
+        "type": "string"
+      }
+    ]
+  },
+  "SessionCompactionResultSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "summary"
+    ],
+    "properties": {
+      "summary": {
+        "minLength": 1,
+        "maxLength": 64000,
+        "type": "string"
+      }
+    }
+  },
+  "StoredCharacterSnapshotSchema": {
+    "description": "已落库的人物快照。",
+    "type": "object",
+    "required": [
+      "name",
+      "confidence",
+      "id",
+      "bookId",
+      "chapterIndex",
+      "chapterName"
+    ],
+    "properties": {
+      "name": {
+        "description": "本章主要使用的称呼。可能是别名，例：琏二爷。",
+        "type": "string"
+      },
+      "aliases_mentioned": {
+        "description": "本章出现过的其他称呼，用于后续归并同一个人。例：[\"琏二哥哥\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "identity": {
+        "description": "身份 / 职务 / 归属。例：荣国府长孙。原文没写就留空。",
+        "type": "string"
+      },
+      "profile": {
+        "additionalProperties": false,
+        "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+        "type": "object",
+        "properties": {
+          "age": {
+            "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
+            "type": "number"
+          },
+          "ageText": {
+            "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+            "type": "string"
+          },
+          "gender": {
+            "description": "原文写明的性别，不知道则省略或填 null。",
+            "type": "string"
+          }
+        }
+      },
+      "appearance": {
+        "description": "外貌。**仅当原文写到**，不要推断。",
+        "type": "string"
+      },
+      "personality": {
+        "description": "性格。**必须能从原文找到依据**，不要凭印象概括。多条用「；」分隔。",
+        "type": "string"
+      },
+      "background": {
+        "description": "背景 / 来历。仅当原文写到。",
+        "type": "string"
+      },
+      "speech_style_sample": {
+        "description": "本章这个人的**原话片段**（直接摘录），用于后续学习他的说话味道。",
+        "type": "string"
+      },
+      "relations": {
+        "description": "本章观察到的关系。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "description": "一条人物关系。",
+          "type": "object",
+          "required": [
+            "target",
+            "relation_type"
+          ],
+          "properties": {
+            "target": {
+              "description": "关系指向的人。用本章原文的称呼，还没归并。",
+              "type": "string"
+            },
+            "relation_type": {
+              "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
+              "type": "string"
+            },
+            "relation_label": {
+              "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
+              "type": "string"
+            },
+            "direction": {
+              "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+              "anyOf": [
+                {
+                  "const": "bidirectional",
+                  "type": "string"
+                },
+                {
+                  "const": "directed",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "confidence": {
+        "minimum": 0,
+        "maximum": 1,
+        "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+        "type": "number"
+      },
+      "frequency": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chapters",
+          "mentions",
+          "scopeChapters",
+          "percentile"
+        ],
+        "properties": {
+          "chapters": {
+            "type": "integer"
+          },
+          "mentions": {
+            "type": "integer"
+          },
+          "scopeChapters": {
+            "type": "integer"
+          },
+          "percentile": {
+            "type": "number"
+          }
+        }
+      },
+      "sourceChapters": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "mergeNotes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "mergeFacts": {
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "id",
+            "field",
+            "text",
+            "chapters"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "field": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "chapters": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "optimizedFactIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "optimizationFingerprint": {
+        "type": "string"
+      },
+      "roleWeightSource": {
+        "anyOf": [
+          {
+            "const": "frequency",
+            "type": "string"
+          },
+          {
+            "const": "manual",
+            "type": "string"
+          }
+        ]
+      },
+      "id": {
+        "description": "代码分配的快照 id。格式 C{章号}-P{3 位序号}，例：C037-P003",
+        "type": "string"
+      },
+      "bookId": {
+        "description": "所属书籍 id。",
+        "type": "string"
+      },
+      "chapterIndex": {
+        "description": "章节标识。字符串以支持切块，例：\"37\" 或 \"101.1\"。",
+        "type": "string"
+      },
+      "chapterName": {
+        "description": "导入预处理后的章节名。",
+        "type": "string"
+      },
+      "aliases": {
+        "description": "合并后的别名列表。例：[\"琏二爷\", \"琏二哥哥\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "roleWeight": {
+        "description": "出场频次分位数计算的默认层级，可由用户手动覆盖。",
+        "anyOf": [
+          {
+            "const": "主要人物",
+            "type": "string"
+          },
+          {
+            "const": "重要配角",
+            "type": "string"
+          },
+          {
+            "const": "NPC",
+            "type": "string"
+          },
+          {
+            "const": "路人",
+            "type": "string"
+          }
+        ]
+      },
+      "updatedAt": {
+        "description": "最后一次编辑时间",
+        "type": "string"
+      }
+    }
+  },
+  "StoredLocationSchema": {
+    "description": "已入库的地点实体。",
+    "type": "object",
+    "required": [
+      "name",
+      "confidence",
+      "id",
+      "bookId"
+    ],
+    "properties": {
+      "name": {
+        "description": "地点名称，用原文的叫法。例：荣国府 / 县一中。",
+        "type": "string"
+      },
+      "description": {
+        "description": "一句话描述。原文没写就留空。",
+        "type": "string"
+      },
+      "confidence": {
+        "minimum": 0,
+        "maximum": 1,
+        "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+        "type": "number"
+      },
+      "id": {
+        "description": "入库时重新编码的 id。例：L001",
+        "type": "string"
+      },
+      "aliases": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "bookId": {
+        "description": "所属书籍 id。",
+        "type": "string"
+      },
+      "chapterIndex": {
+        "description": "最早出现的章节（合并后的那条保留的信息）",
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    }
+  },
+  "StoredLocationSnapshotSchema": {
+    "description": "已落库的地点快照。",
+    "type": "object",
+    "required": [
+      "name",
+      "confidence",
+      "id",
+      "bookId",
+      "chapterIndex",
+      "chapterName"
+    ],
+    "properties": {
+      "name": {
+        "description": "地点名称，用原文的叫法。例：荣国府 / 县一中。",
+        "type": "string"
+      },
+      "description": {
+        "description": "一句话描述。原文没写就留空。",
+        "type": "string"
+      },
+      "confidence": {
+        "minimum": 0,
+        "maximum": 1,
+        "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+        "type": "number"
+      },
+      "frequency": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "chapters",
+          "mentions",
+          "scopeChapters",
+          "percentile"
+        ],
+        "properties": {
+          "chapters": {
+            "type": "integer"
+          },
+          "mentions": {
+            "type": "integer"
+          },
+          "scopeChapters": {
+            "type": "integer"
+          },
+          "percentile": {
+            "type": "number"
+          }
+        }
+      },
+      "sourceChapters": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "mergeNotes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "aliases": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "id": {
+        "description": "代码分配的 id。格式 C{章号}-L{章内序号}，例：C37-L002",
+        "type": "string"
+      },
+      "bookId": {
+        "description": "所属书籍 id。分库后冗余，保留便于导出与调试。",
+        "type": "string"
+      },
+      "chapterIndex": {
+        "description": "章节标识。",
+        "type": "string"
+      },
+      "chapterName": {
+        "description": "章节名。",
+        "type": "string"
+      },
+      "updatedAt": {
+        "description": "最后一次编辑时间（合并或人工修改过）",
+        "type": "string"
+      }
+    }
+  },
+  "StoredNodeSchema": {
+    "description": "已落库的事件节点。",
+    "type": "object",
+    "required": [
+      "name",
+      "summary",
+      "actors",
+      "quote",
+      "confidence",
+      "id",
+      "bookId",
+      "chapterIndex",
+      "chapterName",
+      "order"
+    ],
+    "properties": {
+      "name": {
+        "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+        "type": "string"
+      },
+      "summary": {
+        "description": "事件概述，一到两句。",
+        "type": "string"
+      },
+      "process": {
+        "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+        "type": "string"
+      },
+      "actors": {
+        "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "targets": {
+        "description": "对象 / 承受者。例：[\"王熙凤\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "world_delta": {
+        "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "new_facts": {
+        "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "started_actions": {
+        "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "time_text": {
+        "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+        "type": "string"
+      },
+      "time_hint": {
+        "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+        "type": "string"
+      },
+      "quote": {
+        "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+        "type": "string"
+      },
+      "offset": {
+        "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+        "type": "number"
+      },
+      "confidence": {
+        "minimum": 0,
+        "maximum": 1,
+        "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+        "type": "number"
+      },
+      "id": {
+        "description": "代码分配的节点 id。格式 C{章号}-N{3 位序号}，例：C037-N002",
+        "type": "string"
+      },
+      "bookId": {
+        "description": "所属书籍 id。",
+        "type": "string"
+      },
+      "chapterIndex": {
+        "description": "章节标识。",
+        "type": "string"
+      },
+      "chapterName": {
+        "description": "章节名。",
+        "type": "string"
+      },
+      "order": {
+        "description": "本章内的顺序，从 0 开始。用于按出现顺序展示与排序（比按 id 排序可靠）。",
+        "type": "number"
+      },
+      "createdBy": {
+        "description": "节点来源。P1 = 章节提取；P2 = 聚合时补建。",
+        "anyOf": [
+          {
+            "const": "P1",
+            "type": "string"
+          },
+          {
+            "const": "P2",
+            "type": "string"
+          },
+          {
+            "const": "P3",
+            "type": "string"
+          }
+        ]
+      },
+      "eventLineIds": {
+        "description": "所属事件线 id。多对多，聚合后才有。",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "actorIds": {
+        "description": "入库时由代码把 actors（人名）映射成的人物实体 id。draft 阶段为空；重新入库会整体重算。",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "timeCoord": {
+        "description": "虚构时间坐标。由 P2 推断，P1 阶段为空。例：\"003-02-15 08:00\"",
+        "type": "string"
+      },
+      "timePrecision": {
+        "description": "时间精度。explicit = 原文直接写的；inferred_hour = 推断到小时；inferred_day = 只能推到天；order_only = 只能定先后。",
+        "anyOf": [
+          {
+            "const": "explicit",
+            "type": "string"
+          },
+          {
+            "const": "inferred_hour",
+            "type": "string"
+          },
+          {
+            "const": "inferred_day",
+            "type": "string"
+          },
+          {
+            "const": "order_only",
+            "type": "string"
+          }
+        ]
+      },
+      "canonicalId": {
+        "description": "若本节点被判定与另一节点重复，指向主节点 id。",
+        "type": "string"
+      }
+    }
+  },
+  "StoryEditorCheckpointSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "id",
+      "bookId",
+      "stage",
+      "phase",
+      "scopeIds",
+      "sourceFingerprint",
+      "status",
+      "memberships",
+      "updatedAt"
+    ],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "bookId": {
+        "type": "string"
+      },
+      "stage": {
+        "anyOf": [
+          {
+            "const": "P2",
+            "type": "string"
+          },
+          {
+            "const": "P3",
+            "type": "string"
+          }
+        ]
+      },
+      "sessionId": {
+        "type": "string"
+      },
+      "phase": {
+        "anyOf": [
+          {
+            "const": "link",
+            "type": "string"
+          },
+          {
+            "const": "review",
+            "type": "string"
+          }
+        ]
+      },
+      "scopeIds": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "sourceFingerprint": {
+        "type": "string"
+      },
+      "status": {
+        "anyOf": [
+          {
+            "const": "completed",
+            "type": "string"
+          },
+          {
+            "const": "failed",
+            "type": "string"
+          },
+          {
+            "const": "cancelled",
+            "type": "string"
+          }
+        ]
+      },
+      "memberships": {
+        "type": "object",
+        "patternProperties": {
+          "^(.*)$": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    }
+  },
+  "StoryEditorMemorySchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "id",
+      "bookId",
+      "revision",
+      "workingSummary",
+      "dataFingerprint",
+      "updatedAt"
+    ],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "bookId": {
+        "type": "string"
+      },
+      "sessionId": {
+        "type": "string"
+      },
+      "revision": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "workingSummary": {
+        "maxLength": 2000,
+        "type": "string"
+      },
+      "dataFingerprint": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    }
+  },
+  "StoryEditorNoteSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "key",
+      "kind",
+      "status",
+      "statement",
+      "nodeIds",
+      "lineIds",
+      "evidence",
+      "id",
+      "bookId",
+      "revision",
+      "stage",
+      "basisFingerprint",
+      "createdAt",
+      "updatedAt"
+    ],
+    "properties": {
+      "key": {
+        "minLength": 1,
+        "maxLength": 120,
+        "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+        "type": "string"
+      },
+      "kind": {
+        "anyOf": [
+          {
+            "const": "decision",
+            "type": "string"
+          },
+          {
+            "const": "review",
+            "type": "string"
+          }
+        ]
+      },
+      "status": {
+        "anyOf": [
+          {
+            "const": "active",
+            "type": "string"
+          },
+          {
+            "const": "resolved",
+            "type": "string"
+          }
+        ]
+      },
+      "statement": {
+        "minLength": 1,
+        "maxLength": 1000,
+        "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+        "type": "string"
+      },
+      "nodeIds": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "maxLength": 128,
+          "type": "string"
+        }
+      },
+      "lineIds": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "maxLength": 128,
+          "type": "string"
+        }
+      },
+      "evidence": {
+        "maxItems": 5,
+        "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "chapterIndex",
+            "quote"
+          ],
+          "properties": {
+            "chapterIndex": {
+              "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+              "type": "string"
+            },
+            "quote": {
+              "minLength": 1,
+              "maxLength": 1000,
+              "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "id": {
+        "type": "string"
+      },
+      "bookId": {
+        "type": "string"
+      },
+      "revision": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "sessionId": {
+        "type": "string"
+      },
+      "stage": {
+        "anyOf": [
+          {
+            "const": "P2",
+            "type": "string"
+          },
+          {
+            "const": "P3",
+            "type": "string"
+          }
+        ]
+      },
+      "basisFingerprint": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      }
+    }
+  },
+  "StoryEditorNoteViewSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "key",
+      "kind",
+      "status",
+      "statement",
+      "nodeIds",
+      "lineIds",
+      "evidence",
+      "id",
+      "bookId",
+      "revision",
+      "stage",
+      "basisFingerprint",
+      "createdAt",
+      "updatedAt",
+      "validity"
+    ],
+    "properties": {
+      "key": {
+        "minLength": 1,
+        "maxLength": 120,
+        "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+        "type": "string"
+      },
+      "kind": {
+        "anyOf": [
+          {
+            "const": "decision",
+            "type": "string"
+          },
+          {
+            "const": "review",
+            "type": "string"
+          }
+        ]
+      },
+      "status": {
+        "anyOf": [
+          {
+            "const": "active",
+            "type": "string"
+          },
+          {
+            "const": "resolved",
+            "type": "string"
+          }
+        ]
+      },
+      "statement": {
+        "minLength": 1,
+        "maxLength": 1000,
+        "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+        "type": "string"
+      },
+      "nodeIds": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "maxLength": 128,
+          "type": "string"
+        }
+      },
+      "lineIds": {
+        "maxItems": 20,
+        "type": "array",
+        "items": {
+          "maxLength": 128,
+          "type": "string"
+        }
+      },
+      "evidence": {
+        "maxItems": 5,
+        "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "chapterIndex",
+            "quote"
+          ],
+          "properties": {
+            "chapterIndex": {
+              "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+              "type": "string"
+            },
+            "quote": {
+              "minLength": 1,
+              "maxLength": 1000,
+              "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+              "type": "string"
+            }
+          }
+        }
+      },
+      "id": {
+        "type": "string"
+      },
+      "bookId": {
+        "type": "string"
+      },
+      "revision": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "sessionId": {
+        "type": "string"
+      },
+      "stage": {
+        "anyOf": [
+          {
+            "const": "P2",
+            "type": "string"
+          },
+          {
+            "const": "P3",
+            "type": "string"
+          }
+        ]
+      },
+      "basisFingerprint": {
+        "type": "string"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      },
+      "validity": {
+        "anyOf": [
+          {
+            "const": "current",
+            "type": "string"
+          },
+          {
+            "const": "stale",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  },
+  "StorySessionEntrySchema": {
+    "description": "追加式 PI 会话记录；压缩不删除原始消息。",
+    "anyOf": [
+      {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "sessionId",
+          "bookId",
+          "ordinal",
+          "parentId",
+          "createdAt",
+          "type",
+          "message"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "ordinal": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "type": {
+            "const": "message",
+            "type": "string"
+          },
+          "message": {
+            "additionalProperties": true,
+            "type": "object",
+            "required": [
+              "role"
+            ],
+            "properties": {
+              "role": {
+                "anyOf": [
+                  {
+                    "const": "system",
+                    "type": "string"
+                  },
+                  {
+                    "const": "user",
+                    "type": "string"
+                  },
+                  {
+                    "const": "assistant",
+                    "type": "string"
+                  },
+                  {
+                    "const": "toolResult",
+                    "type": "string"
+                  }
+                ]
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {}
+                  }
+                ]
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "sessionId",
+          "bookId",
+          "ordinal",
+          "parentId",
+          "createdAt",
+          "type",
+          "summary",
+          "firstKeptEntryId",
+          "tokensBefore",
+          "tokensAfter"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "ordinal": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "type": {
+            "const": "compaction",
+            "type": "string"
+          },
+          "summary": {
+            "minLength": 1,
+            "maxLength": 64000,
+            "type": "string"
+          },
+          "firstKeptEntryId": {
+            "type": "string"
+          },
+          "tokensBefore": {
+            "type": "number"
+          },
+          "tokensAfter": {
+            "type": "number"
+          },
+          "systemMessage": {
+            "additionalProperties": true,
+            "type": "object",
+            "required": [
+              "role"
+            ],
+            "properties": {
+              "role": {
+                "anyOf": [
+                  {
+                    "const": "system",
+                    "type": "string"
+                  },
+                  {
+                    "const": "user",
+                    "type": "string"
+                  },
+                  {
+                    "const": "assistant",
+                    "type": "string"
+                  },
+                  {
+                    "const": "toolResult",
+                    "type": "string"
+                  }
+                ]
+              },
+              "content": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "array",
+                    "items": {}
+                  }
+                ]
+              },
+              "timestamp": {
+                "type": "number"
+              }
+            }
+          },
+          "usage": {
+            "type": "object",
+            "required": [
+              "input",
+              "output",
+              "totalTokens",
+              "cost"
+            ],
+            "properties": {
+              "input": {
+                "type": "number"
+              },
+              "output": {
+                "type": "number"
+              },
+              "totalTokens": {
+                "type": "number"
+              },
+              "cost": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "sessionId",
+          "bookId",
+          "ordinal",
+          "parentId",
+          "createdAt",
+          "type",
+          "omittedEntryIds",
+          "reason"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "ordinal": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "type": {
+            "const": "omit",
+            "type": "string"
+          },
+          "omittedEntryIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "sessionId",
+          "bookId",
+          "ordinal",
+          "parentId",
+          "createdAt",
+          "type",
+          "summary"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "ordinal": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "type": {
+            "const": "commit",
+            "type": "string"
+          },
+          "summary": {
+            "maxLength": 2000,
+            "type": "string"
+          }
+        }
+      }
+    ]
+  },
+  "StorySessionSchema": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "id",
+      "bookId",
+      "profile",
+      "kind",
+      "title",
+      "status",
+      "nextOrdinal",
+      "createdAt",
+      "updatedAt"
+    ],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "bookId": {
+        "type": "string"
+      },
+      "profile": {
+        "const": "story_editor",
+        "type": "string"
+      },
+      "kind": {
+        "anyOf": [
+          {
+            "const": "initial",
+            "type": "string"
+          },
+          {
+            "const": "review",
+            "type": "string"
+          }
+        ]
+      },
+      "title": {
+        "type": "string"
+      },
+      "status": {
+        "anyOf": [
+          {
+            "const": "active",
+            "type": "string"
+          },
+          {
+            "const": "archived",
+            "type": "string"
+          }
+        ]
+      },
+      "parentSessionId": {
+        "type": "string"
+      },
+      "leafId": {
+        "type": "string"
+      },
+      "nextOrdinal": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "createdAt": {
+        "type": "string"
+      },
+      "updatedAt": {
+        "type": "string"
+      },
+      "leaseOwner": {
+        "type": "string"
+      },
+      "leaseUntil": {
+        "type": "number"
+      }
+    }
+  },
+  "TimePrecisionSchema": {
+    "description": "时间精度。explicit = 原文直接写的；inferred_hour = 推断到小时；inferred_day = 只能推到天；order_only = 只能定先后。",
+    "anyOf": [
+      {
+        "const": "explicit",
+        "type": "string"
+      },
+      {
+        "const": "inferred_hour",
+        "type": "string"
+      },
+      {
+        "const": "inferred_day",
+        "type": "string"
+      },
+      {
+        "const": "order_only",
+        "type": "string"
+      }
+    ]
+  },
+  "WorldAssetsExtractionSchema": {
+    "additionalProperties": false,
+    "description": "P1-A：世界资产提取结果。",
+    "type": "object",
+    "required": [
+      "characters",
+      "locations"
+    ],
+    "properties": {
+      "characters": {
+        "description": "本章出现的人物快照。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "description": "人物快照（P1 产出，未归并、未分层的原始观察）。",
+          "type": "object",
+          "required": [
+            "name",
+            "confidence"
+          ],
+          "properties": {
+            "name": {
+              "description": "本章主要使用的称呼。可能是别名，例：琏二爷。",
+              "type": "string"
+            },
+            "aliases_mentioned": {
+              "description": "本章出现过的其他称呼，用于后续归并同一个人。例：[\"琏二哥哥\"]",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "identity": {
+              "description": "身份 / 职务 / 归属。例：荣国府长孙。原文没写就留空。",
+              "type": "string"
+            },
+            "profile": {
+              "additionalProperties": false,
+              "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+              "type": "object",
+              "properties": {
+                "age": {
+                  "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
+                  "type": "number"
+                },
+                "ageText": {
+                  "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+                  "type": "string"
+                },
+                "gender": {
+                  "description": "原文写明的性别，不知道则省略或填 null。",
+                  "type": "string"
+                }
+              }
+            },
+            "appearance": {
+              "description": "外貌。**仅当原文写到**，不要推断。",
+              "type": "string"
+            },
+            "personality": {
+              "description": "性格。**必须能从原文找到依据**，不要凭印象概括。多条用「；」分隔。",
+              "type": "string"
+            },
+            "background": {
+              "description": "背景 / 来历。仅当原文写到。",
+              "type": "string"
+            },
+            "speech_style_sample": {
+              "description": "本章这个人的**原话片段**（直接摘录），用于后续学习他的说话味道。",
+              "type": "string"
+            },
+            "relations": {
+              "description": "本章观察到的关系。",
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "description": "一条人物关系。",
+                "type": "object",
+                "required": [
+                  "target",
+                  "relation_type"
+                ],
+                "properties": {
+                  "target": {
+                    "description": "关系指向的人。用本章原文的称呼，还没归并。",
+                    "type": "string"
+                  },
+                  "relation_type": {
+                    "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
+                    "type": "string"
+                  },
+                  "relation_label": {
+                    "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
+                    "type": "string"
+                  },
+                  "direction": {
+                    "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+                    "anyOf": [
+                      {
+                        "const": "bidirectional",
+                        "type": "string"
+                      },
+                      {
+                        "const": "directed",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "confidence": {
+              "minimum": 0,
+              "maximum": 1,
+              "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+              "type": "number"
+            }
+          }
+        }
+      },
+      "locations": {
+        "description": "本章出现的地点。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "description": "地点快照（P1 产出，未合并）。",
+          "type": "object",
+          "required": [
+            "name",
+            "confidence"
+          ],
+          "properties": {
+            "name": {
+              "description": "地点名称，用原文的叫法。例：荣国府 / 县一中。",
+              "type": "string"
+            },
+            "description": {
+              "description": "一句话描述。原文没写就留空。",
+              "type": "string"
+            },
+            "confidence": {
+              "minimum": 0,
+              "maximum": 1,
+              "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  }
+}

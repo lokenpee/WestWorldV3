@@ -1,0 +1,67 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+
+# 工具与测试产物
+.vite/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+
+# 日志与系统文件
+*.log
+.DS_Store
+Thumbs.db
+
+# 本地环境文件；只跟踪示例模板
+.env
+.env.*
+!.env.example
+*.local
+
+# 本地编辑器、截图与用户备份
+.obsidian/
+/Pasted image *.png
+*.wwv2
+*.pem
+*.key
+*.p12
+*.pfx
+.npmrc
+
+# 个人小说原文；保留自动化测试使用的小样本
+/tests/fixtures/*.txt
+!/tests/fixtures/A-*.txt
+!/tests/fixtures/B-*.txt
+
+# 保留开发说明及运行、测试依赖的契约和提示词
+/docs/*
+!/docs/acceptance/
+!/docs/decisions/
+!/docs/分阶段实现与人工验收计划.md
+!/docs/v2/
+/docs/v2/*
+!/docs/v2/*.md
+!/docs/v2/resources/
+/docs/v2/resources/*
+!/docs/v2/resources/schemas.json
+!/docs/v2/resources/golden-results.json
+!/docs/v2/resources/algorithm-parameters.json
+!/docs/v2/resources/assets/
+/docs/v2/resources/assets/*
+!/docs/v2/resources/assets/PI-MIT.txt
+!/docs/v2/resources/fixtures/
+/docs/v2/resources/fixtures/*
+!/docs/v2/resources/fixtures/人工资产样本.wwv2
+!/docs/v2/resources/v2.2/
+/docs/v2/resources/v2.2/*
+!/docs/v2/resources/v2.2/*.json
+!/docs/v2/resources/v2.2/prompts/
+/docs/v2/resources/v2.2/prompts/*
+!/docs/v2/resources/v2.2/prompts/active/
+!/docs/v2/resources/v2.2/acceptance/
+/docs/v2/resources/v2.2/acceptance/*
+!/docs/v2/resources/v2.2/acceptance/recovery-cases.json

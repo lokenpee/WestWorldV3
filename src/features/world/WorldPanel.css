@@ -1,0 +1,14 @@
+.world-panel { margin: 0 0 18px; padding: 16px 18px; background: white; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; overflow-wrap: anywhere; }
+.world-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.world-heading h2 { margin: 0 auto 0 0; font-size: 16px; }
+.world-heading > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.world-panel > p { margin: 10px 0 0; }
+.world-candidates { max-height: min(200px, 25dvh); overflow-y: auto; margin-top: 12px; }
+.world-candidates > button { margin: 0 6px 6px 0; }
+.world-selection { max-height: min(280px, 35dvh); overflow-y: auto; margin-top: 10px; }
+.world-selection label { display: flex; align-items: baseline; gap: 8px; margin: 8px 0; }
+.world-selection input { flex-shrink: 0; }
+.world-selection-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.world-name-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
+.world-name-choice select { max-width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: white; }
+.world-panel [role=alert] { color: #b91c1c; }

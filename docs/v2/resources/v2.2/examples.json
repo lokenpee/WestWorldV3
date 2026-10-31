@@ -1,0 +1,125 @@
+{
+  "receipt": {
+    "key": "1:worldAssets",
+    "bookId": "book-a",
+    "chapterIndex": "1",
+    "substep": "worldAssets",
+    "inputFingerprint": "example-input-fingerprint",
+    "originIds": [
+      "C1-P001"
+    ],
+    "committedAt": "2026-10-21T00:00:00Z",
+    "runId": "run-p1"
+  },
+  "mergedOrigin": {
+    "key": "character:C2-P001",
+    "bookId": "book-a",
+    "kind": "character",
+    "originId": "C2-P001",
+    "currentId": "C1-P001",
+    "state": "merged",
+    "revision": 2,
+    "updatedAt": "2026-10-21T00:01:00Z"
+  },
+  "queryCharacters": {
+    "data": [
+      {
+        "id": "C1-P001",
+        "name": "贾宝玉",
+        "aliases": [
+          "宝玉"
+        ],
+        "identityHint": "贾府公子",
+        "sourceChapters": [
+          "1",
+          "2"
+        ],
+        "revision": 3,
+        "estimatedDetailTokens": 1250,
+        "duplicateScore": 0.9
+      }
+    ],
+    "totalCount": 1,
+    "truncated": false,
+    "nextOffset": null,
+    "nextAfterId": null
+  },
+  "queryLocations": {
+    "data": [
+      {
+        "id": "C1-L001",
+        "name": "荣国府",
+        "aliases": [],
+        "descriptionHint": "京城府邸",
+        "sourceChapters": [
+          "1"
+        ],
+        "revision": 1,
+        "estimatedDetailTokens": 20,
+        "duplicateScore": 0
+      }
+    ],
+    "totalCount": 1,
+    "truncated": false,
+    "nextOffset": null,
+    "nextAfterId": null
+  },
+  "identitySubmit": {
+    "groups": [
+      {
+        "kind": "character",
+        "keepId": "C1-P001",
+        "memberIds": [
+          "C1-P001",
+          "C2-P001"
+        ],
+        "canonicalName": "贾宝玉",
+        "reason": "原文明确为同一人物的两种称呼",
+        "confidence": 1,
+        "evidence": [
+          {
+            "chapterIndex": "2",
+            "quote": "第二章的贾宝玉就是第一章的贾宝玉。",
+            "memberIds": [
+              "C1-P001",
+              "C2-P001"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "p3OperationMetadata": {
+    "phase": "window_link",
+    "confidence": 0.92,
+    "reason": "前节点遗失的信件在后节点被交还，原文明确指回同一信件",
+    "evidenceNodeIds": [
+      "C1-N001",
+      "C2-N001"
+    ]
+  },
+  "note": "人工目标结构示例；不是2.2应用运行证据",
+  "agentWriteReceipt": {
+    "ok": true,
+    "commitId": "commit-story-1",
+    "operationKey": "window-0-page-1",
+    "alreadyApplied": false,
+    "summary": "节点/线/记忆与检查点已同事务提交"
+  },
+  "agentFinalSummary": {
+    "status": "completed",
+    "commitIds": [
+      "commit-story-1"
+    ],
+    "summary": "当前窗口页已完成，后续仍需其他窗口及全书复核",
+    "remainingWorkIds": [],
+    "reviewedItems": []
+  },
+  "sameWriteRetry": {
+    "ok": true,
+    "commitId": "commit-story-1",
+    "operationKey": "window-0-page-1",
+    "alreadyApplied": true,
+    "summary": "节点/线/记忆与检查点已同事务提交"
+  }
+}

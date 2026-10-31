@@ -1,0 +1,165 @@
+{
+  "version": "2.2",
+  "transitions": [
+    {
+      "object": "P1",
+      "from": "idle/failed/cancelled/paused",
+      "event": "用户开始/继续",
+      "guard": "有章、资源可得",
+      "to": "running",
+      "effect": "只补缺凭证子步骤"
+    },
+    {
+      "object": "P1",
+      "from": "running",
+      "event": "成功子步骤事务",
+      "guard": "signal未取消且无凭证",
+      "to": "running/completed",
+      "effect": "资产+凭证+来源+进度原子；全书齐备才完成"
+    },
+    {
+      "object": "P2或P3",
+      "from": "idle/stale/failed/paused/cancelled/completed",
+      "event": "启动/重跑",
+      "guard": "全书P1 current，同stage可得",
+      "to": "running",
+      "effect": "P2/P3可同时running；原会话续用"
+    },
+    {
+      "object": "P2",
+      "from": "running",
+      "event": "整组融合成功",
+      "guard": "全部revision一致",
+      "to": "running",
+      "effect": "只写world域；报告同步追加"
+    },
+    {
+      "object": "P2",
+      "from": "running",
+      "event": "流程结束",
+      "guard": "AI均完成或有部分失败",
+      "to": "completed/degraded/failed",
+      "effect": "始终存报告；不修改P3状态"
+    },
+    {
+      "object": "P3",
+      "from": "window_link",
+      "event": "全部窗口覆盖",
+      "guard": "分页全读且批有效",
+      "to": "global_review",
+      "effect": "同sessionId，全书孤点/线/事项队列"
+    },
+    {
+      "object": "P3",
+      "from": "global_review",
+      "event": "队列遍历完",
+      "guard": "无失败/未读/过期依赖",
+      "to": "completed",
+      "effect": "可保留有说明孤点/疑点；不要求节点全归线"
+    },
+    {
+      "object": "任一阶段",
+      "from": "running",
+      "event": "取消",
+      "guard": "仅目标signal",
+      "to": "cancelled",
+      "effect": "保留提交，另阶段不变；先停止在途工作，持有域锁直至owner释放"
+    },
+    {
+      "object": "持久运行",
+      "from": "running",
+      "event": "刷新后owner失效",
+      "guard": "租约与存活规则",
+      "to": "paused视图",
+      "effect": "用户点击才续跑；不伪造日志"
+    },
+    {
+      "object": "阶段结果",
+      "from": "completed/current",
+      "event": "相关输入变化",
+      "guard": "依赖实际命中",
+      "to": "completed/stale",
+      "effect": "本阶段需重查；不清P1提取凭证"
+    },
+    {
+      "object": "资产",
+      "from": "revision=n",
+      "event": "保存/合并",
+      "guard": "expectedRevision=n",
+      "to": "revision=n+1",
+      "effect": "不一致返回CONFLICT；dirty表单保留"
+    },
+    {
+      "object": "来源映射",
+      "from": "live/merged",
+      "event": "人工合并/删除",
+      "guard": "合法同类目标；对应域锁未被活动阶段持有",
+      "to": "merged/deleted",
+      "effect": "提取恢复不复活"
+    },
+    {
+      "object": "会话",
+      "from": "active",
+      "event": "窗口/复核/重查",
+      "guard": "同bookId owner",
+      "to": "active同sessionId",
+      "effect": "追加消息，不归档新开"
+    },
+    {
+      "object": "会话",
+      "from": "无",
+      "event": "不同书首次P3",
+      "guard": "独立bookId",
+      "to": "新active",
+      "effect": "不继承其他书消息/记忆"
+    },
+    {
+      "object": "笔记/检查点",
+      "from": "current",
+      "event": "实际依据变化",
+      "guard": "依赖指纹失配",
+      "to": "stale",
+      "effect": "同会话重查相关单元"
+    },
+    {
+      "object": "上下文",
+      "from": "接近预算",
+      "event": "有效摘要",
+      "guard": "after<before且保留任务精确输入",
+      "to": "压缩投影",
+      "effect": "原始历史不删除"
+    },
+    {
+      "object": "人物引用读取视图",
+      "from": "当前投影",
+      "event": "当前人物名称/别名/合并/删除变化",
+      "guard": "查询重新读取当前索引",
+      "to": "最新投影",
+      "effect": "actorIds/characterIds即时派生，不复制实体、不要求P2/P3完成"
+    },
+    {
+      "object": "人工编辑域",
+      "from": "editable",
+      "event": "P2/P3取得同书对应域租约",
+      "guard": "与人工保存事务串行化",
+      "to": "locked",
+      "effect": "禁止对应域全部人工写入；任务自身合法写入仍可用"
+    },
+    {
+      "object": "人工编辑域",
+      "from": "locked",
+      "event": "阶段结束/暂停/取消已停稳并释放owner租约",
+      "guard": "旧owner不得释放新owner锁；崩溃需确认失效或租约到期",
+      "to": "editable",
+      "effect": "保留旧输入，保存前仍比较revision"
+    },
+    {
+      "object": "人工编辑域",
+      "from": "locked",
+      "event": "人工新增/保存/删除/合并/即时修改",
+      "guard": "同书同域",
+      "to": "locked",
+      "effect": "ASSET_DOMAIN_LOCKED；零写入"
+    }
+  ]
+}

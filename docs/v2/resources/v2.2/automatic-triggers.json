@@ -1,0 +1,141 @@
+{
+  "version": "2.2",
+  "triggers": [
+    {
+      "id": "AUTO-01",
+      "trigger": "AppShell挂载/卸载",
+      "guard": "无",
+      "steps": "events.on注册唯一applyEvent，卸载取消订阅",
+      "data": "按bookId/stage/runId写任务runtime；不同任务不互相清空",
+      "lifecycle": "重挂载不重播历史事件"
+    },
+    {
+      "id": "AUTO-02",
+      "trigger": "资产页书架首次解析",
+      "guard": "initialSelection=false且books!==undefined",
+      "steps": "置true；无bookId且有书则选最新books[0]",
+      "data": "T03 createdAt倒序→ui.bookId；不写书",
+      "lifecycle": "每次该组件挂载仅判一次"
+    },
+    {
+      "id": "AUTO-03",
+      "trigger": "useLiveQuery订阅",
+      "guard": "所用bookId/数据表变化",
+      "steps": "重查对应表、按规定排序/计数",
+      "data": "T03–T20对应查询→列表/阶段卡/报告",
+      "lifecycle": "每成功子步骤提交即刷新；保持选中ID/滚动，不覆盖dirty表单"
+    },
+    {
+      "id": "AUTO-04",
+      "trigger": "同书阶段域锁取得/释放、工作台卸载及局部忙状态变化",
+      "guard": "订阅当前bookId的world/narrative锁；取消请求本身不等于释放",
+      "steps": "P2锁人物地点人工写，P3锁节点事件线人工写；保留dirty输入，跨标签同步；只读、切书和另一域仍可用",
+      "data": "pipelineRuns资源租约→UI可编辑性；命令事务独立复核",
+      "lifecycle": "任务可切书继续"
+    },
+    {
+      "id": "AUTO-05",
+      "trigger": "选中ID的revision或生命周期变化",
+      "guard": "比较dirty状态",
+      "steps": "无dirty刷新详情；有dirty保留输入并提示重新载入；并入展示目标",
+      "data": "资产revision/来源映射→详情",
+      "lifecycle": "修正旧selected对象不刷新的行为"
+    },
+    {
+      "id": "AUTO-06",
+      "trigger": "日志数量变化",
+      "guard": "logs.length变化",
+      "steps": "日志scroller.scrollTop=scrollHeight",
+      "data": "当前bookId/stage/runId日志→其面板滚动",
+      "lifecycle": "无持久写入"
+    },
+    {
+      "id": "AUTO-07",
+      "trigger": "游玩消息数量变化",
+      "guard": "lines.length变化",
+      "steps": "消息区滚到底",
+      "data": "局部lines→DOM",
+      "lifecycle": "无世界状态结算"
+    },
+    {
+      "id": "AUTO-08",
+      "trigger": "设置页挂载",
+      "guard": "无",
+      "steps": "离线catalog；异步refresh配置+Keyhint+并发；storage.estimate显示MB",
+      "data": "T01/T02→局部；不读取真实Key到表单",
+      "lifecycle": "刷新未完成字段可短暂空；卸载未保存表单消失"
+    },
+    {
+      "id": "AUTO-09",
+      "trigger": "书架挂载",
+      "guard": "无",
+      "steps": "读exportDirectoryName，失败吞掉",
+      "data": "T02.handle.name→局部directory",
+      "lifecycle": "不会自动取得目录写权限"
+    },
+    {
+      "id": "AUTO-10",
+      "trigger": "flash触发",
+      "guard": "成功/异常提示文字",
+      "steps": "setSaved(text)，2200ms后null",
+      "data": "仅局部toast",
+      "lifecycle": "旧计时器未统一去重，连续flash可提前清除后来提示"
+    },
+    {
+      "id": "AUTO-11",
+      "trigger": "网络数据/viewport变化",
+      "guard": "nodes/lines/chapterIndices/zoom",
+      "steps": "计算chapter layout与卡片紧凑状态，轴跟随",
+      "data": "T08/T09/T04→图视图，无写库",
+      "lifecycle": "无自动因果推断"
+    },
+    {
+      "id": "AUTO-12",
+      "trigger": "会话请求准备",
+      "guard": "已取得故事会话租约",
+      "steps": "投影→必要压缩→重注当前任务→校验可用窗口",
+      "data": "T16/T17读写、归并摘要模型；原记录保留",
+      "lifecycle": "超预算失败，不发未容纳的请求"
+    },
+    {
+      "id": "AUTO-13",
+      "trigger": "每个模型message_end",
+      "guard": "story_editor持久session",
+      "steps": "Pi Agent awaited message_end订阅→标准消息校验→appendSessionMessage；写服务原子commit后工具确认再入Pi toolResult",
+      "data": "T17追加、T16 nextOrdinal/leafId/租约",
+      "lifecycle": "仅响应成功不表示事件提交，commit才确认写入"
+    },
+    {
+      "id": "AUTO-14",
+      "trigger": "恢复/检查资料变更",
+      "guard": "下一批读取旧记忆和checkpoint",
+      "steps": "重新计算实际读依赖、原文/叙事指纹和查询页结果，判stale及跳批；不因全世界指纹变化使所有P3失效",
+      "data": "T05–T09/T13–T15读；结果为视图；新提交才写",
+      "lifecycle": "不是后台定时自动检查，需继续任务"
+    },
+    {
+      "id": "AUTO-15",
+      "trigger": "P1子步骤成功事务提交",
+      "guard": "凭证首次写成功",
+      "steps": "资产/凭证/进度同事务；提交后通知查询层",
+      "data": "T10/T11或T08+T18/T19/T12/T20",
+      "lifecycle": "成功凭证在人工编辑/删除/并入后仍保留"
+    },
+    {
+      "id": "AUTO-16",
+      "trigger": "P2终态报告保存",
+      "guard": "按bookId/runId排队",
+      "steps": "当前书自动开报告；别书只加新报告标记，不抢占其他对话框",
+      "data": "T20报告→报告弹窗",
+      "lifecycle": "刷新可重开，关闭不删除"
+    },
+    {
+      "id": "AUTO-17",
+      "trigger": "应用启动扫描book.lifecycle日志",
+      "guard": "仅接管租约过期且原owner不活跃的本机日志；全局事务CAS成功",
+      "steps": "ready复验后发布；preparing/cleanup_pending清理未发布库；deleting继续删除；失败保留日志并提示，不调用模型",
+      "data": "T02日志→单书库完整性/删除→T03可用书架",
+      "lifecycle": "每次状态变更核owner；活操作不抢占；刷新可重试，delete被阻塞不报成功"
+    }
+  ]
+}

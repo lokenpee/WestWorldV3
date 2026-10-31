@@ -1,0 +1,10 @@
+# 决策索引
+
+- [按阶段锁定人工编辑，并统一实际请求预算](stage-edit-lock-and-request-budget.md)：已接受，业务落地分阶段验收。
+- [用 Dexie 分库保存书架，并隔离开发验收资料](local-bookshelf-storage.md)：阶段1存储、查询和样本隔离边界。
+- [保全文本并通过生命周期日志发布完整导入](transactional-text-import.md)：阶段2编码、分章、Worker与可恢复跨库导入。
+- [人工资产维护](manual-asset-editing.md)：表单保存、来源、引用、删除与并发规则。
+- [节点参考引文与人物关联](node-references.md)：涉及人物统一选择、稳定编号、对象保留和删除合并联动。
+- [人物与地点批量合并](batch-merge.md)：选择、预览、提交、关联更新和来源追溯。
+- [完整备份与可恢复的书籍操作](book-backup-and-lifecycle.md)：一致快照、预检、副本恢复、删除与故障重试。
+- [统一模型配置与 Pi 调用](model-connection.md)：配置、凭据、模型解析、请求预算及基础连接测试。

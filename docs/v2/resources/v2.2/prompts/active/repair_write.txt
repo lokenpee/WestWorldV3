@@ -1,0 +1,3 @@
+上次写命令未应用：
+{error}
+这是唯一一次结构/领域修正机会。旧operationKey={operationKey}不可换payload；修正后的新命令使用新键，建议{nextOperationKey}。必要时先查询，预算不足则停止该项并报告remaining。

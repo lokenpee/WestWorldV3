@@ -1,0 +1,1 @@
+探针taskId={taskId}。先get_editor_memory({})。然后commit_story_changes，operationKey={operationKey}，payload={event_line_ops:[],new_nodes:[],memory_update:{workingSummary:"隔离探针摘要",notes:[]}}。最后提交status=completed、实际commitIds、summary、remainingWorkIds=[]、reviewedItems=[]。

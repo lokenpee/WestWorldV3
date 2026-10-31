@@ -1,0 +1,148 @@
+{
+  "version": "2.2",
+  "policyRevision": "2026-10-24.fix-first",
+  "strategy": "fix-known-defects-before-rebuild",
+  "applicationImplemented": false,
+  "bugs": [
+    {
+      "id": "BUG-01",
+      "problem": "首标题前正文丢失",
+      "trigger": "导言\n第一章 开端\n正文",
+      "required": "非空前缀存为序文chapterIndex=0；全部章块拼接等于去BOM并统一LF后的输入，禁止trim正文",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-02",
+      "problem": "文件入口校验与异步预览不一致",
+      "trigger": "拖入exe；先选慢文件A再选快文件B",
+      "required": "选择/拖放统一单个.txt及非空内容验证；busy禁用；仅最新loadToken生效；失败清预览并禁用导入",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-03",
+      "problem": "旧固定实体统计误导",
+      "trigger": "P1有资产但P2/P3未运行",
+      "required": "统计当前四类实体，不以发布副本或整理状态控制资产可用性",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-04",
+      "problem": "同名引用取首项",
+      "trigger": "两个沈青、节点actors=[沈青]",
+      "required": "仅唯一候选解析ID；多个候选显示ambiguities及候选ID，不静默取首项",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-05",
+      "problem": "无Key文案与鉴权能力矛盾",
+      "trigger": "no-auth适配器无Key",
+      "required": "按requiresCredential统一禁用和提示；无鉴权端点正常Pi探测，不伪造Key",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-06",
+      "problem": "人工弱校验/不存在行静默成功",
+      "trigger": "空name、无效成员或旧revision",
+      "required": "必要字段/引用/expectedRevision统一校验；不存在返回NOT_FOUND；失败无写且保留表单",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-07",
+      "problem": "损坏备份及跨库残留",
+      "trigger": "坏JSON；书库写完后书架提交失败",
+      "required": "统一预检返回结构化错误；完整恢复后才发布书架；T02生命周期日志支持重试或清理，不假称跨库原子",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-08",
+      "problem": "锁与人工并发保护不足",
+      "trigger": "两标签同阶段启动；提交前人工改资料",
+      "required": "资源租约原子核owner；按实际读集revision拒绝冲突，保留人工结果",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-09",
+      "problem": "节点引文定位提示与同人资料保全",
+      "trigger": "节点参考引文未匹配；同章同名不同资料",
+      "required": "节点参考引文可空；未匹配记unmatched并继续保存，不触发结果修正；人物按身份区分，同一人的别名归同条",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-10",
+      "problem": "名称信号直接误合并",
+      "trigger": "张三/张三丰；同名异人",
+      "required": "同名/包含/相似度仅生成候选；AI融合须confidence>=0.9和覆盖全成员的有效原文证据；不足保持分开",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-11",
+      "problem": "样本完成冒充全书完成",
+      "trigger": "仅前3章成功后启动P2/P3",
+      "required": "正式全书两类成功凭证齐全才解锁；测试副本不写正式覆盖",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-12",
+      "problem": "游玩交付状态与会话行为不一致",
+      "trigger": "进入游玩、切书并刷新",
+      "required": "按交付状态显示占位或真实会话；启用游玩后历史按书保存，刷新恢复同一会话，事件归属按AI-16验收",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-13",
+      "problem": "日志费用与完成报告串书",
+      "trigger": "书A运行中查看书B",
+      "required": "按bookId/stage/runId隔离；B不弹A报告；取消仅作用目标运行",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-14",
+      "problem": "未知模型价格/能力错误",
+      "trigger": "模型不在目录",
+      "required": "不套首项元数据；能力不足拒绝；费用标known/estimated/unknown，未知不显示0元或推测币种",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-15",
+      "problem": "窄屏操作不可达",
+      "trigger": "375px视口打开长表单",
+      "required": "小于768px上下排列及区域内滚动，保存/取消/阶段入口均可达，图保留平移",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-16",
+      "problem": "详情旧值回显/覆盖脏输入",
+      "trigger": "即时改层级或外部revision更新",
+      "required": "成功使用返回记录；无dirty随revision重读，有dirty保留输入提示冲突；失败回滚控件",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-17",
+      "problem": "退避等待不响应取消",
+      "trigger": "30秒退避时取消",
+      "required": "下一事件循环结束等待且不再发请求，清理timer/listener，保留已提交确认",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-18",
+      "problem": "非法数值配置落库",
+      "trigger": "NaN/Infinity/空串配置",
+      "required": "UI与服务校验有限数及整数范围，非法不写；旧非法值读回安全默认并提示",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-19",
+      "problem": "缺正文静默当空串",
+      "trigger": "chapters有行而chapterTexts无行",
+      "required": "read_original返回SOURCE_MISSING及缺失章标识；P1/引文提交失败，不写成功凭证",
+      "status": "specified-not-application-verified"
+    },
+    {
+      "id": "BUG-20",
+      "problem": "下载URL回收过早",
+      "trigger": "设置页下载立即revoke",
+      "required": "两下载入口均点击后至少1000ms回收，只提示已触发下载；目录close成功才算已保存",
+      "status": "specified-not-application-verified"
+    }
+  ]
+}

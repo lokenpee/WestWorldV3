@@ -1,0 +1,3 @@
+最终总结不符合要求：
+{error}
+这是唯一一次修正机会。只能重新调用submit_result，不查询、不写业务。应用已确认commitIds={commitIdsJson}。

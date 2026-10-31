@@ -1,0 +1,4620 @@
+{
+  "version": "2.2",
+  "status": "target-not-implemented",
+  "databaseVersion": 5,
+  "globalTableCount": 3,
+  "perBookTableCount": 15,
+  "totalDefinitionCount": 18,
+  "baseDictionary": "本文件schemas为18表结构全集；03为逐字段语义。历史schemas.json仅用于未变DTO。",
+  "newTables": [
+    {
+      "id": "T18",
+      "name": "extractionReceipts",
+      "indexes": "key, chapterIndex, substep",
+      "schema": "#/$defs/ExtractionReceipt"
+    },
+    {
+      "id": "T19",
+      "name": "assetLifecycle",
+      "indexes": "key, kind, originId, currentId, state",
+      "schema": "#/$defs/AssetLifecycle"
+    },
+    {
+      "id": "T20",
+      "name": "pipelineRuns",
+      "indexes": "id, recordType, stage, status, startedAt, &lockKey",
+      "schema": "#/$defs/PipelineRecord"
+    }
+  ],
+  "existingTableDeltas": {
+    "characters": {
+      "revision": "integer>=1",
+      "createdBy": "P1|manual",
+      "nameSource": "extracted|automatic|manual",
+      "manualSourceNote": "string?",
+      "chapterIndex": "optional-for-manual-only",
+      "chapterName": "optional-for-manual-only",
+      "manualKeep": "boolean=false; persisted target priority"
+    },
+    "locations": {
+      "revision": "integer>=1",
+      "createdBy": "P1|manual",
+      "nameSource": "extracted|automatic|manual",
+      "manualSourceNote": "string?",
+      "chapterIndex": "optional-for-manual-only",
+      "chapterName": "optional-for-manual-only",
+      "mergeFacts": "description-facts[]?",
+      "optimizedFactIds": "string[]?",
+      "optimizationFingerprint": "string?",
+      "manualKeep": "boolean=false; persisted target priority"
+    },
+    "nodes": {
+      "revision": "integer>=1",
+      "createdBy": "P1|P3|manual; legacy P2 retained",
+      "actorIds": "persisted stable character IDs; application maintains on delete/rename/merge",
+      "targetCharacterIds": "persisted character IDs for targets",
+      "quoteStatus": "matched|unmatched|empty; non-blocking"
+    },
+    "eventLines": {
+      "revision": "integer>=1",
+      "createdBy": "P3|manual; legacy P2 retained",
+      "characterIds": "read-time derived only; no publish gate"
+    },
+    "compileProgress": {
+      "scope": "fullBook",
+      "planVersion": "2.2",
+      "runId": "string",
+      "phase": "string",
+      "unit": "chapter|step|window|item",
+      "validity": "current|stale",
+      "dependencyFingerprint": "string",
+      "coverage": "{total,checked,pendingIds,cursor?}",
+      "status": "idle|running|paused|cancelling|cancelled|failed|degraded|completed"
+    },
+    "storyEditorNotes": "new stage=P3; phase/window & actual worldDependencies",
+    "storyEditorCheckpoints": "new stage=P3; phase/window & actual worldDependencies; queryDependencies tool/args/resultFingerprint",
+    "storySessions": "one persistent active logical story_editor per book, recheck continues same session",
+    "pipelineRuns": {
+      "appliedCommands": "{operationKey,payloadFingerprint,commitId,committedAt,resultSummary}[]; unique within run; append atomically with business changes",
+      "aiMode": "direct|agent for AI runs",
+      "modelSnapshot": "Pi descriptor metadata, no credential plaintext",
+      "executionLedger": "tasks, commandIntents, coverageItems, nextTaskOrdinal, reconciliationPass; 03第10节"
+    }
+  },
+  "schemas": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$defs": {
+      "ExtractionReceipt": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "chapterIndex": {
+            "type": "string"
+          },
+          "substep": {
+            "enum": [
+              "worldAssets",
+              "narrativeAssets"
+            ]
+          },
+          "inputFingerprint": {
+            "type": "string"
+          },
+          "originIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "committedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "legacy": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "bookId",
+          "chapterIndex",
+          "substep",
+          "inputFingerprint",
+          "originIds",
+          "committedAt",
+          "runId"
+        ],
+        "additionalProperties": false
+      },
+      "AssetLifecycle": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "character",
+              "location",
+              "node",
+              "eventLine"
+            ]
+          },
+          "originId": {
+            "type": "string"
+          },
+          "currentId": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "live",
+              "merged",
+              "deleted"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "sourceChapterIndex": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "bookId",
+          "kind",
+          "originId",
+          "state",
+          "revision",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "state": {
+                  "const": "deleted"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "currentId"
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "currentId"
+              ]
+            }
+          }
+        ]
+      },
+      "MergeReport": {
+        "type": "object",
+        "properties": {
+          "beforeCounts": {
+            "type": "object",
+            "properties": {
+              "characters": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "locations": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "characters",
+              "locations"
+            ],
+            "additionalProperties": false
+          },
+          "afterCounts": {
+            "type": "object",
+            "properties": {
+              "characters": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "locations": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "characters",
+              "locations"
+            ],
+            "additionalProperties": false
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "enum": [
+                    "manual",
+                    "mechanical",
+                    "ai_identity"
+                  ]
+                },
+                "kind": {
+                  "enum": [
+                    "character",
+                    "location"
+                  ]
+                },
+                "memberIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "memberNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "keepId": {
+                  "type": "string"
+                },
+                "canonicalName": {
+                  "type": "string"
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "sourceChapters": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "conflicts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "beforeTokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "afterTokens": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "method",
+                "kind",
+                "memberIds",
+                "memberNames",
+                "keepId",
+                "canonicalName",
+                "aliases",
+                "sourceChapters",
+                "conflicts",
+                "beforeTokens",
+                "afterTokens"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "optimizedIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conflicted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "degraded",
+              "failed",
+              "cancelled",
+              "paused"
+            ]
+          },
+          "cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "usage": {
+            "$ref": "#/$defs/Usage"
+          },
+          "externalChanges": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "beforeCounts",
+          "afterCounts",
+          "groups",
+          "optimizedIds",
+          "skipped",
+          "failed",
+          "conflicted",
+          "status",
+          "cost",
+          "usage",
+          "externalChanges"
+        ],
+        "additionalProperties": false
+      },
+      "PipelineRun": {
+        "type": "object",
+        "properties": {
+          "recordType": {
+            "const": "run"
+          },
+          "id": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "P1",
+              "P2",
+              "P3",
+              "manual_merge"
+            ]
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "degraded",
+              "failed",
+              "cancelled",
+              "paused"
+            ]
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "finishedAt": {
+            "type": "string"
+          },
+          "planVersion": {
+            "const": "2.2"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "scope": {
+            "const": "fullBook"
+          },
+          "inputFingerprint": {
+            "type": "string"
+          },
+          "outputFingerprint": {
+            "type": "string"
+          },
+          "coverage": {
+            "$ref": "#/$defs/Coverage"
+          },
+          "cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "usage": {
+            "$ref": "#/$defs/Usage"
+          },
+          "report": {
+            "$ref": "#/$defs/MergeReport"
+          },
+          "appliedCommands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operationKey",
+                "payloadFingerprint",
+                "commitId",
+                "committedAt",
+                "resultSummary",
+                "taskId"
+              ],
+              "properties": {
+                "operationKey": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "payloadFingerprint": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "commitId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "committedAt": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "resultSummary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "taskId": {
+                  "type": "string",
+                  "description": "持久子任务ID；同run不能将其他子任务确认作为本次总结",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "aiMode": {
+            "enum": [
+              "direct",
+              "agent"
+            ]
+          },
+          "modelSnapshot": {
+            "$ref": "#/$defs/ModelSnapshot"
+          },
+          "contractRevision": {
+            "const": "2026-10-24"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/TaskRecord"
+            }
+          },
+          "commandIntents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CommandIntent"
+            }
+          },
+          "coverageItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CoverageItem"
+            }
+          },
+          "reconciliationPass": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "nextTaskOrdinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "noProgressTasks": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "连续无新增有效覆盖/确认的子任务数；到3暂停"
+          }
+        },
+        "required": [
+          "recordType",
+          "id",
+          "bookId",
+          "stage",
+          "status",
+          "startedAt",
+          "planVersion"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "contractRevision"
+              ]
+            },
+            "then": {
+              "required": [
+                "tasks",
+                "commandIntents",
+                "coverageItems",
+                "nextTaskOrdinal",
+                "reconciliationPass",
+                "noProgressTasks"
+              ]
+            }
+          }
+        ]
+      },
+      "ResourceLease": {
+        "type": "object",
+        "properties": {
+          "recordType": {
+            "const": "lease"
+          },
+          "id": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "lockKey": {
+            "enum": [
+              "extraction",
+              "world",
+              "narrative"
+            ]
+          },
+          "owner": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "recordType",
+          "id",
+          "bookId",
+          "lockKey",
+          "owner",
+          "runId",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "PipelineRecord": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/PipelineRun"
+          },
+          {
+            "$ref": "#/$defs/ResourceLease"
+          }
+        ]
+      },
+      "StoredCharacter": {
+        "description": "当前人物实体；P1/人工创建，P2/人工直接更新。",
+        "type": "object",
+        "required": [
+          "name",
+          "confidence",
+          "id",
+          "bookId",
+          "revision",
+          "createdBy"
+        ],
+        "properties": {
+          "name": {
+            "description": "本章主要使用的称呼。可能是别名，例：琏二爷。",
+            "type": "string",
+            "minLength": 1
+          },
+          "aliases_mentioned": {
+            "description": "本章出现过的其他称呼，用于后续归并同一个人。例：[\"琏二哥哥\"]",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "identity": {
+            "description": "身份 / 职务 / 归属。例：荣国府长孙。原文没写就留空。",
+            "type": "string"
+          },
+          "profile": {
+            "additionalProperties": false,
+            "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+            "type": "object",
+            "properties": {
+              "age": {
+                "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
+                "type": "number"
+              },
+              "ageText": {
+                "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+                "type": "string"
+              },
+              "gender": {
+                "description": "原文写明的性别，不知道则省略或填 null。",
+                "type": "string"
+              }
+            }
+          },
+          "appearance": {
+            "description": "外貌。**仅当原文写到**，不要推断。",
+            "type": "string"
+          },
+          "personality": {
+            "description": "性格。**必须能从原文找到依据**，不要凭印象概括。多条用「；」分隔。",
+            "type": "string"
+          },
+          "background": {
+            "description": "背景 / 来历。仅当原文写到。",
+            "type": "string"
+          },
+          "relations": {
+            "description": "本章观察到的关系。",
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "description": "一条人物关系。",
+              "type": "object",
+              "required": [
+                "target",
+                "relation_type"
+              ],
+              "properties": {
+                "target": {
+                  "description": "关系指向的人。用本章原文的称呼，还没归并。",
+                  "type": "string"
+                },
+                "relation_type": {
+                  "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
+                  "type": "string"
+                },
+                "relation_label": {
+                  "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
+                  "type": "string"
+                },
+                "direction": {
+                  "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+                  "anyOf": [
+                    {
+                      "const": "bidirectional",
+                      "type": "string"
+                    },
+                    {
+                      "const": "directed",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "confidence": {
+            "minimum": 0,
+            "maximum": 1,
+            "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+            "type": "number"
+          },
+          "frequency": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "chapters",
+              "mentions",
+              "scopeChapters",
+              "percentile"
+            ],
+            "properties": {
+              "chapters": {
+                "type": "integer"
+              },
+              "mentions": {
+                "type": "integer"
+              },
+              "scopeChapters": {
+                "type": "integer"
+              },
+              "percentile": {
+                "type": "number"
+              }
+            }
+          },
+          "sourceChapters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mergeNotes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mergeFacts": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "field",
+                "text",
+                "chapters"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "field": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "chapters": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "optimizedFactIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "optimizationFingerprint": {
+            "type": "string"
+          },
+          "roleWeightSource": {
+            "anyOf": [
+              {
+                "const": "frequency",
+                "type": "string"
+              },
+              {
+                "const": "manual",
+                "type": "string"
+              }
+            ]
+          },
+          "id": {
+            "description": "代码分配的快照 id。格式 C{章号}-P{3 位序号}，例：C037-P003",
+            "type": "string"
+          },
+          "bookId": {
+            "description": "所属书籍 id。",
+            "type": "string"
+          },
+          "chapterIndex": {
+            "description": "章节标识。字符串以支持切块，例：\"37\" 或 \"101.1\"。",
+            "type": "string"
+          },
+          "chapterName": {
+            "description": "导入预处理后的章节名。",
+            "type": "string"
+          },
+          "aliases": {
+            "description": "合并后的别名列表。例：[\"琏二爷\", \"琏二哥哥\"]",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "roleWeight": {
+            "description": "出场频次分位数计算的默认层级，可由用户手动覆盖。",
+            "anyOf": [
+              {
+                "const": "主要人物",
+                "type": "string"
+              },
+              {
+                "const": "重要配角",
+                "type": "string"
+              },
+              {
+                "const": "NPC",
+                "type": "string"
+              },
+              {
+                "const": "路人",
+                "type": "string"
+              }
+            ]
+          },
+          "updatedAt": {
+            "description": "最后一次编辑时间",
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdBy": {
+            "enum": [
+              "P1",
+              "manual"
+            ]
+          },
+          "nameSource": {
+            "enum": [
+              "extracted",
+              "automatic",
+              "manual"
+            ]
+          },
+          "manualKeep": {
+            "type": "boolean",
+            "default": false
+          },
+          "manualSourceNote": {
+            "type": "string"
+          },
+          "speechStyleSample": {
+            "description": "本章这个人的**原话片段**（直接摘录），用于后续学习他的说话味道。",
+            "type": "string"
+          }
+        }
+      },
+      "StoredLocation": {
+        "description": "当前地点实体；P1/人工创建，P2/人工直接更新。",
+        "type": "object",
+        "required": [
+          "name",
+          "confidence",
+          "id",
+          "bookId",
+          "revision",
+          "createdBy"
+        ],
+        "properties": {
+          "name": {
+            "description": "地点名称，用原文的叫法。例：荣国府 / 县一中。",
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "description": "一句话描述。原文没写就留空。",
+            "type": "string"
+          },
+          "confidence": {
+            "minimum": 0,
+            "maximum": 1,
+            "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+            "type": "number"
+          },
+          "frequency": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "chapters",
+              "mentions",
+              "scopeChapters",
+              "percentile"
+            ],
+            "properties": {
+              "chapters": {
+                "type": "integer"
+              },
+              "mentions": {
+                "type": "integer"
+              },
+              "scopeChapters": {
+                "type": "integer"
+              },
+              "percentile": {
+                "type": "number"
+              }
+            }
+          },
+          "sourceChapters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mergeNotes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "id": {
+            "description": "代码分配的 id。格式 C{章号}-L{章内序号}，例：C37-L002",
+            "type": "string"
+          },
+          "bookId": {
+            "description": "所属书籍 id。分库后冗余，保留便于导出与调试。",
+            "type": "string"
+          },
+          "chapterIndex": {
+            "description": "章节标识。",
+            "type": "string"
+          },
+          "chapterName": {
+            "description": "章节名。",
+            "type": "string"
+          },
+          "updatedAt": {
+            "description": "最后一次编辑时间（合并或人工修改过）",
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdBy": {
+            "enum": [
+              "P1",
+              "manual"
+            ]
+          },
+          "nameSource": {
+            "enum": [
+              "extracted",
+              "automatic",
+              "manual"
+            ]
+          },
+          "manualKeep": {
+            "type": "boolean",
+            "default": false
+          },
+          "manualSourceNote": {
+            "type": "string"
+          },
+          "mergeFacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/LocationFact"
+            }
+          },
+          "optimizedFactIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "optimizationFingerprint": {
+            "type": "string"
+          }
+        }
+      },
+      "StoredNode": {
+        "description": "已落库的事件节点。",
+        "type": "object",
+        "required": [
+          "name",
+          "summary",
+          "actors",
+          "confidence",
+          "id",
+          "bookId",
+          "order",
+          "revision",
+          "createdBy",
+          "chapterIndex",
+          "chapterName"
+        ],
+        "properties": {
+          "name": {
+            "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+            "type": "string"
+          },
+          "summary": {
+            "description": "事件概述，一到两句。",
+            "type": "string"
+          },
+          "process": {
+            "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+            "type": "string"
+          },
+          "actors": {
+            "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "targets": {
+            "description": "对象 / 承受者。例：[\"王熙凤\"]",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "world_delta": {
+            "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "new_facts": {
+            "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "started_actions": {
+            "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "time_text": {
+            "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+            "type": "string"
+          },
+          "time_hint": {
+            "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+            "type": "string"
+          },
+          "quote": {
+            "type": "string",
+            "description": "参考引文，可为空；无法精确定位时记录提示并继续处理。"
+          },
+          "offset": {
+            "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+            "type": "number"
+          },
+          "confidence": {
+            "minimum": 0,
+            "maximum": 1,
+            "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+            "type": "number"
+          },
+          "id": {
+            "description": "代码分配的节点 id。格式 C{章号}-N{3 位序号}，例：C037-N002",
+            "type": "string"
+          },
+          "bookId": {
+            "description": "所属书籍 id。",
+            "type": "string"
+          },
+          "chapterIndex": {
+            "description": "章节标识。",
+            "type": "string"
+          },
+          "chapterName": {
+            "description": "章节名。",
+            "type": "string"
+          },
+          "order": {
+            "description": "本章内的顺序，从 0 开始。用于按出现顺序展示与排序（比按 id 排序可靠）。",
+            "type": "number"
+          },
+          "createdBy": {
+            "enum": [
+              "P1",
+              "P3",
+              "manual",
+              "P2"
+            ]
+          },
+          "eventLineIds": {
+            "description": "所属事件线 id。多对多，聚合后才有。",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeCoord": {
+            "description": "虚构时间坐标。由 P2 推断，P1 阶段为空。例：\"003-02-15 08:00\"",
+            "type": "string"
+          },
+          "timePrecision": {
+            "description": "时间精度。explicit = 原文直接写的；inferred_hour = 推断到小时；inferred_day = 只能推到天；order_only = 只能定先后。",
+            "anyOf": [
+              {
+                "const": "explicit",
+                "type": "string"
+              },
+              {
+                "const": "inferred_hour",
+                "type": "string"
+              },
+              {
+                "const": "inferred_day",
+                "type": "string"
+              },
+              {
+                "const": "order_only",
+                "type": "string"
+              }
+            ]
+          },
+          "canonicalId": {
+            "description": "若本节点被判定与另一节点重复，指向主节点 id。",
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "actorIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "行动人物的稳定编号，删除和合并时同步维护。"
+          },
+          "targetCharacterIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "涉及对象中属于人物的稳定编号。"
+          },
+          "quoteStatus": {
+            "enum": [
+              "matched",
+              "unmatched",
+              "empty"
+            ],
+            "description": "参考引文定位状态。"
+          }
+        }
+      },
+      "StoredEventLine": {
+        "additionalProperties": false,
+        "description": "事件线（P2/P3 聚合产物）",
+        "type": "object",
+        "required": [
+          "id",
+          "bookId",
+          "title",
+          "nodeIds",
+          "chapters",
+          "cause",
+          "process",
+          "result",
+          "lineStatus",
+          "updatedAt",
+          "revision",
+          "createdBy"
+        ],
+        "properties": {
+          "id": {
+            "description": "事件线 id，例：L01",
+            "type": "string"
+          },
+          "bookId": {
+            "description": "所属书籍 id",
+            "type": "string"
+          },
+          "title": {
+            "description": "这条线的名字，例：贾赦父子走私案",
+            "type": "string"
+          },
+          "nodeIds": {
+            "description": "涉及的事件节点 id（多对多）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "chapters": {
+            "description": "涉及章节（代码生成）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeRange": {
+            "description": "虚构时间区间 [最早, 最晚]（代码生成）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cause": {
+            "description": "起因",
+            "type": "string"
+          },
+          "process": {
+            "description": "经过",
+            "type": "string"
+          },
+          "result": {
+            "description": "结果",
+            "type": "string"
+          },
+          "lineStatus": {
+            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+            "anyOf": [
+              {
+                "const": "open",
+                "type": "string"
+              },
+              {
+                "const": "closed",
+                "type": "string"
+              }
+            ]
+          },
+          "updatedAt": {
+            "description": "ISO 8601",
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdBy": {
+            "enum": [
+              "P3",
+              "manual",
+              "P2"
+            ]
+          }
+        }
+      },
+      "LocationFact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "事实标识；同一实体内唯一"
+          },
+          "field": {
+            "const": "description"
+          },
+          "text": {
+            "type": "string",
+            "description": "地点描述事实原文"
+          },
+          "chapters": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "依据章节标识"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "field",
+          "text",
+          "chapters"
+        ],
+        "additionalProperties": false
+      },
+      "Usage": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "number",
+            "description": "输入tokens；累计所有实际响应"
+          },
+          "output": {
+            "type": "number",
+            "description": "输出tokens"
+          },
+          "totalTokens": {
+            "type": "number",
+            "description": "沿用Pi返回totalTokens，不用input+output覆盖缓存计数"
+          },
+          "cost": {
+            "type": "number",
+            "description": "Pi输入与输出费用之和；不兑换货币"
+          },
+          "costStatus": {
+            "enum": [
+              "known",
+              "estimated",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "input",
+          "output",
+          "totalTokens",
+          "cost"
+        ],
+        "additionalProperties": false
+      },
+      "Coverage": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "当前计划项总数"
+          },
+          "checked": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "依据仍有效的已核查项数"
+          },
+          "pendingIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "尚未完成的工作项标识"
+            }
+          },
+          "cursor": {
+            "type": "string",
+            "description": "当前阶段的续扫位置；无下一页时省略"
+          }
+        },
+        "required": [
+          "total",
+          "checked",
+          "pendingIds"
+        ],
+        "additionalProperties": false
+      },
+      "WorldDependency": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "character",
+              "location"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "description": "查询时请求的ID"
+          },
+          "resolvedId": {
+            "type": "string",
+            "description": "当时解析出的最终当前ID"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "resolvedId",
+          "revision"
+        ],
+        "additionalProperties": false
+      },
+      "QueryDependency": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "description": "只读工具名"
+          },
+          "args": {
+            "type": "object",
+            "description": "经过该工具参数Schema校验的完整参数；不含bookId或凭据"
+          },
+          "resultFingerprint": {
+            "type": "string",
+            "description": "返回集合/顺序/所依赖版本的指纹；空结果也记录"
+          }
+        },
+        "required": [
+          "tool",
+          "args",
+          "resultFingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "ModelSnapshot": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "description": "Pi Provider标识"
+          },
+          "api": {
+            "type": "string",
+            "description": "Pi协议适配器标识"
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "请求基址；禁止内嵌密钥"
+          },
+          "modelId": {
+            "type": "string",
+            "description": "模型ID"
+          },
+          "modelRole": {
+            "enum": [
+              "extraction",
+              "aggregation"
+            ]
+          },
+          "contextWindow": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "有效上下文tokens"
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "tools": {
+                "type": "boolean"
+              },
+              "structuredOutput": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "tools",
+              "structuredOutput"
+            ],
+            "additionalProperties": false
+          },
+          "credentialRef": {
+            "type": "string",
+            "description": "T01 providerId引用；不是Key"
+          },
+          "pricingStatus": {
+            "enum": [
+              "known",
+              "estimated",
+              "unknown"
+            ]
+          },
+          "pricingCurrency": {
+            "type": "string",
+            "description": "known/estimated必须声明；unknown省略，不能推测本币"
+          }
+        },
+        "required": [
+          "providerId",
+          "api",
+          "baseUrl",
+          "modelId",
+          "modelRole",
+          "contextWindow",
+          "capabilities",
+          "credentialRef"
+        ],
+        "additionalProperties": false
+      },
+      "Book": {
+        "additionalProperties": false,
+        "description": "一本书。",
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "description": "书籍唯一 id。例：bk_001",
+            "type": "string"
+          },
+          "title": {
+            "description": "书名。默认取文件名。",
+            "type": "string"
+          },
+          "author": {
+            "description": "作者。原文没写就留空。",
+            "type": "string"
+          },
+          "sourceFileName": {
+            "description": "导入时的原始文件名。",
+            "type": "string"
+          },
+          "createdAt": {
+            "description": "导入时间，ISO 8601 字符串。",
+            "type": "string"
+          }
+        }
+      },
+      "Chapter": {
+        "additionalProperties": false,
+        "description": "一章的元信息（不含正文）。",
+        "type": "object",
+        "required": [
+          "bookId",
+          "chapterIndex",
+          "chapterName",
+          "charCount",
+          "order"
+        ],
+        "properties": {
+          "bookId": {
+            "description": "所属书籍 id。",
+            "type": "string"
+          },
+          "chapterIndex": {
+            "description": "章节标识，字符串。超长章节切块后形如 \"101.1\"。用于排序与区间计算。",
+            "type": "string"
+          },
+          "chapterName": {
+            "description": "章节名，导入预处理后的结果。",
+            "type": "string"
+          },
+          "charCount": {
+            "description": "本章字数。",
+            "type": "number"
+          },
+          "order": {
+            "description": "在书中的顺序，从 0 开始。",
+            "type": "number"
+          }
+        }
+      },
+      "ChapterText": {
+        "additionalProperties": false,
+        "description": "一章的正文。",
+        "type": "object",
+        "required": [
+          "bookId",
+          "chapterIndex",
+          "text"
+        ],
+        "properties": {
+          "bookId": {
+            "description": "所属书籍 id。",
+            "type": "string"
+          },
+          "chapterIndex": {
+            "description": "章节标识。",
+            "type": "string"
+          },
+          "text": {
+            "description": "本章正文。",
+            "type": "string"
+          }
+        }
+      },
+      "CompileProgress": {
+        "additionalProperties": false,
+        "description": "编译进度。",
+        "type": "object",
+        "required": [
+          "bookId",
+          "stage",
+          "status",
+          "totalChapters",
+          "completedChapters",
+          "failedChapters",
+          "updatedAt"
+        ],
+        "properties": {
+          "bookId": {
+            "description": "所属书籍 id。",
+            "type": "string"
+          },
+          "stage": {
+            "description": "编译阶段。P1 = 逐章提取；P2 = 每 100 章滚动归并；P3 = 全书收尾。",
+            "anyOf": [
+              {
+                "const": "P1",
+                "type": "string"
+              },
+              {
+                "const": "P2",
+                "type": "string"
+              },
+              {
+                "const": "P3",
+                "type": "string"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "idle",
+              "running",
+              "paused",
+              "cancelling",
+              "cancelled",
+              "failed",
+              "degraded",
+              "completed"
+            ]
+          },
+          "totalChapters": {
+            "description": "总章节数。",
+            "type": "number"
+          },
+          "completedChapters": {
+            "description": "已完成的章节标识。",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failedChapters": {
+            "description": "重试后仍失败的章节标识。",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lastWindowIndex": {
+            "description": "P2 已完成的窗口序号，从 0 开始。",
+            "type": "number"
+          },
+          "planKey": {
+            "description": "窗口配置及编译版本签名；不匹配时重新检查窗口。",
+            "type": "string"
+          },
+          "editorSessionId": {
+            "type": "string"
+          },
+          "testScope": {
+            "description": "临时分阶段测试的已提取章节范围；不代表全书流水线已完成。",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "partialChapters": {
+            "description": "部分提取成功章节尚缺的子步骤；恢复时只重试缺失部分。",
+            "type": "object",
+            "patternProperties": {
+              "^(.*)$": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "const": "worldAssets",
+                      "type": "string"
+                    },
+                    {
+                      "const": "narrativeAssets",
+                      "type": "string"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "updatedAt": {
+            "description": "最后更新时间，ISO 8601 字符串。",
+            "type": "string"
+          },
+          "scope": {
+            "const": "fullBook"
+          },
+          "planVersion": {
+            "const": "2.2"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "chapter",
+              "step",
+              "window",
+              "item"
+            ]
+          },
+          "validity": {
+            "enum": [
+              "current",
+              "stale"
+            ]
+          },
+          "dependencyFingerprint": {
+            "type": "string"
+          },
+          "coverage": {
+            "$ref": "#/$defs/Coverage"
+          }
+        }
+      },
+      "StoryEditorMemory": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "bookId",
+          "revision",
+          "workingSummary",
+          "dataFingerprint",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "workingSummary": {
+            "maxLength": 2000,
+            "type": "string"
+          },
+          "dataFingerprint": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        }
+      },
+      "StoryEditorNote": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "status",
+          "statement",
+          "nodeIds",
+          "lineIds",
+          "evidence",
+          "id",
+          "bookId",
+          "revision",
+          "stage",
+          "basisFingerprint",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "key": {
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "const": "decision",
+                "type": "string"
+              },
+              {
+                "const": "review",
+                "type": "string"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "active",
+                "type": "string"
+              },
+              {
+                "const": "resolved",
+                "type": "string"
+              }
+            ]
+          },
+          "statement": {
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+            "type": "string"
+          },
+          "nodeIds": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "maxLength": 128,
+              "type": "string"
+            }
+          },
+          "lineIds": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "maxLength": 128,
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "maxItems": 5,
+            "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "chapterIndex",
+                "quote"
+              ],
+              "properties": {
+                "chapterIndex": {
+                  "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+                  "type": "string"
+                },
+                "quote": {
+                  "minLength": 1,
+                  "maxLength": 1000,
+                  "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "P3",
+              "P2"
+            ]
+          },
+          "basisFingerprint": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "worldDependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/WorldDependency"
+            }
+          },
+          "queryDependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/QueryDependency"
+            }
+          },
+          "window": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "原章零基包含起点"
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "原章零基排他终点"
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ],
+            "additionalProperties": false
+          },
+          "phase": {
+            "enum": [
+              "window_link",
+              "global_review",
+              "link",
+              "review"
+            ]
+          }
+        }
+      },
+      "StoryEditorCheckpoint": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "bookId",
+          "stage",
+          "phase",
+          "scopeIds",
+          "sourceFingerprint",
+          "status",
+          "memberships",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "stage": {
+            "enum": [
+              "P3",
+              "P2"
+            ]
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "phase": {
+            "enum": [
+              "window_link",
+              "global_review",
+              "link",
+              "review"
+            ]
+          },
+          "scopeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sourceFingerprint": {
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "completed",
+                "type": "string"
+              },
+              {
+                "const": "failed",
+                "type": "string"
+              },
+              {
+                "const": "cancelled",
+                "type": "string"
+              }
+            ]
+          },
+          "memberships": {
+            "type": "object",
+            "patternProperties": {
+              "^(.*)$": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "worldDependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/WorldDependency"
+            }
+          },
+          "queryDependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/QueryDependency"
+            }
+          },
+          "window": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "原章零基包含起点"
+              },
+              "end": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "原章零基排他终点"
+              }
+            },
+            "required": [
+              "start",
+              "end"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "StorySession": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "bookId",
+          "profile",
+          "kind",
+          "title",
+          "status",
+          "nextOrdinal",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "bookId": {
+            "type": "string"
+          },
+          "profile": {
+            "const": "story_editor",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "const": "initial",
+                "type": "string"
+              },
+              {
+                "const": "review",
+                "type": "string"
+              }
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "active",
+                "type": "string"
+              },
+              {
+                "const": "archived",
+                "type": "string"
+              }
+            ]
+          },
+          "parentSessionId": {
+            "type": "string"
+          },
+          "leafId": {
+            "type": "string"
+          },
+          "nextOrdinal": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "leaseOwner": {
+            "type": "string"
+          },
+          "leaseUntil": {
+            "type": "number"
+          }
+        }
+      },
+      "StorySessionEntry": {
+        "description": "追加式 PI 会话记录；压缩不删除原始消息。",
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "sessionId",
+              "bookId",
+              "ordinal",
+              "parentId",
+              "createdAt",
+              "type",
+              "message"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "bookId": {
+                "type": "string"
+              },
+              "ordinal": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "type": {
+                "const": "message",
+                "type": "string"
+              },
+              "message": {
+                "additionalProperties": true,
+                "type": "object",
+                "required": [
+                  "role"
+                ],
+                "properties": {
+                  "role": {
+                    "anyOf": [
+                      {
+                        "const": "system",
+                        "type": "string"
+                      },
+                      {
+                        "const": "user",
+                        "type": "string"
+                      },
+                      {
+                        "const": "assistant",
+                        "type": "string"
+                      },
+                      {
+                        "const": "toolResult",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "content": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      }
+                    ]
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "sessionId",
+              "bookId",
+              "ordinal",
+              "parentId",
+              "createdAt",
+              "type",
+              "summary",
+              "firstKeptEntryId",
+              "tokensBefore",
+              "tokensAfter"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "bookId": {
+                "type": "string"
+              },
+              "ordinal": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "type": {
+                "const": "compaction",
+                "type": "string"
+              },
+              "summary": {
+                "minLength": 1,
+                "maxLength": 64000,
+                "type": "string"
+              },
+              "firstKeptEntryId": {
+                "type": "string"
+              },
+              "tokensBefore": {
+                "type": "number"
+              },
+              "tokensAfter": {
+                "type": "number"
+              },
+              "systemMessage": {
+                "additionalProperties": true,
+                "type": "object",
+                "required": [
+                  "role"
+                ],
+                "properties": {
+                  "role": {
+                    "anyOf": [
+                      {
+                        "const": "system",
+                        "type": "string"
+                      },
+                      {
+                        "const": "user",
+                        "type": "string"
+                      },
+                      {
+                        "const": "assistant",
+                        "type": "string"
+                      },
+                      {
+                        "const": "toolResult",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "content": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      }
+                    ]
+                  },
+                  "timestamp": {
+                    "type": "number"
+                  }
+                }
+              },
+              "usage": {
+                "type": "object",
+                "required": [
+                  "input",
+                  "output",
+                  "totalTokens",
+                  "cost"
+                ],
+                "properties": {
+                  "input": {
+                    "type": "number"
+                  },
+                  "output": {
+                    "type": "number"
+                  },
+                  "totalTokens": {
+                    "type": "number"
+                  },
+                  "cost": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "sessionId",
+              "bookId",
+              "ordinal",
+              "parentId",
+              "createdAt",
+              "type",
+              "omittedEntryIds",
+              "reason"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "bookId": {
+                "type": "string"
+              },
+              "ordinal": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "type": {
+                "const": "omit",
+                "type": "string"
+              },
+              "omittedEntryIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "sessionId",
+              "bookId",
+              "ordinal",
+              "parentId",
+              "createdAt",
+              "type",
+              "summary"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "bookId": {
+                "type": "string"
+              },
+              "ordinal": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "parentId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "type": {
+                "const": "commit",
+                "type": "string"
+              },
+              "summary": {
+                "maxLength": 2000,
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "CredentialRow": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "description": "全局凭据主键；当前默认deepseek"
+          },
+          "credential": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "api_key"
+              },
+              "key": {
+                "type": "string",
+                "description": "trim后的API Key；明文，不进入单书备份"
+              }
+            },
+            "required": [
+              "type",
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "providerId",
+          "credential"
+        ],
+        "additionalProperties": false
+      },
+      "LlmConfig": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string"
+          },
+          "extractionModel": {
+            "type": "string"
+          },
+          "aggregationModel": {
+            "type": "string"
+          },
+          "aggregationContextWindow": {
+            "type": "integer",
+            "minimum": 8192
+          },
+          "providerId": {
+            "type": "string"
+          },
+          "api": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "baseUrl",
+          "extractionModel",
+          "aggregationModel"
+        ],
+        "additionalProperties": false
+      },
+      "AppSettingRow": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "const": "llm.config"
+              },
+              "value": {
+                "$ref": "#/$defs/LlmConfig"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "value",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "const": "compile.concurrency"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "value",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "const": "assets.exportDirectory"
+              },
+              "value": {
+                "type": "object",
+                "description": "浏览器FileSystemDirectoryHandle，structured clone保存；不能当JSON对象或路径重建"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "value",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^book\\.lifecycle:.+$"
+              },
+              "value": {
+                "$ref": "#/$defs/BookLifecycleJournal"
+              },
+              "updatedAt": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "key",
+              "value",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "WorkRef": {
+        "type": "object",
+        "properties": {
+          "workItemId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "character",
+              "location",
+              "node",
+              "eventLine",
+              "note",
+              "chapter"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "章节无revision时固定0"
+          },
+          "factFingerprint": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "workItemId",
+          "kind",
+          "id",
+          "revision",
+          "factFingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "ResumeInfo": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "enum": [
+              "initial",
+              "continuation",
+              "interrupted",
+              "conflict"
+            ]
+          },
+          "appliedCommitIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "nextOperationKey": {
+            "type": "string",
+            "description": "应用建议的下一命令键；模型可用其他未使用非空键，但不能换旧键的payload",
+            "minLength": 1
+          },
+          "remainingWorkIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "reason",
+          "appliedCommitIds",
+          "nextOperationKey",
+          "remainingWorkIds"
+        ],
+        "additionalProperties": false
+      },
+      "TaskIdentity": {
+        "type": "object",
+        "properties": {
+          "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "planVersion": {
+            "const": "2.2"
+          },
+          "remainingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resume": {
+            "$ref": "#/$defs/ResumeInfo"
+          }
+        },
+        "required": [
+          "bookId",
+          "runId",
+          "taskId",
+          "planVersion",
+          "remainingCount",
+          "resume"
+        ],
+        "additionalProperties": false
+      },
+      "ChapterTask": {
+        "type": "object",
+        "properties": {
+          "chapterIndex": {
+            "type": "string",
+            "minLength": 1
+          },
+          "chapterName": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "chapterIndex",
+          "chapterName",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "IdentityTask": {
+        "type": "object",
+        "properties": {
+          "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "planVersion": {
+            "const": "2.2"
+          },
+          "remainingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resume": {
+            "$ref": "#/$defs/ResumeInfo"
+          },
+          "stage": {
+            "const": "P2"
+          },
+          "phase": {
+            "const": "ai_identity"
+          },
+          "kind": {
+            "enum": [
+              "character",
+              "location"
+            ]
+          },
+          "scope": {
+            "const": "fullBook"
+          },
+          "workItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/WorkRef"
+            },
+            "minItems": 1,
+            "maxItems": 180
+          },
+          "afterId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pageLimit": {
+            "const": 100
+          }
+        },
+        "required": [
+          "bookId",
+          "runId",
+          "taskId",
+          "planVersion",
+          "remainingCount",
+          "resume",
+          "stage",
+          "phase",
+          "kind",
+          "scope",
+          "workItems",
+          "afterId",
+          "pageLimit"
+        ],
+        "additionalProperties": false
+      },
+      "LineDigest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "nodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "chapters": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lineStatus": {
+            "enum": [
+              "open",
+              "closed"
+            ]
+          },
+          "cause": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "result": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "nodeIds",
+          "chapters",
+          "lineStatus",
+          "cause",
+          "result",
+          "revision"
+        ],
+        "additionalProperties": false
+      },
+      "Window": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "chapterIndices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "chapterIndices"
+        ],
+        "additionalProperties": false
+      },
+      "StoryTask": {
+        "type": "object",
+        "properties": {
+          "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "planVersion": {
+            "const": "2.2"
+          },
+          "remainingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resume": {
+            "$ref": "#/$defs/ResumeInfo"
+          },
+          "stage": {
+            "const": "P3"
+          },
+          "phase": {
+            "enum": [
+              "window_link",
+              "global_review"
+            ]
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "queue": {
+            "enum": [
+              "window_nodes",
+              "orphans",
+              "event_lines",
+              "review_notes"
+            ]
+          },
+          "window": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Window"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/WorkRef"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "existingLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/LineDigest"
+            },
+            "maxItems": 50
+          },
+          "memory": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "bookId",
+              "revision",
+              "workingSummary",
+              "dataFingerprint",
+              "updatedAt"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "bookId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              },
+              "revision": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "workingSummary": {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              "dataFingerprint": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            }
+          },
+          "afterWorkItemId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "bookId",
+          "runId",
+          "taskId",
+          "planVersion",
+          "remainingCount",
+          "resume",
+          "stage",
+          "phase",
+          "sessionId",
+          "queue",
+          "window",
+          "workItems",
+          "existingLines",
+          "memory",
+          "afterWorkItemId"
+        ],
+        "additionalProperties": false
+      },
+      "Fact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "field": {
+            "enum": [
+              "identity",
+              "appearance",
+              "personality",
+              "background",
+              "description"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "field",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "CharacterOptimizationItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "previous": {
+            "type": "object",
+            "properties": {
+              "identity": {
+                "type": "string"
+              },
+              "appearance": {
+                "type": "string"
+              },
+              "personality": {
+                "type": "string"
+              },
+              "background": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Fact"
+            },
+            "minItems": 1
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "aliases",
+          "revision",
+          "reason",
+          "previous",
+          "facts",
+          "conflicts"
+        ],
+        "additionalProperties": false
+      },
+      "CharacterOptimizationTask": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "const": "P2"
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CharacterOptimizationItem"
+            },
+            "minItems": 1,
+            "maxItems": 3
+          }
+        },
+        "required": [
+          "stage",
+          "entities"
+        ],
+        "additionalProperties": false
+      },
+      "LocationOptimizationTask": {
+        "type": "object",
+        "properties": {
+          "stage": {
+            "const": "P2"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Fact"
+            },
+            "minItems": 1
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "stage",
+          "id",
+          "name",
+          "revision",
+          "description",
+          "facts",
+          "conflicts"
+        ],
+        "additionalProperties": false
+      },
+      "CompactionTask": {
+        "type": "object",
+        "properties": {
+          "previousSummary": {
+            "type": "string"
+          },
+          "transcript": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "previousSummary",
+          "transcript"
+        ],
+        "additionalProperties": false
+      },
+      "DirectProbeTask": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "AgentProbeTask": {
+        "type": "object",
+        "properties": {
+          "suite": {
+            "enum": [
+              "asset",
+              "story"
+            ]
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "suite",
+          "taskId",
+          "operationKey"
+        ],
+        "additionalProperties": false
+      },
+      "RecordDependency": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "enum": [
+              "characters",
+              "locations",
+              "nodes",
+              "eventLines",
+              "storyEditorMemory",
+              "storyEditorNotes",
+              "chapterTexts",
+              "assetLifecycle"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolvedId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "factFingerprint": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "table",
+          "id",
+          "resolvedId",
+          "revision",
+          "factFingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "QueryDependencyV2": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "minLength": 1
+          },
+          "args": {
+            "type": "object",
+            "description": "严格按该tool的参数Schema二次校验"
+          },
+          "resultFingerprint": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "tool",
+          "args",
+          "resultFingerprint"
+        ],
+        "additionalProperties": false
+      },
+      "ReadSet": {
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/RecordDependency"
+            }
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/QueryDependencyV2"
+            }
+          }
+        },
+        "required": [
+          "records",
+          "queries"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewItem": {
+        "type": "object",
+        "properties": {
+          "workItemId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outcome": {
+            "enum": [
+              "changed",
+              "no_change",
+              "needs_review"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "workItemId",
+          "outcome",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "CoverageItem": {
+        "type": "object",
+        "properties": {
+          "workItemId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phase": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": [
+              "character",
+              "location",
+              "node",
+              "eventLine",
+              "note",
+              "chapter"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "assigned",
+              "checked",
+              "stale",
+              "skipped"
+            ]
+          },
+          "inputRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "inputFingerprint": {
+            "type": "string"
+          },
+          "coveredRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "coveredFingerprint": {
+            "type": "string"
+          },
+          "dependencies": {
+            "$ref": "#/$defs/ReadSet"
+          },
+          "taskId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "changed",
+                  "no_change",
+                  "needs_review",
+                  "deleted",
+                  "redirected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "invalidations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "workItemId",
+          "phase",
+          "kind",
+          "id",
+          "status",
+          "inputRevision",
+          "inputFingerprint",
+          "coveredRevision",
+          "coveredFingerprint",
+          "dependencies",
+          "taskId",
+          "outcome",
+          "reason",
+          "invalidations",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "TaskError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "TaskRecord": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "callId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "phase": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "partial",
+              "completed",
+              "failed",
+              "cancelled",
+              "stale"
+            ]
+          },
+          "workItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "input": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ChapterTask"
+              },
+              {
+                "$ref": "#/$defs/IdentityTask"
+              },
+              {
+                "$ref": "#/$defs/StoryTask"
+              },
+              {
+                "$ref": "#/$defs/CharacterOptimizationTask"
+              },
+              {
+                "$ref": "#/$defs/LocationOptimizationTask"
+              },
+              {
+                "$ref": "#/$defs/CompactionTask"
+              },
+              {
+                "$ref": "#/$defs/DirectProbeTask"
+              },
+              {
+                "$ref": "#/$defs/AgentProbeTask"
+              }
+            ]
+          },
+          "inputFingerprint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "promptHash": {
+            "type": "string",
+            "minLength": 1
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "repairCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "stepsUsed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "appliedCommitIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "reviewedItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ReviewItem"
+            }
+          },
+          "readSet": {
+            "$ref": "#/$defs/ReadSet"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "lastError": {
+            "$ref": "#/$defs/TaskError"
+          }
+        },
+        "required": [
+          "taskId",
+          "ordinal",
+          "callId",
+          "phase",
+          "status",
+          "workItemIds",
+          "input",
+          "inputFingerprint",
+          "promptHash",
+          "attempt",
+          "repairCount",
+          "stepsUsed",
+          "appliedCommitIds",
+          "reviewedItems",
+          "readSet",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "CommandIntent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operationKey": {
+                "type": "string",
+                "minLength": 1
+              },
+              "taskId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "toolCallId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "state": {
+                "enum": [
+                  "prepared",
+                  "applied",
+                  "rejected",
+                  "abandoned"
+                ]
+              },
+              "payloadFingerprint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "expectedReadSet": {
+                "$ref": "#/$defs/ReadSet"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "commitId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "error": {
+                "$ref": "#/$defs/TaskError"
+              },
+              "toolName": {
+                "const": "commit_asset_changes"
+              },
+              "payload": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "groups"
+                ],
+                "properties": {
+                  "groups": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "keepId",
+                        "memberIds",
+                        "canonicalName",
+                        "reason",
+                        "confidence",
+                        "evidence"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "character",
+                            "location"
+                          ]
+                        },
+                        "keepId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "memberIds": {
+                          "type": "array",
+                          "minItems": 2,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "canonicalName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "reason": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "confidence": {
+                          "type": "number",
+                          "minimum": 0.9,
+                          "maximum": 1
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 10,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "chapterIndex": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "quote": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              },
+                              "memberIds": {
+                                "type": "array",
+                                "minItems": 1,
+                                "uniqueItems": true,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            },
+                            "required": [
+                              "chapterIndex",
+                              "quote",
+                              "memberIds"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "required": [
+              "operationKey",
+              "taskId",
+              "toolCallId",
+              "state",
+              "payloadFingerprint",
+              "expectedReadSet",
+              "createdAt",
+              "updatedAt",
+              "toolName",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operationKey": {
+                "type": "string",
+                "minLength": 1
+              },
+              "taskId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "toolCallId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "state": {
+                "enum": [
+                  "prepared",
+                  "applied",
+                  "rejected",
+                  "abandoned"
+                ]
+              },
+              "payloadFingerprint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "expectedReadSet": {
+                "$ref": "#/$defs/ReadSet"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "commitId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "error": {
+                "$ref": "#/$defs/TaskError"
+              },
+              "toolName": {
+                "const": "commit_story_changes"
+              },
+              "payload": {
+                "additionalProperties": false,
+                "description": "事件线串联结果。",
+                "type": "object",
+                "required": [
+                  "event_line_ops",
+                  "new_nodes",
+                  "memory_update"
+                ],
+                "properties": {
+                  "event_line_ops": {
+                    "description": "对事件线的增量操作。空数组表示本批节点没有归属到任何线。",
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "op",
+                            "line_id",
+                            "node_ids",
+                            "cause",
+                            "process",
+                            "result",
+                            "line_status",
+                            "confidence",
+                            "reason",
+                            "evidenceNodeIds"
+                          ],
+                          "properties": {
+                            "op": {
+                              "description": "追加到已有的那条事件线",
+                              "const": "append",
+                              "type": "string"
+                            },
+                            "line_id": {
+                              "description": "已有事件线的 id，例：L05",
+                              "type": "string"
+                            },
+                            "node_ids": {
+                              "description": "要追加进来的节点 id",
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "cause": {
+                              "description": "补充后的起因",
+                              "type": "string"
+                            },
+                            "process": {
+                              "description": "补充后的经过",
+                              "type": "string"
+                            },
+                            "result": {
+                              "description": "补充后的结果",
+                              "type": "string"
+                            },
+                            "line_status": {
+                              "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                              "anyOf": [
+                                {
+                                  "const": "open",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "closed",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "confidence": {
+                              "type": "number",
+                              "minimum": 0.85,
+                              "maximum": 1
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "evidenceNodeIds": {
+                              "type": "array",
+                              "minItems": 1,
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "op",
+                            "title",
+                            "node_ids",
+                            "cause",
+                            "process",
+                            "result",
+                            "line_status",
+                            "confidence",
+                            "reason",
+                            "evidenceNodeIds"
+                          ],
+                          "properties": {
+                            "op": {
+                              "description": "新建一条事件线",
+                              "const": "create",
+                              "type": "string"
+                            },
+                            "title": {
+                              "description": "这条线的名字，例：贾赦父子走私案",
+                              "type": "string"
+                            },
+                            "node_ids": {
+                              "description": "这条线包含的节点 id",
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "cause": {
+                              "description": "起因",
+                              "type": "string"
+                            },
+                            "process": {
+                              "description": "经过",
+                              "type": "string"
+                            },
+                            "result": {
+                              "description": "结果",
+                              "type": "string"
+                            },
+                            "line_status": {
+                              "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                              "anyOf": [
+                                {
+                                  "const": "open",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "closed",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "confidence": {
+                              "type": "number",
+                              "minimum": 0.85,
+                              "maximum": 1
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "evidenceNodeIds": {
+                              "type": "array",
+                              "minItems": 1,
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "op",
+                            "line_id",
+                            "node_ids",
+                            "cause",
+                            "process",
+                            "result",
+                            "line_status",
+                            "confidence",
+                            "reason",
+                            "evidenceNodeIds"
+                          ],
+                          "properties": {
+                            "op": {
+                              "const": "update",
+                              "type": "string"
+                            },
+                            "line_id": {
+                              "type": "string"
+                            },
+                            "node_ids": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "cause": {
+                              "type": "string"
+                            },
+                            "process": {
+                              "type": "string"
+                            },
+                            "result": {
+                              "type": "string"
+                            },
+                            "line_status": {
+                              "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                              "anyOf": [
+                                {
+                                  "const": "open",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "closed",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "confidence": {
+                              "type": "number",
+                              "minimum": 0.85,
+                              "maximum": 1
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "evidenceNodeIds": {
+                              "type": "array",
+                              "minItems": 1,
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "op",
+                            "keep_line_id",
+                            "merge_line_ids",
+                            "node_ids",
+                            "cause",
+                            "process",
+                            "result",
+                            "line_status",
+                            "confidence",
+                            "reason",
+                            "evidenceNodeIds"
+                          ],
+                          "properties": {
+                            "op": {
+                              "const": "merge",
+                              "type": "string"
+                            },
+                            "keep_line_id": {
+                              "type": "string"
+                            },
+                            "merge_line_ids": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "node_ids": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "cause": {
+                              "type": "string"
+                            },
+                            "process": {
+                              "type": "string"
+                            },
+                            "result": {
+                              "type": "string"
+                            },
+                            "line_status": {
+                              "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                              "anyOf": [
+                                {
+                                  "const": "open",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "closed",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "confidence": {
+                              "type": "number",
+                              "minimum": 0.85,
+                              "maximum": 1
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "evidenceNodeIds": {
+                              "type": "array",
+                              "minItems": 1,
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "new_nodes": {
+                    "description": "补断点时新建的节点。没有就返回空数组。",
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "description": "有原文依据的补充事件节点，正式 id 由代码分配。",
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "summary",
+                        "actors",
+                        "client_id",
+                        "chapterIndex"
+                      ],
+                      "properties": {
+                        "name": {
+                          "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+                          "type": "string"
+                        },
+                        "summary": {
+                          "description": "事件概述，一到两句。",
+                          "type": "string"
+                        },
+                        "process": {
+                          "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+                          "type": "string"
+                        },
+                        "actors": {
+                          "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "targets": {
+                          "description": "对象 / 承受者。例：[\"王熙凤\"]",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "world_delta": {
+                          "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "new_facts": {
+                          "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "started_actions": {
+                          "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "time_text": {
+                          "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+                          "type": "string"
+                        },
+                        "time_hint": {
+                          "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+                          "type": "string"
+                        },
+                        "quote": {
+                          "type": "string",
+                          "description": "参考引文，可为空；无法精确定位时记录提示并继续处理。"
+                        },
+                        "offset": {
+                          "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+                          "type": "number"
+                        },
+                        "client_id": {
+                          "description": "本次输出内的临时节点编号；操作中的 node_ids 可引用它。",
+                          "type": "string"
+                        },
+                        "chapterIndex": {
+                          "description": "原文所在的章节标识，必须真实存在。",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "memory_update": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "workingSummary",
+                      "notes"
+                    ],
+                    "properties": {
+                      "workingSummary": {
+                        "minLength": 1,
+                        "maxLength": 2000,
+                        "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
+                        "type": "string"
+                      },
+                      "notes": {
+                        "maxItems": 20,
+                        "description": "本批新增、修正或已解决的判断与复核事项；无变更用空数组。",
+                        "type": "array",
+                        "items": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "key",
+                            "kind",
+                            "status",
+                            "statement",
+                            "nodeIds",
+                            "lineIds",
+                            "evidence"
+                          ],
+                          "properties": {
+                            "key": {
+                              "minLength": 1,
+                              "maxLength": 120,
+                              "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "anyOf": [
+                                {
+                                  "const": "decision",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "review",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "active",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "resolved",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "statement": {
+                              "minLength": 1,
+                              "maxLength": 1000,
+                              "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+                              "type": "string"
+                            },
+                            "nodeIds": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "maxLength": 128,
+                                "type": "string"
+                              }
+                            },
+                            "lineIds": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "maxLength": 128,
+                                "type": "string"
+                              }
+                            },
+                            "evidence": {
+                              "maxItems": 5,
+                              "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "chapterIndex",
+                                  "quote"
+                                ],
+                                "properties": {
+                                  "chapterIndex": {
+                                    "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+                                    "type": "string"
+                                  },
+                                  "quote": {
+                                    "minLength": 1,
+                                    "maxLength": 1000,
+                                    "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "required": [
+              "operationKey",
+              "taskId",
+              "toolCallId",
+              "state",
+              "payloadFingerprint",
+              "expectedReadSet",
+              "createdAt",
+              "updatedAt",
+              "toolName",
+              "payload"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "BookLifecycleJournal": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action": {
+            "enum": [
+              "import",
+              "delete"
+            ]
+          },
+          "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state": {
+            "enum": [
+              "preparing",
+              "ready",
+              "deleting",
+              "cleanup_pending"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "updatedAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "book": {
+            "additionalProperties": false,
+            "description": "一本书。",
+            "type": "object",
+            "required": [
+              "id",
+              "title",
+              "createdAt"
+            ],
+            "properties": {
+              "id": {
+                "description": "书籍唯一 id。例：bk_001",
+                "type": "string"
+              },
+              "title": {
+                "description": "书名。默认取文件名。",
+                "type": "string"
+              },
+              "author": {
+                "description": "作者。原文没写就留空。",
+                "type": "string"
+              },
+              "sourceFileName": {
+                "description": "导入时的原始文件名。",
+                "type": "string"
+              },
+              "createdAt": {
+                "description": "导入时间，ISO 8601 字符串。",
+                "type": "string"
+              }
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1
+          },
+          "leaseUntil": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "operationId",
+          "action",
+          "bookId",
+          "state",
+          "createdAt",
+          "updatedAt",
+          "owner",
+          "leaseUntil"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "action": {
+                  "const": "import"
+                },
+                "state": {
+                  "const": "ready"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "book"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "retiredTables": [
+    "characterSnapshots",
+    "locationSnapshots"
+  ],
+  "authoritativeTables": {
+    "T10": "characters",
+    "T11": "locations",
+    "T08": "nodes",
+    "T09": "eventLines"
+  },
+  "migration": "canon v4 to v5: move latest editable snapshots to characters/locations using unchanged IDs, then retire snapshot stores; no secondary publish copy",
+  "completeTableSchemas": [
+    {
+      "id": "T01",
+      "name": "credentials",
+      "schema": "#/$defs/CredentialRow",
+      "indexes": "providerId"
+    },
+    {
+      "id": "T02",
+      "name": "appSettings",
+      "schema": "#/$defs/AppSettingRow",
+      "indexes": "key"
+    },
+    {
+      "id": "T03",
+      "name": "books",
+      "schema": "#/$defs/Book",
+      "indexes": "id, createdAt"
+    },
+    {
+      "id": "T04",
+      "name": "chapters",
+      "schema": "#/$defs/Chapter",
+      "indexes": "chapterIndex, order"
+    },
+    {
+      "id": "T05",
+      "name": "chapterTexts",
+      "schema": "#/$defs/ChapterText",
+      "indexes": "chapterIndex"
+    },
+    {
+      "id": "T08",
+      "name": "nodes",
+      "schema": "#/$defs/StoredNode",
+      "indexes": "id, chapterIndex, order"
+    },
+    {
+      "id": "T09",
+      "name": "eventLines",
+      "schema": "#/$defs/StoredEventLine",
+      "indexes": "id, lineStatus"
+    },
+    {
+      "id": "T10",
+      "name": "characters",
+      "schema": "#/$defs/StoredCharacter",
+      "indexes": "id, chapterIndex, name"
+    },
+    {
+      "id": "T11",
+      "name": "locations",
+      "schema": "#/$defs/StoredLocation",
+      "indexes": "id, chapterIndex, name"
+    },
+    {
+      "id": "T12",
+      "name": "compileProgress",
+      "schema": "#/$defs/CompileProgress",
+      "indexes": "stage"
+    },
+    {
+      "id": "T13",
+      "name": "storyEditorMemory",
+      "schema": "#/$defs/StoryEditorMemory",
+      "indexes": "id, sessionId"
+    },
+    {
+      "id": "T14",
+      "name": "storyEditorNotes",
+      "schema": "#/$defs/StoryEditorNote",
+      "indexes": "id, &[sessionId+key], sessionId, kind, status, updatedAt"
+    },
+    {
+      "id": "T15",
+      "name": "storyEditorCheckpoints",
+      "schema": "#/$defs/StoryEditorCheckpoint",
+      "indexes": "id, sessionId, stage, phase, status, updatedAt"
+    },
+    {
+      "id": "T16",
+      "name": "storySessions",
+      "schema": "#/$defs/StorySession",
+      "indexes": "id, status, createdAt, parentSessionId"
+    },
+    {
+      "id": "T17",
+      "name": "storySessionEntries",
+      "schema": "#/$defs/StorySessionEntry",
+      "indexes": "id, &[sessionId+ordinal], sessionId, parentId, type"
+    },
+    {
+      "id": "T18",
+      "name": "extractionReceipts",
+      "schema": "#/$defs/ExtractionReceipt",
+      "indexes": "key, chapterIndex, substep"
+    },
+    {
+      "id": "T19",
+      "name": "assetLifecycle",
+      "schema": "#/$defs/AssetLifecycle",
+      "indexes": "key, kind, originId, currentId, state"
+    },
+    {
+      "id": "T20",
+      "name": "pipelineRuns",
+      "schema": "#/$defs/PipelineRecord",
+      "indexes": "id, recordType, stage, status, startedAt, &lockKey"
+    }
+  ],
+  "clarificationDate": "2026-10-24",
+  "contractRevision": "2026-10-24",
+  "bugfixPolicyRevision": "2026-10-24.fix-first"
+}

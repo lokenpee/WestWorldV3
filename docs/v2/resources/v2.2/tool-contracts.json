@@ -1,0 +1,2323 @@
+{
+  "version": "2.2",
+  "uniqueReadToolCount": 14,
+  "assetEditorReadToolCount": 9,
+  "storyEditorReadToolCount": 14,
+  "profiles": {
+    "asset_editor": [
+      {
+        "name": "query_nodes",
+        "description": "检索事件节点摘要。支持章节、人物、事件线过滤和 offset 分页；细节用 get_node_detail。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "chapter_range": {
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "恰好两个字符串：[起始章节, 结束章节]。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "actor": {
+              "type": "string"
+            },
+            "event_line_id": {
+              "type": "string"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 200,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "get_node_detail",
+        "description": "按 ID 读取节点详情，包含原文摘录与完整事件字段。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 20,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "query_event_lines",
+        "description": "检索事件线摘要。确认跨窗口是否同一件事；详情用 get_event_line_detail。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "chapter_range": {
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "恰好两个字符串：[起始章节, 结束章节]。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "character": {
+              "type": "string"
+            },
+            "name_like": {
+              "type": "string"
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "const": "open",
+                  "type": "string"
+                },
+                {
+                  "const": "closed",
+                  "type": "string"
+                }
+              ]
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 50,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "get_event_line_detail",
+        "description": "按 ID 读取完整事件线，核对成员与连贯性。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 10,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "query_characters",
+        "description": "查询本书当前精简资产，支持分页和名称筛选；不返回完整详细字段。提示最多160字符，详情须显式调用详情工具。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "name_like": {
+              "type": "string"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            },
+            "after_id": {
+              "type": "string"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 100,
+        "maxBytes": 65536,
+        "targetRowFields": [
+          "id",
+          "name",
+          "aliases",
+          "identityHint",
+          "sourceChapters",
+          "revision",
+          "estimatedDetailTokens",
+          "duplicateScore"
+        ],
+        "excludedRowFields": [
+          "personality",
+          "background",
+          "appearance",
+          "description",
+          "mergeFacts",
+          "process"
+        ],
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint",
+        "semanticValidation": "after_id and offset mutually exclusive; ID Unicode code-point lexicographic ordering; nextAfterId is last returned ID or null at end"
+      },
+      {
+        "name": "get_character_detail",
+        "description": "按ID读取本书人物详细信息及revision；include_facts=true仅P2整编允许，返回事实底稿以校验覆盖。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "include_facts": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 20,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "query_locations",
+        "description": "查询本书当前精简资产，支持分页和名称筛选；不返回完整详细字段。提示最多160字符，详情须显式调用详情工具。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "name_like": {
+              "type": "string"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            },
+            "after_id": {
+              "type": "string"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 100,
+        "maxBytes": 65536,
+        "targetRowFields": [
+          "id",
+          "name",
+          "aliases",
+          "descriptionHint",
+          "sourceChapters",
+          "revision",
+          "estimatedDetailTokens",
+          "duplicateScore"
+        ],
+        "excludedRowFields": [
+          "personality",
+          "background",
+          "appearance",
+          "description",
+          "mergeFacts",
+          "process"
+        ],
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint",
+        "semanticValidation": "after_id and offset mutually exclusive; ID Unicode code-point lexicographic ordering; nextAfterId is last returned ID or null at end"
+      },
+      {
+        "name": "get_location_detail",
+        "description": "按ids读取完整地点详情和revision；include_facts=true仅P2整编允许返回事实底稿。",
+        "kind": "read",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 20
+            },
+            "include_facts": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "ids"
+          ],
+          "additionalProperties": false
+        },
+        "maxResults": 20,
+        "maxBytes": 65536,
+        "dependencyTracking": "actual-id-revision-and-redirect-resolution"
+      },
+      {
+        "name": "read_original",
+        "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "chapter_range"
+          ],
+          "properties": {
+            "chapter_range": {
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "恰好两个字符串：[起始章节, 结束章节]。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxChars": {
+              "minimum": 1,
+              "maximum": 200000,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 200,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "commit_asset_changes",
+        "description": "P2判同写工具：验证已读同类ID分组并直接机械融合当前实体、生命周期和报告，返回持久提交凭据。",
+        "kind": "write",
+        "executionMode": "sequential",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationKey",
+            "payload"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "groups"
+              ],
+              "properties": {
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "keepId",
+                      "memberIds",
+                      "canonicalName",
+                      "reason",
+                      "confidence",
+                      "evidence"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "character",
+                          "location"
+                        ]
+                      },
+                      "keepId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "memberIds": {
+                        "type": "array",
+                        "minItems": 2,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "canonicalName": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0.9,
+                        "maximum": 1
+                      },
+                      "evidence": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 10,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "chapterIndex": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "quote": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 1000
+                            },
+                            "memberIds": {
+                              "type": "array",
+                              "minItems": 1,
+                              "uniqueItems": true,
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            }
+                          },
+                          "required": [
+                            "chapterIndex",
+                            "quote",
+                            "memberIds"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "maxBytes": 65536,
+        "maxResults": 1,
+        "scope": "application-bound bookId/runId/profile/phase/sessionId",
+        "execute": "AgentTool.execute calls shared validated command service; commits before success toolResult",
+        "idempotency": "pipelineRuns.appliedCommands[operationKey], same payload returns original receipt",
+        "returns": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ok",
+            "commitId",
+            "operationKey",
+            "alreadyApplied",
+            "summary"
+          ],
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "commitId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "alreadyApplied": {
+              "type": "boolean"
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    ],
+    "story_editor": [
+      {
+        "name": "query_nodes",
+        "description": "检索事件节点摘要。支持章节、人物、事件线过滤和 offset 分页；细节用 get_node_detail。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "chapter_range": {
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "恰好两个字符串：[起始章节, 结束章节]。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "actor": {
+              "type": "string"
+            },
+            "event_line_id": {
+              "type": "string"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 200,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "get_node_detail",
+        "description": "按 ID 读取节点详情，包含原文摘录与完整事件字段。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 20,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "query_event_lines",
+        "description": "检索事件线摘要。确认跨窗口是否同一件事；详情用 get_event_line_detail。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "chapter_range": {
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "恰好两个字符串：[起始章节, 结束章节]。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "character": {
+              "type": "string"
+            },
+            "name_like": {
+              "type": "string"
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "const": "open",
+                  "type": "string"
+                },
+                {
+                  "const": "closed",
+                  "type": "string"
+                }
+              ]
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 50,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "get_event_line_detail",
+        "description": "按 ID 读取完整事件线，核对成员与连贯性。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 10,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "query_characters",
+        "description": "查询本书当前精简资产，支持分页和名称筛选；不返回完整详细字段。提示最多160字符，详情须显式调用详情工具。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "name_like": {
+              "type": "string"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            },
+            "after_id": {
+              "type": "string"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 100,
+        "maxBytes": 65536,
+        "targetRowFields": [
+          "id",
+          "name",
+          "aliases",
+          "identityHint",
+          "sourceChapters",
+          "revision",
+          "estimatedDetailTokens",
+          "duplicateScore"
+        ],
+        "excludedRowFields": [
+          "personality",
+          "background",
+          "appearance",
+          "description",
+          "mergeFacts",
+          "process"
+        ],
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint",
+        "semanticValidation": "after_id and offset mutually exclusive; ID Unicode code-point lexicographic ordering; nextAfterId is last returned ID or null at end"
+      },
+      {
+        "name": "get_character_detail",
+        "description": "按ID读取本书人物详细信息及revision；include_facts=true仅P2整编允许，返回事实底稿以校验覆盖。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "include_facts": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 20,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "query_locations",
+        "description": "查询本书当前精简资产，支持分页和名称筛选；不返回完整详细字段。提示最多160字符，详情须显式调用详情工具。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "name_like": {
+              "type": "string"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            },
+            "after_id": {
+              "type": "string"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 100,
+        "maxBytes": 65536,
+        "targetRowFields": [
+          "id",
+          "name",
+          "aliases",
+          "descriptionHint",
+          "sourceChapters",
+          "revision",
+          "estimatedDetailTokens",
+          "duplicateScore"
+        ],
+        "excludedRowFields": [
+          "personality",
+          "background",
+          "appearance",
+          "description",
+          "mergeFacts",
+          "process"
+        ],
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint",
+        "semanticValidation": "after_id and offset mutually exclusive; ID Unicode code-point lexicographic ordering; nextAfterId is last returned ID or null at end"
+      },
+      {
+        "name": "get_location_detail",
+        "description": "按ids读取完整地点详情和revision；include_facts=true仅P2整编允许返回事实底稿。",
+        "kind": "read",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 20
+            },
+            "include_facts": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": [
+            "ids"
+          ],
+          "additionalProperties": false
+        },
+        "maxResults": 20,
+        "maxBytes": 65536,
+        "dependencyTracking": "actual-id-revision-and-redirect-resolution"
+      },
+      {
+        "name": "read_original",
+        "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "chapter_range"
+          ],
+          "properties": {
+            "chapter_range": {
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "恰好两个字符串：[起始章节, 结束章节]。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxChars": {
+              "minimum": 1,
+              "maximum": 200000,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 200,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "get_editor_memory",
+        "description": "读取当前故事会话的工作记忆；提供 session_id 可回查本书旧会话。历史记录不是本轮已通过的结论。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 10,
+        "maxBytes": 65536,
+        "returns": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "memory",
+            "dataChanged",
+            "pendingCount",
+            "staleCount",
+            "notes",
+            "recentCheckpoints"
+          ],
+          "properties": {
+            "memory": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "bookId",
+                "revision",
+                "workingSummary",
+                "dataFingerprint",
+                "updatedAt"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "bookId": {
+                  "type": "string"
+                },
+                "sessionId": {
+                  "type": "string"
+                },
+                "revision": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "workingSummary": {
+                  "maxLength": 2000,
+                  "type": "string"
+                },
+                "dataFingerprint": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              }
+            },
+            "dataChanged": {
+              "type": "boolean"
+            },
+            "pendingCount": {
+              "type": "integer"
+            },
+            "staleCount": {
+              "type": "integer"
+            },
+            "notes": {
+              "maxItems": 10,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "key",
+                  "kind",
+                  "status",
+                  "statement",
+                  "nodeIds",
+                  "lineIds",
+                  "validity",
+                  "truncated"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "const": "decision",
+                        "type": "string"
+                      },
+                      {
+                        "const": "review",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "active",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resolved",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "statement": {
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+                    "type": "string"
+                  },
+                  "nodeIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "lineIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "validity": {
+                    "anyOf": [
+                      {
+                        "const": "current",
+                        "type": "string"
+                      },
+                      {
+                        "const": "stale",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "recentCheckpoints": {
+              "maxItems": 5,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "stage",
+                  "phase",
+                  "status",
+                  "scopeCount",
+                  "updatedAt"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "stage": {
+                    "type": "string"
+                  },
+                  "phase": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "scopeCount": {
+                    "type": "integer"
+                  },
+                  "updatedAt": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "query_editor_notes",
+        "description": "查询已确认判断、待复核或已解决事项，按节点/事件线定位。过期结论不得直接沿用，核实后通过提交结果更新。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "kind": {
+              "anyOf": [
+                {
+                  "const": "decision",
+                  "type": "string"
+                },
+                {
+                  "const": "review",
+                  "type": "string"
+                }
+              ]
+            },
+            "session_id": {
+              "type": "string"
+            },
+            "key": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "status": {
+              "anyOf": [
+                {
+                  "const": "active",
+                  "type": "string"
+                },
+                {
+                  "const": "resolved",
+                  "type": "string"
+                },
+                {
+                  "const": "stale",
+                  "type": "string"
+                }
+              ]
+            },
+            "node_id": {
+              "type": "string"
+            },
+            "line_id": {
+              "type": "string"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 50,
+        "maxBytes": 65536,
+        "returns": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "data",
+            "totalCount",
+            "truncated",
+            "nextOffset"
+          ],
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "key",
+                  "kind",
+                  "status",
+                  "statement",
+                  "nodeIds",
+                  "lineIds",
+                  "evidence",
+                  "id",
+                  "bookId",
+                  "revision",
+                  "stage",
+                  "basisFingerprint",
+                  "createdAt",
+                  "updatedAt",
+                  "validity"
+                ],
+                "properties": {
+                  "key": {
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "const": "decision",
+                        "type": "string"
+                      },
+                      {
+                        "const": "review",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "active",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resolved",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "statement": {
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+                    "type": "string"
+                  },
+                  "nodeIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "lineIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "evidence": {
+                    "maxItems": 5,
+                    "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "chapterIndex",
+                        "quote"
+                      ],
+                      "properties": {
+                        "chapterIndex": {
+                          "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+                          "type": "string"
+                        },
+                        "quote": {
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  },
+                  "stage": {
+                    "enum": [
+                      "P3",
+                      "P2"
+                    ]
+                  },
+                  "basisFingerprint": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "type": "string"
+                  },
+                  "worldDependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "character",
+                            "location"
+                          ]
+                        },
+                        "id": {
+                          "type": "string",
+                          "description": "查询时请求的ID"
+                        },
+                        "resolvedId": {
+                          "type": "string",
+                          "description": "当时解析出的最终当前ID"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id",
+                        "resolvedId",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "queryDependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "tool": {
+                          "type": "string",
+                          "description": "只读工具名"
+                        },
+                        "args": {
+                          "type": "object",
+                          "description": "经过该工具参数Schema校验的完整参数；不含bookId或凭据"
+                        },
+                        "resultFingerprint": {
+                          "type": "string",
+                          "description": "返回集合/顺序/所依赖版本的指纹；空结果也记录"
+                        }
+                      },
+                      "required": [
+                        "tool",
+                        "args",
+                        "resultFingerprint"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "window": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "原章零基包含起点"
+                      },
+                      "end": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "原章零基排他终点"
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "phase": {
+                    "enum": [
+                      "window_link",
+                      "global_review",
+                      "link",
+                      "review"
+                    ]
+                  },
+                  "validity": {
+                    "enum": [
+                      "current",
+                      "stale"
+                    ]
+                  }
+                }
+              }
+            },
+            "totalCount": {
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "nextOffset": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "get_editor_note_detail",
+        "description": "读取工作记录详情；提供 session_id 可读本书旧会话记录。只读。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "session_id": {
+              "type": "string"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 20,
+        "maxBytes": 65536,
+        "returns": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "data",
+            "totalCount",
+            "truncated",
+            "nextOffset"
+          ],
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "key",
+                  "kind",
+                  "status",
+                  "statement",
+                  "nodeIds",
+                  "lineIds",
+                  "evidence",
+                  "id",
+                  "bookId",
+                  "revision",
+                  "stage",
+                  "basisFingerprint",
+                  "createdAt",
+                  "updatedAt",
+                  "validity"
+                ],
+                "properties": {
+                  "key": {
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "const": "decision",
+                        "type": "string"
+                      },
+                      {
+                        "const": "review",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "active",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resolved",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "statement": {
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+                    "type": "string"
+                  },
+                  "nodeIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "lineIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "evidence": {
+                    "maxItems": 5,
+                    "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "chapterIndex",
+                        "quote"
+                      ],
+                      "properties": {
+                        "chapterIndex": {
+                          "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+                          "type": "string"
+                        },
+                        "quote": {
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  },
+                  "stage": {
+                    "enum": [
+                      "P3",
+                      "P2"
+                    ]
+                  },
+                  "basisFingerprint": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "type": "string"
+                  },
+                  "worldDependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "character",
+                            "location"
+                          ]
+                        },
+                        "id": {
+                          "type": "string",
+                          "description": "查询时请求的ID"
+                        },
+                        "resolvedId": {
+                          "type": "string",
+                          "description": "当时解析出的最终当前ID"
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id",
+                        "resolvedId",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "queryDependencies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "tool": {
+                          "type": "string",
+                          "description": "只读工具名"
+                        },
+                        "args": {
+                          "type": "object",
+                          "description": "经过该工具参数Schema校验的完整参数；不含bookId或凭据"
+                        },
+                        "resultFingerprint": {
+                          "type": "string",
+                          "description": "返回集合/顺序/所依赖版本的指纹；空结果也记录"
+                        }
+                      },
+                      "required": [
+                        "tool",
+                        "args",
+                        "resultFingerprint"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "window": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "原章零基包含起点"
+                      },
+                      "end": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "原章零基排他终点"
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "end"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "phase": {
+                    "enum": [
+                      "window_link",
+                      "global_review",
+                      "link",
+                      "review"
+                    ]
+                  },
+                  "validity": {
+                    "enum": [
+                      "current",
+                      "stale"
+                    ]
+                  }
+                }
+              }
+            },
+            "totalCount": {
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "nextOffset": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "list_editor_sessions",
+        "description": "列出本书当前及历史故事会话，供回查旧复核过程。不能查询其他书。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 50,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "query_editor_session_history",
+        "description": "回查本书完整原始会话。默认摘要预览，mode=full 取完整记录；超长单条用 entry_id/char_offset/maxChars 分段。压缩不会删除原始消息，旧会话仅供历史参考。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "session_id": {
+              "type": "string"
+            },
+            "offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "limit": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "integer"
+            },
+            "mode": {
+              "anyOf": [
+                {
+                  "const": "summary",
+                  "type": "string"
+                },
+                {
+                  "const": "full",
+                  "type": "string"
+                }
+              ]
+            },
+            "entry_id": {
+              "type": "string"
+            },
+            "char_offset": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxChars": {
+              "minimum": 1,
+              "maximum": 20000,
+              "type": "integer"
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 50,
+        "maxBytes": 65536,
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+      },
+      {
+        "name": "commit_story_changes",
+        "description": "P3叙事/记忆写工具：校验节点/线增量、依据与memory_update，原子写当前叙事资产、工作记忆、检查点和覆盖；空资产操作可仅更新工作记忆。",
+        "kind": "write",
+        "executionMode": "sequential",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationKey",
+            "payload"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "payload": {
+              "additionalProperties": false,
+              "description": "事件线串联结果。",
+              "type": "object",
+              "required": [
+                "event_line_ops",
+                "new_nodes",
+                "memory_update"
+              ],
+              "properties": {
+                "event_line_ops": {
+                  "description": "对事件线的增量操作。空数组表示本批节点没有归属到任何线。",
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "op",
+                          "line_id",
+                          "node_ids",
+                          "cause",
+                          "process",
+                          "result",
+                          "line_status",
+                          "confidence",
+                          "reason",
+                          "evidenceNodeIds"
+                        ],
+                        "properties": {
+                          "op": {
+                            "description": "追加到已有的那条事件线",
+                            "const": "append",
+                            "type": "string"
+                          },
+                          "line_id": {
+                            "description": "已有事件线的 id，例：L05",
+                            "type": "string"
+                          },
+                          "node_ids": {
+                            "description": "要追加进来的节点 id",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "cause": {
+                            "description": "补充后的起因",
+                            "type": "string"
+                          },
+                          "process": {
+                            "description": "补充后的经过",
+                            "type": "string"
+                          },
+                          "result": {
+                            "description": "补充后的结果",
+                            "type": "string"
+                          },
+                          "line_status": {
+                            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                            "anyOf": [
+                              {
+                                "const": "open",
+                                "type": "string"
+                              },
+                              {
+                                "const": "closed",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0.85,
+                            "maximum": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "evidenceNodeIds": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "op",
+                          "title",
+                          "node_ids",
+                          "cause",
+                          "process",
+                          "result",
+                          "line_status",
+                          "confidence",
+                          "reason",
+                          "evidenceNodeIds"
+                        ],
+                        "properties": {
+                          "op": {
+                            "description": "新建一条事件线",
+                            "const": "create",
+                            "type": "string"
+                          },
+                          "title": {
+                            "description": "这条线的名字，例：贾赦父子走私案",
+                            "type": "string"
+                          },
+                          "node_ids": {
+                            "description": "这条线包含的节点 id",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "cause": {
+                            "description": "起因",
+                            "type": "string"
+                          },
+                          "process": {
+                            "description": "经过",
+                            "type": "string"
+                          },
+                          "result": {
+                            "description": "结果",
+                            "type": "string"
+                          },
+                          "line_status": {
+                            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                            "anyOf": [
+                              {
+                                "const": "open",
+                                "type": "string"
+                              },
+                              {
+                                "const": "closed",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0.85,
+                            "maximum": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "evidenceNodeIds": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "op",
+                          "line_id",
+                          "node_ids",
+                          "cause",
+                          "process",
+                          "result",
+                          "line_status",
+                          "confidence",
+                          "reason",
+                          "evidenceNodeIds"
+                        ],
+                        "properties": {
+                          "op": {
+                            "const": "update",
+                            "type": "string"
+                          },
+                          "line_id": {
+                            "type": "string"
+                          },
+                          "node_ids": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "cause": {
+                            "type": "string"
+                          },
+                          "process": {
+                            "type": "string"
+                          },
+                          "result": {
+                            "type": "string"
+                          },
+                          "line_status": {
+                            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                            "anyOf": [
+                              {
+                                "const": "open",
+                                "type": "string"
+                              },
+                              {
+                                "const": "closed",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0.85,
+                            "maximum": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "evidenceNodeIds": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "op",
+                          "keep_line_id",
+                          "merge_line_ids",
+                          "node_ids",
+                          "cause",
+                          "process",
+                          "result",
+                          "line_status",
+                          "confidence",
+                          "reason",
+                          "evidenceNodeIds"
+                        ],
+                        "properties": {
+                          "op": {
+                            "const": "merge",
+                            "type": "string"
+                          },
+                          "keep_line_id": {
+                            "type": "string"
+                          },
+                          "merge_line_ids": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "node_ids": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "cause": {
+                            "type": "string"
+                          },
+                          "process": {
+                            "type": "string"
+                          },
+                          "result": {
+                            "type": "string"
+                          },
+                          "line_status": {
+                            "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                            "anyOf": [
+                              {
+                                "const": "open",
+                                "type": "string"
+                              },
+                              {
+                                "const": "closed",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0.85,
+                            "maximum": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "evidenceNodeIds": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "new_nodes": {
+                  "description": "补断点时新建的节点。没有就返回空数组。",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "description": "有原文依据的补充事件节点，正式 id 由代码分配。",
+                    "type": "object",
+                    "required": [
+                      "name",
+                      "summary",
+                      "actors",
+                      "quote",
+                      "client_id",
+                      "chapterIndex"
+                    ],
+                    "properties": {
+                      "name": {
+                        "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+                        "type": "string"
+                      },
+                      "summary": {
+                        "description": "事件概述，一到两句。",
+                        "type": "string"
+                      },
+                      "process": {
+                        "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+                        "type": "string"
+                      },
+                      "actors": {
+                        "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "targets": {
+                        "description": "对象 / 承受者。例：[\"王熙凤\"]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "world_delta": {
+                        "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "new_facts": {
+                        "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "started_actions": {
+                        "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "time_text": {
+                        "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+                        "type": "string"
+                      },
+                      "time_hint": {
+                        "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+                        "type": "string"
+                      },
+                      "quote": {
+                        "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+                        "type": "string"
+                      },
+                      "offset": {
+                        "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+                        "type": "number"
+                      },
+                      "client_id": {
+                        "description": "本次输出内的临时节点编号；操作中的 node_ids 可引用它。",
+                        "type": "string"
+                      },
+                      "chapterIndex": {
+                        "description": "原文所在的章节标识，必须真实存在。",
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "memory_update": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "workingSummary",
+                    "notes"
+                  ],
+                  "properties": {
+                    "workingSummary": {
+                      "minLength": 1,
+                      "maxLength": 2000,
+                      "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
+                      "type": "string"
+                    },
+                    "notes": {
+                      "maxItems": 20,
+                      "description": "本批新增、修正或已解决的判断与复核事项；无变更用空数组。",
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "key",
+                          "kind",
+                          "status",
+                          "statement",
+                          "nodeIds",
+                          "lineIds",
+                          "evidence"
+                        ],
+                        "properties": {
+                          "key": {
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "decision",
+                                "type": "string"
+                              },
+                              {
+                                "const": "review",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "const": "active",
+                                "type": "string"
+                              },
+                              {
+                                "const": "resolved",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "statement": {
+                            "minLength": 1,
+                            "maxLength": 1000,
+                            "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+                            "type": "string"
+                          },
+                          "nodeIds": {
+                            "maxItems": 20,
+                            "type": "array",
+                            "items": {
+                              "maxLength": 128,
+                              "type": "string"
+                            }
+                          },
+                          "lineIds": {
+                            "maxItems": 20,
+                            "type": "array",
+                            "items": {
+                              "maxLength": 128,
+                              "type": "string"
+                            }
+                          },
+                          "evidence": {
+                            "maxItems": 5,
+                            "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "chapterIndex",
+                                "quote"
+                              ],
+                              "properties": {
+                                "chapterIndex": {
+                                  "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+                                  "type": "string"
+                                },
+                                "quote": {
+                                  "minLength": 1,
+                                  "maxLength": 1000,
+                                  "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "maxBytes": 65536,
+        "maxResults": 1,
+        "scope": "application-bound bookId/runId/profile/phase/sessionId",
+        "execute": "AgentTool.execute calls shared validated command service; commits before success toolResult",
+        "idempotency": "pipelineRuns.appliedCommands[operationKey], same payload returns original receipt",
+        "returns": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ok",
+            "commitId",
+            "operationKey",
+            "alreadyApplied",
+            "summary"
+          ],
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "commitId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "alreadyApplied": {
+              "type": "boolean"
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "wrapper": {
+    "pagination": [
+      "data",
+      "totalCount",
+      "truncated",
+      "nextOffset"
+    ],
+    "summaryHintMaxChars": 160,
+    "maxBytes": 65536,
+    "includeFactsPermission": "asset_editor optimization phase only",
+    "newErrors": [
+      "CONFLICT",
+      "IDEMPOTENCY_CONFLICT",
+      "WRITE_SCOPE_DENIED"
+    ],
+    "legacyResponseSchemas": "use only for unchanged tools; changed projections superseded by targetRowFields",
+    "writeOrdering": "sequential; finalizer must be sole tool call in its batch; validate batch before first mutation",
+    "returnValidation": "All target tools validate success against declared success schema; structuredContent plus model-facing JSON; errors set isError."
+  },
+  "uniqueWriteToolCount": 2,
+  "uniqueBusinessToolCount": 16,
+  "assetEditorBusinessToolCount": 10,
+  "storyEditorBusinessToolCount": 15,
+  "finalizer": {
+    "name": "submit_result",
+    "kind": "finalize",
+    "schema": "AgentTaskSummarySchema",
+    "writesDatabase": false,
+    "notCountedAsBusinessTool": true,
+    "success": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted",
+        "status",
+        "commitIds"
+      ],
+      "properties": {
+        "accepted": {
+          "const": true
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "partial"
+          ]
+        },
+        "commitIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "taskBinding": "application taskId; reviewedItems + remainingWorkIds partition assigned task workItemIds"
+  },
+  "manualWriteBoundary": "人工调用同一领域服务时按pipeline-contract manualEditPolicy拒绝同域写；Agent按绑定run/owner/role检查自己租约，不被自身阶段的人工锁禁止"
+}

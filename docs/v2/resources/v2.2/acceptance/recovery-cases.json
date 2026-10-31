@@ -1,0 +1,2078 @@
+{
+  "contractRevision": "2026-10-24.stage0",
+  "kind": "adapter-driven-target-cases",
+  "applicationExecuted": false,
+  "cases": [
+    {
+      "id": "GAP-REC-01",
+      "title": "提交后反馈丢失：重放同一确认",
+      "seed": {
+        "clockMs": 1792800000000,
+        "uuidSequence": [
+          "K1",
+          "E1",
+          "K2",
+          "E2"
+        ],
+        "binding": {
+          "bookId": "book-a",
+          "runId": "R",
+          "taskId": "T1",
+          "profile": "asset_editor",
+          "phase": "ai_identity",
+          "owner": "owner-1"
+        },
+        "tables": {
+          "characters": [
+            {
+              "id": "C1-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "1",
+              "chapterName": "第1章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "1"
+              ],
+              "manualKeep": false
+            },
+            {
+              "id": "C2-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "2"
+              ],
+              "manualKeep": false
+            }
+          ],
+          "assetLifecycle": [
+            {
+              "key": "character:C1-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C1-P001",
+              "currentId": "C1-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            },
+            {
+              "key": "character:C2-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C2-P001",
+              "currentId": "C2-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            }
+          ],
+          "pipelineRuns": [
+            {
+              "recordType": "run",
+              "id": "R",
+              "bookId": "book-a",
+              "stage": "P2",
+              "status": "running",
+              "startedAt": "2026-10-24T00:00:00.000Z",
+              "planVersion": "2.2",
+              "contractRevision": "2026-10-24",
+              "phase": "ai_identity",
+              "tasks": [
+                {
+                  "taskId": "T1",
+                  "ordinal": 0,
+                  "callId": "PROMPT-P2-IDENTITY",
+                  "phase": "ai_identity",
+                  "status": "running",
+                  "workItemIds": [
+                    "ai_identity:fullBook:character:C1-P001",
+                    "ai_identity:fullBook:character:C2-P001"
+                  ],
+                  "input": {
+                    "bookId": "book-a",
+                    "runId": "R",
+                    "taskId": "T1",
+                    "planVersion": "2.2",
+                    "remainingCount": 2,
+                    "resume": {
+                      "reason": "initial",
+                      "appliedCommitIds": [],
+                      "nextOperationKey": "T1:1",
+                      "remainingWorkIds": [
+                        "ai_identity:fullBook:character:C1-P001",
+                        "ai_identity:fullBook:character:C2-P001"
+                      ]
+                    },
+                    "stage": "P2",
+                    "phase": "ai_identity",
+                    "kind": "character",
+                    "scope": "fullBook",
+                    "workItems": [
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C1-P001",
+                        "kind": "character",
+                        "id": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C2-P001",
+                        "kind": "character",
+                        "id": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "afterId": null,
+                    "pageLimit": 100
+                  },
+                  "inputFingerprint": "c79a2c8f283c1e2f19d06b212b79e4331ec118bcba631086dab5355735815ead",
+                  "promptHash": "fixture-known-prompt-hash",
+                  "attempt": 1,
+                  "repairCount": 0,
+                  "stepsUsed": 1,
+                  "appliedCommitIds": [],
+                  "reviewedItems": [],
+                  "readSet": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C1-P001",
+                        "resolvedId": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "table": "characters",
+                        "id": "C2-P001",
+                        "resolvedId": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "createdAt": "2026-10-24T00:00:00.000Z",
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "commandIntents": [],
+              "appliedCommands": [],
+              "coverageItems": [
+                {
+                  "workItemId": "ai_identity:fullBook:character:C1-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C1-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                },
+                {
+                  "workItemId": "ai_identity:fullBook:character:C2-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C2-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "reconciliationPass": 0,
+              "nextTaskOrdinal": 1,
+              "noProgressTasks": 0,
+              "coverage": {
+                "total": 2,
+                "checked": 0,
+                "pendingIds": [
+                  "ai_identity:fullBook:character:C1-P001",
+                  "ai_identity:fullBook:character:C2-P001"
+                ]
+              }
+            },
+            {
+              "recordType": "lease",
+              "id": "lease:world",
+              "bookId": "book-a",
+              "lockKey": "world",
+              "owner": "owner-1",
+              "runId": "R",
+              "expiresAt": 1792800300000
+            }
+          ],
+          "chapters": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "charCount": 15,
+              "order": 1
+            }
+          ],
+          "chapterTexts": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "text": "第二章的沈青就是第一章的沈青。"
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareCommand",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "taskId": "T1",
+            "toolCallId": "call-1",
+            "toolName": "commit_asset_changes",
+            "arguments": {
+              "operationKey": "T1:1",
+              "payload": {
+                "groups": [
+                  {
+                    "kind": "character",
+                    "keepId": "C1-P001",
+                    "memberIds": [
+                      "C1-P001",
+                      "C2-P001"
+                    ],
+                    "canonicalName": "沈青",
+                    "reason": "已读资料确认同一人物",
+                    "confidence": 1,
+                    "evidence": [
+                      {
+                        "chapterIndex": "2",
+                        "quote": "第二章的沈青就是第一章的沈青。",
+                        "memberIds": [
+                          "C1-P001",
+                          "C2-P001"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "readSet": {
+              "records": [
+                {
+                  "table": "characters",
+                  "id": "C1-P001",
+                  "resolvedId": "C1-P001",
+                  "revision": 1,
+                  "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                },
+                {
+                  "table": "characters",
+                  "id": "C2-P001",
+                  "resolvedId": "C2-P001",
+                  "revision": 1,
+                  "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                }
+              ],
+              "queries": []
+            }
+          },
+          "expect": {
+            "output": {
+              "state": "prepared"
+            },
+            "snapshot": {
+              "run.commandIntents.0.state": "prepared",
+              "characters.length": 2
+            }
+          }
+        },
+        {
+          "operation": "executePrepared",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "operationKey": "T1:1"
+          },
+          "expect": {
+            "output": {
+              "ok": true,
+              "commitId": "K1",
+              "alreadyApplied": false
+            },
+            "snapshot": {
+              "characters.length": 1,
+              "characters.0.revision": 2,
+              "run.appliedCommands.length": 1,
+              "run.appliedCommands.0.taskId": "T1",
+              "run.commandIntents.0.state": "applied"
+            }
+          }
+        },
+        {
+          "operation": "executePrepared",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "operationKey": "T1:1"
+          },
+          "expect": {
+            "output": {
+              "ok": true,
+              "commitId": "K1",
+              "alreadyApplied": true
+            },
+            "snapshot": {
+              "characters.0.revision": 2,
+              "run.appliedCommands.length": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "GAP-REC-02",
+      "title": "同键不同payload不得覆盖意图",
+      "seed": {
+        "clockMs": 1792800000000,
+        "uuidSequence": [
+          "K1",
+          "E1",
+          "K2",
+          "E2"
+        ],
+        "binding": {
+          "bookId": "book-a",
+          "runId": "R",
+          "taskId": "T1",
+          "profile": "asset_editor",
+          "phase": "ai_identity",
+          "owner": "owner-1"
+        },
+        "tables": {
+          "characters": [
+            {
+              "id": "C1-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "1",
+              "chapterName": "第1章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "1"
+              ],
+              "manualKeep": false
+            },
+            {
+              "id": "C2-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "2"
+              ],
+              "manualKeep": false
+            }
+          ],
+          "assetLifecycle": [
+            {
+              "key": "character:C1-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C1-P001",
+              "currentId": "C1-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            },
+            {
+              "key": "character:C2-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C2-P001",
+              "currentId": "C2-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            }
+          ],
+          "pipelineRuns": [
+            {
+              "recordType": "run",
+              "id": "R",
+              "bookId": "book-a",
+              "stage": "P2",
+              "status": "running",
+              "startedAt": "2026-10-24T00:00:00.000Z",
+              "planVersion": "2.2",
+              "contractRevision": "2026-10-24",
+              "phase": "ai_identity",
+              "tasks": [
+                {
+                  "taskId": "T1",
+                  "ordinal": 0,
+                  "callId": "PROMPT-P2-IDENTITY",
+                  "phase": "ai_identity",
+                  "status": "running",
+                  "workItemIds": [
+                    "ai_identity:fullBook:character:C1-P001",
+                    "ai_identity:fullBook:character:C2-P001"
+                  ],
+                  "input": {
+                    "bookId": "book-a",
+                    "runId": "R",
+                    "taskId": "T1",
+                    "planVersion": "2.2",
+                    "remainingCount": 2,
+                    "resume": {
+                      "reason": "initial",
+                      "appliedCommitIds": [],
+                      "nextOperationKey": "T1:1",
+                      "remainingWorkIds": [
+                        "ai_identity:fullBook:character:C1-P001",
+                        "ai_identity:fullBook:character:C2-P001"
+                      ]
+                    },
+                    "stage": "P2",
+                    "phase": "ai_identity",
+                    "kind": "character",
+                    "scope": "fullBook",
+                    "workItems": [
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C1-P001",
+                        "kind": "character",
+                        "id": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C2-P001",
+                        "kind": "character",
+                        "id": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "afterId": null,
+                    "pageLimit": 100
+                  },
+                  "inputFingerprint": "c79a2c8f283c1e2f19d06b212b79e4331ec118bcba631086dab5355735815ead",
+                  "promptHash": "fixture-known-prompt-hash",
+                  "attempt": 1,
+                  "repairCount": 0,
+                  "stepsUsed": 1,
+                  "appliedCommitIds": [],
+                  "reviewedItems": [],
+                  "readSet": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C1-P001",
+                        "resolvedId": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "table": "characters",
+                        "id": "C2-P001",
+                        "resolvedId": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "createdAt": "2026-10-24T00:00:00.000Z",
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "commandIntents": [],
+              "appliedCommands": [],
+              "coverageItems": [
+                {
+                  "workItemId": "ai_identity:fullBook:character:C1-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C1-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                },
+                {
+                  "workItemId": "ai_identity:fullBook:character:C2-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C2-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "reconciliationPass": 0,
+              "nextTaskOrdinal": 1,
+              "noProgressTasks": 0,
+              "coverage": {
+                "total": 2,
+                "checked": 0,
+                "pendingIds": [
+                  "ai_identity:fullBook:character:C1-P001",
+                  "ai_identity:fullBook:character:C2-P001"
+                ]
+              }
+            },
+            {
+              "recordType": "lease",
+              "id": "lease:world",
+              "bookId": "book-a",
+              "lockKey": "world",
+              "owner": "owner-1",
+              "runId": "R",
+              "expiresAt": 1792800300000
+            }
+          ],
+          "chapters": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "charCount": 15,
+              "order": 1
+            }
+          ],
+          "chapterTexts": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "text": "第二章的沈青就是第一章的沈青。"
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareCommand",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "taskId": "T1",
+            "toolCallId": "call-1",
+            "toolName": "commit_asset_changes",
+            "arguments": {
+              "operationKey": "T1:1",
+              "payload": {
+                "groups": [
+                  {
+                    "kind": "character",
+                    "keepId": "C1-P001",
+                    "memberIds": [
+                      "C1-P001",
+                      "C2-P001"
+                    ],
+                    "canonicalName": "沈青",
+                    "reason": "已读资料确认同一人物",
+                    "confidence": 1,
+                    "evidence": [
+                      {
+                        "chapterIndex": "2",
+                        "quote": "第二章的沈青就是第一章的沈青。",
+                        "memberIds": [
+                          "C1-P001",
+                          "C2-P001"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "readSet": {
+              "records": [
+                {
+                  "table": "characters",
+                  "id": "C1-P001",
+                  "resolvedId": "C1-P001",
+                  "revision": 1,
+                  "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                },
+                {
+                  "table": "characters",
+                  "id": "C2-P001",
+                  "resolvedId": "C2-P001",
+                  "revision": 1,
+                  "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                }
+              ],
+              "queries": []
+            }
+          },
+          "expect": {
+            "output": {
+              "state": "prepared"
+            },
+            "snapshot": {}
+          }
+        },
+        {
+          "operation": "prepareCommand",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "taskId": "T1",
+            "toolCallId": "call-1",
+            "toolName": "commit_asset_changes",
+            "arguments": {
+              "operationKey": "T1:1",
+              "payload": {
+                "groups": [
+                  {
+                    "kind": "character",
+                    "keepId": "C1-P001",
+                    "memberIds": [
+                      "C1-P001",
+                      "C2-P001"
+                    ],
+                    "canonicalName": "沈青",
+                    "reason": "不同的判断",
+                    "confidence": 1,
+                    "evidence": [
+                      {
+                        "chapterIndex": "2",
+                        "quote": "第二章的沈青就是第一章的沈青。",
+                        "memberIds": [
+                          "C1-P001",
+                          "C2-P001"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "readSet": {
+              "records": [
+                {
+                  "table": "characters",
+                  "id": "C1-P001",
+                  "resolvedId": "C1-P001",
+                  "revision": 1,
+                  "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                },
+                {
+                  "table": "characters",
+                  "id": "C2-P001",
+                  "resolvedId": "C2-P001",
+                  "revision": 1,
+                  "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                }
+              ],
+              "queries": []
+            }
+          },
+          "expect": {
+            "output": {
+              "error": "IDEMPOTENCY_CONFLICT"
+            },
+            "snapshot": {
+              "characters.length": 2,
+              "run.commandIntents.length": 1,
+              "run.appliedCommands.length": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "GAP-REC-03",
+      "title": "prepared后暂停解锁并人工修改：恢复拒绝旧依据",
+      "seed": {
+        "clockMs": 1792800000000,
+        "uuidSequence": [
+          "K1",
+          "E1",
+          "K2",
+          "E2"
+        ],
+        "binding": {
+          "bookId": "book-a",
+          "runId": "R",
+          "taskId": "T1",
+          "profile": "asset_editor",
+          "phase": "ai_identity",
+          "owner": "owner-1"
+        },
+        "tables": {
+          "characters": [
+            {
+              "id": "C1-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "1",
+              "chapterName": "第1章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "1"
+              ],
+              "manualKeep": false
+            },
+            {
+              "id": "C2-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "2"
+              ],
+              "manualKeep": false
+            }
+          ],
+          "assetLifecycle": [
+            {
+              "key": "character:C1-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C1-P001",
+              "currentId": "C1-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            },
+            {
+              "key": "character:C2-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C2-P001",
+              "currentId": "C2-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            }
+          ],
+          "pipelineRuns": [
+            {
+              "recordType": "run",
+              "id": "R",
+              "bookId": "book-a",
+              "stage": "P2",
+              "status": "running",
+              "startedAt": "2026-10-24T00:00:00.000Z",
+              "planVersion": "2.2",
+              "contractRevision": "2026-10-24",
+              "phase": "ai_identity",
+              "tasks": [
+                {
+                  "taskId": "T1",
+                  "ordinal": 0,
+                  "callId": "PROMPT-P2-IDENTITY",
+                  "phase": "ai_identity",
+                  "status": "running",
+                  "workItemIds": [
+                    "ai_identity:fullBook:character:C1-P001",
+                    "ai_identity:fullBook:character:C2-P001"
+                  ],
+                  "input": {
+                    "bookId": "book-a",
+                    "runId": "R",
+                    "taskId": "T1",
+                    "planVersion": "2.2",
+                    "remainingCount": 2,
+                    "resume": {
+                      "reason": "initial",
+                      "appliedCommitIds": [],
+                      "nextOperationKey": "T1:1",
+                      "remainingWorkIds": [
+                        "ai_identity:fullBook:character:C1-P001",
+                        "ai_identity:fullBook:character:C2-P001"
+                      ]
+                    },
+                    "stage": "P2",
+                    "phase": "ai_identity",
+                    "kind": "character",
+                    "scope": "fullBook",
+                    "workItems": [
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C1-P001",
+                        "kind": "character",
+                        "id": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C2-P001",
+                        "kind": "character",
+                        "id": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "afterId": null,
+                    "pageLimit": 100
+                  },
+                  "inputFingerprint": "c79a2c8f283c1e2f19d06b212b79e4331ec118bcba631086dab5355735815ead",
+                  "promptHash": "fixture-known-prompt-hash",
+                  "attempt": 1,
+                  "repairCount": 0,
+                  "stepsUsed": 1,
+                  "appliedCommitIds": [],
+                  "reviewedItems": [],
+                  "readSet": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C1-P001",
+                        "resolvedId": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "table": "characters",
+                        "id": "C2-P001",
+                        "resolvedId": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "createdAt": "2026-10-24T00:00:00.000Z",
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "commandIntents": [],
+              "appliedCommands": [],
+              "coverageItems": [
+                {
+                  "workItemId": "ai_identity:fullBook:character:C1-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C1-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                },
+                {
+                  "workItemId": "ai_identity:fullBook:character:C2-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C2-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "reconciliationPass": 0,
+              "nextTaskOrdinal": 1,
+              "noProgressTasks": 0,
+              "coverage": {
+                "total": 2,
+                "checked": 0,
+                "pendingIds": [
+                  "ai_identity:fullBook:character:C1-P001",
+                  "ai_identity:fullBook:character:C2-P001"
+                ]
+              }
+            },
+            {
+              "recordType": "lease",
+              "id": "lease:world",
+              "bookId": "book-a",
+              "lockKey": "world",
+              "owner": "owner-1",
+              "runId": "R",
+              "expiresAt": 1792800300000
+            }
+          ],
+          "chapters": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "charCount": 15,
+              "order": 1
+            }
+          ],
+          "chapterTexts": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "text": "第二章的沈青就是第一章的沈青。"
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareCommand",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "taskId": "T1",
+            "toolCallId": "call-1",
+            "toolName": "commit_asset_changes",
+            "arguments": {
+              "operationKey": "T1:1",
+              "payload": {
+                "groups": [
+                  {
+                    "kind": "character",
+                    "keepId": "C1-P001",
+                    "memberIds": [
+                      "C1-P001",
+                      "C2-P001"
+                    ],
+                    "canonicalName": "沈青",
+                    "reason": "已读资料确认同一人物",
+                    "confidence": 1,
+                    "evidence": [
+                      {
+                        "chapterIndex": "2",
+                        "quote": "第二章的沈青就是第一章的沈青。",
+                        "memberIds": [
+                          "C1-P001",
+                          "C2-P001"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "readSet": {
+              "records": [
+                {
+                  "table": "characters",
+                  "id": "C1-P001",
+                  "resolvedId": "C1-P001",
+                  "revision": 1,
+                  "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                },
+                {
+                  "table": "characters",
+                  "id": "C2-P001",
+                  "resolvedId": "C2-P001",
+                  "revision": 1,
+                  "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                }
+              ],
+              "queries": []
+            }
+          },
+          "expect": {
+            "output": {
+              "state": "prepared"
+            },
+            "snapshot": {}
+          }
+        },
+        {
+          "operation": "pauseAndRelease",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R"
+          },
+          "expect": {
+            "output": {
+              "ok": true
+            },
+            "snapshot": {
+              "run.status": "paused"
+            }
+          }
+        },
+        {
+          "operation": "manualUpdate",
+          "input": {
+            "bookId": "book-a",
+            "kind": "character",
+            "id": "C1-P001",
+            "expectedRevision": 1,
+            "patch": {
+              "identity": "新的人工身份"
+            }
+          },
+          "expect": {
+            "output": {
+              "ok": true
+            },
+            "snapshot": {
+              "characters.0.revision": 2
+            }
+          }
+        },
+        {
+          "operation": "resumeRun",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R"
+          },
+          "expect": {
+            "output": {
+              "ok": true
+            },
+            "snapshot": {
+              "run.status": "running"
+            }
+          }
+        },
+        {
+          "operation": "executePrepared",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "operationKey": "T1:1"
+          },
+          "expect": {
+            "output": {
+              "error": "CONFLICT"
+            },
+            "snapshot": {
+              "characters.length": 2,
+              "characters.0.identity": "新的人工身份",
+              "run.appliedCommands.length": 0,
+              "run.commandIntents.0.state": "rejected"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "GAP-REC-04",
+      "title": "暂停解锁后人工修改：逐项覆盖只失效被改人物",
+      "seed": {
+        "clockMs": 1792800000000,
+        "uuidSequence": [
+          "K1",
+          "E1",
+          "K2",
+          "E2"
+        ],
+        "binding": {
+          "bookId": "book-a",
+          "runId": "R",
+          "taskId": "T1",
+          "profile": "asset_editor",
+          "phase": "ai_identity",
+          "owner": "owner-1"
+        },
+        "tables": {
+          "characters": [
+            {
+              "id": "C1-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "1",
+              "chapterName": "第1章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "1"
+              ],
+              "manualKeep": false
+            },
+            {
+              "id": "C2-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "2"
+              ],
+              "manualKeep": false
+            }
+          ],
+          "assetLifecycle": [
+            {
+              "key": "character:C1-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C1-P001",
+              "currentId": "C1-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            },
+            {
+              "key": "character:C2-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C2-P001",
+              "currentId": "C2-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            }
+          ],
+          "pipelineRuns": [
+            {
+              "recordType": "run",
+              "id": "R",
+              "bookId": "book-a",
+              "stage": "P2",
+              "status": "paused",
+              "startedAt": "2026-10-24T00:00:00.000Z",
+              "planVersion": "2.2",
+              "contractRevision": "2026-10-24",
+              "phase": "ai_identity",
+              "tasks": [
+                {
+                  "taskId": "T1",
+                  "ordinal": 0,
+                  "callId": "PROMPT-P2-IDENTITY",
+                  "phase": "ai_identity",
+                  "status": "completed",
+                  "workItemIds": [
+                    "ai_identity:fullBook:character:C1-P001",
+                    "ai_identity:fullBook:character:C2-P001"
+                  ],
+                  "input": {
+                    "bookId": "book-a",
+                    "runId": "R",
+                    "taskId": "T1",
+                    "planVersion": "2.2",
+                    "remainingCount": 2,
+                    "resume": {
+                      "reason": "initial",
+                      "appliedCommitIds": [],
+                      "nextOperationKey": "T1:1",
+                      "remainingWorkIds": [
+                        "ai_identity:fullBook:character:C1-P001",
+                        "ai_identity:fullBook:character:C2-P001"
+                      ]
+                    },
+                    "stage": "P2",
+                    "phase": "ai_identity",
+                    "kind": "character",
+                    "scope": "fullBook",
+                    "workItems": [
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C1-P001",
+                        "kind": "character",
+                        "id": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C2-P001",
+                        "kind": "character",
+                        "id": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "afterId": null,
+                    "pageLimit": 100
+                  },
+                  "inputFingerprint": "c79a2c8f283c1e2f19d06b212b79e4331ec118bcba631086dab5355735815ead",
+                  "promptHash": "fixture-known-prompt-hash",
+                  "attempt": 1,
+                  "repairCount": 0,
+                  "stepsUsed": 1,
+                  "appliedCommitIds": [],
+                  "reviewedItems": [],
+                  "readSet": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C1-P001",
+                        "resolvedId": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "table": "characters",
+                        "id": "C2-P001",
+                        "resolvedId": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "createdAt": "2026-10-24T00:00:00.000Z",
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "commandIntents": [],
+              "appliedCommands": [],
+              "coverageItems": [
+                {
+                  "workItemId": "ai_identity:fullBook:character:C1-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C1-P001",
+                  "status": "checked",
+                  "inputRevision": 1,
+                  "inputFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a",
+                  "coveredRevision": 1,
+                  "coveredFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a",
+                  "dependencies": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C1-P001",
+                        "resolvedId": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": "no_change",
+                  "reason": "已检查，无变更",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                },
+                {
+                  "workItemId": "ai_identity:fullBook:character:C2-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C2-P001",
+                  "status": "checked",
+                  "inputRevision": 1,
+                  "inputFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1",
+                  "coveredRevision": 1,
+                  "coveredFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1",
+                  "dependencies": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C2-P001",
+                        "resolvedId": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": "no_change",
+                  "reason": "已检查，无变更",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "reconciliationPass": 0,
+              "nextTaskOrdinal": 1,
+              "noProgressTasks": 0,
+              "coverage": {
+                "total": 2,
+                "checked": 2,
+                "pendingIds": []
+              }
+            }
+          ],
+          "chapters": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "charCount": 15,
+              "order": 1
+            }
+          ],
+          "chapterTexts": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "text": "第二章的沈青就是第一章的沈青。"
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "operation": "manualUpdate",
+          "input": {
+            "bookId": "book-a",
+            "kind": "character",
+            "id": "C1-P001",
+            "expectedRevision": 1,
+            "patch": {
+              "identity": "新的人工身份"
+            }
+          },
+          "expect": {
+            "output": {
+              "ok": true
+            },
+            "snapshot": {}
+          }
+        },
+        {
+          "operation": "reconcileCoverage",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R"
+          },
+          "expect": {
+            "output": {
+              "ok": true
+            },
+            "snapshot": {
+              "run.coverage.checked": 1,
+              "run.coverage.pendingIds": [
+                "ai_identity:fullBook:character:C1-P001"
+              ],
+              "run.coverageItems.0.status": "stale",
+              "run.coverageItems.1.status": "checked"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "GAP-REC-05",
+      "title": "最终总结不能漏掉分配项",
+      "seed": {
+        "clockMs": 1792800000000,
+        "uuidSequence": [
+          "K1",
+          "E1",
+          "K2",
+          "E2"
+        ],
+        "binding": {
+          "bookId": "book-a",
+          "runId": "R",
+          "taskId": "T1",
+          "profile": "asset_editor",
+          "phase": "ai_identity",
+          "owner": "owner-1"
+        },
+        "tables": {
+          "characters": [
+            {
+              "id": "C1-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "1",
+              "chapterName": "第1章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "1"
+              ],
+              "manualKeep": false
+            },
+            {
+              "id": "C2-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "2"
+              ],
+              "manualKeep": false
+            }
+          ],
+          "assetLifecycle": [
+            {
+              "key": "character:C1-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C1-P001",
+              "currentId": "C1-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            },
+            {
+              "key": "character:C2-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C2-P001",
+              "currentId": "C2-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            }
+          ],
+          "pipelineRuns": [
+            {
+              "recordType": "run",
+              "id": "R",
+              "bookId": "book-a",
+              "stage": "P2",
+              "status": "running",
+              "startedAt": "2026-10-24T00:00:00.000Z",
+              "planVersion": "2.2",
+              "contractRevision": "2026-10-24",
+              "phase": "ai_identity",
+              "tasks": [
+                {
+                  "taskId": "T1",
+                  "ordinal": 0,
+                  "callId": "PROMPT-P2-IDENTITY",
+                  "phase": "ai_identity",
+                  "status": "running",
+                  "workItemIds": [
+                    "ai_identity:fullBook:character:C1-P001",
+                    "ai_identity:fullBook:character:C2-P001"
+                  ],
+                  "input": {
+                    "bookId": "book-a",
+                    "runId": "R",
+                    "taskId": "T1",
+                    "planVersion": "2.2",
+                    "remainingCount": 2,
+                    "resume": {
+                      "reason": "initial",
+                      "appliedCommitIds": [],
+                      "nextOperationKey": "T1:1",
+                      "remainingWorkIds": [
+                        "ai_identity:fullBook:character:C1-P001",
+                        "ai_identity:fullBook:character:C2-P001"
+                      ]
+                    },
+                    "stage": "P2",
+                    "phase": "ai_identity",
+                    "kind": "character",
+                    "scope": "fullBook",
+                    "workItems": [
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C1-P001",
+                        "kind": "character",
+                        "id": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C2-P001",
+                        "kind": "character",
+                        "id": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "afterId": null,
+                    "pageLimit": 100
+                  },
+                  "inputFingerprint": "c79a2c8f283c1e2f19d06b212b79e4331ec118bcba631086dab5355735815ead",
+                  "promptHash": "fixture-known-prompt-hash",
+                  "attempt": 1,
+                  "repairCount": 0,
+                  "stepsUsed": 1,
+                  "appliedCommitIds": [],
+                  "reviewedItems": [],
+                  "readSet": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C1-P001",
+                        "resolvedId": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "table": "characters",
+                        "id": "C2-P001",
+                        "resolvedId": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "createdAt": "2026-10-24T00:00:00.000Z",
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "commandIntents": [],
+              "appliedCommands": [],
+              "coverageItems": [
+                {
+                  "workItemId": "ai_identity:fullBook:character:C1-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C1-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                },
+                {
+                  "workItemId": "ai_identity:fullBook:character:C2-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C2-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "reconciliationPass": 0,
+              "nextTaskOrdinal": 1,
+              "noProgressTasks": 0,
+              "coverage": {
+                "total": 2,
+                "checked": 0,
+                "pendingIds": [
+                  "ai_identity:fullBook:character:C1-P001",
+                  "ai_identity:fullBook:character:C2-P001"
+                ]
+              }
+            },
+            {
+              "recordType": "lease",
+              "id": "lease:world",
+              "bookId": "book-a",
+              "lockKey": "world",
+              "owner": "owner-1",
+              "runId": "R",
+              "expiresAt": 1792800300000
+            }
+          ],
+          "chapters": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "charCount": 15,
+              "order": 1
+            }
+          ],
+          "chapterTexts": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "text": "第二章的沈青就是第一章的沈青。"
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "operation": "finalizeTask",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "taskId": "T1",
+            "summary": {
+              "status": "completed",
+              "commitIds": [],
+              "summary": "全部完成",
+              "remainingWorkIds": [],
+              "reviewedItems": [
+                {
+                  "workItemId": "ai_identity:fullBook:character:C1-P001",
+                  "outcome": "no_change",
+                  "reason": "只检查了一项"
+                }
+              ]
+            }
+          },
+          "expect": {
+            "output": {
+              "error": "INVALID_ARGS"
+            },
+            "snapshot": {
+              "run.tasks.0.status": "running",
+              "run.coverage.checked": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "GAP-REC-06",
+      "title": "不能冒用同run其他task的确认",
+      "seed": {
+        "clockMs": 1792800000000,
+        "uuidSequence": [
+          "K1",
+          "E1",
+          "K2",
+          "E2"
+        ],
+        "binding": {
+          "bookId": "book-a",
+          "runId": "R",
+          "taskId": "T1",
+          "profile": "asset_editor",
+          "phase": "ai_identity",
+          "owner": "owner-1"
+        },
+        "tables": {
+          "characters": [
+            {
+              "id": "C1-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "1",
+              "chapterName": "第1章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "1"
+              ],
+              "manualKeep": false
+            },
+            {
+              "id": "C2-P001",
+              "bookId": "book-a",
+              "name": "沈青",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "revision": 1,
+              "createdBy": "P1",
+              "confidence": 1,
+              "aliases": [],
+              "sourceChapters": [
+                "2"
+              ],
+              "manualKeep": false
+            }
+          ],
+          "assetLifecycle": [
+            {
+              "key": "character:C1-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C1-P001",
+              "currentId": "C1-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            },
+            {
+              "key": "character:C2-P001",
+              "bookId": "book-a",
+              "kind": "character",
+              "originId": "C2-P001",
+              "currentId": "C2-P001",
+              "state": "live",
+              "revision": 1,
+              "updatedAt": "2026-10-24T00:00:00.000Z"
+            }
+          ],
+          "pipelineRuns": [
+            {
+              "recordType": "run",
+              "id": "R",
+              "bookId": "book-a",
+              "stage": "P2",
+              "status": "running",
+              "startedAt": "2026-10-24T00:00:00.000Z",
+              "planVersion": "2.2",
+              "contractRevision": "2026-10-24",
+              "phase": "ai_identity",
+              "tasks": [
+                {
+                  "taskId": "T1",
+                  "ordinal": 1,
+                  "callId": "PROMPT-P2-IDENTITY",
+                  "phase": "ai_identity",
+                  "status": "running",
+                  "workItemIds": [
+                    "ai_identity:fullBook:character:C1-P001",
+                    "ai_identity:fullBook:character:C2-P001"
+                  ],
+                  "input": {
+                    "bookId": "book-a",
+                    "runId": "R",
+                    "taskId": "T1",
+                    "planVersion": "2.2",
+                    "remainingCount": 2,
+                    "resume": {
+                      "reason": "initial",
+                      "appliedCommitIds": [],
+                      "nextOperationKey": "T1:1",
+                      "remainingWorkIds": [
+                        "ai_identity:fullBook:character:C1-P001",
+                        "ai_identity:fullBook:character:C2-P001"
+                      ]
+                    },
+                    "stage": "P2",
+                    "phase": "ai_identity",
+                    "kind": "character",
+                    "scope": "fullBook",
+                    "workItems": [
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C1-P001",
+                        "kind": "character",
+                        "id": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C2-P001",
+                        "kind": "character",
+                        "id": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "afterId": null,
+                    "pageLimit": 100
+                  },
+                  "inputFingerprint": "c79a2c8f283c1e2f19d06b212b79e4331ec118bcba631086dab5355735815ead",
+                  "promptHash": "fixture-known-prompt-hash",
+                  "attempt": 1,
+                  "repairCount": 0,
+                  "stepsUsed": 1,
+                  "appliedCommitIds": [],
+                  "reviewedItems": [],
+                  "readSet": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C1-P001",
+                        "resolvedId": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "table": "characters",
+                        "id": "C2-P001",
+                        "resolvedId": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "createdAt": "2026-10-24T00:00:00.000Z",
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                },
+                {
+                  "taskId": "T0",
+                  "ordinal": 0,
+                  "callId": "PROMPT-P2-IDENTITY",
+                  "phase": "ai_identity",
+                  "status": "partial",
+                  "workItemIds": [
+                    "ai_identity:fullBook:character:C1-P001",
+                    "ai_identity:fullBook:character:C2-P001"
+                  ],
+                  "input": {
+                    "bookId": "book-a",
+                    "runId": "R",
+                    "taskId": "T0",
+                    "planVersion": "2.2",
+                    "remainingCount": 2,
+                    "resume": {
+                      "reason": "initial",
+                      "appliedCommitIds": [],
+                      "nextOperationKey": "T1:1",
+                      "remainingWorkIds": [
+                        "ai_identity:fullBook:character:C1-P001",
+                        "ai_identity:fullBook:character:C2-P001"
+                      ]
+                    },
+                    "stage": "P2",
+                    "phase": "ai_identity",
+                    "kind": "character",
+                    "scope": "fullBook",
+                    "workItems": [
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C1-P001",
+                        "kind": "character",
+                        "id": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "workItemId": "ai_identity:fullBook:character:C2-P001",
+                        "kind": "character",
+                        "id": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "afterId": null,
+                    "pageLimit": 100
+                  },
+                  "inputFingerprint": "c5901da1dde944356c8f7933e06061f6b181e6b32503e8cf12dfc9e8c1c77954",
+                  "promptHash": "fixture-known-prompt-hash",
+                  "attempt": 1,
+                  "repairCount": 0,
+                  "stepsUsed": 1,
+                  "appliedCommitIds": [
+                    "K0"
+                  ],
+                  "reviewedItems": [],
+                  "readSet": {
+                    "records": [
+                      {
+                        "table": "characters",
+                        "id": "C1-P001",
+                        "resolvedId": "C1-P001",
+                        "revision": 1,
+                        "factFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a"
+                      },
+                      {
+                        "table": "characters",
+                        "id": "C2-P001",
+                        "resolvedId": "C2-P001",
+                        "revision": 1,
+                        "factFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1"
+                      }
+                    ],
+                    "queries": []
+                  },
+                  "createdAt": "2026-10-24T00:00:00.000Z",
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "commandIntents": [],
+              "appliedCommands": [
+                {
+                  "operationKey": "old-key",
+                  "taskId": "T0",
+                  "payloadFingerprint": "old-fingerprint",
+                  "commitId": "K0",
+                  "committedAt": "2026-10-24T00:00:00.000Z",
+                  "resultSummary": "先前子任务确认"
+                }
+              ],
+              "coverageItems": [
+                {
+                  "workItemId": "ai_identity:fullBook:character:C1-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C1-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "a87c2151456f7c4133d5867d9dae65de4b2ab90ab14cac722382c3560c00ed7a",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                },
+                {
+                  "workItemId": "ai_identity:fullBook:character:C2-P001",
+                  "phase": "ai_identity",
+                  "kind": "character",
+                  "id": "C2-P001",
+                  "status": "assigned",
+                  "inputRevision": 1,
+                  "inputFingerprint": "42d00be5e4cfde3ce6e7d3675d449d6398bef9e2caf6b47b2ca0897ed5b7d6d1",
+                  "coveredRevision": 0,
+                  "coveredFingerprint": "",
+                  "dependencies": {
+                    "records": [],
+                    "queries": []
+                  },
+                  "taskId": "T1",
+                  "outcome": null,
+                  "reason": "",
+                  "invalidations": 0,
+                  "updatedAt": "2026-10-24T00:00:00.000Z"
+                }
+              ],
+              "reconciliationPass": 0,
+              "nextTaskOrdinal": 2,
+              "noProgressTasks": 0,
+              "coverage": {
+                "total": 2,
+                "checked": 0,
+                "pendingIds": [
+                  "ai_identity:fullBook:character:C1-P001",
+                  "ai_identity:fullBook:character:C2-P001"
+                ]
+              }
+            },
+            {
+              "recordType": "lease",
+              "id": "lease:world",
+              "bookId": "book-a",
+              "lockKey": "world",
+              "owner": "owner-1",
+              "runId": "R",
+              "expiresAt": 1792800300000
+            }
+          ],
+          "chapters": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "chapterName": "第2章",
+              "charCount": 15,
+              "order": 1
+            }
+          ],
+          "chapterTexts": [
+            {
+              "bookId": "book-a",
+              "chapterIndex": "2",
+              "text": "第二章的沈青就是第一章的沈青。"
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "operation": "finalizeTask",
+          "input": {
+            "bookId": "book-a",
+            "runId": "R",
+            "taskId": "T1",
+            "summary": {
+              "status": "completed",
+              "commitIds": [
+                "K0"
+              ],
+              "summary": "全部完成",
+              "remainingWorkIds": [],
+              "reviewedItems": [
+                {
+                  "workItemId": "ai_identity:fullBook:character:C1-P001",
+                  "outcome": "no_change",
+                  "reason": "已核查"
+                },
+                {
+                  "workItemId": "ai_identity:fullBook:character:C2-P001",
+                  "outcome": "no_change",
+                  "reason": "已核查"
+                }
+              ]
+            }
+          },
+          "expect": {
+            "output": {
+              "error": "INVALID_ARGS"
+            },
+            "snapshot": {
+              "run.tasks.0.status": "running"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

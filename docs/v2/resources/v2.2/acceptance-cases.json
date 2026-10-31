@@ -1,0 +1,372 @@
+{
+  "version": "2.2",
+  "kind": "declarative-target-scenarios-not-executable-suite",
+  "status": "not-run-against-application",
+  "cases": [
+    {
+      "id": "AC-V22-01",
+      "title": "P1全书先行",
+      "given": "240原章含第100章多切块",
+      "when": "仅导入后分别尝试启动P2/P3；再启动P1",
+      "then": "P2/P3拒绝；P1顺序全书，成功数据即时可用，完成后不自动下游",
+      "references": [
+        "FR-04",
+        "FR-05",
+        "ALG-02"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-02",
+      "title": "P1即时落表",
+      "given": "第2章请求尚未结束",
+      "when": "第1章世界/叙事各返回一次",
+      "then": "成功子步骤资产/凭证/进度原子提交，第1章表格可查改，不等第100章",
+      "references": [
+        "FR-04",
+        "UI-04"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-03",
+      "title": "P1部分失败恢复",
+      "given": "世界成功、叙事失败",
+      "when": "继续P1",
+      "then": "只补叙事；世界不重请求不覆盖人工编辑",
+      "references": [
+        "ALG-02",
+        "DF-02"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-04",
+      "title": "P1人工并入不复活",
+      "given": "前两章人物已生成并有凭证",
+      "when": "手工合并、删除目标，再模拟刷新和恢复",
+      "then": "并入/删除墓碑保留；成功原ID不复活；P1成功覆盖不丢",
+      "references": [
+        "T18",
+        "T19",
+        "DF-07"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-05",
+      "title": "人工CRUD",
+      "given": "P1运行中且存在章文/节点",
+      "when": "分别新增人物地点节点线、查询编辑删除",
+      "then": "必要字段/引文/成员校验，U-UUID/manual；revision增长；不阻止P1",
+      "references": [
+        "FR-09",
+        "OP-61"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-06",
+      "title": "批量手动合并",
+      "given": "三条同类资产，名称不同，一条隐藏于筛选",
+      "when": "多选→确定→选keep和新主名→确认",
+      "then": "至少2；隐藏选择明确；ID由keep决定；其他名归别名；不调用AI",
+      "references": [
+        "UI-05",
+        "OP-21"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-07",
+      "title": "手工预览冲突与取消",
+      "given": "预览打开后另一操作修改一条",
+      "when": "确认/取消/刷新预览",
+      "then": "CONFLICT整组不提交；保留选择；取消不写库；刷新后可重试",
+      "references": [
+        "ALG-07",
+        "DF-07"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-08",
+      "title": "名称信号不得直接误合并",
+      "given": "张三/张三丰、同名异人、地点包含、分数0.9与>0.9",
+      "when": "执行候选阶段并尝试无证据AI写入",
+      "then": "实体数不因候选减少；无证据拒绝；有效原文证据或人工确认后才融合",
+      "references": [
+        "ALG-04"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-09",
+      "title": "P2精简查询",
+      "given": "档案含很长性格/背景/地点描述",
+      "when": "执行AI判同并记录工具返回",
+      "then": "首轮精简分页不含完整长字段，只有提示和指标；按需详情；所有页有覆盖",
+      "references": [
+        "AI-02",
+        "AI-06"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-10",
+      "title": "P2按ID跨页判同",
+      "given": "候选在不同页，且存在同名不同ID",
+      "when": "查询两页后提交ID组",
+      "then": "按查询ID分组；未查询ID/跨类型/重叠组拒绝；人工主名优先",
+      "references": [
+        "ALG-04",
+        "model-output-contract"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-11",
+      "title": "P2人物地点整编",
+      "given": ">1200 token或近重复>=0.85档案及正常小档案",
+      "when": "机械后筛选并整编",
+      "then": "只按需读取详细事实；人物地点均可；全部事实ID覆盖；小档案不无故整编",
+      "references": [
+        "ALG-04",
+        "AI-02"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-12",
+      "title": "P2部分失败与报告",
+      "given": "机械合并已成功，AI部分失败/取消",
+      "when": "结束后刷新重开报告",
+      "then": "已提交结果保留；状态degraded/cancelled；前后数/组/整编/失败/费用准确；零变更有报告",
+      "references": [
+        "FR-07",
+        "OP-62"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-13",
+      "title": "P2/P3并行",
+      "given": "全书P1完成",
+      "when": "先P3再P2，反向重做；取消P2",
+      "then": "两个running且租约不同；各自控制器/费用/日志；取消P2不停止P3",
+      "references": [
+        "AR-07",
+        "UI-04"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-14",
+      "title": "P3窗口边界",
+      "given": "240章，其中100章有多个切块",
+      "when": "记录全部window_link范围",
+      "then": "1–100、81–180、161–240；切块不多算原章；最后不生成空窗",
+      "references": [
+        "ALG-03"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-15",
+      "title": "窗口内超分页容量",
+      "given": "同窗超过400节点，已有50条以上事件线",
+      "when": "遍历串联",
+      "then": "全部节点页覆盖；摘要首50条不是全量线；无漏页完成标记",
+      "references": [
+        "ALG-03",
+        "AI-10"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-16",
+      "title": "高置信与重叠幂等",
+      "given": "操作置信度0.84/0.85/0.92及重叠节点",
+      "when": "提交/恢复/重复create",
+      "then": "<0.85不写线；有效操作有证据；重复同成员create不增线；优先追加已有线",
+      "references": [
+        "ALG-06"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-17",
+      "title": "同书持续会话",
+      "given": "同书多窗口及已有原始条目",
+      "when": "继续→全书复核→失败恢复→重新串联",
+      "then": "全程同sessionId，消息链追加；不归档新开；压缩保原文历史",
+      "references": [
+        "FR-12",
+        "AI-08"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-18",
+      "title": "跨书隔离",
+      "given": "书A有会话/摘要；重复导入产生书B",
+      "when": "B启动P3并试图查A条目",
+      "then": "新独立会话；不可读A消息/笔记；备份为新书也按新bookId隔离",
+      "references": [
+        "AR-07",
+        "AI-08"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-19",
+      "title": "全书复核覆盖",
+      "given": "孤点、跨窗伏笔、缺关键环节线和合理独立节点",
+      "when": "窗口结束后global_review",
+      "then": "全部孤点/线/事项有检查记录；可回原文；伏笔跨窗连；独立节点可保留",
+      "references": [
+        "FR-08",
+        "ALG-03"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-20",
+      "title": "补点证据",
+      "given": "缺环线和原文含/不含拟补事件",
+      "when": "尝试new_nodes",
+      "then": "补点选择本书章节，参考引文可空；未匹配记录提示并保留节点，不因此重试；新点加入复核清单",
+      "references": [
+        "ALG-06",
+        "AI-10"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-21",
+      "title": "并行依赖隔离",
+      "given": "P3批仅读人物A，P2修改无关地点B后修改A",
+      "when": "分别提交P3批",
+      "then": "改B正常提交；改A仅该批CONFLICT并同会话重查；不全书无故失效",
+      "references": [
+        "AR-06",
+        "AI-07"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-22",
+      "title": "锁定域拒绝人工写与跨域覆盖失效",
+      "given": "P2/P3持锁期间；或暂停释放锁后人工修改再继续",
+      "when": "尝试同域人工写；P3读取世界依赖后世界资料合法变化；暂停后修改并继续",
+      "then": "同域人工写返回ASSET_DOMAIN_LOCKED且零写；相关跨域/暂停期间变化入待办，不把失效覆盖标current-completed",
+      "references": [
+        "DATA-22",
+        "ALG-03"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-23",
+      "title": "单层实体直接生效",
+      "given": "P1首章成功，P2/P3均未运行",
+      "when": "查询并修改人物→合并→导出→刷新重开",
+      "then": "P1直接写characters/locations/nodes；CRUD与合并直接操作同表；ID稳定；无草稿副本/入库按钮或P2/P3生效门槛",
+      "references": [
+        "FR-10",
+        "ALG-08",
+        "DF-09"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-24",
+      "title": "备份v5与旧迁移",
+      "given": "运行中单书含凭证/映射/报告，另有v4历史包",
+      "when": "导出/新书恢复/迁移",
+      "then": "单书15表快照；lease排除、running暂停；v4优先可编辑源并保留ID，不能把冻结副本相加或复活已删行；无发布前置",
+      "references": [
+        "DATA-22",
+        "DF-10"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-25",
+      "title": "多标签竞争和切书报告",
+      "given": "两个标签同书，另有书B",
+      "when": "重复启动同P2/活owner竞争；A完成时查看B",
+      "then": "同阶段只有一个owner；P2/P3可并行；B不串A日志/费用/弹窗，A有新报告标记",
+      "references": [
+        "AR-07",
+        "OP-62"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-26",
+      "title": "两模式统一Pi与配置切换",
+      "given": "同一保存配置的提取/归并角色；两个受支持地址/模型",
+      "when": "依次执行direct、Agent、摘要、结果修正、两类探测并监控边界",
+      "then": "全部生成经pi-ai，Agent循环经pi-agent-core；无业务/设置raw生成HTTP旁路；同配置解析/凭据/用量，目录GET仅发现",
+      "references": [
+        "FR-15",
+        "AI-00",
+        "AR-11"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-27",
+      "title": "统一校验与错误",
+      "given": "direct/Agent分别遇无效结构、无效引用、限流、取消、模型能力缺失",
+      "when": "按相同领域命令输入和Provider错误执行",
+      "then": "两模式均校验并归一错误；最多一次结构修正；无叠加网络重试；无效写不落库；不支持能力不raw HTTP兜底",
+      "references": [
+        "AI-01",
+        "AI-03",
+        "AI-05"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-28",
+      "title": "Agent受控读写与记忆原子提交",
+      "given": "P3已有当前书上下文/节点，P2也有候选人物组",
+      "when": "Pi循环查询后分别commit_story_changes/commit_asset_changes，再最终摘要",
+      "then": "写工具execute实际修改当前实体；故事资产/记忆/覆盖/凭据同事务，返回commitId后才成功；最终submit不重写；越书/角色写被拒绝",
+      "references": [
+        "AI-04",
+        "AI-11",
+        "DF-13"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-29",
+      "title": "写成功后反馈丢失与幂等",
+      "given": "写工具业务事务已提交，toolResult或最终模型响应丢失",
+      "when": "恢复原runId，同operationKey重试；再用同key改payload；取消最终回复",
+      "then": "同payload返回原commitId/alreadyApplied=true，无重复合并/补点/记忆revision；不同payload冲突；最终失败/取消保留已提交数据和报告",
+      "references": [
+        "AI-11",
+        "DATA-7",
+        "ALG-12"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    },
+    {
+      "id": "AC-V22-30",
+      "title": "Pi运行状态与应用长期记忆分工",
+      "given": "本书已有原始消息/摘要/检查点，另一书也有会话",
+      "when": "销毁进程Pi Agent后恢复，继续原书并切换受支持模型",
+      "then": "应用存档恢复同书规范Pi上下文和同sessionId，不假设SDK自动落盘；Pi管理新运行循环/工具；新配置下一run生效，跨书不能读写记忆",
+      "references": [
+        "AR-11",
+        "AI-08",
+        "AI-11"
+      ],
+      "applicationVerification": "not-run-target-not-implemented"
+    }
+  ]
+}

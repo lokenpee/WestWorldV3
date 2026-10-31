@@ -1,0 +1,265 @@
+{
+  "version": "2.2",
+  "status": "target-not-implemented",
+  "decisionDate": "2026-10-22 Asia/Shanghai",
+  "principle": "AI统一基于Pi：pi-ai为统一模型调用层；pi-agent-core为Agent执行与运行状态管理层；应用持久化长期记忆和业务状态并通过受控工具读写。",
+  "dependencies": {
+    "modelLayer": {
+      "name": "pi-ai",
+      "installedPackage": "@earendil-works/pi-ai",
+      "version": "1.0.2"
+    },
+    "agentLayer": {
+      "name": "pi-agent-core",
+      "installedPackage": "@earendil-works/pi-agent-core",
+      "version": "1.0.2"
+    },
+    "apiEvidence": [
+      "app/node_modules/@earendil-works/pi-ai/README.md",
+      "app/node_modules/@earendil-works/pi-agent-core/README.md"
+    ]
+  },
+  "modelBoundary": {
+    "sharedBy": [
+      "direct",
+      "agent"
+    ],
+    "configuration": "one-saved-config-resolver-per-run",
+    "resolvedSnapshot": [
+      "providerId",
+      "api",
+      "baseUrl",
+      "modelId",
+      "modelRole",
+      "contextWindow",
+      "capabilities",
+      "credentialRef"
+    ],
+    "publicTypes": "Pi Model/Context/Message/AssistantMessage/Usage/events plus application validation/error metadata",
+    "providerProtocols": "Pi built-in provider or registered Pi-compatible adapter only",
+    "businessRawInferenceHttpAllowed": false,
+    "settingsRawInferenceHttpAllowed": false,
+    "discoveryHttp": "GET /models allowed inside catalog adapter; is not inference",
+    "unknownCapability": "unsupported_capability-before-business-write",
+    "unsupportedProvider": "unsupported_provider; no fallback raw HTTP path",
+    "providerDefault": "deepseek is default, not a universal hard-coded identity",
+    "modelRoleVsMode": "extraction/aggregation select model configuration; direct/agent select execution behavior, independently",
+    "authentication": "adapter-declared required credential or no-auth; do not fake anonymous keys"
+  },
+  "modes": {
+    "direct": {
+      "execution": "pi-ai Models.complete/completeSimple or stream/streamSimple; application bounded retry/repair wrapper",
+      "usesAgentCoreLoop": false,
+      "autonomousToolLoop": false,
+      "structuredSubmit": "single submit_result schema function may constrain response but has no DB side effect and is not an Agent",
+      "uses": [
+        "P1-world",
+        "P1-narrative",
+        "P2-character-optimization",
+        "P2-location-optimization",
+        "session-compaction",
+        "extraction-probe"
+      ],
+      "commit": "caller shared command service commits validated output"
+    },
+    "agent": {
+      "execution": "pi-agent-core Agent class",
+      "streamFn": "same pi-ai Models.streamSimple instance/adapter",
+      "runtimeStateOwner": "pi-agent-core",
+      "hooks": [
+        "subscribe",
+        "prepareRequest",
+        "beforeToolCall",
+        "afterToolCall",
+        "finishTurn"
+      ],
+      "restore": "application canonical session projection into Pi Agent state",
+      "persistedMemoryOwner": "application IndexedDB",
+      "toolExecution": "sequential",
+      "uses": [
+        "P2-identity",
+        "P3-window-link",
+        "P3-global-review",
+        "agent-probe"
+      ],
+      "businessWrites": "executing registered AgentTool.execute calls shared command service and returns durable commit receipt",
+      "finalSubmit": "AgentTaskSummarySchema includes commitIds; does not repeat business mutations"
+    }
+  },
+  "sharedValidation": [
+    "Pi message/type normalization",
+    "input/result JSON Schema",
+    "bookId/profile/phase scope",
+    "reference/quote/fact coverage rules applicable to command",
+    "expected revision/read-set/lease checks",
+    "same domain command service for direct callers and Agent write tools"
+  ],
+  "sharedErrors": {
+    "kinds": [
+      "network",
+      "rate_limit",
+      "server",
+      "auth",
+      "context_length",
+      "content_policy",
+      "validation",
+      "cancelled",
+      "unsupported_provider",
+      "unsupported_capability",
+      "unknown"
+    ],
+    "preserve": [
+      "Pi stopReason",
+      "provider diagnostic without secrets",
+      "attempts",
+      "attemptsUsage",
+      "mode",
+      "modelRole",
+      "bookId",
+      "runId"
+    ],
+    "retryOwner": "one application retry policy; Agent loop is not a second provider retry layer",
+    "repairLimit": 1,
+    "contextRecovery": "one additional compaction recovery only for persistent Agent sessions",
+    "businessConflict": "CONFLICT tool result is a domain conflict to re-read, not a provider network failure",
+    "backoffCancellation": "AbortSignal ends delay before next request",
+    "repairBudget": "all-repair-provider-requests-consume-requestBudget"
+  },
+  "memory": {
+    "runtime": "Pi Agent messages/tools/pending calls/events",
+    "persistent": [
+      "storySessions",
+      "storySessionEntries",
+      "storyEditorMemory",
+      "storyEditorNotes",
+      "storyEditorCheckpoints",
+      "pipelineRuns"
+    ],
+    "readTools": [
+      "get_editor_memory",
+      "query_editor_notes",
+      "get_editor_note_detail",
+      "list_editor_sessions",
+      "query_editor_session_history"
+    ],
+    "writeTool": "commit_story_changes (includes memory_update; empty asset ops permit memory-only commit)",
+    "crossBookSharing": false,
+    "runtimeInstanceScope": "bookId + profile; each book has independent Pi Agent state and tools",
+    "persistentSessionScope": "bookId + sessionId + profile",
+    "restore": "recreate Pi runtime from the original logical session and canonical messages",
+    "windowSwitch": "view selection changes subscriptions; events retain original bookId/sessionId/runId",
+    "windowUnmount": "persisted history survives; cancellation is an explicit task operation",
+    "compactionStorage": "append summary and projection boundary; retain original messages, tool results and chapter text",
+    "futurePlay": {
+      "windowScope": "one persistent conversation window per book",
+      "contextScope": "book-owned play session with its own role and tool contract",
+      "mechanism": "shared session persistence, restoration and compaction",
+      "schemaDelivery": "play integration defines storage upgrade and backup validation before use"
+    },
+    "P3SameSessionOnRecheck": true,
+    "P2StoryMemoryAccess": false,
+    "SDKAutoPersistence": false,
+    "commitAnnotationProjection": "buffer app commit annotations until matching Pi toolResult batch or explicit interruption placeholders; never interleave before unresolved toolResults"
+  },
+  "writePolicy": {
+    "tools": [
+      "commit_asset_changes",
+      "commit_story_changes"
+    ],
+    "submit_result": "finalization only; no DB mutation",
+    "scopeBinding": "bookId/runId/sessionId/profile/phase bound by application, not model parameters",
+    "revisionBinding": "from latest actual tool read-set; same validator as direct mode",
+    "idempotencyKey": [
+      "runId",
+      "operationKey"
+    ],
+    "ledger": "pipelineRuns.appliedCommands",
+    "repeatSameKeySamePayload": "return original durable receipt without new mutation",
+    "repeatSameKeyDifferentPayload": "IDEMPOTENCY_CONFLICT",
+    "commitBeforeToolResult": true,
+    "atomicMemoryAndAssets": true,
+    "noWriteOnValidationFailure": true,
+    "cancelBeforeTransaction": "reject uncommitted command",
+    "cancelAfterCommit": "preserve committed state and receipt",
+    "finalResponseFailureAfterWrite": "preserve committed state; report partial/failed with applied commits",
+    "businessSuccess": "durable commit receipt, never assistant text or agent_end alone",
+    "resumeRunIdentity": "interruption recovery reuses runId/operationKey with new lease owner; explicit recheck starts new runId but same P3 sessionId",
+    "idempotencyCheckOrder": [
+      "validate structure and application-bound scope",
+      "transactionally lookup ledger",
+      "return original same-payload receipt if already applied",
+      "only new commands validate current records/read-set then commit"
+    ],
+    "commandAtomicity": "all groups/operations in one payload and its idempotency ledger commit together; prior separate commands remain applied on later failure",
+    "finalizerPiTermination": "valid sole finalizer returns terminate hint or finishTurn end; do not trigger another generation solely to replay mutations",
+    "durableIntent": "pipelineRuns.commandIntents before any business side effect",
+    "receiptTaskBinding": "appliedCommands.taskId"
+  },
+  "probe": {
+    "direct": "Pi direct text request; provider error/abort fails even if transport is 2xx",
+    "agent": "two isolated suites (asset/story), maxSteps=3, maxTokens=1024, timeoutMs=30000 per suite; exact fixtures and prompts in 05 AI-15",
+    "discovery": "catalog adapter GET is allowed, cannot substitute for generation validation"
+  },
+  "readToolCount": 14,
+  "writeToolCount": 2,
+  "uniqueBusinessToolCount": 16,
+  "finalizerSeparate": true,
+  "applicationImplementationVerified": false,
+  "packageBoundary": {
+    "runtimeEnvironment": "browser",
+    "additionalLocalServiceRequired": false,
+    "engineReuse": "fixed Pi packages and public hooks; native model/tool loop and message/event protocol",
+    "probeOverrides": "single-turn finish and short output belong to connection probes",
+    "retain": {
+      "@earendil-works/pi-ai": "1.0.2",
+      "@earendil-works/pi-agent-core": "1.0.2"
+    },
+    "codingLayer": "not-a-web-runtime-dependency",
+    "excludedCapabilities": [
+      "host-shell",
+      "arbitrary-host-file-read-write-edit",
+      "coding-cli-tui",
+      "coding-file-session-store",
+      "automatic-mcp-or-extension-loading"
+    ],
+    "migrationSpecification": "../../02-架构与技术规格.md#ar-12-pi接入coding包取舍与迁移顺序",
+    "status": "target-not-implemented"
+  },
+  "contractRevision": "2026-10-24",
+  "taskIdentity": "pipelineRuns.tasks.taskId",
+  "bugfixPolicyRevision": "2026-10-24.fix-first",
+  "requestBudget": {
+    "revision": "2026-10-24.stage0",
+    "countsInitialRequest": true,
+    "direct": {
+      "maxProviderRequests": 3,
+      "maxRepairs": 1,
+      "repairsConsumeBudget": true
+    },
+    "retryableKinds": [
+      "network",
+      "server",
+      "rate_limit"
+    ],
+    "chapterRetryWrapper": false,
+    "agent": {
+      "maxRequestsPerTurn": 3,
+      "maxProviderRequests": 6,
+      "timeoutMs": 180000,
+      "repairsConsumeBudget": true,
+      "resumeKeepsRequestCount": true,
+      "maxWriteRepairs": 1,
+      "maxFinalRepairs": 1
+    },
+    "probe": "existing tighter three-request/30-second ceiling wins",
+    "nonRetryable": [
+      "auth",
+      "content_policy",
+      "cancelled",
+      "unsupported_provider",
+      "unsupported_capability",
+      "unknown"
+    ],
+    "contextRecovery": "one persistent-Agent compaction recovery within remaining parent budget; summary direct call has its own accounted budget"
+  }
+}

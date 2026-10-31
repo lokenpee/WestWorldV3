@@ -1,0 +1,1 @@
+查询和写入阶段已结束。现在仅调用submit_result总结本task；禁止新增业务写入。应用已确认commitIds={commitIdsJson}；尚未确认完成的分配项={remainingIdsJson}。用reviewedItems逐项报告真实检查结果，未处理项保留。

@@ -1,0 +1,27 @@
+{
+  "nodeQuote": {
+    "required": false,
+    "mismatch": "save-with-unmatched-status",
+    "empty": "save-with-empty-status",
+    "offset": "set-only-on-exact-match",
+    "effectOnAiRetry": "none"
+  },
+  "characterLinks": {
+    "authority": [
+      "actorIds",
+      "targetCharacterIds"
+    ],
+    "display": [
+      "actors",
+      "targets"
+    ],
+    "delete": "remove-ID-and-display-name-from-associated-nodes",
+    "rename": "keep-ID-update-display-name",
+    "merge": "replace-member-IDs-with-keepId-and-deduplicate",
+    "originalChapterAndQuote": "unchanged",
+    "transaction": "world-change-and-associated-node-update-atomic",
+    "narrativeLease": "allows-deterministic-link-maintenance; model submissions still compare node revisions",
+    "homonyms": "explicit-ID-selection-for-ambiguous-name",
+    "lineCharacterIds": "derived-from-current-node-links"
+  }
+}

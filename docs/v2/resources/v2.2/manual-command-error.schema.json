@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "error",
+    "message",
+    "bookId",
+    "domain",
+    "stage",
+    "runId"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "error": {
+      "const": "ASSET_DOMAIN_LOCKED"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bookId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "enum": [
+        "world",
+        "narrative"
+      ]
+    },
+    "stage": {
+      "enum": [
+        "P2",
+        "P3"
+      ]
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

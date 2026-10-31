@@ -1,0 +1,821 @@
+{
+  "version": "2.2",
+  "schemas": {
+    "IdentityGroupsSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "groups"
+      ],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "keepId",
+              "memberIds",
+              "canonicalName",
+              "reason",
+              "confidence",
+              "evidence"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "character",
+                  "location"
+                ]
+              },
+              "keepId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "memberIds": {
+                "type": "array",
+                "minItems": 2,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "canonicalName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0.9,
+                "maximum": 1
+              },
+              "evidence": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 10,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "chapterIndex": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "quote": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1000
+                    },
+                    "memberIds": {
+                      "type": "array",
+                      "minItems": 1,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "required": [
+                    "chapterIndex",
+                    "quote",
+                    "memberIds"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "LinkEventLinesResultSchema": {
+      "additionalProperties": false,
+      "description": "事件线串联结果。",
+      "type": "object",
+      "required": [
+        "event_line_ops",
+        "new_nodes",
+        "memory_update"
+      ],
+      "properties": {
+        "event_line_ops": {
+          "description": "对事件线的增量操作。空数组表示本批节点没有归属到任何线。",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "op",
+                  "line_id",
+                  "node_ids",
+                  "cause",
+                  "process",
+                  "result",
+                  "line_status",
+                  "confidence",
+                  "reason",
+                  "evidenceNodeIds"
+                ],
+                "properties": {
+                  "op": {
+                    "description": "追加到已有的那条事件线",
+                    "const": "append",
+                    "type": "string"
+                  },
+                  "line_id": {
+                    "description": "已有事件线的 id，例：L05",
+                    "type": "string"
+                  },
+                  "node_ids": {
+                    "description": "要追加进来的节点 id",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cause": {
+                    "description": "补充后的起因",
+                    "type": "string"
+                  },
+                  "process": {
+                    "description": "补充后的经过",
+                    "type": "string"
+                  },
+                  "result": {
+                    "description": "补充后的结果",
+                    "type": "string"
+                  },
+                  "line_status": {
+                    "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                    "anyOf": [
+                      {
+                        "const": "open",
+                        "type": "string"
+                      },
+                      {
+                        "const": "closed",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0.85,
+                    "maximum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceNodeIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "op",
+                  "title",
+                  "node_ids",
+                  "cause",
+                  "process",
+                  "result",
+                  "line_status",
+                  "confidence",
+                  "reason",
+                  "evidenceNodeIds"
+                ],
+                "properties": {
+                  "op": {
+                    "description": "新建一条事件线",
+                    "const": "create",
+                    "type": "string"
+                  },
+                  "title": {
+                    "description": "这条线的名字，例：贾赦父子走私案",
+                    "type": "string"
+                  },
+                  "node_ids": {
+                    "description": "这条线包含的节点 id",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cause": {
+                    "description": "起因",
+                    "type": "string"
+                  },
+                  "process": {
+                    "description": "经过",
+                    "type": "string"
+                  },
+                  "result": {
+                    "description": "结果",
+                    "type": "string"
+                  },
+                  "line_status": {
+                    "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                    "anyOf": [
+                      {
+                        "const": "open",
+                        "type": "string"
+                      },
+                      {
+                        "const": "closed",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0.85,
+                    "maximum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceNodeIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "op",
+                  "line_id",
+                  "node_ids",
+                  "cause",
+                  "process",
+                  "result",
+                  "line_status",
+                  "confidence",
+                  "reason",
+                  "evidenceNodeIds"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "update",
+                    "type": "string"
+                  },
+                  "line_id": {
+                    "type": "string"
+                  },
+                  "node_ids": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cause": {
+                    "type": "string"
+                  },
+                  "process": {
+                    "type": "string"
+                  },
+                  "result": {
+                    "type": "string"
+                  },
+                  "line_status": {
+                    "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                    "anyOf": [
+                      {
+                        "const": "open",
+                        "type": "string"
+                      },
+                      {
+                        "const": "closed",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0.85,
+                    "maximum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceNodeIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "op",
+                  "keep_line_id",
+                  "merge_line_ids",
+                  "node_ids",
+                  "cause",
+                  "process",
+                  "result",
+                  "line_status",
+                  "confidence",
+                  "reason",
+                  "evidenceNodeIds"
+                ],
+                "properties": {
+                  "op": {
+                    "const": "merge",
+                    "type": "string"
+                  },
+                  "keep_line_id": {
+                    "type": "string"
+                  },
+                  "merge_line_ids": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "node_ids": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "cause": {
+                    "type": "string"
+                  },
+                  "process": {
+                    "type": "string"
+                  },
+                  "result": {
+                    "type": "string"
+                  },
+                  "line_status": {
+                    "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
+                    "anyOf": [
+                      {
+                        "const": "open",
+                        "type": "string"
+                      },
+                      {
+                        "const": "closed",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number",
+                    "minimum": 0.85,
+                    "maximum": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidenceNodeIds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "new_nodes": {
+          "description": "补断点时新建的节点。没有就返回空数组。",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "description": "有原文依据的补充事件节点，正式 id 由代码分配。",
+            "type": "object",
+            "required": [
+              "name",
+              "summary",
+              "actors",
+              "client_id",
+              "chapterIndex"
+            ],
+            "properties": {
+              "name": {
+                "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+                "type": "string"
+              },
+              "summary": {
+                "description": "事件概述，一到两句。",
+                "type": "string"
+              },
+              "process": {
+                "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+                "type": "string"
+              },
+              "actors": {
+                "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "targets": {
+                "description": "对象 / 承受者。例：[\"王熙凤\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "world_delta": {
+                "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "new_facts": {
+                "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "started_actions": {
+                "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "time_text": {
+                "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+                "type": "string"
+              },
+              "time_hint": {
+                "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+                "type": "string"
+              },
+              "quote": {
+                "type": "string",
+                "description": "参考引文，可为空；无法精确定位时记录提示并继续处理。"
+              },
+              "offset": {
+                "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+                "type": "number"
+              },
+              "client_id": {
+                "description": "本次输出内的临时节点编号；操作中的 node_ids 可引用它。",
+                "type": "string"
+              },
+              "chapterIndex": {
+                "description": "原文所在的章节标识，必须真实存在。",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "memory_update": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "workingSummary",
+            "notes"
+          ],
+          "properties": {
+            "workingSummary": {
+              "minLength": 1,
+              "maxLength": 2000,
+              "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
+              "type": "string"
+            },
+            "notes": {
+              "maxItems": 20,
+              "description": "本批新增、修正或已解决的判断与复核事项；无变更用空数组。",
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "key",
+                  "kind",
+                  "status",
+                  "statement",
+                  "nodeIds",
+                  "lineIds",
+                  "evidence"
+                ],
+                "properties": {
+                  "key": {
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "const": "decision",
+                        "type": "string"
+                      },
+                      {
+                        "const": "review",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "active",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resolved",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "statement": {
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
+                    "type": "string"
+                  },
+                  "nodeIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "lineIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "evidence": {
+                    "maxItems": 5,
+                    "description": "逐字原文证据。已有有效 nodeIds/lineIds 时可用空数组；不要为每条判断重复抄原文或猜章节号。",
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "chapterIndex",
+                        "quote"
+                      ],
+                      "properties": {
+                        "chapterIndex": {
+                          "description": "工具返回的原文章节标识，必须与逐字引文所在章节对应，不能猜章节编号。",
+                          "type": "string"
+                        },
+                        "quote": {
+                          "minLength": 1,
+                          "maxLength": 1000,
+                          "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "LocationOptimizationSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "coveredFactIds"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coveredFactIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "AgentTaskSummarySchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "commitIds",
+        "summary",
+        "remainingWorkIds",
+        "reviewedItems"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "completed",
+            "partial"
+          ]
+        },
+        "commitIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "remainingWorkIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reviewedItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "workItemId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome": {
+                "enum": [
+                  "changed",
+                  "no_change",
+                  "needs_review"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "workItemId",
+              "outcome",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "NarrativeAssetsExtractionSchema": {
+      "additionalProperties": false,
+      "description": "P1-B：叙事资产提取结果。",
+      "type": "object",
+      "required": [
+        "nodes"
+      ],
+      "properties": {
+        "nodes": {
+          "description": "本章相对完整的独立事件；同一目标下的连续行动合成一个节点，过程细节写 process。普通章节约 2～5 条供参考，复杂章节不设硬上限。",
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "description": "事件节点（P1 产出，未归类到事件线）。",
+            "type": "object",
+            "required": [
+              "name",
+              "summary",
+              "actors",
+              "confidence"
+            ],
+            "properties": {
+              "name": {
+                "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+                "type": "string"
+              },
+              "summary": {
+                "description": "事件概述，一到两句。",
+                "type": "string"
+              },
+              "process": {
+                "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+                "type": "string"
+              },
+              "actors": {
+                "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "targets": {
+                "description": "对象 / 承受者。例：[\"王熙凤\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "world_delta": {
+                "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "new_facts": {
+                "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "started_actions": {
+                "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "time_text": {
+                "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+                "type": "string"
+              },
+              "time_hint": {
+                "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+                "type": "string"
+              },
+              "quote": {
+                "type": "string",
+                "description": "参考引文，可为空；无法精确定位时记录提示并继续处理。"
+              },
+              "offset": {
+                "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
+                "type": "number"
+              },
+              "confidence": {
+                "minimum": 0,
+                "maximum": 1,
+                "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "semanticValidation": [
+    "identity group members same type and from current task read set; keepId included; no overlapping groups",
+    "manual name/target priority enforced; conflict means no auto merge",
+    "evidenceNodeIds must exist in current or valid newly declared nodes",
+    "all ops confidence>=0.85; low confidence only review note",
+    "all fact IDs covered exactly once; no invented canonical name",
+    "Agent final summary references this task durable commit IDs only; completed requires no pending coverage; no final-summary business replay",
+    "write command operationKey is idempotent per run; changed payload under same key is rejected",
+    "reviewedItems partition assigned work items with remainingWorkIds; committed IDs bound to taskId",
+    "node quote mismatch is a non-blocking location hint; never retries or fails an otherwise valid node",
+    "node actorIds bind stable character identities; delete removes links; merge replaces member IDs with keepId atomically"
+  ]
+}
