@@ -71,21 +71,33 @@ export function setNodeParticipants(node: EventNode, characters: Character[], se
 }
 
 export function remapCharacterLinks(nodes: EventNode[], before: Character[], after: Character[], redirects: ReadonlyMap<string, string> = new Map()): EventNode[] {
+  const index = (people: Character[]) => {
+    const byId = new Map(people.map(person => [person.id, person]))
+    const byName = new Map<string, Character[]>(), knownNames = new Map<string, Set<string>>()
+    for (const person of people) {
+      const names = characterMatchNames(person)
+      knownNames.set(person.id, new Set([person.name, ...names]))
+      for (const name of names) { if (!byName.has(name)) byName.set(name, []); byName.get(name)!.push(person) }
+    }
+    return { byId, byName, knownNames }
+  }
+  const previousIndex = index(before), currentIndex = index(after)
+  const candidates = (name: string, lookup: ReturnType<typeof index>) => isContextualName(name) ? [] : lookup.byName.get(name.trim()) ?? []
   const remap = (names: string[], storedIds: string[] | undefined) => {
-    const oldIds = storedIds ?? bindCharacterNames(names, before).ids
-    const oldPeople = oldIds.map(id => before.find(person => person.id === id)).filter((person): person is Character => !!person)
+    const oldIds = storedIds ?? unique(names.flatMap(name => { const rows = candidates(name, previousIndex); return rows.length === 1 ? [rows[0].id] : [] }))
+    const oldPeople = oldIds.filter(id => previousIndex.byId.has(id))
     const unresolved: string[] = []
     const newlyBound: string[] = []
-    for (const name of names.filter(value => !oldPeople.some(person => namesFor(person).includes(value)))) {
-      const previous = characterCandidates(name, before)
-      const current = characterCandidates(name, after)
+    for (const name of names.filter(value => !oldPeople.some(id => previousIndex.knownNames.get(id)!.has(value)))) {
+      const previous = candidates(name, previousIndex)
+      const current = candidates(name, currentIndex)
       const mergedIds = unique(previous.map(person => redirects.get(person.id) ?? person.id))
       if (previous.length === 0 && current.length === 1) newlyBound.push(current[0].id)
-      else if (redirects.size && previous.length && mergedIds.length === 1 && after.some(person => person.id === mergedIds[0])) newlyBound.push(mergedIds[0])
+      else if (redirects.size && previous.length && mergedIds.length === 1 && currentIndex.byId.has(mergedIds[0])) newlyBound.push(mergedIds[0])
       else unresolved.push(name)
     }
-    const ids = unique([...oldIds.map(id => redirects.get(id) ?? id), ...newlyBound].filter(id => after.some(person => person.id === id)))
-    return { ids, names: unique([...ids.map(id => after.find(person => person.id === id)!.name), ...unresolved]) }
+    const ids = unique([...oldIds.map(id => redirects.get(id) ?? id), ...newlyBound].filter(id => currentIndex.byId.has(id)))
+    return { ids, names: unique([...ids.map(id => currentIndex.byId.get(id)!.name), ...unresolved]) }
   }
   return nodes.map(node => {
     const actors = remap(node.actors, node.actorIds)

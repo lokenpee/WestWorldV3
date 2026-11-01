@@ -3,7 +3,8 @@ import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, typ
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
 import { normalizeCharacterNames } from './characterNames'
-import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRun, type MergeOptions, type MergePreview, type MergeRequest, type WorldKind } from './merge'
+import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRun, type MergeOptions, type MergePreview, type MergeRequest, type WorldKind, type MechanicalMergeContext } from './merge'
+import type { WorldRun } from '../world/types'
 
 type Workspace = ReturnType<typeof createWorkspace>
 type Database = ReturnType<Workspace['openBook']>
@@ -42,11 +43,12 @@ async function writeChanged<T extends Asset>(db: Database, table: string, before
     const old = previous.get(row.id)
     if (JSON.stringify(old) !== JSON.stringify(row)) {
       const next = { ...row, revision: old ? old.revision + 1 : 1 }
-      await db.table<T>(table).put(next); changed.push(next)
+      changed.push(next)
     }
     previous.delete(row.id)
   }
-  for (const row of previous.values()) await db.table(table).delete(row.id)
+  if (changed.length) await db.table<T>(table).bulkPut(changed)
+  if (previous.size) await db.table(table).bulkDelete([...previous.keys()])
   return changed
 }
 
@@ -86,15 +88,17 @@ async function synchronizeNarrative(db: Database, bookId: string, beforeNodes: E
   await writeChanged(db, 'eventLines', beforeLines, surviving)
 }
 
-async function invalidateProgress(db: Database, kind: AssetKind, id: string, timestamp: string) {
+async function invalidateProgressBatch(db: Database, changes: { kind: AssetKind; id: string }[], timestamp: string) {
   interface Coverage { kind: string; id: string; status: string; invalidations: number; updatedAt: string; dependencies?: { records: { table: string; id: string; resolvedId: string | null }[] } }
   interface Run { id: string; recordType: string; stage?: string; coverageItems?: Coverage[] }
-  const runs = await db.table<Run>('pipelineRuns').toArray()
-  const affected = new Set<string>([worldKinds.has(kind) ? 'P2' : 'P3'])
+  const runs = await db.table<Run>('pipelineRuns').where('stage').anyOf(['P2', 'P3']).toArray()
+  const own = new Set(changes.map(change => `${change.kind}:${change.id}`))
+  const dependencies = new Set(changes.map(change => `${assetTables[change.kind]}:${change.id}`))
+  const affected = new Set<string>(changes.map(change => worldKinds.has(change.kind) ? 'P2' : 'P3'))
   for (const run of runs.filter(row => row.recordType === 'run' && row.coverageItems)) {
     let dirty = false
     const coverageItems = run.coverageItems!.map(item => {
-      const hit = (item.kind === kind && item.id === id) || item.dependencies?.records.some(record => record.table === assetTables[kind] && (record.id === id || record.resolvedId === id))
+      const hit = own.has(`${item.kind}:${item.id}`) || item.dependencies?.records.some(record => dependencies.has(`${record.table}:${record.id}`) || dependencies.has(`${record.table}:${record.resolvedId}`))
       if (!hit || item.status === 'pending' || item.status === 'stale') return item
       dirty = true
       return { ...item, status: 'stale', invalidations: item.invalidations + 1, updatedAt: timestamp }
@@ -103,6 +107,7 @@ async function invalidateProgress(db: Database, kind: AssetKind, id: string, tim
   }
   for (const stage of affected) if (await db.table('compileProgress').get(stage)) await db.table('compileProgress').update(stage, { validity: 'stale', updatedAt: timestamp })
 }
+const invalidateProgress = (db: Database, kind: AssetKind, id: string, timestamp: string) => invalidateProgressBatch(db, [{ kind, id }], timestamp)
 
 export function createAssetService(workspace: Workspace) {
   async function database(bookId: string) {
@@ -110,10 +115,17 @@ export function createAssetService(workspace: Workspace) {
     const db = workspace.openBook(bookId); await db.open(); return db
   }
 
-  async function mergeMembers<K extends WorldKind>(db: Database, bookId: string, kind: K, options: MergeOptions, expected?: Record<string, number>): Promise<AssetByKind[K][]> {
+  async function mergeMembers<K extends WorldKind>(db: Database, bookId: string, kind: K, options: MergeOptions, expected?: Record<string, number>, queued?: MechanicalMergeContext): Promise<AssetByKind[K][]> {
     validateMergeOptions(kind, options)
-    const leases = await db.table<Lease>('pipelineRuns').toArray()
-    if (lockState(leases, bookId).world) throw new AssetError('ASSET_DOMAIN_LOCKED', '世界资产正在处理，请等待任务结束后合并。')
+    const leases = await db.table<Lease & { owner?: string; runId?: string; expiresAt?: number }>('pipelineRuns').where('recordType').equals('lease').toArray()
+    if (queued) {
+      const lease = leases.find(row => row.id === 'lease:world')
+      if (lease?.owner !== queued.owner || lease.runId !== queued.runId || leases.some(row => row.lockKey === 'extraction' && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new AssetError('ASSET_DOMAIN_LOCKED', '机械合并队列的执行权已变化。')
+      const run = await db.table<WorldRun>('pipelineRuns').get(queued.runId)
+      const item = run?.mechanicalQueue?.items.find(item => item.id === queued.itemId)
+      if (run?.bookId !== bookId || run.phase !== 'mechanical_queue' || item?.status !== 'running' || item.kind !== kind || item.request.keepId !== options.keepId || item.request.canonicalName !== options.canonicalName || item.request.memberIds.length !== options.memberIds.length || item.request.memberIds.some(id => !options.memberIds.includes(id) || item.request.expectedRevisions[id] !== expected?.[id])) throw new AssetError('ASSET_DOMAIN_LOCKED', '本组不属于当前已确认的机械合并队列。')
+      await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 })
+    } else if (lockState(leases, bookId).world) throw new AssetError('ASSET_DOMAIN_LOCKED', '世界资产正在处理，请等待任务结束后合并。')
     if (expected && (Object.keys(expected).length !== options.memberIds.length || options.memberIds.some(id => !Number.isSafeInteger(expected[id]) || expected[id] < 1))) throw new AssetError('VALIDATION', '合并预览的修订信息不完整，请重新预览。')
     const rows = await db.table<AssetByKind[K]>(assetTables[kind]).bulkGet(options.memberIds)
     if (rows.some(row => !row || row.bookId !== bookId || (expected && row.revision !== expected[row.id]))) throw new AssetError('CONFLICT', '所选资料已变化或删除，请刷新合并预览。')
@@ -131,11 +143,12 @@ export function createAssetService(workspace: Workspace) {
     })
   }
 
-  async function confirmMerge<K extends WorldKind>(bookId: string, kind: K, request: MergeRequest, mode?: 'mechanical') {
+  async function confirmMerge<K extends WorldKind>(bookId: string, kind: K, request: MergeRequest, mode?: 'mechanical' | MechanicalMergeContext) {
     if (!request?.expectedRevisions || typeof request.expectedRevisions !== 'object' || Array.isArray(request.expectedRevisions)) throw new AssetError('VALIDATION', '请先查看合并预览。')
     const db = await database(bookId)
     return db.transaction('rw', db.tables, async () => {
-      const members = await mergeMembers(db, bookId, kind, request, request.expectedRevisions)
+      const queued = typeof mode === 'object' ? mode : undefined
+      const members = await mergeMembers(db, bookId, kind, request, request.expectedRevisions, queued)
       const timestamp = new Date().toISOString()
       const beforeCounts = { characters: await db.table('characters').count(), locations: await db.table('locations').count() }
       const fusion = fuseWorldAssets(kind, members, request.keepId, request.canonicalName, timestamp)
@@ -144,8 +157,11 @@ export function createAssetService(workspace: Workspace) {
       const memberSet = new Set(request.memberIds)
       const after = before.filter(row => !memberSet.has(row.id))
       after.push(fusion.result)
-      const texts = await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()
-      await writeChanged(db, assetTables[kind], before, updateFrequencies(after, texts, kind === 'character'))
+      if (queued) await writeChanged(db, assetTables[kind], before, after)
+      else {
+        const texts = await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()
+        await writeChanged(db, assetTables[kind], before, updateFrequencies(after, texts, kind === 'character'))
+      }
       const redirects = new Map(request.memberIds.map(id => [id, request.keepId]))
       const mappings = await db.table<Lifecycle>('assetLifecycle').toArray()
       for (const member of members) if (!mappings.some(row => row.kind === kind && row.originId === member.id)) mappings.push({ key: `${kind}:${member.id}`, bookId, kind, originId: member.id, currentId: member.id, state: 'live', revision: 0, updatedAt: timestamp })
@@ -161,16 +177,15 @@ export function createAssetService(workspace: Workspace) {
         }
         return true
       }
-      for (const mapping of mappings.filter(row => row.kind === kind && row.bookId === bookId && row.state !== 'deleted' && targetsMergeGroup(row))) {
-        await db.table('assetLifecycle').put({ ...mapping, currentId: request.keepId, state: mapping.originId === request.keepId ? 'live' : 'merged', revision: mapping.revision + 1, updatedAt: timestamp })
-      }
+      await db.table('assetLifecycle').bulkPut(mappings.filter(row => row.kind === kind && row.bookId === bookId && row.state !== 'deleted' && targetsMergeGroup(row)).map(mapping => ({ ...mapping, currentId: request.keepId, state: mapping.originId === request.keepId ? 'live' : 'merged', revision: mapping.revision + 1, updatedAt: timestamp })))
+      const invalidations: { kind: AssetKind; id: string }[] = request.memberIds.map(id => ({ kind, id }))
       if (kind === 'character') {
         const oldNodes = await db.table<EventNode>('nodes').toArray()
         const newCharacters = await db.table<Character>('characters').toArray()
         const changed = await writeChanged(db, 'nodes', oldNodes, remapCharacterLinks(oldNodes, before as Character[], newCharacters, redirects))
-        for (const node of changed) await invalidateProgress(db, 'node', node.id, timestamp)
+        invalidations.push(...changed.map(node => ({ kind: 'node' as const, id: node.id })))
       }
-      for (const id of request.memberIds) await invalidateProgress(db, kind, id, timestamp)
+      await invalidateProgressBatch(db, invalidations, timestamp)
       const saved = (await table.get(request.keepId))!
       const run: ManualMergeRun = {
         id: crypto.randomUUID(), recordType: 'run', bookId, stage: 'manual_merge', status: 'completed', startedAt: timestamp, finishedAt: timestamp, planVersion: '2.2',
@@ -180,6 +195,12 @@ export function createAssetService(workspace: Workspace) {
       }
       await db.table('pipelineRuns').add({ ...run, contractRevision: '2026-10-24', tasks: [], commandIntents: [], coverageItems: [], appliedCommands: [], nextTaskOrdinal: 0, reconciliationPass: 0, noProgressTasks: 0 })
       let reportId: string | undefined
+      if (queued) {
+        const queueRun = (await db.table<WorldRun>('pipelineRuns').get(queued.runId))!
+        const queue = queueRun.mechanicalQueue!
+        await db.table('pipelineRuns').put({ ...queueRun, mechanicalQueue: { ...queue, statisticsPending: true, items: queue.items.map(item => item.id === queued.itemId ? { ...item, status: 'completed', commitId: run.id } : item) }, report: { ...queueRun.report, afterCounts: run.report.afterCounts, groups: [...queueRun.report.groups, ...run.report.groups.map(group => ({ ...group, method: 'mechanical' as const }))] } })
+        reportId = queueRun.id
+      }
       if (mode === 'mechanical') {
         const chapters = await db.chapters.toArray(); const receipts = await db.table('extractionReceipts').toArray()
         if (!chapters.length || chapters.some(chapter => ['worldAssets', 'narrativeAssets'].some(step => !receipts.some(receipt => receipt.key === `${chapter.chapterIndex}:${step}`)))) throw new AssetError('VALIDATION', '请先完成全书逐章提取。')
@@ -308,12 +329,12 @@ export function createAssetService(workspace: Workspace) {
       const db = await database(bookId)
       return db.transaction('r', db.tables, async () => {
         const [characters, locations, storedNodes, eventLines, lifecycle, leases] = await Promise.all([
-          db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<Lease>('pipelineRuns').toArray(),
+          db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray(),
         ])
         const nodes = storedNodes.map(node => node.actorIds === undefined ? bindNodeCharacters(node, characters) : node)
         const references = resolveReferences(nodes, characters)
         const lineCharacterIds = Object.fromEntries(eventLines.map(line => [line.id, [...new Set(line.nodeIds.flatMap(id => references[id]?.actorIds ?? []))]]))
-        const manualMerges = leases.filter((row): row is ManualMergeRun => row.recordType === 'run' && 'stage' in row && row.stage === 'manual_merge' && 'report' in row).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
+        const manualMerges = (await db.table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
         return { characters: characters.map(normalizeCharacterNames), locations, nodes, eventLines, lifecycle, locks: lockState(leases, bookId), references, lineCharacterIds, manualMerges }
       })
     },

@@ -12,20 +12,22 @@ import { records, text } from '../agents/contracts'
 import { coverageFingerprint, identityBatchSize, identityDependencies, saveIdentityQueue } from './queue'
 import { createFrequencyCounter } from '../assets/derive'
 import { normalizeCharacterNames } from '../assets/characterNames'
+import { createMechanicalQueue } from './mechanical'
 import prompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-identity.md?raw'
 
 type Workspace = ReturnType<typeof createWorkspace>
 type Entity = Character | LocationAsset
-interface WorldState { running: boolean; phase: string; processed: number; total: number; error?: string; reportId?: string; reportType?: 'code' | 'ai' }
+interface WorldState { running: boolean; phase: string; processed: number; total: number; error?: string; reportId?: string; reportType?: 'code' | 'ai'; mode?: 'ai' | 'mechanical' }
 export function createWorldService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'generate' | 'settings'>, assets: AssetService) {
   const states = new Map<string, WorldState>(); const controllers = new Map<string, AbortController>(); const listeners = new Set<() => void>()
   const set = (bookId: string, change: Partial<WorldState>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, phase: '', processed: 0, total: 0 }), ...change }); listeners.forEach(listener => listener()) }
+  const mechanical = createMechanicalQueue(workspace, assets, (bookId, state) => set(bookId, { ...state, mode: 'mechanical' }), bookId => controllers.has(bookId))
   async function eligibility(bookId: string) {
     if (!await workspace.settings.books.get(bookId)) throw new Error('书籍不存在。')
     const db = workspace.openBook(bookId)
     return db.transaction('r', db.chapters, db.table('extractionReceipts'), db.table('pipelineRuns'), db.table('compileProgress'), async () => {
       const allCovered = coverage(await db.chapters.toArray(), await db.table<Receipt>('extractionReceipts').toArray()).allCovered
-      const locks = (await db.table('pipelineRuns').toArray()).filter(row => row.recordType === 'lease' && ['world', 'extraction'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
+      const locks = (await db.table('pipelineRuns').where('recordType').equals('lease').toArray()).filter(row => ['world', 'extraction'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
       const locked = locks.length > 0
       const progress = await db.table('compileProgress').get('P2')
       return { ready: allCovered && !locked, covered: allCovered, locked, resumable: !!progress && ['running', 'paused', 'cancelled', 'failed'].includes(progress.status), leaseExpiry: locks.filter(row => typeof row.expiresAt === 'number').reduce<number | undefined>((at, row) => Math.min(at ?? Infinity, row.expiresAt), undefined) }
@@ -33,9 +35,14 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
   }
   async function assertReady(bookId: string) { const state = await eligibility(bookId); if (!state.covered) throw new Error('请先完成全书逐章提取。'); if (state.locked) throw new Error('本书世界资产或提取任务正在运行。') }
   const counts = async (bookId: string) => { const db = workspace.openBook(bookId); return { characters: await db.table('characters').count(), locations: await db.table('locations').count() } }
+  async function worldRows(bookId: string) {
+    if (!await workspace.settings.books.get(bookId)) throw new Error('书籍不存在。')
+    const db = workspace.openBook(bookId)
+    return db.transaction('r', db.table('characters'), db.table('locations'), async () => ({ characters: (await db.table<Character>('characters').toArray()).map(normalizeCharacterNames), locations: await db.table<LocationAsset>('locations').toArray() }))
+  }
   async function scan(bookId: string, saveReport = true) {
     await assertReady(bookId)
-    const snapshot = await assets.read(bookId)
+    const snapshot = await worldRows(bookId)
     const candidates = [...findCandidates('character', snapshot.characters), ...findCandidates('location', snapshot.locations)]
     if (!saveReport) return candidates
     const id = crypto.randomUUID(), now = new Date().toISOString(); const report = emptyReport({ characters: snapshot.characters.length, locations: snapshot.locations.length })
@@ -49,13 +56,18 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     set(bookId, { reportId: result.reportId, reportType: 'code', error: undefined })
     return result
   }
+  async function organize(bookId: string) {
+    await assertReady(bookId)
+    const automatic = await mechanical.mergeExactNames(bookId)
+    return { ...automatic, candidates: await scan(bookId, automatic.merged === 0 && automatic.failed === 0) }
+  }
   async function start(bookId: string) {
-    if (controllers.has(bookId)) return
+    if (controllers.has(bookId) || mechanical.isRunning(bookId)) return
     const controller = new AbortController(); controllers.set(bookId, controller)
     const db = workspace.openBook(bookId); let runId: string = crypto.randomUUID(); const owner = crypto.randomUUID()
     let paused = false; let initialAgentUsage: Row | undefined
     let acquired = false; let timer: ReturnType<typeof setInterval> | undefined
-    set(bookId, { running: true, phase: '准备', processed: 0, total: 0, error: undefined, reportId: undefined })
+    set(bookId, { running: true, phase: '准备', processed: 0, total: 0, error: undefined, reportId: undefined, mode: 'ai' })
     const check = async () => {
       controller.signal.throwIfAborted()
       const lease = await db.table('pipelineRuns').get('lease:world')
@@ -215,7 +227,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
       controllers.delete(bookId); set(bookId, { running: false })
     }
   }
-  return { scan, confirm, start, eligibility, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => controllers.get(bookId)?.abort(), subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
+  return { scan, organize, confirm, start, mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
 }
 export type WorldService = ReturnType<typeof createWorldService>
 export type { Candidate }

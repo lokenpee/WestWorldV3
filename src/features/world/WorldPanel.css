@@ -12,3 +12,9 @@
 .world-name-choice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; }
 .world-name-choice select { max-width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 5px; background: white; }
 .world-panel [role=alert] { color: #b91c1c; }
+.mechanical-queue { margin-top: 12px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
+.mechanical-queue > p { margin: 4px 0 8px; }
+.mechanical-queue ul { list-style: none; margin: 0; padding: 0; max-height: min(240px, 30dvh); overflow-y: auto; }
+.mechanical-queue li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
+.mechanical-queue li > div { flex: 1; min-width: 160px; overflow-wrap: anywhere; }
+.mechanical-queue strong, .mechanical-queue span, .mechanical-queue small { display: block; margin-bottom: 4px; }

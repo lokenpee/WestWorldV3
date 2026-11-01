@@ -103,6 +103,22 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
   for (const entry of tables.storySessionEntries) if (!sessions.has(entry.sessionId) || (entry.parentId !== null && (entries.get(entry.parentId)?.sessionId !== entry.sessionId || Number(entries.get(entry.parentId)?.ordinal) >= Number(entry.ordinal)))) fail(`storySessionEntries/${entry.id}`, '会话归属或父条目链不符。')
   for (const name of ['storyEditorMemory', 'storyEditorNotes', 'storyEditorCheckpoints', 'compileProgress'] as const) for (const row of tables[name]) if ((row.sessionId !== undefined && !sessions.has(row.sessionId)) || (row.editorSessionId !== undefined && !sessions.has(row.editorSessionId))) fail(`${name}/${row.id ?? row.stage}`, '引用的会话不存在。')
   const p1 = tables.compileProgress.find(row => row.stage === 'P1')
+  let currentMechanicalQueues = 0
+  const runIds = new Set(tables.pipelineRuns.map(row => row.id))
+  for (const run of tables.pipelineRuns) if (run.mechanicalQueue) {
+    const queue = run.mechanicalQueue as Row, items = rows(queue.items)
+    if (run.stage !== 'P2' || run.phase !== 'mechanical_queue') fail(`pipelineRuns/${run.id}`, '机械合并队列的阶段或类型不符。')
+    if (queue.current) currentMechanicalQueues++
+    const ids = new Set<string>(), members = new Set<string>()
+    for (const item of items) {
+      const request = item.request as Row, selected = strings(request.memberIds), proofs = item.approvalFingerprints as Row, revisions = request.expectedRevisions as Row
+      if (ids.has(String(item.id)) || !selected.includes(String(request.keepId)) || selected.length !== strings(item.memberNames).length || Object.keys(proofs).length !== selected.length || Object.keys(revisions).length !== selected.length || selected.some(id => !proofs[id] || !revisions[id])) fail(`pipelineRuns/${run.id}/mechanicalQueue`, '已确认组的成员、保留条目或确认依据不完整。')
+      ids.add(String(item.id))
+      if (item.status === 'completed' && !runIds.has(item.commitId)) fail(`pipelineRuns/${run.id}/mechanicalQueue`, '机械合并的提交记录不存在。')
+      if (item.status !== 'completed') for (const id of selected) { const key = `${item.kind}:${id}`; if (members.has(key)) fail(`pipelineRuns/${run.id}/mechanicalQueue`, '待合并组包含重复成员。'); members.add(key) }
+    }
+  }
+  if (currentMechanicalQueues > 1) fail('pipelineRuns/mechanicalQueue', '本书存在多个当前机械合并队列。')
   if (p1 && (p1.totalChapters !== chapters.size || [...strings(p1.completedChapters), ...strings(p1.failedChapters)].some(id => !chapters.has(id)))) fail('compileProgress/P1', '提取进度的章节数量或范围不符。')
   return errors
 }
@@ -115,6 +131,7 @@ export function pauseBookData(data: BookData): BookData {
     if (row.status === 'running' || row.status === 'cancelling') row.status = 'paused'
     for (const task of rows(row.tasks)) if (['pending', 'running', 'prepared'].includes(task.status as string)) task.status = 'partial'
     for (const intent of rows(row.commandIntents)) if (intent.state === 'prepared') intent.state = 'abandoned'
+    for (const item of rows((row.mechanicalQueue as Row | undefined)?.items)) if (item.status === 'running') item.status = 'pending'
   }
   return result
 }

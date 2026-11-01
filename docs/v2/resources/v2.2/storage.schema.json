@@ -455,6 +455,9 @@
           "type": "integer",
           "minimum": 0,
           "description": "连续无新增有效覆盖/确认的子任务数；到3暂停"
+        },
+        "mechanicalQueue": {
+          "$ref": "#/$defs/MechanicalQueue"
         }
       },
       "required": [
@@ -4575,6 +4578,134 @@
           }
         }
       ]
+    },
+    "MechanicalQueue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "stopRequested",
+        "statisticsPending",
+        "current"
+      ],
+      "properties": {
+        "current": {
+          "type": "boolean"
+        },
+        "stopRequested": {
+          "type": "boolean"
+        },
+        "statisticsPending": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MechanicalQueueItem"
+          }
+        }
+      }
+    },
+    "MechanicalQueueItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "request",
+        "memberNames",
+        "approvalFingerprints",
+        "status",
+        "confirmedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "character",
+            "location"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "failed"
+          ]
+        },
+        "confirmedAt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "error": {
+          "type": "string"
+        },
+        "commitId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memberNames": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "approvalFingerprints": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "memberIds",
+            "keepId",
+            "canonicalName",
+            "expectedRevisions"
+          ],
+          "properties": {
+            "memberIds": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "keepId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "canonicalName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevisions": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
+        },
+        "confirmation": {
+          "enum": [
+            "manual",
+            "exact_name"
+          ]
+        }
+      }
     }
   }
 }

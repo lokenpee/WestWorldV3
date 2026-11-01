@@ -1,5 +1,7 @@
 # 决策索引
 
+- [已确认组的机械合并队列](mechanical-merge-queue.md)：人工入队、顺序提交、停止继续、集中统计与备份恢复。
+
 - [逐章提取与失败补提取](extraction-queue.md)：持续队列、主动续期、共享请求预算与两类章节状态。
 
 - [按阶段锁定人工编辑，并统一实际请求预算](stage-edit-lock-and-request-budget.md)：已接受，业务落地分阶段验收。

@@ -5,6 +5,7 @@ import { normalizeCharacterNames } from './characterNames'
 export type WorldKind = 'character' | 'location'
 export interface MergeOptions { memberIds: string[]; keepId: string; canonicalName: string }
 export interface MergeRequest extends MergeOptions { expectedRevisions: Record<string, number> }
+export interface MechanicalMergeContext { runId: string; itemId: string; owner: string }
 export interface MergePreview<K extends WorldKind = WorldKind> {
   kind: K; members: AssetByKind[K][]; request: MergeRequest; result: AssetByKind[K]; conflicts: string[]
 }

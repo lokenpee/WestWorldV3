@@ -73,6 +73,10 @@ export async function rebaseRestoredProgress(original: BookData, tables: BookTab
   }
   for (const run of tables.pipelineRuns) {
     rebase(run)
+    for (const item of records((run.mechanicalQueue as Row | undefined)?.items)) {
+      const proofs = item.approvalFingerprints as Row | undefined
+      if (proofs) for (const [id, before] of Object.entries(proofs)) if (typeof before === 'string' && fingerprints.has(before)) proofs[id] = fingerprints.get(before)!
+    }
     for (const task of records(run.tasks)) if ((task.input as Row | undefined)?.bookId === bookId) task.inputFingerprint = await hash(task.input)
   }
 }

@@ -3,6 +3,8 @@ import { characterMatchNames, isContextualName } from './characterNames'
 
 export function resolveReferences(nodes: EventNode[], characters: Character[]): Record<string, References> {
   const index = new Map<string, Set<string>>()
+  const byId = new Map(characters.map(person => [person.id, person]))
+  const knownNames = new Map(characters.map(person => [person.id, new Set([person.name, ...(person.aliases ?? [])])]))
   for (const character of characters) for (const name of characterMatchNames(character)) {
     const normalized = name.trim()
     if (!index.has(normalized)) index.set(normalized, new Set())
@@ -10,10 +12,10 @@ export function resolveReferences(nodes: EventNode[], characters: Character[]): 
   }
   return Object.fromEntries(nodes.map(node => {
     const result: References = { actorIds: [], ambiguities: [], missingNames: [] }
-    const bound = [...(node.actorIds ?? []), ...(node.targetCharacterIds ?? [])].filter(id => characters.some(person => person.id === id))
+    const bound = [...(node.actorIds ?? []), ...(node.targetCharacterIds ?? [])].filter(id => byId.has(id))
     result.actorIds.push(...bound)
     for (const name of new Set([...node.actors, ...(node.targets ?? [])])) {
-      if (characters.some(person => bound.includes(person.id) && [person.name, ...(person.aliases ?? [])].includes(name))) continue
+      if (bound.some(id => knownNames.get(id)!.has(name))) continue
       const ids = [...(index.get(name.trim()) ?? [])].sort()
       if (bound.some(id => ids.includes(id))) continue
       if (ids.length === 1 && node.actorIds === undefined) result.actorIds.push(ids[0])
@@ -64,10 +66,16 @@ export function createFrequencyCounter<T extends Character | LocationAsset>(asse
       return { asset, chapters: stat?.chapters.size ?? 0, mentions: stat?.mentions ?? 0 }
     })
     const flat = measured.length > 1 && measured.every(row => row.chapters === measured[0].chapters && row.mentions === measured[0].mentions)
+    const ranked = [...measured].sort((a, b) => b.chapters - a.chapters || b.mentions - a.mentions)
+    const percentiles = new Map<string, number>()
+    for (let start = 0; start < ranked.length;) {
+      let end = start + 1
+      while (end < ranked.length && ranked[end].chapters === ranked[start].chapters && ranked[end].mentions === ranked[start].mentions) end++
+      percentiles.set(`${ranked[start].chapters}:${ranked[start].mentions}`, (start + (end - start - 1) / 2) / Math.max(1, measured.length - 1))
+      start = end
+    }
     return measured.map(row => {
-      const higher = measured.filter(other => other.chapters > row.chapters || (other.chapters === row.chapters && other.mentions > row.mentions)).length
-      const same = measured.filter(other => other.chapters === row.chapters && other.mentions === row.mentions).length
-      const percentile = (higher + (same - 1) / 2) / Math.max(1, measured.length - 1)
+      const percentile = percentiles.get(`${row.chapters}:${row.mentions}`)!
       const result = { ...row.asset, frequency: { chapters: row.chapters, mentions: row.mentions, scopeChapters, percentile } }
       if (characters && (!('roleWeightSource' in result) || result.roleWeightSource !== 'manual')) {
         const roleWeight: RoleWeight = flat ? 'NPC' : percentile < 0.1 ? '主要人物' : percentile < 0.3 ? '重要配角' : percentile < 0.8 ? 'NPC' : '路人'

@@ -9,8 +9,8 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
   },
   projects: [
-    { name: 'development', testMatch: ['workspace.spec.ts', 'import.spec.ts', 'assets.spec.ts', 'merge.spec.ts', 'backup.spec.ts', 'models.spec.ts', 'model-acceptance.spec.ts', 'extraction.spec.ts', 'agents.spec.ts', 'world.spec.ts', 'story.spec.ts', 'network.spec.ts', 'backup-transfer.spec.ts'], use: { baseURL: 'http://127.0.0.1:4179' } },
-    { name: 'production', testMatch: ['workspace.production.spec.ts', 'models.spec.ts', 'extraction.spec.ts', 'agents.spec.ts', 'world.spec.ts', 'story.spec.ts', 'network.spec.ts', 'backup-transfer.spec.ts'], use: { baseURL: 'http://127.0.0.1:4180' } },
+    { name: 'development', testMatch: ['workspace.spec.ts', 'import.spec.ts', 'assets.spec.ts', 'asset-search.spec.ts', 'merge.spec.ts', 'backup.spec.ts', 'models.spec.ts', 'model-acceptance.spec.ts', 'extraction.spec.ts', 'agents.spec.ts', 'world.spec.ts', 'mechanical-queue.spec.ts', 'story.spec.ts', 'network.spec.ts', 'backup-transfer.spec.ts'], use: { baseURL: 'http://127.0.0.1:4179' } },
+    { name: 'production', testMatch: ['workspace.production.spec.ts', 'models.spec.ts', 'extraction.spec.ts', 'agents.spec.ts', 'world.spec.ts', 'mechanical-queue.spec.ts', 'story.spec.ts', 'network.spec.ts', 'backup-transfer.spec.ts', 'asset-search.spec.ts'], use: { baseURL: 'http://127.0.0.1:4180' } },
   ],
   webServer: [{
     command: 'npm run dev -- --host 127.0.0.1 --port 4179 --strictPort',
