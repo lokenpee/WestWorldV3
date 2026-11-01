@@ -91,6 +91,8 @@ export async function restoredTables(data: BookData, bookId: string) {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === 'bookId' && item === data.book.id ? bookId : rewrite(item)]))
   }
   const tables = rewrite(copy.tables) as typeof copy.tables
-  for (const run of tables.pipelineRuns) for (const task of Array.isArray(run.tasks) ? run.tasks as Row[] : []) if (task.input) task.inputFingerprint = (await checksumOf(strToU8(JSON.stringify(task.input)))).slice(7)
+  tables.storySessionEntries = tables.storySessionEntries.map((row, index) => ({ ...row, ...(copy.tables.storySessionEntries[index].message ? { message: copy.tables.storySessionEntries[index].message } : {}), ...(copy.tables.storySessionEntries[index].systemMessage ? { systemMessage: copy.tables.storySessionEntries[index].systemMessage } : {}) }))
+  const { rebaseRestoredProgress } = await import('./rebase')
+  await rebaseRestoredProgress(copy, tables, bookId)
   return tables
 }

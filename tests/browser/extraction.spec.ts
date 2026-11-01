@@ -184,6 +184,6 @@ test('同书第二标签不能接管仍运行的任务，即使租约过期也�
   await page.getByRole('button', { name: '取消提取', exact: true }).click()
   await expect(other.getByRole('button', { name: '继续提取', exact: true })).toBeEnabled(); release()
   await other.getByRole('button', { name: '继续提取', exact: true }).click()
-  await expect(other.getByRole('region', { name: '逐章提取', exact: true })).toContainText('提取完成 · 成功 4/4')
+  await expect(other.getByRole('region', { name: '逐章提取', exact: true })).toContainText('提取完成 · 成功 4/4', { timeout: 20000 })
   expect(calls).toBe(9)
 })

@@ -2,6 +2,7 @@ import type { Chapter, createWorkspace } from '../../lib/storage/workspace'
 import type { ModelService } from '../models/service'
 import type { CallResult, CallProgress } from '../models/types'
 import { bindNodeCharacters } from '../assets/characterLinks'
+import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebuildFacts, updateFrequencies } from '../assets/derive'
 import type { Character, EventNode, LocationAsset } from '../assets/types'
 import { stepLabels, substeps, type ExtractionData, type ExtractedRow, type Substep } from './types'
@@ -128,6 +129,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
                   Object.assign(row, { sourceChapters: [chapter.chapterIndex], nameSource: 'extracted' })
                   if (kind === 'character') {
                     row.aliases = source.aliases_mentioned ?? []; delete row.aliases_mentioned
+                    Object.assign(row, normalizeCharacterNames(row as unknown as Character))
                     if (source.speech_style_sample !== undefined) { row.speechStyleSample = source.speech_style_sample; delete row.speech_style_sample }
                   }
                   row.mergeFacts = rebuildFacts([], Object.fromEntries((kind === 'character' ? ['identity', 'appearance', 'personality', 'background'] : ['description']).filter(field => typeof row[field] === 'string').map(field => [field, row[field] as string])), [chapter.chapterIndex])

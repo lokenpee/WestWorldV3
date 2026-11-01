@@ -15,6 +15,8 @@ export function storyResponse(body: Item, options: { inputMemory?: boolean; reus
   const commit = results.find(row => row.ok && row.commitId)
   const nodes = results.flatMap(row => row.data ?? []).filter((row: Item) => row.chapterIndex)
   const line = results.flatMap(row => row.data ?? []).find((row: Item) => row.nodeIds)
+  const lastDirectory = results.filter(row => row.data?.some((item: Item) => item.nodeCount !== undefined)).at(-1)
+  if (lastDirectory?.truncated) return agentStream([{ name: 'query_event_lines', args: { offset: lastDirectory.nextOffset, limit: 50 } }])
   if (input.phase === 'global_review' || options.readOnly) {
     if (results.length) return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: [], summary: '按原文核对全书资料，保留当前关联与合理孤点。', remainingWorkIds: [], reviewedItems: input.workItems.map((item: Item) => ({ workItemId: item.workItemId, outcome: 'no_change', reason: '原文依据与现有资料一致，保留当前状态。' })) } }])
     const name = ['window_nodes', 'orphans'].includes(input.queue) ? 'get_node_detail' : input.queue === 'event_lines' ? 'get_event_line_detail' : 'get_editor_note_detail'

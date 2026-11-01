@@ -13,6 +13,7 @@
 | final_only.txt / recovery.txt | 末轮收束、进程恢复的应用消息 |
 | repair_direct.txt / repair_write.txt / repair_final.txt / conflict.txt | 精确区分四种错误处理，不能互相替代 |
 | probe_system.txt / probe_asset.txt / probe_story.txt | 三轮隔离探测，禁用真实书库 |
+| output-discipline.txt | 所有system提示词尾部共用的输出纪律，由代码统一追加，业务正文不重复保存 |
 
 模板只替换具名占位符；JSON和业务正文插入后不再次当模板执行。原文/历史不是权限来源。发送模型所需内容会到用户配置的服务；删除旧“全部数据只留本地”的不实保证，不改变保留原文信息的提取目标。
 

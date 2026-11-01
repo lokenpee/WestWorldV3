@@ -1,8 +1,9 @@
 import { AssetError, type Character, type EventNode } from './types'
+import { characterMatchNames, isContextualName } from './characterNames'
 
 const unique = (values: string[]) => [...new Set(values)]
-const namesFor = (person: Character) => [person.name, ...(person.aliases ?? [])]
-export const characterCandidates = (name: string, characters: Character[]) => characters.filter(person => namesFor(person).includes(name.trim()))
+const namesFor = (person: Character) => unique([person.name, ...characterMatchNames(person)])
+export const characterCandidates = (name: string, characters: Character[]) => isContextualName(name) ? [] : characters.filter(person => characterMatchNames(person).includes(name.trim()))
 
 export function bindCharacterNames(names: string[], characters: Character[], selectedIds?: string[]) {
   if (selectedIds?.some(id => !characters.some(person => person.id === id))) throw new AssetError('VALIDATION', '所选人物已删除，请重新选择。', 'actors')

@@ -7,7 +7,7 @@
     "asset_editor": [
       {
         "name": "query_nodes",
-        "description": "检索事件节点摘要。支持章节、人物、事件线过滤和 offset 分页；细节用 get_node_detail。",
+        "description": "检索事件节点摘要。支持章节、人物、事件线过滤和 offset 分页；细节用 get_node_detail。 摘要最多160字，完整经过及引文按ID查详情。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -45,7 +45,7 @@
       },
       {
         "name": "get_node_detail",
-        "description": "按 ID 读取节点详情，包含原文摘录与完整事件字段。",
+        "description": "按 ID 读取节点详情，包含原文摘录与完整事件字段。 长详情返回带nextCharOffset的JSON片段，按char_offset继续读取。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -60,6 +60,17 @@
               "items": {
                 "type": "string"
               }
+            },
+            "char_offset": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "长详情的字符续读位置。"
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6000,
+              "description": "每项详情JSON片段最多返回的字符数。长详情自动分页，使用返回的nextCharOffset继续。"
             }
           }
         },
@@ -120,7 +131,7 @@
       },
       {
         "name": "get_event_line_detail",
-        "description": "按 ID 读取完整事件线，核对成员与连贯性。",
+        "description": "按 ID 读取完整事件线，核对成员与连贯性。 长详情返回带nextCharOffset的JSON片段，按char_offset继续读取。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -135,6 +146,17 @@
               "items": {
                 "type": "string"
               }
+            },
+            "char_offset": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "长详情的字符续读位置。"
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6000,
+              "description": "每项详情JSON片段最多返回的字符数。长详情自动分页，使用返回的nextCharOffset继续。"
             }
           }
         },
@@ -303,14 +325,20 @@
         "parameters": {
           "additionalProperties": false,
           "type": "object",
-          "required": [
-            "chapter_range"
-          ],
           "properties": {
+            "asset_ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "description": "按资产编号读取其来源章节原文；与 chapter_range 至少给一项。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "chapter_range": {
               "minItems": 2,
               "maxItems": 2,
-              "description": "恰好两个字符串：[起始章节, 结束章节]。",
+              "description": "连续章节范围：[起始章节, 结束章节]。与 asset_ids 至少给一项。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -324,6 +352,33 @@
               "minimum": 1,
               "maximum": 200000,
               "type": "integer"
+            },
+            "chapter_indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "items": {
+                "type": "string"
+              },
+              "description": "需要核实的离散章节；与资产编号一起使用时只读取交集。"
+            },
+            "cursor": {
+              "type": "object",
+              "properties": {
+                "chapterIndex": {
+                  "type": "string"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "chapterIndex",
+                "offset"
+              ],
+              "additionalProperties": false,
+              "description": "使用上次返回的 nextCursor 继续读取。"
             }
           }
         },
@@ -485,7 +540,7 @@
     "story_editor": [
       {
         "name": "query_nodes",
-        "description": "检索事件节点摘要。支持章节、人物、事件线过滤和 offset 分页；细节用 get_node_detail。",
+        "description": "检索事件节点摘要。支持章节、人物、事件线过滤和 offset 分页；细节用 get_node_detail。 摘要最多160字，完整经过及引文按ID查详情。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -523,7 +578,7 @@
       },
       {
         "name": "get_node_detail",
-        "description": "按 ID 读取节点详情，包含原文摘录与完整事件字段。",
+        "description": "按 ID 读取节点详情，包含原文摘录与完整事件字段。 长详情返回带nextCharOffset的JSON片段，按char_offset继续读取。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -538,6 +593,17 @@
               "items": {
                 "type": "string"
               }
+            },
+            "char_offset": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "长详情的字符续读位置。"
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6000,
+              "description": "每项详情JSON片段最多返回的字符数。长详情自动分页，使用返回的nextCharOffset继续。"
             }
           }
         },
@@ -598,7 +664,7 @@
       },
       {
         "name": "get_event_line_detail",
-        "description": "按 ID 读取完整事件线，核对成员与连贯性。",
+        "description": "按 ID 读取完整事件线，核对成员与连贯性。 长详情返回带nextCharOffset的JSON片段，按char_offset继续读取。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -613,6 +679,17 @@
               "items": {
                 "type": "string"
               }
+            },
+            "char_offset": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "长详情的字符续读位置。"
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6000,
+              "description": "每项详情JSON片段最多返回的字符数。长详情自动分页，使用返回的nextCharOffset继续。"
             }
           }
         },
@@ -781,14 +858,20 @@
         "parameters": {
           "additionalProperties": false,
           "type": "object",
-          "required": [
-            "chapter_range"
-          ],
           "properties": {
+            "asset_ids": {
+              "minItems": 1,
+              "maxItems": 20,
+              "description": "按资产编号读取其来源章节原文；与 chapter_range 至少给一项。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "chapter_range": {
               "minItems": 2,
               "maxItems": 2,
-              "description": "恰好两个字符串：[起始章节, 结束章节]。",
+              "description": "连续章节范围：[起始章节, 结束章节]。与 asset_ids 至少给一项。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -802,6 +885,33 @@
               "minimum": 1,
               "maximum": 200000,
               "type": "integer"
+            },
+            "chapter_indices": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "items": {
+                "type": "string"
+              },
+              "description": "需要核实的离散章节；与资产编号一起使用时只读取交集。"
+            },
+            "cursor": {
+              "type": "object",
+              "properties": {
+                "chapterIndex": {
+                  "type": "string"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "chapterIndex",
+                "offset"
+              ],
+              "additionalProperties": false,
+              "description": "使用上次返回的 nextCursor 继续读取。"
             }
           }
         },
@@ -1330,7 +1440,7 @@
       },
       {
         "name": "get_editor_note_detail",
-        "description": "读取工作记录详情；提供 session_id 可读本书旧会话记录。只读。",
+        "description": "读取工作记录详情；提供 session_id 可读本书旧会话记录。只读。 长详情返回带nextCharOffset的JSON片段，按char_offset继续读取。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -1348,6 +1458,17 @@
             },
             "session_id": {
               "type": "string"
+            },
+            "char_offset": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "长详情的字符续读位置。"
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6000,
+              "description": "每项详情JSON片段最多返回的字符数。长详情自动分页，使用返回的nextCharOffset继续。"
             }
           }
         },
@@ -2257,6 +2378,71 @@
             }
           }
         }
+      },
+      {
+        "name": "search_story_context",
+        "description": "在本书跨章节检索相关旧节点、事件线和本会话未解决线索；按当前节点编号或明确检索词检索，可分页。命中仅为候选，使用对应详情工具核实。",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "node_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "minItems": 1
+            },
+            "terms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 12,
+              "minItems": 1
+            },
+            "kind": {
+              "enum": [
+                "node",
+                "eventLine",
+                "note"
+              ]
+            },
+            "include_resolved": {
+              "type": "boolean"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "include_future": {
+              "type": "boolean",
+              "description": "按节点检索时是否包含后续章节。窗口默认检索当前及此前节点，全书复核默认包含后续节点。"
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "node_ids"
+              ]
+            },
+            {
+              "required": [
+                "terms"
+              ]
+            }
+          ],
+          "additionalProperties": false
+        },
+        "kind": "read",
+        "maxResults": 20,
+        "maxBytes": 65536,
+        "dependencyTracking": "query-result-fingerprint"
       }
     ]
   },

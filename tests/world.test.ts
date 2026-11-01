@@ -10,10 +10,52 @@ import { needsOptimization, optimizationRequest } from '../src/features/world/op
 import { defaultConfig } from '../src/features/models/types'
 import type { Character } from '../src/features/assets/types'
 import { agentStream } from './support/agent-protocol'
+import { readTool } from '../src/features/agents/queries'
+import { createMemoryAgentRepository } from '../src/features/agents/repository'
+import { resultContracts, validate } from '../src/features/agents/contracts'
+import { createAgentTools } from '../src/features/agents/tools'
+import { createBookAgentRepository } from '../src/features/agents/repository'
+import { saveIdentityQueue } from '../src/features/world/queue'
+import { emptyReport } from '../src/features/world/types'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
 const person = (id: string, name: string, extra = {}): Character => ({ id, bookId: 'a', name, aliases: [], confidence: 1, revision: 1, createdBy: 'P1', chapterIndex: '1', chapterName: '第1章', ...extra })
+
+it('旧失败报告的61条长资料在事务外计算指纹，恢复后追加小批且保留旧用量', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => reviewedBatch(JSON.parse(init?.body as string)))
+  const { workspace, db, models, service } = await setup(fetcher)
+  await db.table('characters').clear(); await db.table('locations').clear()
+  await db.table('characters').bulkPut(Array.from({ length: 41 }, (_, i) => person(`P${i}`, `人物${i}`, { background: '原文资料。'.repeat(600) })))
+  await db.table('locations').bulkPut(Array.from({ length: 20 }, (_, i) => ({ ...person(`L${i}`, `地点${i}`), description: '原文地点资料。'.repeat(100) })))
+  const workItems = (await db.table('characters').toArray()).map(row => ({ workItemId: `ai_identity:fullBook:character:${row.id}`, kind: 'character', id: row.id, revision: row.revision, factFingerprint: 'old' }))
+  const oldReport = { ...emptyReport({ characters: 41, locations: 20 }), status: 'failed', usage: { input: 96000, output: 489, totalTokens: 96489, cost: 0.009888, costStatus: 'estimated' }, cost: 0.009888, failed: ['旧请求预算耗尽'] }
+  await db.table('pipelineRuns').put({ id: 'legacy-run', bookId: 'a', recordType: 'run', stage: 'P2', phase: 'ai', status: 'failed', startedAt: new Date().toISOString(), report: oldReport, usage: oldReport.usage, tasks: [{ taskId: 'legacy-task', phase: 'ai_identity', stepsUsed: 6, status: 'partial', input: { workItems }, workItemIds: workItems.map(row => row.workItemId), readSet: { records: [], queries: [] }, appliedCommitIds: [], reviewedItems: [] }], commandIntents: [], appliedCommands: [] })
+  await db.table('compileProgress').put({ bookId: 'a', stage: 'P2', status: 'failed', runId: 'legacy-run' })
+  const originalDigest = crypto.subtle.digest.bind(crypto.subtle), contexts: boolean[] = []
+  const spy = vi.spyOn(crypto.subtle, 'digest').mockImplementation((...args: Parameters<typeof crypto.subtle.digest>) => { contexts.push(!!Dexie.currentTransaction); return originalDigest(...args) })
+  try { await saveIdentityQueue(createBookAgentRepository(workspace, 'a'), 'legacy-run') } finally { spy.mockRestore() }
+  expect(contexts).toHaveLength(61); expect(contexts.every(value => !value)).toBe(true)
+  // Keep the identity-only fixture short enough to skip the independent detail optimization stage.
+  await db.table('characters').toCollection().modify({ background: '' }); await db.table('locations').toCollection().modify({ description: '' })
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  const report = (await service.reports('a'))[0]
+  expect(report.id).toBe('legacy-run'); expect(report.coverage).toMatchObject({ checked: 61, pendingIds: [] })
+  expect(report.tasks!.slice(1).every(task => (task.workItemIds as string[]).length === 1)).toBe(true)
+  expect(report.report.usage.totalTokens).toBe(96489)
+}, 30000)
+
+it('三个以上同名人物的查询评分保持有效，身份核实的详情工具明确关闭事实底稿参数', async () => {
+  const repo = createMemoryAgentRepository('a', { characters: Array.from({ length: 4 }, (_, i) => person(`person-${i}`, '同名人物')) as unknown as Record<string, unknown>[] })
+  const scope = { bookId: 'a', profile: 'asset_editor' as const, phase: 'ai_identity', runId: 'run', taskId: 'task', owner: 'owner', workItemIds: [] }
+  const result = await repo.transaction(false, store => readTool(store, scope, 'query_characters', {}))
+  expect(() => validate(resultContracts.get('query_characters')!, result)).not.toThrow()
+  expect((result.data as { duplicateScore: number }[]).every(row => row.duplicateScore === 1)).toBe(true)
+  const tools = createAgentTools(repo, scope)
+  expect((tools.tools.find(tool => tool.name === 'get_character_detail')!.parameters as unknown as { properties: Record<string, unknown> }).properties.include_facts).toEqual({ type: 'boolean', const: false })
+})
 async function setup(fetcher = vi.fn<typeof fetch>(), complete = true) {
   const id = crypto.randomUUID(); const workspace = createWorkspace({ settingsName: `world-${id}`, bookPrefix: `world-book-${id}-` }); opened.push(workspace)
   const book = { id: 'a', title: '世界整理样本', sourceFileName: 'world.txt', createdAt: new Date().toISOString() }; await workspace.settings.books.put(book)
@@ -64,9 +106,9 @@ function identityFetcher(options: { failureAfterCommit?: boolean } = {}) {
     const replies = messages.filter(row => row.role === 'tool').map(row => { try { return JSON.parse(String(row.content)) } catch { return {} } })
     const commit = replies.find(row => row.ok)
     if (commit && options.failureAfterCommit) return new Response('{"error":{"message":"invalid key"}}', { status: 401 })
-    if (replies.length && (commit || input.kind === 'location' || !['C1-P001', 'C1-P002'].every(id => input.workItems.some((work: { id: string }) => work.id === id)))) return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: commit ? [commit.commitId] : [], summary: '已核对同人多名与同名异人', remainingWorkIds: [], reviewedItems: input.workItems.map((work: { id: string; workItemId: string }) => ({ workItemId: work.workItemId, outcome: commit && ['C1-P001', 'C1-P002'].includes(work.id) ? 'changed' : 'no_change', reason: '核对原文后确认' })) } }])
+    if (replies.length && (commit || input.kind === 'location' || !['C1-P001', 'C1-P002'].every(id => replies.some(row => row.data?.some((item: { id: string }) => item.id === id))))) return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: commit ? [commit.commitId] : [], summary: '已核对同人多名与同名异人', remainingWorkIds: [], reviewedItems: input.workItems.map((work: { id: string; workItemId: string }) => ({ workItemId: work.workItemId, outcome: commit && ['C1-P001', 'C1-P002'].includes(work.id) ? 'changed' : 'no_change', reason: '核对原文后确认' })) } }])
     if (replies.length && input.kind === 'character') return agentStream([{ name: 'commit_asset_changes', args: { operationKey: input.resume.nextOperationKey, payload: { groups: [{ kind: 'character', keepId: 'C1-P001', memberIds: ['C1-P001', 'C1-P002'], canonicalName: '沈青', confidence: 1, reason: '原文说明同人', evidence: [{ chapterIndex: '1', quote: '沈青又叫老沈，两人所指均为同一位船夫。', memberIds: ['C1-P001', 'C1-P002'] }] }] } } }])
-    return agentStream([{ name: input.kind === 'character' ? 'get_character_detail' : 'get_location_detail', args: { ids: input.workItems.map((work: { id: string }) => work.id) } }, ...(input.kind === 'character' ? [{ name: 'read_original', args: { chapter_range: ['1', '1'] } }] : [])])
+    return agentStream([{ name: input.kind === 'character' ? 'get_character_detail' : 'get_location_detail', args: { ids: input.kind === 'character' && input.workItems[0].id === 'C1-P001' ? ['C1-P001', 'C1-P002'] : input.workItems.map((work: { id: string }) => work.id) } }, ...(input.kind === 'character' ? [{ name: 'read_original', args: { asset_ids: input.workItems.map((work: { id: string }) => work.id) } }] : [])])
   })
 }
 it('AI整理复用Pi按证据合并，保持其他人物与地点，最终报告可备份', async () => {
@@ -154,6 +196,238 @@ it('人物地点按需整编完整覆盖事实，保留底稿与人工主名，�
   await db.table('locations').update('C1-L001', { description: '新增事实需要整理', mergeFacts: [{ id: 'new-fact', field: 'description', text: '新增事实需要整理', chapters: ['1'] }] })
   omitFacts = true
   await service.start('a')
-  expect((await service.reports('a'))[0].status).toBe('degraded')
+  expect((await service.reports('a'))[0].status, JSON.stringify({ state: service.state('a'), report: (await service.reports('a'))[0].report.failed })).toBe('degraded')
   expect(await db.table('locations').get('C1-L001')).toMatchObject({ description: '新增事实需要整理' })
+})
+
+function taskInput(body: { messages: { role: string; content: string | { text: string }[] }[] }) {
+  return JSON.parse(body.messages.filter(row => row.role === 'user').map(row => typeof row.content === 'string' ? row.content : row.content.map(part => part.text).join('')).find(value => value.startsWith('{'))!)
+}
+function reviewedBatch(body: Parameters<typeof taskInput>[0], partial = false) {
+  const input = taskInput(body)
+  const results = body.messages.filter(row => row.role === 'tool')
+  if (!results.length) return agentStream([{ name: input.kind === 'character' ? 'get_character_detail' : 'get_location_detail', args: { ids: input.workItems.map((row: { id: string }) => row.id) } }])
+  const reviewed = partial ? input.workItems.slice(0, 2) : input.workItems
+  return agentStream([{ name: 'submit_result', args: { status: reviewed.length < input.workItems.length ? 'partial' : 'completed', commitIds: [], summary: '本批已核实，剩余资料排队继续。', reviewedItems: reviewed.map((row: { workItemId: string }) => ({ workItemId: row.workItemId, outcome: 'no_change', reason: '当前资料身份不同，保持分开。' })), remainingWorkIds: input.workItems.slice(reviewed.length).map((row: { workItemId: string }) => row.workItemId) } }])
+}
+function withUsage(response: Response) {
+  return response.text().then(text => new Response(text.replace('data: [DONE]', `data: ${JSON.stringify({ id: 'usage', object: 'chat.completion.chunk', model: 'fixture', choices: [], usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 } })}\n\ndata: [DONE]`), { headers: { 'Content-Type': 'text/event-stream' } }))
+}
+
+it.each([1, 3])('%i项证据提交失败后继续其余资产，重开时只处理失败项', async failedCount => {
+  let rejectEvidence = true
+  const failedIds = Array.from({ length: failedCount }, (_, i) => `C1-P${String(i + 1).padStart(3, '0')}`)
+  const attempts = new Map<string, number>()
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    if (!rejectEvidence || !failedIds.includes(input.workItems[0].id)) return reviewedBatch(body)
+    const attempt = (attempts.get(input.taskId) ?? 0) + 1; attempts.set(input.taskId, attempt)
+    if (attempt === 1) return agentStream([
+      { name: 'get_character_detail', args: { ids: ['C1-P001', 'C1-P002'] } },
+      { name: 'read_original', args: { chapter_indices: ['1'], maxChars: 1 } },
+    ])
+    return agentStream([{ name: 'commit_asset_changes', args: { operationKey: `${input.resume.nextOperationKey}-${attempt}`, payload: { groups: [{ kind: 'character', keepId: 'C1-P001', memberIds: ['C1-P001', 'C1-P002'], canonicalName: '沈青', confidence: 1, reason: '同人', evidence: [{ chapterIndex: '1', quote: '沈青又叫老沈，两人所指均为同一位船夫。', memberIds: ['C1-P001', 'C1-P002'] }] }] } } }])
+  })
+  const { service, models, db } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await service.start('a')
+  const paused = (await service.reports('a'))[0]
+  expect(paused.status).toBe('degraded')
+  expect(paused.report.failed).toHaveLength(failedCount)
+  expect(paused.report.failed[0]).toContain('C1-P001')
+  expect(paused.coverage).toEqual({ total: 6, checked: 6 - failedCount, pendingIds: failedIds.map(id => `ai_identity:fullBook:character:${id}`) })
+  expect(paused.tasks?.[0]).toMatchObject({ status: 'failed', stepsUsed: 3 })
+  expect(await db.table('characters').count()).toBe(4)
+  const count = fetcher.mock.calls.length
+  rejectEvidence = false
+  await service.start('a')
+  expect(fetcher.mock.calls.length - count).toBe(2 * failedCount)
+  expect((await service.reports('a'))[0]).toMatchObject({ id: paused.id, status: 'completed', coverage: { checked: 6 } })
+})
+
+it('有待办时成功资产仍完成整编，继续时保留成功项覆盖', async () => {
+  let leavePending = true, optimizationCalls = 0
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    if (body.tools.length === 1) {
+      optimizationCalls++
+      const row = input.entities[0]
+      return agentStream([{ name: 'submit_result', args: { entities: { [row.id]: { entity: { name: row.name, aliases: row.aliases, background: '独有背景事实' }, covered_fact_ids: row.facts.map((fact: { id: string }) => fact.id), merge_notes: [] } } } }])
+    }
+    if (leavePending && input.workItems[0].id === 'C1-P001') return agentStream([{ name: 'submit_result', args: { status: 'partial', commitIds: [], summary: '待核实', reviewedItems: [], remainingWorkIds: [input.workItems[0].workItemId] } }])
+    return reviewedBatch(body)
+  })
+  const { service, models, db } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await db.table('characters').update('C1-P003', { background: '独有背景事实', mergeNotes: ['需整编'], mergeFacts: [{ id: 'F-original', field: 'background', text: '独有背景事实', chapters: ['1'] }] })
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect((await service.reports('a'))[0]).toMatchObject({ status: 'paused', coverage: { checked: 5 }, report: { optimizedIds: ['C1-P003'] } })
+  expect(optimizationCalls).toBe(1)
+  const count = fetcher.mock.calls.length
+  leavePending = false
+  await service.start('a')
+  expect(fetcher.mock.calls.length - count).toBe(2)
+  expect(optimizationCalls).toBe(1)
+  expect((await service.reports('a'))[0]).toMatchObject({ status: 'completed', coverage: { checked: 6 } })
+})
+
+it('41人物和20地点每批三条排队核实，全部完成后不留待办', async () => {
+  const calls = new Map<string, number>(), sizes = new Map<string, number>()
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string); const input = taskInput(body)
+    calls.set(input.taskId, (calls.get(input.taskId) ?? 0) + 1); sizes.set(input.taskId, input.workItems.length)
+    return reviewedBatch(body, true)
+  })
+  const { service, db, models, book } = await setup(fetcher)
+  await db.table('characters').clear(); await db.table('locations').clear()
+  await db.table('characters').bulkPut(Array.from({ length: 41 }, (_, i) => person(`C1-P${String(i).padStart(3, '0')}`, `人物${i}`)))
+  await db.table('locations').bulkPut(Array.from({ length: 20 }, (_, i) => ({ ...person(`C1-L${String(i).padStart(3, '0')}`, `地点${i}`), description: '' })))
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(Math.max(...calls.values())).toBeLessThanOrEqual(8)
+  expect(Math.max(...sizes.values())).toBeLessThanOrEqual(3)
+  const report = (await service.reports('a'))[0]
+  expect(report.status).toBe('completed')
+  expect(report.coverage).toEqual({ total: 61, checked: 61, pendingIds: [] })
+  expect(report.report.failed).toEqual([])
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+}, 60000)
+
+it('取消后重建服务从未处理队列继续，复用报告和已核实范围，累计用量不重复计算', async () => {
+  let gate = true
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string)
+    if (gate && fetcher.mock.calls.length === 3) return new Promise((_resolve, reject) => { init?.signal?.addEventListener('abort', () => reject(new DOMException('取消', 'AbortError')), { once: true }) })
+    return withUsage(reviewedBatch(body))
+  })
+  const { workspace, service, models, assets, db } = await setup(fetcher)
+  await db.table('characters').clear(); await db.table('locations').clear()
+  await db.table('characters').bulkPut(Array.from({ length: 20 }, (_, i) => person(`C1-P${String(i).padStart(3, '0')}`, `人物${i}`)))
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  const running = service.start('a')
+  await vi.waitFor(() => expect(fetcher.mock.calls.length).toBe(3))
+  service.cancel('a'); await running
+  const previous = (await service.reports('a'))[0]
+  expect(previous.coverage?.checked).toBe(1)
+  expect(previous.report.usage.totalTokens).toBe(24)
+  gate = false
+  const restored = createWorldService(workspace, models, assets)
+  await restored.start('a')
+  expect(restored.state('a')?.error).toBeUndefined()
+  const report = (await restored.reports('a'))[0]
+  expect(report.id).toBe(previous.id)
+  expect(report.coverage).toEqual({ total: 20, checked: 20, pendingIds: [] })
+  expect(report.report.usage.totalTokens).toBe(480)
+  expect(fetcher.mock.calls).toHaveLength(41)
+})
+
+it('未完成项让后续资产继续，全部尝试后保存待办，用户继续后可完成', async () => {
+  let partial = true
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    if (!partial) return reviewedBatch(body)
+    return agentStream([{ name: 'submit_result', args: { status: 'partial', commitIds: [], summary: '仍需查询', reviewedItems: [], remainingWorkIds: input.workItems.map((row: { workItemId: string }) => row.workItemId) } }])
+  })
+  const { service, models, db } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await service.start('a')
+  expect(fetcher.mock.calls).toHaveLength(6)
+  const previous = (await service.reports('a'))[0]
+  expect(previous.status).toBe('paused'); expect(previous.coverage?.pendingIds).toHaveLength(6)
+  expect(await db.table('pipelineRuns').get('lease:world')).toBeUndefined()
+  partial = false; await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect((await service.reports('a'))[0]).toMatchObject({ id: previous.id, status: 'completed', coverage: { checked: 6 } })
+})
+
+it.each([false, true])('后续合并同步完成状态和旧失败，目录查询不使队列回头（先失败：%s）', async failFirst => {
+  const order: string[] = []
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    const id = input.workItems[0].id
+    const replies = body.messages.filter((row: { role: string }) => row.role === 'tool').map((row: { content: string }) => { try { return JSON.parse(row.content) } catch { return {} } })
+    if (failFirst && id === 'C1-P001') {
+      if (!replies.length) order.push(id)
+      return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: [], summary: '缺少读取依据', remainingWorkIds: [], reviewedItems: [{ workItemId: input.workItems[0].workItemId, outcome: 'no_change', reason: '未读取' }] } }])
+    }
+    if (!replies.length) {
+      order.push(id)
+      return agentStream([
+        { name: input.kind === 'character' ? 'query_characters' : 'query_locations', args: {} },
+        { name: input.kind === 'character' ? 'get_character_detail' : 'get_location_detail', args: { ids: id === 'C1-P004' ? [id, 'C1-P001', 'C1-P002'] : [id] } },
+        ...(id === 'C1-P004' ? [{ name: 'read_original', args: { chapter_indices: ['1'] } }] : []),
+      ])
+    }
+    const commit = replies.find((row: { ok?: boolean }) => row.ok)
+    if (id === 'C1-P004' && !commit) return agentStream([{ name: 'commit_asset_changes', args: { operationKey: input.resume.nextOperationKey, payload: { groups: [{ kind: 'character', keepId: 'C1-P001', memberIds: ['C1-P001', 'C1-P002'], canonicalName: '沈青', confidence: 1, reason: '原文明示', evidence: [{ chapterIndex: '1', quote: '沈青又叫老沈，两人所指均为同一位船夫。', memberIds: ['C1-P001', 'C1-P002'] }] }] } } }])
+    return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: commit ? [commit.commitId] : [], summary: '已核实当前项', remainingWorkIds: [], reviewedItems: [{ workItemId: input.workItems[0].workItemId, outcome: 'no_change', reason: '当前分配项保持独立' }] } }])
+  })
+  const { service, models } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(order).toEqual(['C1-P001', 'C1-P002', 'C1-P003', 'C1-P004', 'C1-L001', 'C1-L002'])
+  expect((await service.reports('a'))[0]).toMatchObject({ status: 'completed', coverage: { total: 5, checked: 5, pendingIds: [] }, report: { failed: [] } })
+})
+
+it('提交合并后其余批次继续，不重复合并同一组', async () => {
+  const fetcher = identityFetcher()
+  const { models, service, db } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  const report = (await service.reports('a'))[0]
+  expect(report.report.groups).toHaveLength(1)
+  expect(report.coverage).toMatchObject({ total: 5, checked: 5, pendingIds: [] })
+  expect(report.tasks).toHaveLength(5)
+  expect(report.tasks!.every(task => task.status === 'completed')).toBe(true)
+  expect(await db.table('characters').count()).toBe(3)
+})
+
+it('单资产第六轮开始收尾，第八轮返回后保存待办，不重复启动该资产', async () => {
+  const notes: string[] = []
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    notes.push(JSON.stringify(body.messages.at(-1)))
+    return agentStream([{ name: 'get_character_detail', args: { ids: input.workItems.map((row: { id: string }) => row.id) } }])
+  })
+  const { service, models, db } = await setup(fetcher)
+  await db.table('characters').clear(); await db.table('locations').clear()
+  await db.table('characters').put(person('one', '单个人物'))
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await service.start('a')
+  expect(fetcher).toHaveBeenCalledTimes(8)
+  expect(notes[5]).toContain('进入收尾')
+  const report = (await service.reports('a'))[0]
+  expect(report.status).toBe('paused')
+  expect(report.coverage).toMatchObject({ checked: 0, pendingIds: ['ai_identity:fullBook:character:one'] })
+  expect(report.tasks).toHaveLength(1)
+  expect(report.report.failed).toEqual([])
+})
+
+it('剩余一分钟提醒收尾，跨过目标时间的在途请求正常返回并保存待办', async () => {
+  const realNow = Date.now.bind(Date); let elapsed = 0
+  const notes: string[] = [], aborted: boolean[] = []
+  let db: ReturnType<ReturnType<typeof createWorkspace>['openBook']>
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    notes.push(JSON.stringify(body.messages.at(-1)))
+    elapsed = fetcher.mock.calls.length === 1 ? 130000 : 190000
+    await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 })
+    aborted.push(!!init?.signal?.aborted)
+    return agentStream([{ name: 'get_character_detail', args: { ids: input.workItems.map((row: { id: string }) => row.id) } }])
+  })
+  const fixture = await setup(fetcher); db = fixture.db
+  await db.table('characters').clear(); await db.table('locations').clear()
+  await db.table('characters').put(person('one', '单个人物'))
+  await fixture.models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed)
+  try { await fixture.service.start('a') } finally { clock.mockRestore() }
+  expect(fetcher).toHaveBeenCalledTimes(2)
+  expect(notes[1]).toContain('进入收尾')
+  expect(aborted).toEqual([false, false])
+  expect((await fixture.service.reports('a'))[0]).toMatchObject({ status: 'paused', coverage: { checked: 0 } })
 })

@@ -7,6 +7,9 @@ import { createBookAgentRepository, type Row } from '../agents/repository'
 import { checkpointId, evidenceEntries, membershipsOf, type StoryCheckpoint, type StoryProgress } from './checkpoints'
 import { createStoryWindows, windowKey, windowNodes, type StoryWindow } from './windows'
 import { runGlobalReview, reviewQueue } from './review'
+import { recoverStoryCoverage, saveStoryCoverage, storyFingerprint, validStoryCoverage, windowFingerprint } from './coverage'
+import { hash } from '../agents/contracts'
+import { buildStoryContext, lineDigest, selectStoryBatch, storyBatchBudget } from './retrieval'
 import type { SessionStatus } from '../agents/compaction'
 import storyPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-story.md?raw'
 import taskTemplate from '../../../docs/v2/resources/v2.2/prompts/active/story.txt?raw'
@@ -32,7 +35,7 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
     }
     const nodesFor = async (window: StoryWindow) => windowNodes(window, chapters, await db.table<EventNode>('nodes').toArray())
     try {
-      const [{ createAgentRuntime }, { hash, records, strings, text }, { resolveSession }] = await Promise.all([import('../agents/runtime'), import('../agents/contracts'), import('../agents/sessions')])
+      const [{ createAgentRuntime }, { records, text }, { resolveSession }] = await Promise.all([import('../agents/runtime'), import('../agents/contracts'), import('../agents/sessions')])
       if (!await workspace.settings.books.get(bookId)) throw new Error('书籍不存在。')
       const settings = await models.settings.read()
       if (!settings.configured || !settings.config.aggregationModel) throw new Error('请先保存整理模型与密钥。')
@@ -53,7 +56,8 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
         if (previous?.planKey === planKey && previous.editorSessionId === sessionId && previousRun?.stage === 'P3') runId = text(previousRun.id)
         if (phase === 'global_review') for (const window of windows) {
           const checkpoint = await store.get('storyEditorCheckpoints', checkpointId(sessionId, planKey, window))
-          if (checkpoint?.status !== 'completed' || previous?.phase !== 'global_review' && checkpoint.sourceFingerprint !== await store.wait(hash({ window, nodes: windowNodes(window, chapters, await store.rows('nodes') as unknown as EventNode[]) }))) throw new Error('请先完成当前资料的窗口串联。')
+          const nodes = windowNodes(window, chapters, await store.rows('nodes') as unknown as EventNode[])
+          if (checkpoint?.status !== 'completed' || previous?.phase !== 'global_review' && ![await store.wait(windowFingerprint(window, nodes)), await store.wait(hash({ window, nodes }))].includes(text(checkpoint.sourceFingerprint))) throw new Error('请先完成当前资料的窗口串联。')
         }
         const now = new Date().toISOString()
         const run = runId === previousRun?.id ? previousRun : { id: runId, bookId, recordType: 'run', stage: 'P3', startedAt: now, planVersion: '2.2', scope: 'fullBook', tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent' }
@@ -68,73 +72,105 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
         if (lease?.owner !== owner || session?.leaseOwner !== owner) throw new Error('叙事执行权已变化。')
         await store.put('pipelineRuns', { ...lease, expiresAt: Date.now() + 30000 }); await store.put('storySessions', { ...session, leaseUntil: Date.now() + 30000 })
       }).catch(() => controller.abort()) }, 8000)
+      await repo.transaction(true, store => recoverStoryCoverage(store, runId))
       if (phase === 'global_review') {
-        await runGlobalReview(repo, runtime, { runId, sessionId, owner, signal: controller.signal, check, onProgress: (processed, nodeTotal, queue) => set(bookId, { processed, nodeTotal, queue }) })
-        set(bookId, { message: '全书复核完成。' })
+        const completed = await runGlobalReview(repo, runtime, { runId, sessionId, owner, signal: controller.signal, check, contextWindow: settings.config.aggregationContextWindow, onProgress: (processed, nodeTotal, queue) => set(bookId, { processed, nodeTotal, queue }) })
+        if (completed) await db.transaction('rw', db.tables, async () => {
+          await check()
+          for (const window of windows) {
+            const id = checkpointId(sessionId, planKey, window)
+            const checkpoint = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(id)
+            const nodes = await nodesFor(window)
+            if (checkpoint) await db.table('storyEditorCheckpoints').put({ ...checkpoint, scopeIds: nodes.map(row => row.id), sourceFingerprint: await Dexie.waitFor(windowFingerprint(window, nodes)), memberships: membershipsOf(nodes), updatedAt: new Date().toISOString() })
+          }
+        })
+        set(bookId, { message: completed ? '全书复核完成。' : '本轮复核已保存，剩余项可继续。' })
         return
       }
       const saveCheckpoint = async (window: StoryWindow, status: StoryCheckpoint['status']) => {
         const nodes = await nodesFor(window)
-        const sourceFingerprint = await Dexie.waitFor(hash({ window, nodes }))
+        const sourceFingerprint = await Dexie.waitFor(windowFingerprint(window, nodes))
         await db.table('storyEditorCheckpoints').put({ id: checkpointId(sessionId, planKey, window), bookId, sessionId, stage: 'P3', phase: 'window_link', scopeIds: nodes.map(row => row.id), sourceFingerprint, status, memberships: membershipsOf(nodes), updatedAt: new Date().toISOString(), window: { start: window.start, end: window.end } } satisfies StoryCheckpoint)
       }
+      const windowCoverage = async (window: StoryWindow) => repo.transaction(false, async store => {
+        const current = windowNodes(window, chapters, await store.rows('nodes') as unknown as EventNode[])
+        const run = (await store.get('pipelineRuns', runId))!
+        const saved = records(run.coverageItems)
+        const covered = new Set<string>()
+        for (const row of current) {
+          const item = saved.find(item => item.workItemId === `window_link:${windowKey(window)}:node:${encodeURIComponent(row.id)}`)
+          if (item && await validStoryCoverage(store, item, row as unknown as Row)) covered.add(row.id)
+        }
+        return { current, covered, run }
+      })
+      let completedWindows = 0
       for (const [windowIndex, window] of windows.entries()) {
         await check(); activeWindow = window
         set(bookId, { window: windowIndex + 1, total: windows.length, processed: 0 })
         const existing = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(checkpointId(sessionId, planKey, window))
-        const initialNodes = await nodesFor(window)
-        if (!recheck && existing?.status === 'completed' && existing.sourceFingerprint === await hash({ window, nodes: initialNodes })) continue
-        const covered = new Map<string, string>(), readLines = new Set<string>(); let noProgress = 0
+        const initial = await windowCoverage(window)
+        if (!recheck && existing?.status === 'completed' && initial.covered.size === initial.current.length &&
+          [await windowFingerprint(window, initial.current), await hash({ window, nodes: initial.current })].includes(existing.sourceFingerprint)) { completedWindows++; continue }
+        const attempted = new Set<string>(), readLines = new Set<string>()
+        for (const task of records(initial.run.tasks)) {
+          const prior = (task.input as Row)?.window as Row | undefined
+          if (task.phase !== 'window_link' || prior?.start !== window.start || prior?.end !== window.end) continue
+          for (const read of records((task.readSet as Row)?.records).filter(row => row.table === 'eventLines')) {
+            const row = await db.table('eventLines').get(text(read.resolvedId ?? read.id))
+            if (row && [await hash(row), await storyFingerprint('eventLines', row)].includes(text(read.factFingerprint))) readLines.add(text(row.id))
+          }
+        }
+        let complete = false
         for (;;) {
           await check()
-          const current = await nodesFor(window)
-          const fingerprints = new Map(await Promise.all(current.map(async row => [row.id, await hash(row)] as const)))
-          const pending = current.filter(row => covered.get(row.id) !== fingerprints.get(row.id))
+          const state = await windowCoverage(window)
+          const pending = state.current.filter(row => !state.covered.has(row.id))
           const lines = await db.table('eventLines').toArray()
           const unreadLines = lines.filter(row => !readLines.has(String(row.id)))
-          set(bookId, { nodeTotal: current.length, processed: current.length - pending.length })
-          if (!current.length || !pending.length && !unreadLines.length) break
-          const batch = (pending.length ? pending : current).slice(0, 100)
+          set(bookId, { nodeTotal: state.current.length, processed: state.covered.size })
+          if (!state.current.length || !pending.length && !unreadLines.length) { complete = true; break }
+          const kind = pending.some(row => !attempted.has(`node:${row.id}`)) ? 'node' : 'eventLine'
+          const batch = selectStoryBatch((kind === 'node' ? pending as unknown as Row[] : unreadLines).filter(row => !attempted.has(`${kind}:${row.id}`)), storyBatchBudget(settings.config.aggregationContextWindow))
+          if (!batch.length) break
+          for (const row of batch) attempted.add(`${kind}:${row.id}`)
           const taskId = crypto.randomUUID(), operationKey = crypto.randomUUID()
-          const workItems = batch.map(row => ({ workItemId: `window_link:${windowKey(window)}:node:${encodeURIComponent(row.id)}`, kind: 'node', id: row.id, revision: row.revision, factFingerprint: fingerprints.get(row.id)! }))
+          const workItems = await Promise.all(batch.map(async row => ({ workItemId: `window_link:${windowKey(window)}:${kind}:${encodeURIComponent(text(row.id))}`, kind, id: text(row.id), revision: Number(row.revision), factFingerprint: await storyFingerprint(kind === 'node' ? 'nodes' : 'eventLines', row) })))
           const memory = await db.table('storyEditorMemory').get(sessionId) ?? { id: sessionId, bookId, sessionId, revision: 0, workingSummary: '', dataFingerprint: '', updatedAt: '' }
-          const input = { bookId, runId, taskId, planVersion: '2.2', remainingCount: pending.length, resume: { reason: existing ? 'continuation' : 'initial', appliedCommitIds: [], nextOperationKey: operationKey, remainingWorkIds: workItems.map(row => row.workItemId) }, stage: 'P3', phase: 'window_link', sessionId, queue: 'window_nodes', window, workItems, existingLines: lines.slice(0, 50).map(row => ({ id: row.id, title: row.title, lineStatus: row.lineStatus, nodeIds: strings(row.nodeIds), chapters: strings(row.chapters), cause: String(row.cause ?? '').slice(0, 100), result: String(row.result ?? '').slice(0, 100), revision: row.revision })), memory, afterWorkItemId: null }
+          const contextHints = await repo.transaction(false, store => buildStoryContext(store, bookId, sessionId, batch, kind))
+          const relatedLineIds = contextHints.related.filter(row => row.kind === 'eventLine').map(row => row.id)
+          const lineHints = [...lines].sort((a, b) => Number(relatedLineIds.includes(b.id)) - Number(relatedLineIds.includes(a.id))).slice(0, 6).map(lineDigest)
+          const input = { bookId, runId, taskId, planVersion: '2.2', remainingCount: pending.length, resume: { reason: existing ? 'continuation' : 'initial', appliedCommitIds: [], nextOperationKey: operationKey, remainingWorkIds: workItems.map(row => row.workItemId) }, stage: 'P3', phase: 'window_link', sessionId, queue: 'window_nodes', window, workItems, existingLines: lineHints, contextHints, memory, afterWorkItemId: null }
           const result = await runtime.run(repo, { profile: 'story_editor', phase: 'window_link', sessionId, runId, taskId, leaseOwner: owner, retainLease: true, workItems, input, requiredLineIds: unreadLines.map(row => String(row.id)), businessPrompt: storyPrompt, prompt: taskTemplate.replace('{taskJson}', JSON.stringify(input)), signal: controller.signal })
           await check()
           if (!result.ok) throw new Error(result.error ?? '窗口串联失败。')
-          const after = await nodesFor(window)
-          const afterHash = new Map(await Promise.all(after.map(async row => [row.id, await hash(row)] as const)))
-          const { task } = await repo.transaction(false, async store => { const run = (await store.get('pipelineRuns', runId))!; return { task: records(run.tasks).find(row => row.taskId === taskId)! } })
-          const reads = task.readSet as { records: Row[]; queries: Row[] }
-          let gained = 0
-          for (const read of reads.records.filter(row => row.table === 'eventLines')) { const id = String(read.resolvedId ?? read.id); if (!readLines.has(id)) gained++; readLines.add(id) }
+          const task = await repo.transaction(true, async store => {
+            const run = (await store.get('pipelineRuns', runId))!
+            const task = records(run.tasks).find(row => row.taskId === taskId)!
+            await saveStoryCoverage(store, runId, task, result.summary?.reviewedItems as unknown as Row[] ?? [])
+            return task
+          })
+          for (const read of records((task.readSet as Row)?.records).filter(row => row.table === 'eventLines')) readLines.add(text(read.resolvedId ?? read.id))
           const previousLineIds = new Set(lines.map(row => String(row.id)))
           for (const line of await db.table('eventLines').toArray()) if (!previousLineIds.has(String(line.id))) readLines.add(String(line.id))
-          const reviewed = result.summary?.reviewedItems ?? []
-          const items = reviewed.map(item => {
-            const work = workItems.find(work => work.workItemId === item.workItemId)!
-            const row = after.find(row => row.id === work.id)
-            const currentHash = afterHash.get(work.id) ?? 'deleted'
-            if (covered.get(work.id) !== currentHash) gained++
-            covered.set(work.id, currentHash)
-            return { workItemId: work.workItemId, phase: 'window_link', kind: 'node', id: work.id, status: row ? 'checked' : 'skipped', inputRevision: work.revision, inputFingerprint: work.factFingerprint, coveredRevision: row?.revision ?? 0, coveredFingerprint: currentHash, dependencies: reads, taskId, outcome: row ? item.outcome : 'deleted', reason: item.reason, invalidations: 0, updatedAt: new Date().toISOString() }
-          })
-          await db.transaction('rw', db.table('pipelineRuns'), db.table('storySessions'), async () => { await check(); const run = (await db.table('pipelineRuns').get(runId))!; const old = records(run.coverageItems); const keys = new Set(items.map(item => item.workItemId)); await db.table('pipelineRuns').update(runId, { status: 'running', phase: 'window_link', coverageItems: [...old.filter(item => !keys.has(text(item.workItemId))), ...items] }) })
-          noProgress = gained ? 0 : noProgress + 1
-          if (noProgress >= 3) throw new Error('连续尝试未取得节点覆盖进展，请查看依据后继续。')
         }
-        await db.transaction('rw', db.tables, async () => { await check(); await saveCheckpoint(window, 'completed'); await db.table('compileProgress').update('P3', { lastWindowIndex: windowIndex, updatedAt: new Date().toISOString() }) })
+        if (complete) completedWindows++
+        await db.transaction('rw', db.tables, async () => { await check(); await saveCheckpoint(window, complete ? 'completed' : 'failed'); await db.table('compileProgress').update('P3', { lastWindowIndex: windowIndex, updatedAt: new Date().toISOString() }) })
       }
       await db.transaction('rw', db.tables, async () => {
         await check()
+        const pendingWindows: string[] = []
         for (const window of windows) {
           const checkpoint = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(checkpointId(sessionId, planKey, window))
-          if (checkpoint?.status !== 'completed' || checkpoint.sourceFingerprint !== await Dexie.waitFor(hash({ window, nodes: await nodesFor(window) }))) throw new Error('已处理窗口的资料发生变化，请继续核对受影响的窗口。')
+          const nodes = await nodesFor(window)
+          if (checkpoint?.status !== 'completed' || ![await Dexie.waitFor(windowFingerprint(window, nodes)), await Dexie.waitFor(hash({ window, nodes }))].includes(checkpoint.sourceFingerprint)) pendingWindows.push(windowKey(window))
         }
-        await db.table('compileProgress').update('P3', { status: 'paused', phase: 'window_link_complete', validity: 'current', updatedAt: new Date().toISOString() })
-        await db.table('pipelineRuns').update(runId, { status: 'paused', phase: 'window_link_complete', finishedAt: new Date().toISOString(), coverage: { total: windows.length, checked: windows.length, pendingIds: [] } })
+        completedWindows = windows.length - pendingWindows.length
+        const finalPhase = pendingWindows.length ? 'window_link' : 'window_link_complete'
+        await db.table('compileProgress').update('P3', { status: 'paused', phase: finalPhase, validity: pendingWindows.length ? 'stale' : 'current', updatedAt: new Date().toISOString() })
+        await db.table('pipelineRuns').update(runId, { status: 'paused', phase: finalPhase, finishedAt: new Date().toISOString(), coverage: { total: windows.length, checked: completedWindows, pendingIds: pendingWindows } })
       })
-      set(bookId, { message: '窗口串联完成。', processed: states.get(bookId)?.nodeTotal ?? 0 })
+      set(bookId, { message: completedWindows === windows.length ? '窗口串联完成。' : '本轮串联已保存，剩余项可继续。', processed: states.get(bookId)?.processed ?? 0 })
+
     } catch (error) {
       const message = controller.signal.aborted ? '整理已取消，已提交的资料和依据保留。' : error instanceof Error ? error.message : '叙事整理失败。'
       set(bookId, { error: message })
@@ -161,14 +197,21 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
       const progress = await store.get('compileProgress', 'P3') as unknown as StoryProgress | undefined
       const run = progress?.runId ? await store.get('pipelineRuns', progress.runId) : undefined
       const checkpoints = (await store.rows('storyEditorCheckpoints') as unknown as StoryCheckpoint[]).filter(row => row.phase === 'window_link' && row.sessionId === progress?.editorSessionId && windows.some(window => row.id === checkpointId(progress.editorSessionId, progress.planKey, window)))
+      const nodes = await store.rows('nodes'), lines = await store.rows('eventLines')
+      for (const checkpoint of checkpoints) {
+        const window = windows.find(window => window.start === checkpoint.window.start && window.end === checkpoint.window.end)!
+        const current = windowNodes(window, chapters, nodes as unknown as EventNode[])
+        if (checkpoint.status === 'completed' && ![await store.wait(windowFingerprint(window, current)), await store.wait(hash({ window, nodes: current }))].includes(checkpoint.sourceFingerprint)) checkpoint.status = 'failed'
+      }
       const leases = await store.rows('pipelineRuns')
       const covered = coverage(chapters, await store.rows('extractionReceipts') as unknown as Receipt[]).allCovered
       const locked = leases.some(row => row.recordType === 'lease' && ['narrative', 'extraction'].includes(String(row.lockKey)) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
+      const leaseExpiry = leases.filter(row => row.recordType === 'lease' && ['narrative', 'extraction'].includes(String(row.lockKey)) && typeof row.expiresAt === 'number' && row.expiresAt > Date.now()).reduce<number | undefined>((expiry, row) => Math.min(expiry ?? Infinity, Number(row.expiresAt)), undefined)
       const entries = progress?.editorSessionId ? (await store.rows('storySessionEntries')).filter(row => row.sessionId === progress.editorSessionId).sort((a, b) => Number(a.ordinal) - Number(b.ordinal)) : []
       const compact = entries.findLast(row => row.type === 'compaction')
       const review = run ? await reviewQueue(store, progress!.runId, progress!.editorSessionId) : undefined
       const memory = progress?.editorSessionId ? await store.get('storyEditorMemory', progress.editorSessionId) : undefined
-      return { progress, windows, covered, locked, checkpoints, completed: checkpoints.filter(row => row.status === 'completed').length, tasks: evidenceEntries((run?.tasks as Row[] | undefined) ?? []), usage: run?.usage as { totalTokens: number; cost: number; costStatus?: string } | undefined, commits: (run?.appliedCommands as Row[] | undefined) ?? [], memory, notes: review?.items.filter(row => row.queue === 'review_notes').map(row => row.row) ?? [], session: { id: progress?.editorSessionId, entryCount: entries.length, compactions: entries.filter(row => row.type === 'compaction').length, compact }, review: { total: review?.items.length ?? 0, pending: review?.pending.length ?? 0, conclusions: review?.coverage ?? [] } }
+      return { progress, windows, covered, locked, leaseExpiry, checkpoints, completed: checkpoints.filter(row => row.status === 'completed').length, tasks: evidenceEntries((run?.tasks as Row[] | undefined) ?? [], nodes, lines), usage: run?.usage as { totalTokens: number; cost: number; costStatus?: string } | undefined, commits: (run?.appliedCommands as Row[] | undefined) ?? [], memory, notes: review?.items.filter(row => row.queue === 'review_notes').map(row => row.row) ?? [], session: { id: progress?.editorSessionId, entryCount: entries.length, compactions: entries.filter(row => row.type === 'compaction').length, compact }, review: { total: review?.items.length ?? 0, pending: review?.pending.length ?? 0, conclusions: review?.coverage ?? [] } }
     })
   }
   async function history(bookId: string, offset = 0) {

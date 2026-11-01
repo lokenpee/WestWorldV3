@@ -1,6 +1,6 @@
 # WestWorld V2 · 详细规格：AI、工具与会话
 
-> **阶段0修订（2026-10-24）：** P2持有world域锁时禁止同书人物/地点人工写入，P3持有narrative域锁时禁止节点/事件线人工写入；UI与命令事务均校验，拒绝返回`ASSET_DOMAIN_LOCKED`。取消须等在途提交停止并释放锁才恢复编辑。P1人工编辑、跨书编辑、只读和备份不受此域锁限制。P2/P3仍可并行，保留跨域实际读依赖校验。direct首次/网络重发/至多一次修正合计最多3次实际请求；Agent每轮最多3次且task总共最多6次。详见[阶段0决策](../decisions/stage-edit-lock-and-request-budget.md)及当前机器契约。历史证据不代表新规则已在业务应用执行。
+> **阶段0修订（2026-10-24）：** P2持有world域锁时禁止同书人物/地点人工写入，P3持有narrative域锁时禁止节点/事件线人工写入；UI与命令事务均校验，拒绝返回`ASSET_DOMAIN_LOCKED`。取消须等在途提交停止并释放锁才恢复编辑。P1人工编辑、跨书编辑、只读和备份不受此域锁限制。P2/P3仍可并行，保留跨域实际读依赖校验。direct首次/网络重发/至多一次修正合计最多3次实际请求；P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾；P3预算见[叙事整理的排队与恢复](../decisions/story-organization.md)。详见[阶段0决策](../decisions/stage-edit-lock-and-request-budget.md)及当前机器契约。历史证据不代表新规则已在业务应用执行。
 
 | 文档控制项 | 内容 |
 |---|---|
@@ -88,7 +88,7 @@ P1用户消息必须为下列格式，换行保留；timestamp为当前毫秒：
 --- 正文结束 ---
 ```
 
-串联/复核用户消息按AI-14的StoryTask规范JSON和story.txt模板组装，明确phase、分配项、窗口/队列、前50条已有线提示、工作摘要和恢复信息。旧模板参数资源仅作为2.1取证，不能代替目标请求。
+串联/复核用户消息按AI-14的StoryTask规范JSON和story.txt模板组装，明确阶段、分配项、窗口或队列、精简目录、相关旧资料、最多6条事件线提示、工作摘要和恢复信息。
 
 P2初始消息只含任务/类型/范围和分页提示，AI调用精简查询自主找候选；不常驻完整人物性格/背景/外貌或地点描述。摘要提示最多160字符，指标不携带详细底稿。分组按已查询的ID提交，跨页可查询后入本次读集；没有确定变更时groups=[]，地点整体与内部区域分开。temperature0。长内容仅在核实候选或整编阶段按需get_*_detail读取，工具参数/返回见11。
 
@@ -117,7 +117,7 @@ write工具的AgentTool.execute实际调用与direct共用的命令服务，按S
 
 Agent设置toolExecution=sequential，写工具也声明executionMode=sequential。submit_result必须独占本批调用，混合写入+最终提交的批在首次副作用前拒绝。最终使用AgentTaskSummarySchema（status/commitIds/summary/remainingWorkIds/reviewedItems）报告当前子任务结果；不再用最终submit_result重复执行已生效的资产增量。completed还须代码核覆盖，不能仅信模型声明。
 
-默认maxSteps6/timeout180000ms；通过Pi subscribe、prepareRequest、beforeToolCall/afterToolCall和finishTurn管理日志/预算/终止。最后一轮只允许submit_result总结已提交结果和未完成游标，未做的写操作留待下一子任务，不强迫提交未查证业务内容。Provider特有末轮强制参数在Pi适配边界处理。
+P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾；P3按[叙事整理的排队与恢复](../decisions/story-organization.md)执行预算；通过Pi subscribe、prepareRequest、beforeToolCall/afterToolCall和finishTurn管理日志/预算/终止。最后一轮只允许submit_result总结已提交结果和未完成游标，未做的写操作留待下一子任务，不强迫提交未查证业务内容。Provider特有末轮强制参数在Pi适配边界处理。
 
 工具入参及声明返回Schema均按统一校验策略处理，超过65536字节返回TOO_LARGE。业务CONFLICT需要重读相关资料，不当作网络重试；结构/业务无效最多一次定向修正。提交意图和结果收集器不持有原始DB句柄。
 
@@ -135,7 +135,7 @@ direct和agent共用同一错误归一器。signal取消或Pi stopReason=aborted
 | rate_limit | 3 | 解析Retry-After整数秒优先，否则指数 |
 | auth/content_policy/context_length/validation/cancelled/unsupported_provider/unsupported_capability/unknown | 1 | 普通服务重试禁用；结构修正至多一次且消耗剩余总请求预算 |
 
-delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅按字符串正则提取整数，不增加HTTP日期支持。direct每逻辑调用最多3次实际Provider请求，Agent每轮最多3次并受task总6次约束，章节层不另套重试。两模式由同一服务重试策略处理可重试错误/Retry-After，不在Pi Agent外再叠加一套独立网络重试循环。退避等待必须响应signal；取消在下一事件循环结束等待并阻止下一请求，清理timer/listener；已提交确认保留。
+delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅按字符串正则提取整数，不增加HTTP日期支持。direct每逻辑调用最多3次实际Provider请求，P2身份核实按世界资产整理决策收尾；P3按叙事整理的排队与恢复决策执行预算，章节层不另套重试。两模式由同一服务重试策略处理可重试错误/Retry-After，不在Pi Agent外再叠加一套独立网络重试循环。退避等待必须响应signal；取消在下一事件循环结束等待并阻止下一请求，清理timer/listener；已提交确认保留。
 
 有session的Agent遇context_length可额外强制压缩恢复一次，再按服务策略；不能无限压缩。模型调用失败对象统一含ok=false、原Pi stopReason、errorKind/errorMessage、attempts/attemptsUsage、mode/modelRole/bookId/runId；保留无凭据的Provider诊断。工具业务错误独立记录，写成功后末轮失败/取消不得回滚已提交实体、记忆和确认，状态与报告必须列出已应用commitIds。费用为每次返回usage.cost.input+output的总和，摘要费用也计入；不按UI货币符号自行换算。
 
@@ -146,14 +146,14 @@ delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅
 | 工具 | 过滤/排序/输出与限额 |
 |---|---|
 | query_nodes | chapter_range闭区间、actor精确匹配actors或targets、event_line_id按真实线成员；章/order排序；summary前240；最多200 |
-| get_node_detail | ids1–20，完整匹配节点；返回最多20 |
+| get_node_detail | ids1–20；短详情完整返回，长详情返回最多6000字符的JSON片段，按char_offset与nextCharOffset续读 |
 | query_event_lines | status/name_like子串/章节任一相交；character先查人物资产扩充全部同组称呼，再用成员actors/targets匹配；cause/result前160；最多50 |
 | get_event_line_detail | 参数ids最多20，实际最多10条 |
 | query_characters | 主名和别名包含name_like；返回id/name/aliases/identityHint/sourceChapters/revision/指标；无详细字段；最多100 |
 | get_character_detail | 按ID取详细档案；默认排除优化缓存，include_facts=true仅P2整编显式取底稿；最多20 |
 | get_location_detail | 按ids1–20取完整地点；include_facts语义同上；最多20 |
 | query_locations | 主名别名包含过滤，精简行id/name/aliases/descriptionHint/sourceChapters/revision/指标；不返回完整description；最多100 |
-| read_original | 必填chapter_range恰两字符串；章节order；片段前缀`\n【章节 id：name】\n`，offset对拼接后整体；maxChars默认8000、实际至多20000（参数允许200000）；超字节每次缩80% |
+| read_original | 按资产来源、离散章节或连续范围选择原文；多个条件取交集。返回章节片段及续读游标，按游标从指定章节的章内位置继续；每次最多20段、20000字，并受字节限制。合并校验实际返回过的引文片段 |
 | get_editor_memory | 当前或指定同书会话；摘要、dataChanged、pending/stale数、最多10条active笔记摘要、最近5个批次；statement前240、引用各前5，truncated提示 |
 | query_editor_notes | kind/key/status/node_id/line_id，stale匹配validity而非status；最新更新在前；最多50 |
 | get_editor_note_detail | 同会话指定ids完整笔记；最多20 |
@@ -218,7 +218,7 @@ NativeMessage保存标准PI形状，允许额外字段包含模型/用量/推理
 
 window_link只接受confidence>=0.85且引用有效的event_line_ops，附reason/evidenceNodeIds；低置信关联记录review事项。global_review也不凭空造因果，允许明确结论“独立节点/暂不归线/尚无足够证据”。补点参考引文采用可选定位提示；结构与领域提交仍按统一修正规则处理。
 
-每个子任务保持maxSteps6/180000ms等有限预算；Agent可自由选择本书工具，未完成时拆分/续同会话处理下一页。步数预算仅限制单次调用，不能截断整书覆盖。任务上下文标明已看范围、未看游标和当前阶段，不得将压缩摘要当作新原文证据。
+P2身份核实按世界资产整理决策分配预算；P3子任务按叙事整理决策分配预算；Agent可自由选择本书工具，未完成时拆分/续同会话处理下一页。步数预算仅限制单次调用，不能截断整书覆盖。任务上下文标明已看范围、未看游标和当前阶段，不得将压缩摘要当作新原文证据。
 
 世界详情工具返回revision/当前redirect目标，代码记录实际读集。P2并行更新命中读集时，本批拒绝并同会话重查；不命中则正常提交。任务结束前再核全书覆盖清单和依赖有效性，未覆盖不能标completed。
 
@@ -226,7 +226,7 @@ window_link只接受confidence>=0.85且引用有效的event_line_ops，附reason
 
 query_characters/query_locations新增可选after_id。按当前ID的Unicode码点字典序返回，设置after_id时必须省略offset；nextAfterId返回下一页所用最后ID，末页为null。totalCount仍为名称条件匹配的当前全量数，nextOffset仅供无after_id的普通读取兼容。处理边合并边删除时用稳定游标，不能让offset偏移跳过未读行；最终重枚举清单补人工新插入或变更项。
 
-候选逻辑批180/步长160可由多次最多100条查询组合。字段白名单、after_id和nextAfterId以当前工具机器契约为准。详情单行超过字节/上下文上限且无法完整读取时明确降级并保留底稿，不能宣称用截断事实完成整编。
+P2每次分配一个资产，其他候选可通过最多100条的分页查询读取。字段白名单、after_id和nextAfterId以当前工具机器契约为准。详情单行超过字节/上下文上限且无法完整读取时明确降级并保留底稿，不能宣称用截断事实完成整编。
 
 ## AI-11 应用长期记忆与业务写工具
 
@@ -313,10 +313,11 @@ Pi包取舍、coding层不接入的具体能力、浏览器限制和逐模块迁
 | 输入对象 | 确定来源、排序与缺省 |
 |---|---|
 | TaskIdentity | bookId/runId/taskId来自应用绑定；planVersion=2.2；remainingCount为当前phase未有效覆盖项数，不能信模型计数；resume四字段均必填，初始reason=initial、appliedCommitIds=[]、remainingWorkIds=本task分配ID，nextOperationKey建议taskId加命令序号 |
-| IdentityTask | stage=P2、phase=ai_identity、kind=当前人物或地点队列、scope=fullBook；workItems为ALG-12.4分配的1–180项；afterId为本次扫描起点，无则null；pageLimit=100。输入仅ID/版本/hash，不常驻人物背景等长字段。主名、别名、完整资料用工具读取 |
+| IdentityTask | stage=P2、phase=ai_identity、kind=当前人物或地点队列、scope=fullBook；workItems为ALG-12.4分配的1项；afterId为本次扫描起点，无则null；pageLimit=100。输入仅ID/版本/hash，不常驻人物背景等长字段。主名、别名、完整资料用工具读取 |
 | StoryTask | stage=P3；phase与queue对应：window_link→window_nodes且window必为对象，global_review→orphans/event_lines/review_notes且window=null；sessionId来自本书active会话；workItems上限100，event_lines实际最多30；afterWorkItemId无起点为null |
 | Window | start/end按原章零基半开范围，end>start；chapterIndices为该窗口所有实际切块主键，按Chapter.order排列；不得用“章号字符串的大小”替代原章顺序 |
-| StoryTask.existingLines | 当前书按ID码点排序前50条，精确字段见LineDigest；cause/result各前100字符；不是全书线清单，模型可继续query_event_lines。输入行记录为实际读集 |
+| StoryTask.existingLines | 最多6条事件线提示，优先相关线；长成员与章节列表标注截短，完整内容通过详情工具读取 |
+| StoryTask.contextHints | assigned为分配项精简目录，按版本核验登记读取；related为本书相关旧节点、事件线和未解决事项候选，更多结果通过search_story_context分页检索 |
 | StoryTask.memory | 当前session的T13完整记录；无存储时使用03虚拟空记录；不混入另一书或P2记忆。事项、检查点及原始历史由对应工具按需读，不在该字段塞入未声明对象 |
 | CharacterOptimizationTask | 原AI-13绑定加每个人物revision；必须等于读取版本。事实field限四个文本字段；每个id局部F1/F2，附带独立输入短号→持久事实ID映射供调用方校验，映射不让模型生成。previous为上次有效整理稿，无则{} |
 | LocationOptimizationTask | stage=P2；id/name/revision来自当前地点；description缺省空串；facts为本地点**全部**description事实，按持久事实ID排序后改成本次F1/F2；conflicts=mergeNotes或[]。不使用人物的增量事实/previous机制；全事实为空则代码跳过，不发模型 |
@@ -338,20 +339,24 @@ TaskRecord.input保存首次创建任务的不可变快照。每次实际请求�
 | 末轮 | system撤回全部业务工具，仅保留submit_result；追加final_only.txt，变量commitIds来自本task账本，remainingIds来自分配清单；同时把可执行白名单收窄。只改Prompt文字而不改执行白名单不合格 |
 | 探测 | 使用probe_system及probe_asset/probe_story；完整业务工具声明可发送，但回调接隔离fixture；完成门槛见AI-15 |
 
+所有模式的system提示词都在业务正文之后追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)：direct追加在业务正文之后，Agent追加在业务正文之后、结束约束之前。该文件是这段文字的唯一来源，代码统一读取，业务正文文件不重复保存。
+
 角色文字固定：asset_editor“只整理人物地点；不读故事会话/工作记忆，不改叙事实体。”；story_editor“只整理节点、事件线和工作记忆；不合并人物地点，历史摘要不是原文事实。”。bookId/runId/taskId/phase由调用上下文绑定；工具参数永远不能扩展权限。
 
 字符/地点整编动态Schema均锁定本次事实短号，数量必须恰好相等且唯一；人物还锁定entities键和已知名称枚举。调用方在提交前再核revision及短号映射，成功后将coveredFactIds映射回持久事实ID；模型不能通过抄全ID获得免除语义校验的权利。
 
 ### 预算、网络重试和一次修正
 
-生产Agent普通预算为6个Provider请求、180000ms一次活动执行期限；stepsUsed在发请求前持久递增，刷新恢复不清零。maxTokens=`min(model.maxTokens或8192,reserve)`，P2/P3同式；reserve按AI-08。恢复发现已用完6轮则task=partial，剩余工作按新task处理。连续3个子任务既无新有效覆盖也无业务确认则run=paused，UI显示“连续尝试未取得进展”，由用户继续后重置计数；不得无限自动开新task。
+P2身份核实的时间、请求次数与提前收尾方式以[世界资产整理决策](../decisions/world-organization.md)为准。每次请求前提示剩余时间和次数，已提交修改与未完成项分开保存。累计使用量只计一次。
 
-网络/服务重试仍按AI-05；每次实际Provider请求消耗stepsUsed并计usage，不存在免费重试轮。tool CONFLICT不算网络失败：追加conflict.txt，保留工具权限供重读，消耗正常余下轮数；预算不足则partial。任务attempt统计实际Provider请求次数，与stepsUsed同时递增；启动/恢复本身不加1。180秒中断保留已提交确认，无后续请求。
+P3每个子任务的5分钟、20次请求收尾规则以[叙事整理决策](../decisions/story-organization.md)为准；stepsUsed在发请求前持久递增，刷新恢复不清零。maxTokens=`min(model.maxTokens或8192,reserve)`，P2/P3同式；reserve按AI-08。恢复发现已用完本任务预算则task=partial，剩余工作按新task处理。P3本轮未完成项让后续任务继续；本轮结束保存剩余清单，由用户继续。
+
+网络/服务重试仍按AI-05；每次实际Provider请求消耗stepsUsed并计usage，不存在免费重试轮。tool CONFLICT不算网络失败：追加conflict.txt，保留工具权限供重读，消耗正常余下轮数；预算不足则partial。任务attempt统计实际Provider请求次数，与stepsUsed同时递增；启动/恢复本身不加1。P2在响应结束后收尾；其他任务到期中断时保留已提交确认。
 
 | 错误类型 | 本task唯一修正机会怎么用 | 工具权限与终止 |
 |---|---|---|
 | direct输出结构/语义错误 | 原assistant与每个toolCall配对错误结果入上下文，再repair_direct.txt；最多一次 | 仍仅submit_result；第二次错返回validation |
-| Agent写参数/领域错误 | 错误toolResult后追加repair_write.txt；repairCount从0变1；修改payload必须新key | 保留本角色工具；须在第6轮之前修正，避免末轮偷偷写。没有足够轮数则partial |
+| Agent写参数/领域错误 | 错误toolResult后追加repair_write.txt；repairCount从0变1；修改payload必须新key | 保留本角色工具；按本任务剩余预算修正，未完成项保存为partial |
 | Agent最终总结错误 | 追加repair_final.txt；若repairCount仍0可变1，并额外允许第7轮仅修最终总结 | 第7轮只允许submit_result；已用过修正机会或再次失败就partial/validation |
 | CONFLICT | 不消耗repairCount；必须重读相关依据；新判断用新key | 只消耗普通请求预算；不能无限续轮 |
 

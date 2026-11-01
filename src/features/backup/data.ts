@@ -50,6 +50,7 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
   const orders = new Set(tables.chapters.map(row => row.order))
   for (const [index, chapter] of tables.chapters.entries()) {
     const text = texts.get(chapter.chapterIndex)?.text
+    if (typeof text === 'string' && /[\uD800-\uDFFF]/u.test(text)) fail(`chapterTexts/${chapter.chapterIndex}`, '章节正文含不完整字符，请核对原文后重新导入。', 'SCHEMA')
     if (!/^\d+(?:\.\d+)*$/.test(chapter.chapterIndex as string) || !orders.has(index) || typeof text !== 'string' || !text.length || text.length > 10000 || text.length !== chapter.charCount) fail(`chapters[${index}]`, '章节顺序、编号或正文字符数不符。')
   }
   const hasChapter = (value: unknown) => chapters.has(value) || [...chapters.keys()].some(key => (key as string).startsWith(`${value}.`))

@@ -1,6 +1,6 @@
 # WestWorld V2 · 详细规格：流程、接口与算法
 
-> **阶段0修订（2026-10-24）：** P2持有world域锁时禁止同书人物/地点人工写入，P3持有narrative域锁时禁止节点/事件线人工写入；UI与命令事务均校验，拒绝返回`ASSET_DOMAIN_LOCKED`。取消须等在途提交停止并释放锁才恢复编辑。P1人工编辑、跨书编辑、只读和备份不受此域锁限制。P2/P3仍可并行，保留跨域实际读依赖校验。direct首次/网络重发/至多一次修正合计最多3次实际请求；Agent每轮最多3次且task总共最多6次。详见[阶段0决策](../decisions/stage-edit-lock-and-request-budget.md)及当前机器契约。历史证据不代表新规则已在业务应用执行。
+> **阶段0修订（2026-10-24）：** P2持有world域锁时禁止同书人物/地点人工写入，P3持有narrative域锁时禁止节点/事件线人工写入；UI与命令事务均校验，拒绝返回`ASSET_DOMAIN_LOCKED`。取消须等在途提交停止并释放锁才恢复编辑。P1人工编辑、跨书编辑、只读和备份不受此域锁限制。P2/P3仍可并行，保留跨域实际读依赖校验。direct首次/网络重发/至多一次修正合计最多3次实际请求；P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾；P3预算见[叙事整理的排队与恢复](../decisions/story-organization.md)。详见[阶段0决策](../decisions/stage-edit-lock-and-request-budget.md)及当前机器契约。历史证据不代表新规则已在业务应用执行。
 
 | 文档控制项 | 内容 |
 |---|---|
@@ -132,7 +132,7 @@ profile.age/gender保留目标现值，缺值补充；冲突记录“字段 冲�
 
 机械阶段先生成候选及报告，不因名称信号删除不同来源实体。AI判同通过`query_characters`/`query_locations`分页读取精简行：id/name/aliases、身份摘要或地点类型提示（最多160字符）、sourceChapters、revision、estimatedDetailTokens、duplicateScore，不包含完整性格、背景、外貌、process或description。Token与重复度由本地计算，仅返回指标。AI可自主选候选，通过按ID详情工具/read_original核实；不默认读取所有详细档案。
 
-保留180条候选/160条步长（20条重叠）作为逻辑遍历策略；单次工具至多100条，可分两次以上取得，不改变工具条数上限。全量遍历使用after_id稳定游标而非边删除边递增offset，按ID码点字典序读；新插入在游标之前的记录由末次清单校验补入待办。同时允许按名称检索其他页；所有分页都覆盖后才完成判同。Agent调用commit_asset_changes以资产ID分组（同名不同ID可区分），`keepId/memberIds/canonicalName/reason/confidence/evidence`限定本次已查询的同类当前ID，至少两条；主名选已有称呼，人工自定主名及人工保留目标优先。跨页组须把成员查询纳入本次读集，不能凭未读取名称提交。写工具execute中的共用命令服务再次核记录revision并调用与手工相同的机械融合；AI判同自身不压缩长文本。
+人物、地点按稳定编号建立持久待办清单，每次安排最多3个待办，逐个资产执行。模型可跨批检索同名和别名对象，合并仍核对完整成员及原文依据。每批保存已核实范围、资料指纹和实际读依赖，部分完成只确认已核实项；单项按[世界资产整理决策](../decisions/world-organization.md)提前收尾，未完成项保留待办，让后续资产继续。P2单项失败或未完成时继续后续资产；本轮全部尝试后，由用户继续剩余项。取消、失败或刷新后沿用本次运行及有效覆盖，变化资料重新核对。全量查询使用after_id稳定游标而非边删除边递增offset，按ID码点字典序读；新插入在游标之前的记录由末次清单校验补入待办。同时允许按名称检索其他页；所有分页都覆盖后才完成判同。Agent调用commit_asset_changes以资产ID分组（同名不同ID可区分），`keepId/memberIds/canonicalName/reason/confidence/evidence`限定本次已查询的同类当前ID，至少两条；主名选已有称呼，人工自定主名及人工保留目标优先。跨页组须把成员查询纳入本次读集，不能凭未读取名称提交。写工具execute中的共用命令服务再次核记录revision并调用与手工相同的机械融合；AI判同自身不压缩长文本。
 
 整编候选在机械与AI判同后重新计算。新增明确触发：详细字段估算>1200 tokens，或同字段非完全相同片段的3-gram字符Jaccard重复度>=0.85（每片段去空白、至少20字符）；保留原有冲突、1800字符/8事实以及高频重要人物触发。完全相同片段已在机械融合去重，不重复提交整编。人物和地点都进入候选；指标仅控制读取/整编，不用于实体判同。
 
@@ -161,7 +161,7 @@ P2结束统计各类型开始数、机械后/判同后/整编后数量；合并�
 
 ## ALG-06 串联、补点与批提交
 
-只在P3执行。先按ALG-03窗口扫描，再全书复核；同书持续sessionId贯穿全部子任务和恢复。常驻消息只含phase、窗口/全书待办游标、节点ID、已有线索引和工作记忆，细节通过工具获取。前50条线摘要仅是引导，不代表已扫描全库。
+只在P3执行。先按ALG-03窗口扫描，再全书复核；同书持续会话贯穿全部子任务和恢复。输入提供阶段、分配目录、相关旧资料摘要、有限事件线提示和工作记忆，细节通过工具获取。批次按数量与估算内容量共同限制，相关候选可继续检索和分页。
 
 window_link通过commit_story_changes的payload提交操作；每个操作须有confidence和evidenceNodeIds/reason，默认阈值>=0.85；代码校验数值与引用，低于阈值不写线，只记复核事项。模型置信度不是语义准确率保证。global_review同样仅在证据充分时写入，疑点保留说明；不得要求孤点数归零，也不得凭“逻辑应有”编造新事件。
 
@@ -279,12 +279,12 @@ T20.coverageItems是完成证明的权威清单。workItemId=`phase + ':' + scop
 |---|---|---|
 | P1 | 每章两个子步骤，按Chapter.order再world/narrative | 一个子步骤；成功receipt满足后checked |
 | P2 mechanical | 当前人物再地点，类型内按ID码点顺序 | 代码单组提交；无模型 |
-| P2 ai_identity | 当前人物再地点，类型内ID码点；180条逻辑批/160步长的重叠只作上下文，不重复分配已checked项 | 180个待检查项；每次查询仍≤100 |
+| P2 ai_identity | 当前人物再地点，类型内ID码点；最多3项排队，每项独立核实 | 1个分配项，可跨资产批量查证；每次查询仍≤100 |
 | P2 optimize | 判同后重枚举；候选按类型/ID排序；非候选记录no_change与触发判断 | 人物≤3且服从tokens预算；地点1 |
-| P3 window_link | 按窗口起点顺序，再章节order、节点order、ID码点；切块按原章进入窗口 | 100个节点项 |
-| P3 global_review | 队列依次orphans、event_lines、review_notes；队内ID码点顺序 | 线30项，孤点/事项各100项 |
+| P3 window_link | 按窗口起点顺序，再章节order、节点order、ID码点；切块按原章进入窗口 | 20个节点项 |
+| P3 global_review | 队列依次orphans、event_lines、review_notes；队内ID码点顺序 | 节点、线和事项每批最多20项 |
 
-0项阶段不发无意义模型请求，代码写零覆盖完成记录。读取工具可超出分配项查证，但未分配新对象不能借一次总结直接标checked；新建节点/线必须加入后续适用队列。phase切换只在前一phase所有当前项有效结束后发生。
+0项阶段不发无意义模型请求，代码写零覆盖完成记录。读取工具可超出分配项查证，但未分配新对象不能借一次总结直接标checked；新建节点/线必须加入后续适用队列。P2本轮核实结束后，成功项进入按需整编，失败和未完成项保留待办；其他阶段在前一阶段当前项有效结束后切换。
 
 TaskRecord记录需要模型参与的子任务，包含P1/direct整编与Agent任务。候选生成、同来源幂等核验及非候选跳过由代码处理，不伪造Agent调用：coverage.taskId=null，该阶段仅写覆盖/报告，不融合不同来源实体；已确认组由人工或AI命令事务处理。direct通过输出Schema/领域校验后，调用方把业务修改和该task对应覆盖/状态同事务保存，reviewedItems由代码根据真实变化生成，不要求direct额外调用Agent finalizer。命令意图/operationKey账本用于本规范两种受控Agent写工具；P1成功幂等仍以T18子步骤凭证为准，整编幂等以事实/优化指纹和revision为准。
 
@@ -309,7 +309,7 @@ RecordDependency必须记录实际请求ID、resolvedId、revision和事实hash�
 
 AgentTaskSummarySchema新增必填reviewedItems：每项`{workItemId,outcome,reason}`；outcome为changed/no_change/needs_review。reviewedItems ID唯一、remainingWorkIds唯一且互斥，两集合并必须等于本task.workItemIds。commitIds必须精确列出本task所有持久成功确认，不能漏报或引用同run其他task；changed必须有本task命令写集命中该工作项或其当前解析目标。no_change/needs_review也必须有实际读取依据；needs_review为“已检查但需人工核实”，可以算覆盖，不代表事实已确定。
 
-WorkRef的ID/revision/hash只是任务定位，不算已读取业务事实。P2人物/地点至少须有本task实际查询返回该记录；P3至少须有输入existingLines包含该线的业务摘要，或相应节点/线/事项查询返回该对象。输入完整事实/摘要可以作为依据，但仅分配了ID不能标已检查。无法证明读取时该项必须留remaining；此守卫不宣称能证明模型语义理解正确。
+WorkRef的ID/revision/hash用于任务定位。P2人物、地点通过本任务查询读取；P3的分配目录经版本核验后可以支持保持现状的结论，相关候选提示通过详情查证。新建或修改事件线前读取相关节点及已有事件线详情，解决原事项前读取该事项详情；未核实项保留待办。
 
 finalizer只校验/收集总结；结束钩子由Coordinator在短事务重核依赖后保存TaskRecord.reviewedItems和coverageItems。没有合法最终总结时，已写业务仍有效，分配项不能凭commitId自动全部checked；下次从原确认和当前事实继续检查。completed summary要求remaining为空，partial要求仍有剩余；预算耗尽的代码partial可以没有模型summary。
 

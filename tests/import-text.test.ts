@@ -77,3 +77,12 @@ describe('阶段2：异步预览防串结果', () => {
     expect(latest?.text).toBe('新正文')
   })
 })
+it('长章和无标题切分在字符边界结束，UTF8往返保留表情与扩展汉字', () => {
+  for (const [prefix, size, symbol] of [['第一章 测试\n', 10000, '😀'], ['', 4000, '𠮷']] as const) {
+    const text = prefix + '甲'.repeat(size - 1 - prefix.length) + symbol + '乙'.repeat(30)
+    const chapters = splitChapters(text, DEFAULT_CHAPTER_PATTERN)
+    expect(chapters.length).toBeGreaterThan(1)
+    for (const chapter of chapters) expect(/[\uD800-\uDFFF]/u.test(chapter.text)).toBe(false)
+    expect(chapters.map(chapter => new TextDecoder().decode(new TextEncoder().encode(chapter.text))).join('')).toBe(text)
+  }
+})

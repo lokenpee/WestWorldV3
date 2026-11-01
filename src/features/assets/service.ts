@@ -2,6 +2,7 @@ import type { createWorkspace } from '../../lib/storage/workspace'
 import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type EventLine, type EventNode, type Lifecycle, type LocationAsset } from './types'
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
+import { normalizeCharacterNames } from './characterNames'
 import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRun, type MergeOptions, type MergePreview, type MergeRequest, type WorldKind } from './merge'
 
 type Workspace = ReturnType<typeof createWorkspace>
@@ -213,6 +214,8 @@ export function createAssetService(workspace: Workspace) {
       }
       if (kind === 'character') {
         const character = row as Character
+        Object.assign(character, normalizeCharacterNames(character))
+        if (character.identity !== (previous as Character | undefined)?.identity && character.identity !== undefined) facts.identity = character.identity
         if (input.ageText !== undefined) character.profile = { ...(previous as Character | undefined)?.profile, ageText: input.ageText }
         if (input.roleWeight !== undefined) { character.roleWeight = input.roleWeight; character.roleWeightSource = 'manual' }
       }
@@ -311,7 +314,7 @@ export function createAssetService(workspace: Workspace) {
         const references = resolveReferences(nodes, characters)
         const lineCharacterIds = Object.fromEntries(eventLines.map(line => [line.id, [...new Set(line.nodeIds.flatMap(id => references[id]?.actorIds ?? []))]]))
         const manualMerges = leases.filter((row): row is ManualMergeRun => row.recordType === 'run' && 'stage' in row && row.stage === 'manual_merge' && 'report' in row).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
-        return { characters, locations, nodes, eventLines, lifecycle, locks: lockState(leases, bookId), references, lineCharacterIds, manualMerges }
+        return { characters: characters.map(normalizeCharacterNames), locations, nodes, eventLines, lifecycle, locks: lockState(leases, bookId), references, lineCharacterIds, manualMerges }
       })
     },
     async create<K extends AssetKind>(bookId: string, kind: K, input: AssetInput) { validateInput(kind, input); return (await mutate(bookId, kind, input))! },

@@ -10,7 +10,8 @@ export function classifyError(error: unknown, secrets: string[] = [], status?: n
   let kind: ErrorKind = error instanceof ModelError ? error.kind : 'unknown'
   const lower = text.toLowerCase()
   if (!(error instanceof ModelError)) {
-    if (error instanceof DOMException && error.name === 'AbortError') kind = 'cancelled'
+    if (/budget:|实际请求上限|请求预算已用完/i.test(text)) kind = 'budget'
+    else if (error instanceof DOMException && error.name === 'AbortError') kind = 'cancelled'
     else if (status === 401 || status === 403 || /401|403|auth|invalid.?key|api key/.test(lower)) kind = 'auth'
     else if (status === 429 || /429|rate.?limit|quota/.test(lower)) kind = 'rate_limit'
     else if ((status !== undefined && status >= 500) || /\b5\d\d\b|internal|bad gateway|unavailable/.test(lower)) kind = 'server'
@@ -18,7 +19,7 @@ export function classifyError(error: unknown, secrets: string[] = [], status?: n
     else if (/content.?policy|content.?filter|safety|blocked/.test(lower)) kind = 'content_policy'
     else if (!lower || /network|fetch|timeout|timed out|econnreset|connection error|failed to load/.test(lower)) kind = 'network'
   }
-  const labels: Record<ErrorKind, string> = { network: '网络请求失败，请检查网络与服务跨域设置。', rate_limit: '服务请求受限。', server: '服务暂时不可用。', auth: '鉴权失败，请检查当前服务商密钥。', context_length: '输入超过模型上下文容量。', content_policy: '服务拒绝了本次内容。', validation: '调用校验失败。', cancelled: '已取消。', unsupported_provider: '当前服务或协议不受支持。', unsupported_capability: '模型缺少所需能力。', unknown: '模型调用失败。' }
+  const labels: Record<ErrorKind, string> = { network: '网络请求失败，请检查网络与服务跨域设置。', rate_limit: '服务请求受限。', server: '服务暂时不可用。', auth: '鉴权失败，请检查当前服务商密钥。', context_length: '输入超过模型上下文容量。', content_policy: '服务拒绝了本次内容。', validation: '调用校验失败。', budget: '本子任务请求预算已用完。', cancelled: '已取消。', unsupported_provider: '当前服务或协议不受支持。', unsupported_capability: '模型缺少所需能力。', unknown: '模型调用失败。' }
   const detail = redact(text, secrets).slice(0, 1200)
   return { kind, message: detail.startsWith(labels[kind]) ? detail : `${labels[kind]}${detail ? ` ${detail}` : ''}`, ...(status === undefined ? {} : { status }) }
 }

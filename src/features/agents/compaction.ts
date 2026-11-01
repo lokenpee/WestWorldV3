@@ -5,6 +5,7 @@ import { ModelError, type UsageSummary } from '../models/types'
 import { appendEntry, checkLease } from './commands'
 import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, entryMessages, findCutPoint, projectSession, settingsForWindow } from './context'
 import { text, validate } from './contracts'
+import { withOutputDiscipline } from './output-discipline'
 import type { AgentRepository, Row } from './repository'
 import type { Scope } from './queries'
 import compactPrompt from '../../../docs/v2/resources/v2.2/prompts/active/compact.md?raw'
@@ -49,6 +50,7 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
       ...keep.flatMap(entryMessages).filter(message => message.role !== 'system'),
     ], options.prompt)
     let keep = projection.entries.slice(cut)
+    if (!projection.entries.slice(0, cut).some(entry => entry.type !== 'compaction' && entryMessages(entry).some(message => message.role !== 'system'))) { cut = projection.entries.length; keep = [] }
     if (messagesFor('', keep).reduce((sum, message) => sum + estimateMessageTokens(message), 0) > capacity) { cut = projection.entries.length; keep = [] }
     const prefix = projection.entries.slice(0, cut)
     const transcript = prefix.filter(row => row.type !== 'compaction').flatMap(row => entryMessages(row).filter(message => message.role !== 'system').map(message => `[原始条目 ${row.id}，角色 ${message.role}]\n${JSON.stringify(message)}`)).join('\n\n')
@@ -69,7 +71,7 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
     for (const part of chunks) {
       options.signal?.throwIfAborted()
       await repo.transaction(false, store => checkLease(store, scope, options.signal))
-      const result = await options.generate({ role: 'aggregation', context: { systemPrompt: `${compactPrompt}\n本次摘要最多${maxChars}字符。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。`, messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: outputSchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
+      const result = await options.generate({ role: 'aggregation', context: { systemPrompt: withOutputDiscipline(`${compactPrompt}\n本次摘要最多${maxChars}字符。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。`), messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: outputSchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
         validate(message) {
           const calls = message.content.filter(part => part.type === 'toolCall')
           if (calls.length !== 1 || calls[0].name !== 'submit_result') throw new ModelError('validation', '压缩摘要须通过指定工具返回。')

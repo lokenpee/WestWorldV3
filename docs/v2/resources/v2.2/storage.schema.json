@@ -2791,6 +2791,12 @@
         "revision": {
           "type": "integer",
           "minimum": 1
+        },
+        "nodeCount": {
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -2948,6 +2954,168 @@
               "type": "null"
             }
           ]
+        },
+        "contextHints": {
+          "type": "object",
+          "properties": {
+            "assigned": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "node",
+                      "eventLine",
+                      "note"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "chapters": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8
+                  },
+                  "nodeIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 12
+                  },
+                  "actors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  },
+                  "estimatedDetailTokens": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind",
+                  "title",
+                  "summary",
+                  "chapters",
+                  "nodeIds",
+                  "actors",
+                  "status",
+                  "truncated",
+                  "estimatedDetailTokens"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 20
+            },
+            "related": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "node",
+                      "eventLine",
+                      "note"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "chapters": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8
+                  },
+                  "nodeIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 12
+                  },
+                  "actors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  },
+                  "estimatedDetailTokens": {
+                    "type": "integer"
+                  },
+                  "matchedTerms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 8
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind",
+                  "title",
+                  "summary",
+                  "chapters",
+                  "nodeIds",
+                  "actors",
+                  "status",
+                  "truncated",
+                  "estimatedDetailTokens",
+                  "matchedTerms"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 12
+            },
+            "totalRelated": {
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "assigned",
+            "related",
+            "totalRelated",
+            "truncated"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

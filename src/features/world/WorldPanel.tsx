@@ -14,7 +14,14 @@ export function WorldPanel({ bookId, service, assets }: { bookId: string; servic
   const [prepared, setPrepared] = useState<MergeRequest>(); const [merging, setMerging] = useState(false); const [message, setMessage] = useState('')
   const [chosenName, setChosenName] = useState('')
   const submitting = useRef(false)
-  const eligibility = useLiveResult(useCallback(() => service.eligibility(bookId), [service, bookId]))
+  const [leaseAttempt, retryLease] = useState(0)
+  const eligibility = useLiveResult(useCallback(() => service.eligibility(bookId), [service, bookId]), leaseAttempt)
+  const leaseExpiry = eligibility.status === 'ready' ? eligibility.value.leaseExpiry : undefined
+  useEffect(() => {
+    if (leaseExpiry === undefined) return
+    const timer = setTimeout(() => retryLease(value => value + 1), Math.max(1, leaseExpiry - Date.now() + 50))
+    return () => clearTimeout(timer)
+  }, [leaseExpiry])
   const reports = useLiveResult(useCallback(() => service.reports(bookId), [service, bookId]))
   const snapshot = useLiveResult(useCallback(() => assets.read(bookId), [assets, bookId]))
   const state = service.state(bookId); const lastReport = useRef<string | undefined>(undefined)
@@ -65,7 +72,7 @@ export function WorldPanel({ bookId, service, assets }: { bookId: string; servic
     } catch (failure) { setError(failure instanceof Error ? failure.message : '合并失败，请重试。') }
     finally { submitting.current = false; setMerging(false) }
   }
-  return <section className="world-panel" aria-label="世界资产整理"><div className="world-heading"><h2>P2 世界资产整理</h2><div><button className="secondary-button" disabled={!ready || scanning || busy} onClick={() => void scan()}>{scanning ? '正在查找候选…' : '代码整理'}</button><button className="primary-button" disabled={!ready || scanning || busy} onClick={() => { setError(''); void service.start(bookId) }}>{busy ? 'AI整理中…' : 'AI整理'}</button>{busy && <button className="text-button" onClick={() => service.cancel(bookId)}>取消AI整理</button>}{reports.status === 'ready' && reports.value.length > 0 && <button className="text-button" onClick={() => setReportOpen(true)}>查看整理报告</button>}</div></div>
+  return <section className="world-panel" aria-label="世界资产整理"><div className="world-heading"><h2>P2 世界资产整理</h2><div><button className="secondary-button" disabled={!ready || scanning || busy} onClick={() => void scan()}>{scanning ? '正在查找候选…' : '代码整理'}</button><button className="primary-button" disabled={!ready || scanning || busy} onClick={() => { setError(''); void service.start(bookId) }}>{busy ? 'AI整理中…' : eligibility.status === 'ready' && eligibility.value.resumable ? '继续AI整理' : 'AI整理'}</button>{busy && <button className="text-button" onClick={() => service.cancel(bookId)}>取消AI整理</button>}{reports.status === 'ready' && reports.value.length > 0 && <button className="text-button" onClick={() => setReportOpen(true)}>查看整理报告</button>}</div></div>
     <p>代码整理：自动找候选，选择成员后确认合并，可按需预览。AI整理：核对原文后合并，按需整编详细资料。</p>
     {eligibility.status === 'ready' && !eligibility.value.covered && <p className="muted">请先完成全书逐章提取。</p>}
     {eligibility.status === 'error' && <p role="alert">{eligibility.message}</p>}

@@ -12,6 +12,8 @@ import { compactSession, type SessionStatus } from './compaction'
 import { projectSession } from './context'
 import type { ModelService } from '../models/service'
 import wrapper from '../../../docs/v2/resources/v2.2/prompts/active/agent-wrapper.txt?raw'
+import { outputDiscipline } from './output-discipline'
+import { storyFingerprint, storyTable } from '../story/coverage'
 
 export type AgentRunner = (input: AgentInput, options?: CallOptions) => Promise<CallResult>
 export interface AgentTaskOptions {
@@ -22,7 +24,7 @@ export interface AgentTaskOptions {
   leaseOwner?: string; retainLease?: boolean
   requiredLineIds?: string[]
 }
-export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; readCalls: number; writeCalls: number }
+export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; itemFailure?: string; readCalls: number; writeCalls: number }
 const initialReadSet = (): ReadSet => ({ records: [], queries: [] })
 const timestamp = () => new Date().toISOString()
 export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { generate: ModelService['generate']; onStatus?: (status: SessionStatus) => void }) {
@@ -38,8 +40,14 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     let acquired = false; let heartbeat: ReturnType<typeof setInterval> | undefined
     const controller = new AbortController(); const abort = () => controller.abort()
     options.signal?.addEventListener('abort', abort, { once: true }); if (options.signal?.aborted) abort()
-    const maxRequests = Math.min(options.maxRequests ?? (options.probe ? 3 : 6), options.probe ? 3 : 6)
+    const identity = !options.probe && options.profile === 'asset_editor' && options.phase === 'ai_identity'
+    const resumable = identity || !options.probe && options.profile === 'story_editor'
+    const ceiling = options.probe ? 3 : identity ? 8 : resumable ? 20 : 6
+    const maxRequests = Math.min(options.maxRequests ?? ceiling, ceiling)
+    const started = Date.now(), duration = identity ? 180000 : resumable ? 300000 : options.timeoutMs ?? 180000
+    const timeLeft = () => Math.max(0, duration - (Date.now() - started))
     let agent: Agent | undefined; let loadedMessages: AgentMessage[] = []; let persistedMessages = 0
+    let deferredAfterValidation = false
     let adapter: ReturnType<typeof createAgentTools> | undefined
     try {
       controller.signal.throwIfAborted()
@@ -66,6 +74,12 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         if (task && task.inputFingerprint !== await store.wait(hash(options.input))) throw new Error('CONFLICT:恢复任务须使用原有冻结输入。')
         if (!task) {
           const readSet = initialReadSet()
+          if (scope.profile === 'story_editor' && options.input.contextHints) for (const work of options.workItems) {
+            const table = storyTable(text(work.kind))
+            const row = await store.get(table, text(work.id))
+            if (!row || work.factFingerprint !== await store.wait(storyFingerprint(table, row))) throw new Error('CONFLICT:分配项摘要的依据已变化，请重新读取任务。')
+            readSet.records.push({ table, id: text(work.id), resolvedId: text(work.id), revision: Number(row.revision ?? 0), factFingerprint: await store.wait(hash(row)) })
+          }
           if (scope.profile === 'story_editor' && options.input.memory) {
             const memory = options.input.memory as Row
             if (memory.id !== scope.sessionId || memory.bookId !== scope.bookId) throw new Error('SCOPE:任务工作记忆不属于当前会话。')
@@ -79,7 +93,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         await store.put('pipelineRuns', { ...run, status: 'running', tasks: [...records(run.tasks).filter(row => row.taskId !== scope.taskId), { ...task, status: 'running' }] })
         await store.put('pipelineRuns', { id: `lease:${domainOf(scope)}`, recordType: 'lease', bookId: scope.bookId, lockKey: domainOf(scope), owner: scope.owner, runId: scope.runId, expiresAt: Date.now() + 30000 })
       }); acquired = true
-      const systemPrompt = wrapper.replace(/\{(\w+)\}/g, (_, name: string) => ({ ...scope, maxSteps: maxRequests, roleInstruction: scope.profile === 'asset_editor' ? '只整理人物地点，不读取故事会话或修改叙事资料。' : '只整理节点、事件线和工作记忆，不合并人物地点。', businessPrompt: options.businessPrompt } as Record<string, unknown>)[name]?.toString() ?? `{${name}}`)
+      const systemPrompt = wrapper.replace(/\{(\w+)\}/g, (_, name: string) => ({ ...scope, maxSteps: maxRequests, roleInstruction: scope.profile === 'asset_editor' ? '只整理人物地点，不读取故事会话或修改叙事资料。' : '只整理节点、事件线和工作记忆，不合并人物地点。', businessPrompt: options.businessPrompt, outputDiscipline } as Record<string, unknown>)[name]?.toString() ?? `{${name}}`)
       if (loadedMessages.length) loadedMessages.push({ role: 'system', content: systemPrompt, timestamp: Date.now() })
       persistedMessages = loadedMessages.length ? loadedMessages.length - 1 : 0
       const prior = await repo.transaction(false, store => taskOf(store, scope))
@@ -91,38 +105,58 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         await store.put('pipelineRuns', { ...lease, expiresAt: Date.now() + 30000 })
         if (scope.sessionId) { const session = (await store.get('storySessions', scope.sessionId))!; if (session.leaseOwner !== scope.owner) throw new Error('CONFLICT:会话执行权已转移。'); await store.put('storySessions', { ...session, leaseUntil: Date.now() + 30000 }) }
       }).catch(() => controller.abort()) }, 8000)
-      const persistTail = async () => {
+      let persistQueue = Promise.resolve()
+      const persistTail = () => persistQueue = persistQueue.then(async () => {
         if (!agent || !scope.sessionId) return
         const tail = agent.state.messages.slice(persistedMessages)
         if (!tail.length) return
         await repo.transaction(true, async store => { await checkLease(store, scope); for (const message of tail) await appendEntry(store, scope, { type: 'message', message }); await rebaseReadSet(store, scope, tools.reads, true); await saveTask(store, scope, { readSet: tools.reads }) })
         persistedMessages += tail.length
-      }
+      })
+      const consumeRequest = async () => repo.transaction(true, async store => {
+          await checkLease(store, scope, controller.signal)
+          const { task } = await taskOf(store, scope)
+          if (Number(task.stepsUsed) >= maxRequests || resumable && timeLeft() === 0) throw new ModelError('budget', 'BUDGET:本任务的实际请求预算已用完。')
+          usedRequests = Number(task.stepsUsed) + 1
+          await saveTask(store, scope, { stepsUsed: Number(task.stepsUsed) + 1, attempt: Number(task.attempt) + 1 })
+        })
       const prepareContext = async (context: { messages: AgentMessage[] }, window: number, force = false) => {
         await persistTail()
         if (!scope.sessionId || !sessionOptions) return undefined
         const effectiveSystem = getCurrentSystemMessage(context.messages)
-        const messages = await compactSession(repo, scope, { generate: sessionOptions.generate, contextWindow: window, prompt: options.prompt, systemMessage: effectiveSystem ? { ...effectiveSystem, content: systemPrompt } : undefined, force, signal: controller.signal, onStatus: sessionOptions.onStatus })
+        const messages = await compactSession(repo, scope, { generate: request => sessionOptions.generate({ ...request, beforeRequest: consumeRequest }), contextWindow: window, prompt: options.prompt, systemMessage: effectiveSystem ? { ...effectiveSystem, content: systemPrompt } : undefined, force, signal: controller.signal, onStatus: sessionOptions.onStatus })
         await repo.transaction(true, async store => { await rebaseReadSet(store, scope, tools.reads, true); await saveTask(store, scope, { readSet: tools.reads }) })
         return messages
       }
+      let usedRequests = Number(prior.task.stepsUsed ?? 0)
       const previousAgent = instances.get(key)
       outcome.result = await runner({ prompt: options.prompt, systemPrompt, tools: tools.tools, ...(loadedMessages.length ? { messages: loadedMessages } : {}), agent: !scope.probe && scope.profile === 'story_editor' && previousAgent?.sessionId === scope.sessionId ? previousAgent : undefined,
         onAgent: value => { agent = value; value.sessionId = scope.sessionId; if (!scope.probe) instances.set(key, value) },
-        onEvent: async event => { if (event.type === 'message_end') await persistTail(); options.onEvent?.(event) },
-        prepareRequest: async ({ context, model }) => { const messages = await prepareContext(context, model.contextWindow); return messages ? { context: { ...context, messages } } : undefined },
+        onEvent: async event => {
+          if (event.type === 'message_end') await persistTail()
+          if (event.type === 'tool_execution_end' && event.isError) await repo.transaction(true, async store => { await checkLease(store, scope, controller.signal); await saveTask(store, scope, { lastError: { code: 'TOOL_ERROR', message: `${event.toolName}：${JSON.stringify(event.result).slice(0, 2000)}` } }) })
+          options.onEvent?.(event)
+        },
+        prepareRequest: async ({ context, model }) => {
+          const messages = await prepareContext(context, model.contextWindow)
+          if (!scope.probe) {
+            const left = maxRequests - usedRequests
+            const closing = resumable ? (identity ? left <= 3 : usedRequests >= 14) || timeLeft() <= 60000 : left <= 5
+            const note = resumable
+              ? `${identity ? '本资产目标3分钟' : '本组任务目标5分钟'}、最多${maxRequests}次实际请求；现在剩余约${Math.ceil(timeLeft() / 1000)}秒、${left}轮。${closing ? '进入收尾：停止扩展调查，提交证据充分的修改和总结；证据不足的分配项放入remainingWorkIds，使用partial。最后一轮仅提交总结。' : '围绕当前分配项核实，可在同一轮批量调用查询工具；证据充分即可提交总结。'}`
+              : closing ? `本子任务还可请求模型${left}次。请按已核实的分配项提交结果；最后一次仅调用submit_result，未完成项列入remainingWorkIds并使用partial，交由后续排队批次处理。` : '按需调用工具核实分配项，证据齐全后调用submit_result逐项说明outcome；未核实项列入remainingWorkIds交后续批次。'
+
+            return { context: { ...context, messages: [...(messages ?? context.messages), { role: 'user', content: note, timestamp: Date.now() }] } }
+          }
+          return messages ? { context: { ...context, messages } } : undefined
+        },
         recoverContext: scope.sessionId && sessionOptions ? async (context, model) => { const messages = await prepareContext(context, model.contextWindow, true); return messages ? { ...context, messages } : undefined } : undefined,
-        beforeRequest: async () => repo.transaction(true, async store => {
-          await checkLease(store, scope, controller.signal)
-          const { task } = await taskOf(store, scope)
-          if (Number(task.stepsUsed) >= maxRequests) throw new ModelError('validation', '本任务的实际请求预算已用完。')
-          await saveTask(store, scope, { stepsUsed: Number(task.stepsUsed) + 1, attempt: Number(task.attempt) + 1 })
-        }),
+        beforeRequest: consumeRequest,
         beforeToolCall: async ({ assistantMessage, toolCall }) => {
           const batch = assistantMessage.content.filter(part => part.type === 'toolCall')
           if (batch.some(call => call.name === 'submit_result') && batch.length !== 1) return { block: true, reason: '最终总结须独占本批调用，混合批全部操作均未执行。' }
           const { task } = await repo.transaction(false, store => taskOf(store, scope))
-          if (Number(task.stepsUsed) >= maxRequests && toolCall.name !== 'submit_result') return { block: true, reason: '最后一次请求只允许提交任务总结。' }
+          if (!resumable && Number(task.stepsUsed) >= maxRequests && toolCall.name !== 'submit_result') return { block: true, reason: '最后一次请求只允许提交任务总结。' }
           return undefined
         },
         afterToolCall: async ({ toolCall, result, isError }) => {
@@ -130,13 +164,25 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           const message = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n')
           if (message.includes('CONFLICT:')) { agent?.steer({ role: 'user', content: '资料发生变化，请重新读取相关依据，再决定是否使用新的命令键提交。', timestamp: Date.now() }); return undefined }
           const terminate = await repo.transaction(true, async store => { const { task } = await taskOf(store, scope); if (Number(task.repairCount) >= 1) return true; await saveTask(store, scope, { repairCount: 1 }); return false })
+          if (terminate && resumable) { deferredAfterValidation = true; outcome.itemFailure = message }
           if (!terminate) agent?.steer({ role: 'user', content: '这是本任务唯一一次结果修正机会。请根据工具错误修正；改变写入内容时使用新的命令键。', timestamp: Date.now() })
           return terminate ? { terminate: true } : undefined
         },
-        finishTurn: () => tools.summary ? { action: 'end' } : undefined,
-        validateFinal: () => { if (!tools.summary) throw new ModelError('validation', '智能体尚未提交包含真实确认的任务总结。') },
-      }, { signal: controller.signal, maxRequests, timeoutMs: Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(scope.probe ? { temperature: 0 } : {}) })
-      outcome.summary = adapter.summary; outcome.ok = outcome.result.ok && !!outcome.summary
+        finishTurn: () => tools.summary || resumable && (usedRequests >= maxRequests || resumable && timeLeft() === 0) ? { action: 'end' } : undefined,
+        validateFinal: () => { if (!tools.summary && !(resumable && (deferredAfterValidation || usedRequests >= maxRequests || resumable && timeLeft() === 0))) throw new ModelError(usedRequests >= maxRequests ? 'budget' : 'validation', usedRequests >= maxRequests ? 'BUDGET:子任务预算已用完，剩余工作交后续批次。' : '智能体尚未提交包含真实确认的任务总结。') },
+      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(scope.probe ? { temperature: 0 } : {}) })
+      outcome.summary = adapter.summary
+      if (resumable && outcome.result.error && ['validation', 'context_length', 'content_policy'].includes(outcome.result.error.kind)) outcome.itemFailure = outcome.result.error.message
+      if (resumable && !outcome.summary && (outcome.result.ok || outcome.itemFailure || outcome.result.error?.kind === 'budget')) {
+        await repo.transaction(true, async store => {
+          await checkLease(store, scope, controller.signal)
+          const { task } = await taskOf(store, scope)
+          const reviewed = records(task.reviewedItems).filter(item => item.outcome === 'changed' && scope.workItemIds.includes(text(item.workItemId)))
+          outcome.summary = { status: 'partial', commitIds: strings(task.appliedCommitIds), summary: '本任务已收尾，已提交修改保留，未完成项留待继续。', reviewedItems: reviewed as unknown as Summary['reviewedItems'], remainingWorkIds: scope.workItemIds.filter(id => !reviewed.some(item => item.workItemId === id)) }
+          await saveTask(store, scope, { reviewedItems: reviewed })
+        })
+      }
+      outcome.ok = !!outcome.summary && (outcome.result.ok || resumable && (!!outcome.itemFailure || outcome.result.error?.kind === 'budget'))
       if (!outcome.ok) outcome.error = outcome.result.error?.message ?? '任务总结未通过校验。'
     } catch (error) { outcome.error = controller.signal.aborted ? '任务已取消，已提交成果保留。' : error instanceof Error ? error.message : '智能体执行失败。' }
     finally {
@@ -147,8 +193,9 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         outcome.commitIds = strings(task.appliedCommitIds)
         const lease = await store.get('pipelineRuns', `lease:${domainOf(scope)}`)
         if (lease?.owner !== scope.owner) return
-        const status = outcome.ok ? outcome.summary?.status === 'partial' ? 'partial' : 'completed' : controller.signal.aborted ? 'cancelled' : 'partial'
-        await saveTask(store, scope, { status, ...(outcome.error ? { lastError: { code: controller.signal.aborted ? 'cancelled' : 'AGENT_FAILED', message: outcome.error } } : {}) })
+        const status = outcome.itemFailure ? 'failed' : outcome.ok ? outcome.summary?.status === 'partial' ? 'partial' : 'completed' : controller.signal.aborted ? 'cancelled' : 'partial'
+        const failure = outcome.error ?? outcome.itemFailure
+        await saveTask(store, scope, { status, ...(failure ? { lastError: { code: controller.signal.aborted ? 'cancelled' : outcome.result?.error?.kind === 'budget' ? 'BUDGET' : 'AGENT_FAILED', message: `${failure}${(task.lastError as Row | undefined)?.code === 'TOOL_ERROR' ? `；最近工具反馈：${text((task.lastError as Row).message)}` : ''}` } } : {}) })
         const updated = (await store.get('pipelineRuns', scope.runId))!
         const usage = outcome.result?.usage
         const previous = run.usage as Row | undefined

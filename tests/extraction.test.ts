@@ -30,6 +30,20 @@ async function setup(fetcher: typeof fetch, count = 1) {
 }
 afterEach(async () => { for (const workspace of workspaces.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
 
+it('P1把通用称谓归入身份说明，保留稳定别名与只有称谓的人物', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream({ characters: [
+    { name: '林如海', confidence: 1, aliases_mentioned: ['爸爸', '姑父', '林姑父'], identity: '官员' },
+    { name: '太后', confidence: 1, aliases_mentioned: ['娘娘', '哀家'] },
+  ], locations: [] })).mockResolvedValueOnce(stream({ nodes: [{ name: '问候', summary: '问候', actors: ['爸爸', '太后'], quote: '', confidence: 1 }] }))
+  const { service, db, book } = await setup(fetcher)
+  await service.start('a')
+  expect(await db.table('characters').get('C1-P001')).toMatchObject({ aliases: ['林姑父'], identity: '官员；原文称谓：爸爸、姑父' })
+  expect(await db.table('characters').get('C1-P002')).toMatchObject({ name: '太后', aliases: [], identity: '原文称谓：娘娘、哀家' })
+  expect(await db.table('nodes').get('C1-N001')).toMatchObject({ actors: ['爸爸', '太后'], actorIds: [] })
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+})
+
 it('两章顺序执行独立请求，资产和凭证实时出现，完整资料可备份', async () => {
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_input, init) => {
     const body = JSON.parse(init?.body as string)

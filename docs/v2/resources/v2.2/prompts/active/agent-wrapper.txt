@@ -7,5 +7,6 @@
 同run同operationKey重试必须使用同payload；已应用确认不重复执行。新决定使用新键。CONFLICT先重读，不能当网络失败盲重试。
 【业务职责正文】
 {businessPrompt}
+{outputDiscipline}
 【结束约束】
 submit_result必须独占本批。commitIds只列本task已确认的ID；reviewedItems与remainingWorkIds恰好分割分配项。无法完整判断的项留为remaining，合理孤点可记no_change或needs_review并说明依据。

@@ -32,16 +32,17 @@ it('Pi原生循环完成两套隔离探测，声明全部工具并核对真实�
   expect((await Dexie.getDatabaseNames()).filter(name => name.startsWith(workspace.scope.bookPrefix))).toHaveLength(0)
 })
 
-async function commandFixture(profile: 'asset_editor' | 'story_editor' = 'asset_editor') {
+async function commandFixture(profile: 'asset_editor' | 'story_editor' = 'asset_editor', originalArgs: Record<string, unknown> = { chapter_range: ['2', '2'] }) {
   const repo = createMemoryAgentRepository('book-a', createAgentFixture('book-a'))
   const scope: Scope = { bookId: repo.bookId, profile, phase: profile === 'asset_editor' ? 'ai_identity' : 'window_link', runId: 'run-a', taskId: 'task-a', owner: 'owner-a', workItemIds: [], probe: true }
   await repo.transaction(true, async store => {
     await store.put('pipelineRuns', { id: scope.runId, bookId: scope.bookId, tasks: [{ taskId: scope.taskId, appliedCommitIds: [], readSet: { records: [], queries: [] } }], commandIntents: [], appliedCommands: [] })
     await store.put('pipelineRuns', { id: 'lease:world', bookId: scope.bookId, owner: scope.owner, runId: scope.runId, expiresAt: Date.now() + 30000 })
   })
+  await repo.transaction(true, async store => { for (const row of await store.rows('characters')) await store.put('characters', { ...row, sourceChapters: [row.id === 'C1-P001' ? '1' : '2'] }) })
   const adapter = createAgentTools(repo, scope)
   await adapter.tools.find(tool => tool.name === 'get_character_detail')!.execute('read', { ids: ['C1-P001', 'C2-P001'] })
-  await adapter.tools.find(tool => tool.name === 'read_original')!.execute('original', { chapter_range: ['2', '2'] })
+  await adapter.tools.find(tool => tool.name === 'read_original')!.execute('original', originalArgs)
   const args = { operationKey: 'merge-a', payload: { groups: [{ kind: 'character', keepId: 'C1-P001', memberIds: ['C1-P001', 'C2-P001'], canonicalName: '沈青', reason: '原文明示', confidence: 1, evidence: [{ chapterIndex: '2', quote: '第二章的沈青就是第一章的沈青。', memberIds: ['C1-P001', 'C2-P001'] }] }] } }
   return { repo, scope, adapter, args }
 }
@@ -281,4 +282,31 @@ it('同书P2与P3使用不同实例，P2请求不携带P3私有历史和工作�
   expect(JSON.stringify(worldRequests)).not.toContain('隔离探针摘要')
   expect(await db.table('storySessionEntries').count()).toBe(originalEntries)
   expect(await db.table('storyEditorMemory').get(session.id)).toEqual(originalMemory)
+})
+
+it('按资产来源读取原文后允许跨章节合并，校验实际返回的证据片段', async () => {
+  const { repo, scope, adapter, args } = await commandFixture('asset_editor', { asset_ids: ['C1-P001', 'C2-P001'] })
+  expect(await commitCommand(repo, scope, 'commit_asset_changes', 'write', args, adapter.reads)).toMatchObject({ ok: true })
+  expect(await repo.transaction(false, store => store.rows('characters'))).toHaveLength(1)
+  const detail = await adapter.tools.find(tool => tool.name === 'get_character_detail')!.execute('redirect', { ids: ['C1-P001', 'C2-P001'] })
+  expect((detail.details as { data: unknown[] }).data).toHaveLength(1)
+  expect((detail.details as { data: unknown[] }).data[0]).toMatchObject({ id: 'C1-P001', resolvedFrom: ['C2-P001'] })
+  const short = await commandFixture('asset_editor', { chapter_range: ['1', '2'], maxChars: 1 })
+  await expect(commitCommand(short.repo, short.scope, 'commit_asset_changes', 'write', short.args, short.adapter.reads)).rejects.toThrow('证据所在原文片段')
+})
+
+it('引文连续跨页读取可以合并，缺失中间一字时给出补读位置', async () => {
+  const split = await commandFixture('asset_editor', { chapter_indices: ['2'], maxChars: 6 })
+  await split.adapter.tools.find(tool => tool.name === 'read_original')!.execute('page-two', { chapter_indices: ['2'], cursor: { chapterIndex: '2', offset: 6 } })
+  expect(await commitCommand(split.repo, split.scope, 'commit_asset_changes', 'write', split.args, split.adapter.reads)).toMatchObject({ ok: true })
+  const gap = await commandFixture('asset_editor', { chapter_indices: ['2'], maxChars: 6 })
+  await gap.adapter.tools.find(tool => tool.name === 'read_original')!.execute('page-two', { chapter_indices: ['2'], cursor: { chapterIndex: '2', offset: 7 } })
+  await expect(commitCommand(gap.repo, gap.scope, 'commit_asset_changes', 'write', gap.args, gap.adapter.reads)).rejects.toThrow('请调用read_original')
+  expect(await gap.repo.transaction(false, store => store.rows('characters'))).toHaveLength(2)
+})
+
+it('改写的引文反馈章节和逐字核对要求', async () => {
+  const fixture = await commandFixture()
+  fixture.args.payload.groups[0].evidence[0].quote = '原文没有这句话。'
+  await expect(commitCommand(fixture.repo, fixture.scope, 'commit_asset_changes', 'write', fixture.args, fixture.adapter.reads)).rejects.toThrow('第2章找不到连续逐字引文')
 })

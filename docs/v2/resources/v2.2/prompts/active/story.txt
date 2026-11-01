@@ -1,3 +1,3 @@
 【P3故事编辑任务】
 {taskJson}
-window_link仅覆盖本窗口分配节点；global_review只处理当前queue分配项。existingLines是提示摘要，不代表全部线；必要时用工具遍历。memory是参考，过期依据须重查。合理孤点不强行归线。
+window_link处理本窗口分配项；global_review处理当前queue分配项。先看contextHints中的分配目录与相关候选，按kind选择详情工具。existingLines是有限提示；需要更多候选时使用search_story_context或目录分页。memory是检索线索，判断回查节点与原文。合理孤点保持独立。

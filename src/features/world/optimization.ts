@@ -5,6 +5,8 @@ import type { Character, LocationAsset, Fact } from '../assets/types'
 import { rebuildFacts } from '../assets/derive'
 import { detailTokens, type WorldKind } from '../assets/merge'
 import { hash } from '../agents/contracts'
+import { withOutputDiscipline } from '../agents/output-discipline'
+import { normalizeCharacterNames } from '../assets/characterNames'
 import schemasText from '../../../docs/v2/resources/schemas.json?raw'
 import outputText from '../../../docs/v2/resources/v2.2/model-output-contract.json?raw'
 import characterPrompt from '../../../docs/v2/resources/v2.2/prompts/active/character-optimize.md?raw'
@@ -43,6 +45,7 @@ function normalize(schema: Shape, value: unknown): unknown {
   }))
 }
 export async function optimizationRequest(kind: WorldKind, row: Entity) {
+  if (kind === 'character') row = normalizeCharacterNames(row)
   const facts = entityFacts(kind, row)
   const fingerprint = await hash({ version: '2.2', names: [row.name, ...(row.aliases ?? [])].map(name => name.trim()).sort(), facts, notes: row.mergeNotes ?? [] })
   const selected = facts.filter(fact => !row.optimizedFactIds?.includes(fact.id))
@@ -63,7 +66,7 @@ export async function optimizationRequest(kind: WorldKind, row: Entity) {
     schema.properties!.coveredFactIds = { type: 'array', items: { type: 'string', enum: ids }, minItems: ids.length, maxItems: ids.length, uniqueItems: true } as Shape
     input = { stage: 'P2', id: row.id, name: row.name, revision: row.revision, description: (row as LocationAsset).description ?? '', facts: shortFacts, conflicts: row.mergeNotes ?? [] }
   }
-  const prompt = kind === 'character' ? characterPrompt : locationPrompt
+  const prompt = withOutputDiscipline(kind === 'character' ? characterPrompt : locationPrompt)
   const validate = (message: AssistantMessage) => {
     const calls = message.content.filter(part => part.type === 'toolCall')
     if (calls.length !== 1 || calls[0].name !== 'submit_result') throw new Error('请使用唯一的提交工具返回整编结果。')

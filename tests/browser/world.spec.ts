@@ -1,5 +1,36 @@
 import { expect, test, type Page } from '@playwright/test'
+import { addEmptyBook } from '../support/browser-books'
 import { worldResponse, worldText } from '../support/world-streams'
+import { agentStream } from '../support/agent-protocol'
+
+test('AI整理无进展暂停后刷新可继续队列，报告显示批次请求和覆盖范围', async ({ page }, testInfo) => {
+  let partial = true
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    const body = route.request().postDataJSON()
+    if (body.tools.length > 1 && partial) {
+      const user = body.messages.filter((row: { role: string }) => row.role === 'user').map((row: { content: string | { text: string }[] }) => typeof row.content === 'string' ? row.content : row.content.map(part => part.text).join('')).find((value: string) => value.startsWith('{'))
+      const input = JSON.parse(user)
+      await route.fulfill({ contentType: 'text/event-stream', body: await agentStream([{ name: 'submit_result', args: { status: 'partial', commitIds: [], summary: '继续核对当前待办', reviewedItems: [], remainingWorkIds: input.workItems.map((row: { workItemId: string }) => row.workItemId) } }]).text() }); return
+    }
+    await route.fulfill({ contentType: 'text/event-stream', body: await worldResponse(body).text() })
+  })
+  await prepare(page)
+  await page.getByRole('button', { name: 'AI整理', exact: true }).click()
+  const report = page.getByRole('dialog', { name: '世界资产整理报告', exact: true })
+  await expect(report).toContainText('已暂停', { timeout: 15000 })
+  await expect(report).toContainText('待处理 10 条')
+  await report.getByText('批次与实际请求（10批）', { exact: true }).click()
+  await expect(report).toContainText('实际请求1次')
+  await report.getByRole('button', { name: '关闭报告', exact: true }).click()
+  await page.reload()
+  partial = false
+  await page.getByRole('button', { name: '继续AI整理', exact: true }).click()
+  await expect(report).toContainText('减少 3 条', { timeout: 15000 })
+  await expect(report).toContainText('待处理 0 条')
+  await page.setViewportSize({ width: 375, height: 812 })
+  await report.screenshot({ path: testInfo.outputPath('world-queue-mobile.png') })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
 
 async function prepare(page: Page) {
   await page.goto('/')
@@ -74,7 +105,7 @@ test('AI整理由Pi核对原文合并人物地点，身份不同的同名人物�
   await prepare(page)
   await page.getByRole('button', { name: 'AI整理', exact: true }).click()
   const report = page.getByRole('dialog', { name: '世界资产整理报告', exact: true })
-  await expect(report).toContainText('人物 7 → 5')
+  await expect(report).toContainText('人物 7 → 5', { timeout: 15000 })
   await expect(report).toContainText('地点 3 → 2')
   await report.getByRole('button', { name: '关闭报告', exact: true }).click()
   await expect(page.getByRole('button', { name: '编辑 陆川', exact: true })).toHaveCount(2)
@@ -99,4 +130,32 @@ test('不同名称可在候选栏选择主名直接确认，取消预览也不�
   await page.getByRole('button', { name: '取消预览', exact: true }).click()
   await page.getByRole('button', { name: '确认机械合并', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '已合并“沈青”' })).toBeVisible()
+})
+
+test('切书后原书AI整理继续保存，另一书不弹出原书报告', async ({ page }) => {
+  let calls = 0, release: () => void = () => undefined
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    if (++calls === 3) await gate
+    await route.fulfill({ contentType: 'text/event-stream', body: await worldResponse(route.request().postDataJSON()).text() })
+  })
+  await prepare(page)
+  await addEmptyBook(page, 'book-other', '另一书')
+  await page.getByRole('button', { name: 'AI整理', exact: true }).click()
+  await expect.poll(() => calls).toBe(3)
+  await page.getByRole('button', { name: '进入 另一书', exact: true }).click()
+  release()
+  await expect.poll(async () => page.evaluate(async () => {
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_') && row.name !== 'westworld_canon_book-other')!.name!
+    const request = indexedDB.open(name)
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
+    const rows = await new Promise<Record<string, unknown>[]>((resolve, reject) => { const read = db.transaction('pipelineRuns').objectStore('pipelineRuns').getAll(); read.onsuccess = () => resolve(read.result); read.onerror = () => reject(read.error) }); db.close()
+    return rows.some(row => row.stage === 'P2' && row.recordType === 'run' && row.status === 'completed')
+  }), { timeout: 20000 }).toBe(true)
+  await expect(page.getByRole('heading', { name: '另一书', exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '世界资产整理报告', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^人物 0$/ })).toBeVisible()
+  await page.getByRole('button', { name: '进入 世界整理样本', exact: true }).click()
+  await page.getByRole('button', { name: '查看整理报告', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '世界资产整理报告', exact: true })).toContainText('人物 7 → 5')
 })

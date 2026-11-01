@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { storyResponse, storyTask } from '../support/story-protocol'
+import { addEmptyBook } from '../support/browser-books'
 
 const seed = JSON.parse(readFileSync(new URL('../fixtures/F-跨窗口叙事.json', import.meta.url), 'utf8')) as { tables: Record<string, Record<string, unknown>[]> }
 async function prepare(page: Page, contextWindow?: string) {
@@ -34,18 +35,22 @@ async function prepare(page: Page, contextWindow?: string) {
 }
 
 test('三个100/20窗口复用事件线，进度与依据刷新保留，窄屏操作可达', async ({ page }, testInfo) => {
+  test.setTimeout(60000)
   const windows: string[] = []; let calls = 0
   const duplicateKeys: string[] = []
   page.on('console', message => { if (message.text().includes('same key')) duplicateKeys.push(message.text()) })
   await page.route('**/story-fixture/v1/chat/completions', async route => {
     calls++; const body = route.request().postDataJSON(); const { input } = storyTask(body)
+    expect(input.contextHints.assigned.length).toBeLessThanOrEqual(20)
+    expect(input.contextHints.assigned.every((row: Record<string, unknown>) => row.process === undefined && row.quote === undefined)).toBe(true)
+    expect(body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'search_story_context')).toBe(true)
     windows.push(`${input.window.start}-${input.window.end}`)
     await route.fulfill({ contentType: 'text/event-stream', body: await storyResponse(body).text() })
   })
   await prepare(page)
   await page.getByRole('button', { name: '串联事件线', exact: true }).click()
   const panel = page.getByRole('region', { name: '事件线窗口串联', exact: true })
-  await expect(panel).toContainText('窗口串联完成 · 已完成 3/3 个窗口', { timeout: 15000 })
+  await expect(panel).toContainText('窗口串联完成 · 已完成 3/3 个窗口', { timeout: 30000 })
   expect([...new Set(windows)]).toEqual(['0-100', '80-180', '160-240'])
   await panel.getByText('窗口进度与串联依据', { exact: true }).click()
   await expect(panel).toContainText('第 1–100 原章')
@@ -67,6 +72,7 @@ test('三个100/20窗口复用事件线，进度与依据刷新保留，窄屏�
 })
 
 test('取消保留已提交线与窗口，叙事编辑锁生效，继续时跳过有效检查点', async ({ page }) => {
+  test.setTimeout(60000)
   let calls = 0; let release: () => void = () => undefined
   const gate = new Promise<void>(resolve => { release = resolve })
   await page.route('**/story-fixture/v1/chat/completions', async route => {
@@ -76,7 +82,7 @@ test('取消保留已提交线与窗口，叙事编辑锁生效，继续时跳�
   })
   await prepare(page)
   await page.getByRole('button', { name: '串联事件线', exact: true }).click()
-  await expect.poll(() => calls).toBe(4)
+  await expect.poll(() => calls, { timeout: 15000 }).toBe(4)
   await page.getByRole('button', { name: /^事件节点 6$/ }).click()
   await expect(page.getByRole('button', { name: '新增事件节点', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: '取消串联', exact: true }).click()
@@ -85,7 +91,7 @@ test('取消保留已提交线与窗口，叙事编辑锁生效，继续时跳�
   await expect(page.getByRole('button', { name: '新增事件节点', exact: true })).toBeEnabled()
   release()
   await page.getByRole('button', { name: '继续串联事件线', exact: true }).click()
-  await expect(panel).toContainText('窗口串联完成 · 已完成 3/3 个窗口', { timeout: 15000 })
+  await expect(panel).toContainText('窗口串联完成 · 已完成 3/3 个窗口', { timeout: 30000 })
   expect(calls).toBe(10)
   await page.getByRole('button', { name: /^事件线 1$/ }).click()
   await expect(page.getByRole('button', { name: '编辑 信件流转', exact: true })).toHaveCount(1)
@@ -137,4 +143,43 @@ test('全书复核压缩长历史，刷新后保留原会话、完整历史与�
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   expect(await panel.evaluate(element => element.clientHeight <= innerHeight - 100)).toBe(true)
   expect(await history.locator('.story-details-body').evaluate(element => element.clientHeight <= innerHeight * 0.36 + 1)).toBe(true)
+})
+
+test('切到另一书后晚到的串联结果保持原书归属', async ({ page }) => {
+  let release: () => void = () => undefined, calls = 0
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/story-fixture/v1/chat/completions', async route => {
+    if (++calls === 1) await gate
+    await route.fulfill({ contentType: 'text/event-stream', body: await storyResponse(route.request().postDataJSON()).text() })
+  })
+  await prepare(page)
+  await addEmptyBook(page, 'book-other', '另一书')
+  await page.getByRole('button', { name: '串联事件线', exact: true }).click()
+  await expect.poll(() => calls).toBe(1)
+  await page.getByRole('button', { name: '进入 另一书', exact: true }).click()
+  release()
+  await expect(page.getByRole('heading', { name: '另一书', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: /^事件线 0$/ })).toBeVisible()
+  await expect(page.getByRole('region', { name: '事件线窗口串联', exact: true })).not.toContainText('正在串联')
+  await expect.poll(() => calls, { timeout: 20000 }).toBe(9)
+  await page.getByRole('button', { name: '进入 跨窗口信件样本', exact: true }).click()
+  await expect(page.getByRole('region', { name: '事件线窗口串联', exact: true })).toContainText('已完成 3/3 个窗口', { timeout: 15000 })
+  await expect(page.getByRole('button', { name: /^事件线 1$/ })).toBeVisible()
+})
+
+test('失效标签的叙事执行权到期后，页面自动恢复启动入口', async ({ page }) => {
+  await prepare(page)
+  await page.evaluate(async () => {
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!
+    const request = indexedDB.open(name)
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('pipelineRuns', 'readwrite')
+      tx.objectStore('pipelineRuns').put({ id: 'lease:narrative', bookId: name.slice('westworld_canon_'.length), recordType: 'lease', lockKey: 'narrative', runId: 'interrupted', owner: 'closed-tab', expiresAt: Date.now() + 10000 })
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error)
+    }); db.close()
+  })
+  await page.reload()
+  await expect(page.getByRole('button', { name: '串联事件线', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '串联事件线', exact: true })).toBeEnabled({ timeout: 20000 })
 })

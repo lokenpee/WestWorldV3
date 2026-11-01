@@ -514,7 +514,7 @@
         "type": "string"
       },
       "aliases_mentioned": {
-        "description": "本章出现过的其他称呼，用于后续归并同一个人。例：[\"琏二哥哥\"]",
+        "description": "原文明示属于此人的稳定别名或限定称呼。通用亲属称谓、尊称、职务及代词保留在关系或身份说明中。例：[\"琏二哥哥\"]",
         "type": "array",
         "items": {
           "type": "string"
@@ -2733,7 +2733,7 @@
         "type": "string"
       },
       "aliases_mentioned": {
-        "description": "本章出现过的其他称呼，用于后续归并同一个人。例：[\"琏二哥哥\"]",
+        "description": "原文明示属于此人的稳定别名或限定称呼。通用亲属称谓、尊称、职务及代词保留在关系或身份说明中。例：[\"琏二哥哥\"]",
         "type": "array",
         "items": {
           "type": "string"
@@ -4122,7 +4122,7 @@
               "type": "string"
             },
             "aliases_mentioned": {
-              "description": "本章出现过的其他称呼，用于后续归并同一个人。例：[\"琏二哥哥\"]",
+              "description": "原文明示属于此人的稳定别名或限定称呼。通用亲属称谓、尊称、职务及代词保留在关系或身份说明中。例：[\"琏二哥哥\"]",
               "type": "array",
               "items": {
                 "type": "string"

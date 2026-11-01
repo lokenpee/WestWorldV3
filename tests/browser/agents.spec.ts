@@ -17,7 +17,7 @@ test('设置页保存当前配置，Pi依次完成两套工具读写与提交确
     const body = route.request().postDataJSON(); count++
     expect(body.model).toBe('probe-agent')
     expect(await route.request().headerValue('authorization')).toBe('Bearer agent-browser-fixture')
-    expect(body.tools).toHaveLength(body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'get_editor_memory') ? 16 : 11)
+    expect(body.tools).toHaveLength(body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'get_editor_memory') ? 17 : 11)
     await route.fulfill({ contentType: 'text/event-stream', body: await agentResponse(body).text() })
   })
   await prepare(page)

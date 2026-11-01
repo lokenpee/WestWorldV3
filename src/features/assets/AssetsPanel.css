@@ -16,6 +16,8 @@
 .assets-layout-grid { display: grid; min-width: 0; }
 .assets-layout-grid.has-editor { grid-template-columns: minmax(220px, .8fr) minmax(0, 1.3fr); }
 .asset-results { min-width: 0; padding: 16px; }
+.asset-list-view { display: flex; flex-direction: column; min-height: 0; }
+.asset-list-view[hidden] { display: none; }
 .merge-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 16px 12px; font-size: 12px; color: var(--muted); }
 .merge-toolbar:not(:empty) { padding-top: 12px; border-bottom: 1px solid var(--border); }
 .merge-selection { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 5px; cursor: pointer; }

@@ -2,9 +2,11 @@ import type { AgentRepository, AgentStore, Row } from './repository'
 import { canonical, hash, records, strings, text, toolContracts, validate } from './contracts'
 import { assertScope, noteFingerprint, readTool, resolveAsset, type Scope } from './queries'
 import { detailTokens, fuseWorldAssets } from '../assets/merge'
-import { updateFrequencies } from '../assets/derive'
 import { remapCharacterLinks, bindNodeCharacters } from '../assets/characterLinks'
 import type { Character, EventNode, LocationAsset } from '../assets/types'
+import { acceptIdentityMerge } from '../world/queue'
+import { normalizeCharacterNames } from '../assets/characterNames'
+import { rebaseStoryCoverage, saveStoryCoverage } from '../story/coverage'
 
 export interface QueryRead { tool: string; args: Row; resultFingerprint: string }
 export interface RecordRead { table: string; id: string; resolvedId: string | null; revision: number; factFingerprint: string }
@@ -46,19 +48,23 @@ export async function rebaseReadSet(store: AgentStore, scope: Scope, reads: Read
   }
   if (!historyOnly) for (const read of reads.records) {
     const asset = ['characters', 'locations', 'nodes', 'eventLines'].includes(read.table) ? await resolveAsset(store, scope, read.table, read.id) : await store.get(read.table, read.id)
-    const row = asset ? await store.get(read.table, text(asset.id)) : undefined
-    read.resolvedId = row ? text(row.id) : null; read.revision = Number(row?.revision ?? 0); read.factFingerprint = await store.wait(hash(row ?? null))
+    const key = asset ? text(asset.id ?? asset.chapterIndex) : ''
+    const row = asset ? await store.get(read.table, key) : undefined
+    read.resolvedId = row ? key : null; read.revision = Number(row?.revision ?? 0); read.factFingerprint = await store.wait(hash(row ?? null))
   }
 }
-async function validateReadSet(store: AgentStore, scope: Scope, reads: ReadSet) {
+export async function validateReadSet(store: AgentStore, scope: Scope, reads: ReadSet) {
+  const results = new Map<QueryRead, Row>()
   for (const query of reads.queries) {
     const value = await readTool(store, scope, query.tool, query.args, toolContracts[scope.profile].find(tool => tool.name === query.tool)?.maxResults)
-    if (await store.wait(hash(value)) !== query.resultFingerprint) throw new Error('CONFLICT:已读取的资料或查询结果发生变化，请重新读取。')
+    if (await store.wait(hash(value)) !== query.resultFingerprint) throw new Error(`CONFLICT:${query.tool}的已读取资料或查询结果发生变化，请重新读取。`)
+    results.set(query, value)
   }
   for (const read of reads.records) {
     const row = await store.get(read.table, read.resolvedId ?? read.id)
     if ((row ? Number(row.revision ?? 0) : 0) !== read.revision || await store.wait(hash(row ?? null)) !== read.factFingerprint) throw new Error('CONFLICT:已读取的资料版本发生变化，请重新读取。')
   }
+  return results
 }
 async function assertEvidence(store: AgentStore, evidence: Row[]) {
   for (const item of evidence) {
@@ -66,9 +72,29 @@ async function assertEvidence(store: AgentStore, evidence: Row[]) {
     if (!original || !text(original.text).includes(text(item.quote)) || !text(item.quote)) throw new Error('INVALID_ARGS:证据引文须连续存在于指定章节。')
   }
 }
+async function assertReadEvidence(store: AgentStore, item: Row, originalReads: Row[]) {
+  const chapterIndex = text(item.chapterIndex), quote = text(item.quote)
+  const original = text((await store.get('chapterTexts', chapterIndex))?.text)
+  const first = quote ? original.indexOf(quote) : -1
+  if (first < 0) throw new Error(`INVALID_ARGS:第${chapterIndex}章找不到连续逐字引文：${JSON.stringify(quote.slice(0, 160))}。请从read_original返回的segments中复制原文，核对章节编号；省略、拼接或改写的文字请分别引用。`)
+  const ranges = originalReads.flatMap(result => records(result.segments))
+    .filter(segment => segment.chapterIndex === chapterIndex)
+    .map(segment => ({ start: Number(segment.offset), end: Number(segment.offset) + text(segment.text).length }))
+    .sort((a, b) => a.start - b.start)
+  const covered: { start: number; end: number }[] = []
+  for (const range of ranges) {
+    const last = covered.at(-1)
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end)
+    else covered.push({ ...range })
+  }
+  for (let at = first; at >= 0; at = original.indexOf(quote, at + 1)) {
+    if (covered.some(range => range.start <= at && range.end >= at + quote.length)) return
+  }
+  const args = { chapter_indices: [chapterIndex], cursor: { chapterIndex, offset: first }, maxChars: Math.min(quote.length + 200, 8000) }
+  throw new Error(`INVALID_ARGS:合并前须读取证据所在原文片段。第${chapterIndex}章引文位于${first}–${first + quote.length}字，已读范围：${covered.map(range => `${range.start}–${range.end}`).join('、') || '无'}。请调用read_original：${JSON.stringify(args)}，必要时按nextCursor续读；补读后使用新的operationKey提交。`)
+}
 async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSet: ReadSet) {
-  const originalRevisions = new Map<string, number>()
-  for (const table of ['characters', 'locations']) for (const row of await store.rows(table)) originalRevisions.set(`${table}:${row.id}`, Number(row.revision))
+  const originalReads = await Promise.all(readSet.queries.filter(read => read.tool === 'read_original').map(read => readTool(store, scope, read.tool, read.args)))
   const used = new Set<string>()
   for (const group of records(payload.groups)) {
     const kind = text(group.kind); const table = kind === 'character' ? 'characters' : 'locations'
@@ -80,7 +106,7 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
     }
     const members = await Promise.all(ids.map(id => store.get(table, id)))
     if (members.some(row => !row || row.bookId !== scope.bookId)) throw new Error('SCOPE:合并成员不存在或不属于当前书籍。')
-    const named = members as Row[]
+    const named: Row[] = (members as Row[]).map(row => kind === 'character' ? normalizeCharacterNames({ ...row, name: text(row.name), aliases: strings(row.aliases), identity: text(row.identity) }) : row)
     const manualKeep = named.filter(row => row.manualKeep === true)
     const manualNames = [...new Set(named.filter(row => row.nameSource === 'manual').map(row => text(row.name)))]
     if (manualKeep.length > 1 || manualKeep.length === 1 && manualKeep[0].id !== group.keepId || manualNames.length > 1 || manualNames.length === 1 && manualNames[0] !== group.canonicalName) throw new Error('INVALID_ARGS:合并须保留人工指定的条目与主名。')
@@ -91,7 +117,7 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
     const evidenceIds = new Set(evidence.flatMap(item => strings(item.memberIds)))
     if (ids.some(id => !evidenceIds.has(id))) throw new Error('INVALID_ARGS:原文证据须覆盖全部合并成员。')
     for (const item of evidence) {
-      if (!readSet.queries.some(read => read.tool === 'read_original' && strings(read.args.chapter_range).length === 2 && text(item.chapterIndex).localeCompare(strings(read.args.chapter_range)[0], undefined, { numeric: true }) >= 0 && text(item.chapterIndex).localeCompare(strings(read.args.chapter_range)[1], undefined, { numeric: true }) <= 0)) throw new Error('INVALID_ARGS:合并前须读取证据所在原文。')
+      await assertReadEvidence(store, item, originalReads)
       for (const id of strings(item.memberIds)) { const member = named.find(row => row.id === id)!; if (![text(member.name), ...strings(member.aliases)].some(name => name && text(item.quote).includes(name))) throw new Error('INVALID_ARGS:证据须包含所引用成员的现有称呼。') }
     }
     await assertEvidence(store, evidence)
@@ -117,15 +143,13 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
       await store.put('pipelineRuns', { ...run, report: { ...report, groups: [...records(report.groups), { method: 'ai_identity', kind, memberIds: ids, memberNames: named.map(row => text(row.name)), keepId: merged.id, canonicalName: merged.name, aliases: merged.aliases ?? [], sourceChapters: merged.sourceChapters ?? [], conflicts: merged.mergeNotes ?? [], beforeTokens: named.reduce((sum, row) => sum + detailTokens(row as unknown as Character), 0), afterTokens: detailTokens(merged) }] } })
     }
   }
-  const texts = (await store.rows('chapterTexts')) as unknown as { chapterIndex: string; text: string }[]
-  for (const [table, characters] of [['characters', true], ['locations', false]] as const) {
-    const before = await store.rows(table)
-    const after = updateFrequencies(before as unknown as (Character | LocationAsset)[], texts, characters)
-    for (const [index, row] of after.entries()) if (canonical(row) !== canonical(before[index])) await store.put(table, { ...row, revision: row.revision > (originalRevisions.get(`${table}:${row.id}`) ?? 0) ? row.revision : row.revision + 1 } as unknown as Row)
-  }
 }
-async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet: ReadSet) {
+async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet: ReadSet, queryResults: Map<QueryRead, Row>) {
   const timestamp = new Date().toISOString(); const remap = new Map<string, string>()
+  const wasDetailed = (table: string, id: string) => {
+    const tool = ({ nodes: 'get_node_detail', eventLines: 'get_event_line_detail', storyEditorNotes: 'get_editor_note_detail' } as Record<string, string>)[table]
+    return readSet.queries.some(query => query.tool === tool && records(queryResults.get(query)?.data).some(row => row.id === id && !row.fields_omitted && (row.text === undefined || text(row.text).length > 0)))
+  }
   const changedChapters = new Set<string>()
   for (const source of records(payload.new_nodes)) {
     const chapter = await store.get('chapters', text(source.chapterIndex)); const original = await store.get('chapterTexts', text(source.chapterIndex))
@@ -160,7 +184,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     const old = existingId ? await store.get('eventLines', existingId) : undefined
     if (op.op !== 'create' && (!old || old.bookId !== scope.bookId)) throw new Error('SCOPE:事件线不存在或不属于当前书籍。')
     const affectedIds = [...(existingId ? [existingId] : []), ...strings(op.merge_line_ids)]
-    for (const id of affectedIds) if (!readSet.records.some(read => read.table === 'eventLines' && read.resolvedId === id)) throw new Error('INVALID_ARGS:修改事件线前须读取详情。')
+    for (const id of affectedIds) if (!wasDetailed('eventLines', id)) throw new Error('INVALID_ARGS:修改事件线前须调用get_event_line_detail读取详情。')
     const merging = await Promise.all(strings(op.merge_line_ids).map(id => store.get('eventLines', id)))
     if (merging.some(row => !row || row.bookId !== scope.bookId) || strings(op.merge_line_ids).includes(existingId)) throw new Error('INVALID_ARGS:事件线合并成员无效。')
     const nodeIds = [...new Set([...(op.op === 'append' || op.op === 'merge' ? strings(old?.nodeIds) : []), ...merging.flatMap(row => strings(row?.nodeIds)), ...strings(op.node_ids).map(resolveId)])]
@@ -172,7 +196,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     const previousMembers = new Set([...(op.op === 'append' || op.op === 'merge' ? strings(old?.nodeIds) : []), ...merging.flatMap(row => strings(row?.nodeIds))])
     for (const id of [...nodeIds, ...evidenceIds]) {
       if (previousMembers.has(id) && !evidenceIds.includes(id)) continue
-      if (![...remap.values()].includes(id) && !readSet.records.some(read => read.table === 'nodes' && read.resolvedId === id)) throw new Error('INVALID_ARGS:新串联或作为依据的节点须先读取详情。')
+      if (![...remap.values()].includes(id) && !wasDetailed('nodes', id)) throw new Error('INVALID_ARGS:新串联或作为依据的节点须先调用get_node_detail读取详情。')
     }
     if (op.op === 'create' && (await store.rows('eventLines')).some(line => canonical([...strings(line.nodeIds)].sort()) === canonical([...nodeIds].sort()))) continue
     const id = existingId || `U-${crypto.randomUUID()}`
@@ -207,6 +231,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     for (const id of strings(note.nodeIds)) if (!await store.get('nodes', resolveId(id))) throw new Error('INVALID_ARGS:事项节点不存在。')
     for (const id of strings(note.lineIds)) if (!await store.get('eventLines', id)) throw new Error('INVALID_ARGS:事项事件线不存在。')
     const old = (await store.rows('storyEditorNotes')).find(row => row.sessionId === scope.sessionId && row.key === note.key)
+    if (old && note.status === 'resolved' && !wasDetailed('storyEditorNotes', text(old.id))) throw new Error('INVALID_ARGS:解决已有线索前须调用get_editor_note_detail核对该事项。')
     const resolvedNote = { ...note, nodeIds: strings(note.nodeIds).map(resolveId) }
     await store.put('storyEditorNotes', { ...old, ...resolvedNote, id: old?.id ?? crypto.randomUUID(), bookId: scope.bookId, ...(scope.sessionId ? { sessionId: scope.sessionId } : {}), revision: Number(old?.revision ?? 0) + 1, stage: 'P3', basisFingerprint: await noteFingerprint(store, resolvedNote), createdAt: old?.createdAt ?? timestamp, updatedAt: timestamp })
   }
@@ -245,12 +270,14 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       const intent = records(run.commandIntents).find(row => row.operationKey === operationKey && row.taskId === scope.taskId && row.state === 'prepared')
       if (!intent) throw new Error('CONFLICT:命令意图未就绪。')
       const expected = intent.expectedReadSet as unknown as ReadSet
-      await validateReadSet(store, scope, expected)
+      const queryResults = await validateReadSet(store, scope, expected)
+      const previousStory = new Map<string, Row>()
+      if (name === 'commit_story_changes') for (const table of ['nodes', 'eventLines', 'storyEditorNotes']) for (const row of await store.rows(table)) previousStory.set(`${table}:${row.id}`, row)
       const workTables: Record<string, string> = { character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' }
       const workItems = records((task.input as Row | undefined)?.workItems)
       const before = await Promise.all(workItems.map(item => workTables[text(item.kind)] ? store.get(workTables[text(item.kind)], text(item.id)) : undefined))
       if (name === 'commit_asset_changes') await applyAssets(store, scope, payload, expected)
-      else await applyStory(store, scope, payload, expected)
+      else await applyStory(store, scope, payload, expected, queryResults)
       signal?.throwIfAborted()
       const commitId = crypto.randomUUID(); const summary = name === 'commit_asset_changes' ? '世界资产修改已提交。' : '叙事资产与工作记忆已提交。'
       const latest = (await store.get('pipelineRuns', scope.runId))!
@@ -258,6 +285,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       const businessContent = (row: Row | undefined) => {
         if (!row) return row
         const { revision: _revision, updatedAt: _updatedAt, frequency: _frequency, ...content } = row
+        if (scope.profile === 'story_editor') { delete content.order; delete content.offset }
         if (row.roleWeightSource !== 'manual') { delete content.roleWeight; delete content.roleWeightSource }
         return content
       }
@@ -272,6 +300,12 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       updatedReads = structuredClone(readSet)
       await rebaseReadSet(store, scope, updatedReads)
       await saveTask(store, scope, { readSet: updatedReads })
+      if (name === 'commit_story_changes') {
+        await rebaseStoryCoverage(store, scope.runId, previousStory)
+        const latestTask = (await taskOf(store, scope)).task
+        await saveStoryCoverage(store, scope.runId, latestTask, records(latestTask.reviewedItems).filter(item => item.outcome === 'changed'))
+      }
+      if (name === 'commit_asset_changes') for (const group of records(payload.groups)) await acceptIdentityMerge(store, scope.runId, scope.taskId, text(group.kind), strings(group.memberIds), text(group.keepId), updatedReads)
       return { ok: true, commitId, operationKey, alreadyApplied: false, summary }
     })
     if (updatedReads) { readSet.records = updatedReads.records; readSet.queries = updatedReads.queries }

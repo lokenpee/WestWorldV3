@@ -67,20 +67,20 @@ export function splitChapters(text: string, pattern: string): ChapterDraft[] {
   }
   const chapters: ChapterDraft[] = []
   function add(index: string, name: string, body: string, chunkSize = 10000) {
-    const chunks = Math.ceil(body.length / chunkSize)
-    for (let part = 0; part < chunks; part++) {
-      const chunk = body.slice(part * chunkSize, (part + 1) * chunkSize)
+    const chunks = splitCharacters(body, chunkSize)
+    for (let part = 0; part < chunks.length; part++) {
+      const chunk = chunks[part]
       chapters.push({
-        chapterIndex: chunks > 1 ? `${index}.${part + 1}` : index,
-        chapterName: chunks > 1 ? `${name}（第 ${part + 1} 块）` : name,
+        chapterIndex: chunks.length > 1 ? `${index}.${part + 1}` : index,
+        chapterName: chunks.length > 1 ? `${name}（第 ${part + 1} 块）` : name,
         order: chapters.length, charCount: chunk.length, text: chunk,
       })
     }
   }
   if (!titles.length) {
-    for (let offset = 0; offset < text.length; offset += 4000) {
+    for (const chunk of splitCharacters(text, 4000)) {
       const index = String(chapters.length + 1)
-      add(index, `第 ${index} 段`, text.slice(offset, offset + 4000))
+      add(index, `第 ${index} 段`, chunk)
     }
   } else {
     const prefix = text.slice(0, titles[0].start)
@@ -93,6 +93,16 @@ export function splitChapters(text: string, pattern: string): ChapterDraft[] {
   }
   if (chapters.map(chapter => chapter.text).join('') !== text) throw new Error('分章后正文不完整，请检查正则。')
   return chapters
+}
+
+function splitCharacters(text: string, size: number) {
+  const chunks: string[] = []
+  for (let offset = 0; offset < text.length;) {
+    let end = Math.min(offset + size, text.length)
+    if (end < text.length && /[\uD800-\uDBFF]/.test(text[end - 1]) && /[\uDC00-\uDFFF]/.test(text[end])) end--
+    chunks.push(text.slice(offset, end)); offset = end
+  }
+  return chunks
 }
 
 export function assertPreview(preview: NovelPreview) {

@@ -3,14 +3,15 @@ import type { JsonValue } from '@earendil-works/pi-ai'
 import type { AgentRepository, Row } from './repository'
 import { canonical, hash, records, resultContracts, strings, summarySchema, text, toolContracts, validate, type Summary } from './contracts'
 import { assertScope, readTool, toolBytes, type Scope } from './queries'
-import { commitCommand, saveTask, taskOf, type CommitAck, type ReadSet } from './commands'
+import { checkLease, commitCommand, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
 
 const tableOf: Record<string, string> = { get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
 export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
   const reads: ReadSet = structuredClone(options.initialReadSet ?? { records: [], queries: [] })
   let summary: Summary | undefined
   let readCalls = 0; let writeCalls = 0
-  const tools: AgentTool[] = toolContracts[scope.profile].map(contract => ({ name: contract.name, description: contract.description, label: contract.name, parameters: contract.parameters,
+  const tools: AgentTool[] = toolContracts[scope.profile].map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
+    parameters: scope.phase !== 'optimize' && ((contract.parameters as { properties?: Row }).properties)?.include_facts ? { ...contract.parameters, properties: { ...((contract.parameters as { properties?: Row }).properties), include_facts: { type: 'boolean', const: false } } } : contract.parameters,
     outputSchema: resultContracts.get(contract.name),
     async execute(toolCallId, parameters, signal) {
       assertScope(scope, repo.bookId); signal?.throwIfAborted(); validate(contract.parameters, parameters)
@@ -23,7 +24,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         writeCalls++; await options.afterCommit?.(ack)
         value = ack as unknown as Row
       } else {
-        value = await repo.transaction(false, store => readTool(store, scope, contract.name, args, contract.maxResults))
+        value = await repo.transaction(false, async store => { await checkLease(store, scope, signal); return readTool(store, scope, contract.name, args, contract.maxResults) })
         if (toolBytes(value) > 65536) throw new Error('TOO_LARGE:工具结果超过单次返回上限。')
         const output = resultContracts.get(contract.name)
         if (output) validate(output, value, `INVALID_RESULT:${contract.name}返回结构不符合要求。`)
@@ -32,14 +33,21 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         const at = reads.queries.findIndex(read => read.tool === query.tool && canonical(read.args) === canonical(query.args))
         if (at < 0) reads.queries.push(query); else reads.queries[at] = query
         await repo.transaction(true, async store => {
+          await checkLease(store, scope, signal)
           const table = tableOf[contract.name]
           const items = records(value.data)
           if (table) for (const item of items) {
             if (item.fields_omitted) continue
-            const id = text(item.resolvedFrom) || text(item.id); const resolvedId = text(item.id)
+            const id = strings(item.resolvedFrom)[0] || text(item.id); const resolvedId = text(item.id)
             const row = await store.get(table, resolvedId)
             const dependency = { table, id, resolvedId, revision: Number(row?.revision ?? 0), factFingerprint: await store.wait(hash(row ?? null)) }
             const index = reads.records.findIndex(read => read.table === table && read.id === id)
+            if (index < 0) reads.records.push(dependency); else reads.records[index] = dependency
+          }
+          if (contract.name === 'read_original') for (const id of strings(value.chapters)) {
+            const row = await store.get('chapterTexts', id)
+            const dependency = { table: 'chapterTexts', id, resolvedId: row ? id : null, revision: 0, factFingerprint: await store.wait(hash(row ?? null)) }
+            const index = reads.records.findIndex(read => read.table === 'chapterTexts' && read.id === id)
             if (index < 0) reads.records.push(dependency); else reads.records[index] = dependency
           }
           if (contract.name === 'get_editor_memory') {
@@ -63,6 +71,8 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       if (toolBytes(parameters) > 65536) throw new Error('TOO_LARGE:任务总结超过单次处理上限。')
       const proposed = parameters as unknown as Summary
       await repo.transaction(true, async store => {
+        await checkLease(store, scope, signal)
+        if (!scope.probe && scope.profile === 'story_editor') await validateReadSet(store, scope, reads)
         const { task } = await taskOf(store, scope)
         const actual = strings(task.appliedCommitIds)
         if (canonical([...actual].sort()) !== canonical([...proposed.commitIds].sort())) throw new Error('INVALID_ARGS:总结中的提交确认须与本任务真实提交一致。')

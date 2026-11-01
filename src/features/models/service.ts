@@ -15,16 +15,16 @@ export function createModelService(workspace: ReturnType<typeof createWorkspace>
     const abort = () => controller.abort(new ModelError('cancelled', '用户已取消本次调用。'))
     options.signal?.addEventListener('abort', abort, { once: true }); if (options.signal?.aborted) abort()
     const timeout = options.timeoutMs ?? 180000
-    const timer = Number.isSafeInteger(timeout) && timeout > 0 ? setTimeout(() => controller.abort(new ModelError('network', '本次调用已超时。')), Math.min(timeout, 180000)) : undefined
+    const timer = !options.cooperativeTimeout && Number.isSafeInteger(timeout) && timeout > 0 ? setTimeout(() => controller.abort(new ModelError('network', '本次调用已超时。')), Math.min(timeout, 180000)) : undefined
     try {
-      for (const value of [options.maxRequests, options.timeoutMs, options.maxTokens]) if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) throw new ModelError('validation', '请求预算、超时及输出长度须为正整数。')
+      for (const value of [options.maxRequests, options.timeoutMs, options.requestTimeoutMs, options.maxTokens]) if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) throw new ModelError('validation', '请求预算、超时及输出长度须为正整数。')
       controller.signal.throwIfAborted()
       options.onProgress?.({ state: 'preparing', attempts: 0 })
       const { config, apiKey } = await awaitWithSignal(settings.load(), controller.signal); key = apiKey
       const [{ resolveModel }, gateway] = await awaitWithSignal(Promise.all([import('./registry'), import('./gateway')]), controller.signal)
       const resolved = await awaitWithSignal(resolveModel(config, apiKey, role), controller.signal)
       controller.signal.throwIfAborted()
-      const effective = { ...options, signal: controller.signal, timeoutMs: Math.max(1, Math.min(timeout, 180000) - (now() - started)) }
+      const effective = { ...options, signal: controller.signal, timeoutMs: Math.max(1, Math.min(timeout, options.cooperativeTimeout ? 300000 : 180000) - (now() - started)) }
       const result = mode === 'agent' ? await gateway.executeAgent(resolved, effective, environment, agentInput) : await gateway.executeDirect(resolved, direct ? { ...direct, ...effective } : { ...effective, role, context: { messages: [{ role: 'user', content: '回复一个字：好', timestamp: now() }] } }, environment)
       return { ...result, elapsedMs: now() - started }
     } catch (error) {

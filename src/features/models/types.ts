@@ -4,7 +4,7 @@ export const modelApis = ['openai-completions', 'openai-responses', 'anthropic-m
 export type ModelApi = typeof modelApis[number]
 export type ModelRole = 'extraction' | 'aggregation'
 export type CallMode = 'direct' | 'agent' | 'catalog'
-export type ErrorKind = 'network' | 'rate_limit' | 'server' | 'auth' | 'context_length' | 'content_policy' | 'validation' | 'cancelled' | 'unsupported_provider' | 'unsupported_capability' | 'unknown'
+export type ErrorKind = 'network' | 'rate_limit' | 'server' | 'auth' | 'context_length' | 'content_policy' | 'validation' | 'budget' | 'cancelled' | 'unsupported_provider' | 'unsupported_capability' | 'unknown'
 export interface ModelConfig {
   providerId: string; api: ModelApi; baseUrl: string; extractionModel: string; aggregationModel: string; aggregationContextWindow?: number
 }
@@ -29,7 +29,7 @@ export interface CallResult {
   usage: UsageSummary; error?: ModelFailure; message?: AssistantMessage
 }
 export interface CallProgress { state: 'preparing' | 'requesting' | 'waiting'; attempts: number; delayMs?: number }
-export interface CallOptions { signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number }
+export interface CallOptions { beforeRequest?: () => Promise<void>; signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; cooperativeTimeout?: boolean; requestTimeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number }
 export interface DirectRequest<T = string> extends CallOptions {
   role: ModelRole; context: Context; validate?: (message: AssistantMessage) => T; repairPrompt?: string
 }

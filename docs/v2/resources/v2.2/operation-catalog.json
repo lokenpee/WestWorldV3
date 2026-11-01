@@ -660,7 +660,7 @@
       "id": "OP-34",
       "label": "图的高亮/全部",
       "page": "事件网络",
-      "event": "click线名或全部节点",
+      "event": "点击事件线名称或全部事件线",
       "inputs": "line.id或null",
       "guard": "有节点",
       "reads": [
@@ -672,26 +672,26 @@
       "steps": "同一线再次点清高亮；无此线时active=null",
       "success": "其他节点/边淡化，不移除",
       "error": "无",
-      "repeat": "不持久、不改线成员",
+      "repeat": "当前页面会话按书保留高亮选择；事件线成员保持原样",
       "flow": null
     },
     {
       "id": "OP-35",
       "label": "图缩放/平移/全图/起点",
       "page": "事件网络",
-      "event": "ReactFlow controls/drag背景",
-      "inputs": "viewport或fit命令",
+      "event": "缩放按钮、拖动画布、方向键、全图或起点",
+      "inputs": "视口或适配命令",
       "guard": "图存在",
       "reads": [
         "graph尺寸/章刻度"
       ],
       "writes": [
-        "局部ReactFlow viewport"
+        "本书的页面视口状态"
       ],
-      "steps": "min0.08 max2；全图padding.15；起点x20/y0/zoom1；250ms动画",
-      "success": "章轴同步，<.65简化卡片",
+      "steps": "按UI-06事件网络规则计算视口，再绘制可见节点与连线",
+      "success": "章轴、节点与连线同步显示",
       "error": "无专设错误",
-      "repeat": "不拖节点不手动连线；不存布局偏好",
+      "repeat": "页面会话内按书保留视口，刷新后重新适配；布局操作保持业务关联原样",
       "flow": null
     },
     {
@@ -1156,7 +1156,7 @@
       "id": "OP-60",
       "label": "图节点打开详情",
       "page": "事件网络",
-      "event": "click ReactFlow节点",
+      "event": "点击节点或聚焦后按回车",
       "inputs": "node.id找到nodes当前对象",
       "guard": "有匹配node",
       "reads": [

@@ -4,11 +4,12 @@ import { Value } from 'typebox/value'
 import schemaText from '../../../docs/v2/resources/schemas.json?raw'
 import worldPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p1-world.md?raw'
 import narrativePrompt from '../../../docs/v2/resources/v2.2/prompts/active/p1-narrative.md?raw'
+import { withOutputDiscipline } from '../agents/output-discipline'
 import { ModelError } from '../models/types'
 import type { Substep, ExtractionData } from './types'
 const schemas = JSON.parse(schemaText) as Record<string, TSchema>
 export const schemaOf = (step: Substep) => schemas[step === 'worldAssets' ? 'WorldAssetsExtractionSchema' : 'NarrativeAssetsExtractionSchema']
-export const promptOf = (step: Substep) => (step === 'worldAssets' ? worldPrompt : narrativePrompt).replace(/^---[\s\S]*?---\s*/, '')
+export const promptOf = (step: Substep) => withOutputDiscipline((step === 'worldAssets' ? worldPrompt : narrativePrompt).replace(/^---[\s\S]*?---\s*/, ''))
 
 function normalize(schema: TSchema, value: unknown): unknown {
   const shape = schema as TSchema & { items?: TSchema; properties?: Record<string, TSchema>; required?: string[] }

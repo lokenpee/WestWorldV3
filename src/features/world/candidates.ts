@@ -1,6 +1,7 @@
 import parameters from '../../../docs/v2/resources/algorithm-parameters.json'
 import type { Character, LocationAsset } from '../assets/types'
 import type { WorldKind } from '../assets/merge'
+import { characterMatchNames, isContextualName } from '../assets/characterNames'
 
 export interface Candidate { id: string; kind: WorldKind; memberIds: string[]; reason: string }
 const expression = (value: string) => { const end = value.lastIndexOf('/'); return new RegExp(value.slice(1, end), value.slice(end + 1)) }
@@ -41,13 +42,13 @@ export function findCandidates(kind: WorldKind, input: (Character | LocationAsse
   const root = (i: number): number => parent[i] === i ? i : parent[i] = root(parent[i])
   const connect = (a: number, b: number) => { parent[root(b)] = root(a) }
   for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
-    const a = normalizeName(rows[i].name), b = normalizeName(rows[j].name)
+    const a = kind === 'character' && isContextualName(rows[i].name) ? '' : normalizeName(rows[i].name), b = kind === 'character' && isContextualName(rows[j].name) ? '' : normalizeName(rows[j].name)
     if (a && b && (a === b || kind === 'character' && (a.includes(b) || b.includes(a)))) connect(i, j)
   }
   const groups = () => { const result = new Map<number, number[]>(); rows.forEach((_, i) => { const r = root(i); if (!result.has(r)) result.set(r, []); result.get(r)!.push(i) }); return [...result.values()] }
   const first = groups()
   for (let i = 0; i < first.length; i++) for (let j = i + 1; j < first.length; j++) {
-    const names = (indices: number[]) => indices.flatMap(index => [rows[index].name, ...(rows[index].aliases ?? [])])
+    const names = (indices: number[]) => indices.flatMap(index => kind === 'character' ? characterMatchNames(rows[index]) : [rows[index].name, ...(rows[index].aliases ?? [])])
     if (aliasScore(names(first[i]), names(first[j])) > 0.9) connect(first[i][0], first[j][0])
   }
   return groups().filter(group => group.length > 1).map(group => ({ id: `${kind}:${group.map(i => rows[i].id).join('|')}`, kind, memberIds: group.map(i => rows[i].id), reason: '名称或别名符合候选规则，请核对身份和来源后选择实际合并成员。' }))

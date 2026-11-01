@@ -24,7 +24,7 @@ class CallSession {
   readonly now: () => number
   readonly maxRequests: number
   readonly timeoutMs: number
-  private timer: ReturnType<typeof setTimeout>
+  private timer?: ReturnType<typeof setTimeout>
   private externalAbort: () => void
   private turn = 0
   private status?: number
@@ -40,22 +40,22 @@ class CallSession {
     this.resolved = resolved; this.mode = mode; this.options = options; this.environment = environment
     this.now = environment.now ?? Date.now
     this.started = this.now()
-    for (const value of [options.maxRequests, options.timeoutMs, options.maxTokens]) if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) throw new ModelError('validation', '请求预算、超时及输出长度须为正整数。')
+    for (const value of [options.maxRequests, options.timeoutMs, options.requestTimeoutMs, options.maxTokens]) if (value !== undefined && (!Number.isSafeInteger(value) || value < 1)) throw new ModelError('validation', '请求预算、超时及输出长度须为正整数。')
     if (options.temperature !== undefined && (!Number.isFinite(options.temperature) || options.temperature < 0 || options.temperature > 2)) throw new ModelError('validation', '采样温度须为0到2之间的数字。')
-    const ceiling = mode === 'agent' ? 6 : 3
+    const ceiling = mode === 'agent' ? options.cooperativeTimeout ? 20 : 6 : 3
     this.maxRequests = Math.min(options.maxRequests ?? ceiling, ceiling)
-    this.timeoutMs = Math.min(options.timeoutMs ?? 180000, 180000)
+    this.timeoutMs = Math.min(options.timeoutMs ?? 180000, options.cooperativeTimeout ? 300000 : 180000)
     if (!Number.isSafeInteger(this.maxRequests) || this.maxRequests < 1 || !Number.isSafeInteger(this.timeoutMs) || this.timeoutMs < 1 || (options.maxTokens !== undefined && (!Number.isSafeInteger(options.maxTokens) || options.maxTokens < 1))) throw new ModelError('validation', '请求预算、超时及输出长度须为正整数。')
     this.externalAbort = () => this.controller.abort(options.signal?.reason instanceof ModelError ? options.signal.reason : new ModelError('cancelled', '用户已取消本次调用。'))
     options.signal?.addEventListener('abort', this.externalAbort, { once: true })
     if (options.signal?.aborted) this.externalAbort()
-    this.timer = setTimeout(() => this.controller.abort(new ModelError('network', '本次调用已超时。')), this.timeoutMs)
+    if (!options.cooperativeTimeout) this.timer = setTimeout(() => this.controller.abort(new ModelError('network', '本次调用已超时。')), this.timeoutMs)
   }
   close() { clearTimeout(this.timer); this.options.signal?.removeEventListener('abort', this.externalAbort) }
   private ensureActive() {
     this.controller.signal.throwIfAborted()
-    if (this.attempts.length >= this.maxRequests) throw new ModelError('validation', '已达到本次实际请求上限。')
-    if (this.now() - this.started >= this.timeoutMs) throw new ModelError('network', '本次调用已超时。')
+    if (this.attempts.length >= this.maxRequests) throw new ModelError(this.mode === 'agent' ? 'budget' : 'validation', this.mode === 'agent' ? 'BUDGET:已达到本子任务实际请求上限。' : '已达到本次实际请求上限。')
+    if (!this.options.cooperativeTimeout && this.now() - this.started >= this.timeoutMs) throw new ModelError('network', '本次调用已超时。')
   }
   private async models() {
     if (this.client) return this.client
@@ -70,6 +70,7 @@ class CallSession {
   }
   private transport: typeof fetch = async (input, init) => {
     try { this.ensureActive() } catch (error) { this.transportFailure = error instanceof ModelError ? error : new ModelError('cancelled', '本次调用已取消。'); throw error }
+    await this.options.beforeRequest?.()
     await this.environment.beforeRequest?.()
     this.ensureActive()
     const attempt: Attempt = { ordinal: this.attempts.length + 1, turn: this.turn, elapsedMs: 0 }
@@ -91,7 +92,7 @@ class CallSession {
       this.status = undefined; this.retryAfter = undefined; this.transportFailure = undefined
       const before = this.attempts.length
       const started = this.now()
-      const stream = client.streamSimple(this.resolved.model, context, { signal: this.controller.signal, fetch: this.transport, maxRetries: 0, transport: 'sse', timeoutMs: Math.max(1, this.timeoutMs - (this.now() - this.started)), maxTokens: Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens), ...(this.options.temperature === undefined ? {} : { temperature: this.options.temperature }) })
+      const stream = client.streamSimple(this.resolved.model, context, { signal: this.controller.signal, fetch: this.transport, maxRetries: 0, transport: 'sse', timeoutMs: Math.max(1, Math.min(this.options.requestTimeoutMs ?? 180000, this.options.cooperativeTimeout ? Infinity : this.timeoutMs - (this.now() - this.started))), maxTokens: Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens), ...(this.options.temperature === undefined ? {} : { temperature: this.options.temperature }) })
       const events: AssistantMessageEvent[] = []
       for await (const event of stream) events.push(event)
       const raw = await stream.result()
@@ -177,10 +178,14 @@ export async function executeAgent(resolved: ResolvedModel, options: CallOptions
     agent.afterToolCall = input.afterToolCall
     if (input.agent && input.messages) agent.state.messages = input.messages
     input.onAgent?.(agent)
-    const unsubscribe = input.onEvent ? agent.subscribe(input.onEvent) : undefined
+    let eventTail = Promise.resolve()
+    let eventFailure: unknown
+    const unsubscribe = input.onEvent ? agent.subscribe(event => {
+      eventTail = eventTail.then(() => input.onEvent!(event)).catch(error => { eventFailure = error; agent.abort() })
+    }) : undefined
     const abort = () => agent.abort()
     session.controller.signal.addEventListener('abort', abort, { once: true })
-    try { session.controller.signal.throwIfAborted(); await agent.prompt(input.prompt); await agent.waitForIdle() }
+    try { session.controller.signal.throwIfAborted(); await agent.prompt(input.prompt); await agent.waitForIdle(); await eventTail; if (eventFailure) throw eventFailure }
     finally { session.controller.signal.removeEventListener('abort', abort); unsubscribe?.() }
     last = agent.state.messages.findLast((message): message is AssistantMessage => message.role === 'assistant')
     if (!last) throw new ModelError('validation', '智能体未返回模型回复。')
