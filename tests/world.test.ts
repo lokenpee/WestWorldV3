@@ -18,6 +18,7 @@ import { createBookAgentRepository } from '../src/features/agents/repository'
 import { saveIdentityQueue } from '../src/features/world/queue'
 import { emptyReport } from '../src/features/world/types'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
+import { hash } from '../src/features/agents/contracts'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
 const person = (id: string, name: string, extra = {}): Character => ({ id, bookId: 'a', name, aliases: [], confidence: 1, revision: 1, createdBy: 'P1', chapterIndex: '1', chapterName: '第1章', ...extra })
@@ -203,6 +204,60 @@ it('人物地点按需整编完整覆盖事实，保留底稿与人工主名，�
 function taskInput(body: { messages: { role: string; content: string | { text: string }[] }[] }) {
   return JSON.parse(body.messages.filter(row => row.role === 'user').map(row => typeof row.content === 'string' ? row.content : row.content.map(part => part.text).join('')).find(value => value.startsWith('{'))!)
 }
+
+it('百万上下文整编超6000的长档案，归并短句且保留底稿，旧规则完成标记可重新整编', async () => {
+  let optimizationCalls = 0
+  const original = '曾在北地从军，熟悉边塞军务。'.repeat(1200)
+  const facts = [{ id: 'bg', field: 'background', text: original, chapters: ['1'] }, { id: 'a', field: 'personality', text: '性情沉稳，处事果断', chapters: ['1'] }, { id: 'b', field: 'personality', text: '为人沉稳，遇事果决', chapters: ['2'] }, { id: 'c', field: 'personality', text: '精于谋略', chapters: ['2'] }]
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string)
+    if (body.tools.length !== 1) return reviewedBatch(body)
+    optimizationCalls++
+    const input = taskInput(body), row = input.entities[0]
+    expect(row.facts).toHaveLength(4)
+    expect(row.facts.some((fact: { text: string }) => fact.text === original)).toBe(true)
+    expect(JSON.stringify(body).length).toBeGreaterThan(6000)
+    return agentStream([{ name: 'submit_result', args: { entities: { [row.id]: { entity: { name: row.name, aliases: row.aliases, background: '曾在北地从军，熟悉边塞军务。', personality: '性情沉稳，处事果断，精于谋略' }, covered_fact_ids: row.facts.map((fact: { id: string }) => fact.id), merge_notes: [] } } } }])
+  })
+  const { db, service, models, book } = await setup(fetcher)
+  await db.table('characters').clear(); await db.table('locations').clear()
+  await db.table('characters').put(person('P1', '沈青', { nameSource: 'manual', background: original, personality: '性情沉稳，处事果断；为人沉稳，遇事果决；精于谋略', mergeFacts: facts }))
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1', aggregationContextWindow: 1000000 }, 'fake-key')
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect((await service.reports('a'))[0].status).toBe('completed')
+  expect(optimizationCalls).toBe(1)
+  const result = await db.table<Character>('characters').get('P1')
+  expect(result).toMatchObject({ name: '沈青', nameSource: 'manual', personality: '性情沉稳，处事果断，精于谋略', background: '曾在北地从军，熟悉边塞军务。', mergeFacts: expect.arrayContaining(facts) })
+  await service.start('a')
+  expect(optimizationCalls).toBe(1)
+  const request = await optimizationRequest('character', result!)
+  const oldFingerprint = await hash({ version: '2.2', names: ['沈青'], facts: request.facts, notes: result!.mergeNotes ?? [] })
+  await db.table('characters').update('P1', { optimizationFingerprint: oldFingerprint })
+  await service.start('a')
+  expect(optimizationCalls).toBe(2)
+  expect(await db.table('characters').get('P1')).toMatchObject({ optimizationFingerprint: request.fingerprint, mergeFacts: expect.arrayContaining(facts) })
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+}, 30000)
+
+it('整编真正超出模型上下文时说明容量与预留，保留原档案而不发送超限请求', async () => {
+  let optimizationCalls = 0
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string)
+    if (body.tools.length === 1) { optimizationCalls++; throw new Error('超限资料不应请求模型') }
+    return reviewedBatch(body)
+  })
+  const { db, service, models } = await setup(fetcher)
+  await db.table('characters').clear(); await db.table('locations').clear()
+  const original = '独有的人物背景与经历。'.repeat(1200)
+  await db.table('characters').put(person('P1', '沈青', { background: original }))
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1', aggregationContextWindow: 8192 }, 'fake-key')
+  await service.start('a')
+  expect(optimizationCalls).toBe(0)
+  expect((await service.reports('a'))[0]).toMatchObject({ status: 'degraded', report: { failed: [expect.stringContaining('超出当前整理模型上下文8192 token')] } })
+  expect(await db.table('characters').get('P1')).toMatchObject({ background: original })
+})
 function reviewedBatch(body: Parameters<typeof taskInput>[0], partial = false) {
   const input = taskInput(body)
   const results = body.messages.filter(row => row.role === 'tool')

@@ -284,7 +284,7 @@ Pi包取舍、coding层不接入的具体能力、浏览器限制和逐模块迁
 
 **ChapterTask**：chapterIndex来自chapters主键，chapterName来自该行，text来自对应chapterTexts完整正文/切块；均必填string。使用AI-02逐字模板与LF换行，不能悄悄截断。用户消息timestamp为本次Unix毫秒。世界与叙事请求独立；temperature/maxTokens未指定时保留省略，由锁定Pi/模型默认处理，不能写成temperature=0的既有事实。
 
-**CharacterOptimizationTask**：JSON对象`{stage:"P2",entities:[...]}`，每项含id、name、aliases、reason、previous、facts、conflicts。id/name来自当前人物；aliases缺省[]；reason为本地候选判定原因；previous是上次有效整编的identity/appearance/personality/background，无则{}。facts来自未优化事实，为空则取全部事实；每项`{id:"F1",field,text}`，F1/F2按本人物本次顺序编号，不能跨人物混用。conflicts取mergeNotes或[]。调用方保留短号→持久事实ID映射，模型不生成主键或revision。
+**CharacterOptimizationTask**：JSON对象`{stage:"P2",entities:[...]}`，每项含id、name、aliases、previous、facts、conflicts。id和name来自当前人物，aliases缺省为空列表。previous是当前identity、appearance、personality、background展示稿；facts读取完整事实底稿，每项包含本次短号、字段、文字和来源章节，按本人物本次顺序编号。conflicts取mergeNotes或空列表。多条同义事实可以合成一句，仍完整返回对应编号。调用方保留短号与持久事实的对应，模型生成展示文字。
 
 动态输出Schema的entities键必须等于本批人物ID且全部必填；各人物name及aliases元素限定在去重后的`[name,...aliases]`枚举；covered_fact_ids枚举只含本人物本次短号，minItems=maxItems=事实数且uniqueItems=true；各层additionalProperties=false。通过Schema仍要验证文本没有把已知字段清空；“列全事实ID”不证明模型语义上没有漏事实。
 

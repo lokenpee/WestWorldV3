@@ -45,6 +45,35 @@ async function prepare(page: Page) {
   await page.getByRole('button', { name: '开始提取', exact: true }).click()
   await expect(page.getByRole('button', { name: '代码整理', exact: true })).toBeEnabled()
 }
+
+test('AI整编将短句同义描述写入统一展示，刷新后保留独有信息', async ({ page }) => {
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    const body = route.request().postDataJSON()
+    if (body.tools.length === 1 && body.tools[0].function.parameters.properties.entities) {
+      const content = body.messages.find((row: { role: string }) => row.role === 'user').content
+      const input = JSON.parse(typeof content === 'string' ? content : content.map((part: { text: string }) => part.text).join(''))
+      const row = input.entities[0]
+      await route.fulfill({ contentType: 'text/event-stream', body: await agentStream([{ name: 'submit_result', args: { entities: { [row.id]: { entity: { name: row.name, aliases: row.aliases, identity: '青石镇的船夫，亦称老沈', personality: '性情沉稳，处事果断，精于谋略' }, covered_fact_ids: row.facts.map((fact: { id: string }) => fact.id), merge_notes: [] } } } }]).text() })
+      return
+    }
+    await route.fulfill({ contentType: 'text/event-stream', body: await worldResponse(body).text() })
+  })
+  await prepare(page)
+  await page.getByRole('button', { name: '编辑 沈青', exact: true }).first().click()
+  await page.getByLabel('性格', { exact: true }).fill('性情沉稳，处事果断；为人沉稳，遇事果决；精于谋略')
+  await page.getByRole('button', { name: '保存', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: '已保存' }).last()).toBeVisible()
+  await page.getByRole('button', { name: 'AI整理', exact: true }).click()
+  const report = page.getByRole('dialog', { name: '世界资产整理报告', exact: true })
+  await expect(report).toContainText('人物 7 → 5', { timeout: 20000 })
+  await expect(report).toContainText('整编 2 条')
+  await report.getByRole('button', { name: '关闭报告', exact: true }).click()
+  await page.getByRole('button', { name: '编辑 沈青', exact: true }).click()
+  await expect(page.getByLabel('性格', { exact: true })).toHaveValue('性情沉稳，处事果断，精于谋略')
+  await page.reload()
+  await page.getByRole('button', { name: '编辑 沈青', exact: true }).click()
+  await expect(page.getByLabel('性格', { exact: true })).toHaveValue('性情沉稳，处事果断，精于谋略')
+})
 test('代码整理选择成员后可直接确认并连续处理，预览为可选操作', async ({ page }, testInfo) => {
   let calls = 0
   await page.route('**/world-fixture/v1/chat/completions', async route => { calls++; await route.fulfill({ contentType: 'text/event-stream', body: await worldResponse(route.request().postDataJSON()).text() }) })

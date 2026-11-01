@@ -9,6 +9,15 @@ export function worldResponse(body: { tools: { function: { parameters: { propert
   const content = (value: unknown) => typeof value === 'string' ? value : (value as { text: string }[]).map(part => part.text).join('')
   if (body.tools.length === 1) {
     const schema = body.tools[0].function.parameters
+    if (schema.properties.entities || schema.properties.coveredFactIds) {
+      const input = JSON.parse(content(body.messages.find(row => row.role === 'user')!.content))
+      if (input.entities) {
+        const row = input.entities[0]
+        const fields = Object.fromEntries([...new Set(row.facts.map((fact: { field: string }) => fact.field))].map(field => [String(field), row.facts.filter((fact: { field: string }) => fact.field === field).map((fact: { text: string }) => fact.text).join('；')]))
+        return agentStream([{ name: 'submit_result', args: { entities: { [row.id]: { entity: { name: row.name, aliases: row.aliases, ...fields }, covered_fact_ids: row.facts.map((fact: { id: string }) => fact.id), merge_notes: [] } } } }])
+      }
+      return agentStream([{ name: 'submit_result', args: { description: input.facts.map((fact: { text: string }) => fact.text).join('；'), coveredFactIds: input.facts.map((fact: { id: string }) => fact.id), conflicts: [] } }])
+    }
     return agentStream([{ name: 'submit_result', args: schema.properties.characters ? { ...worldExtraction, locations: worldExtraction.locations.map(({ aliases_mentioned: _aliases, ...row }) => row) } : { nodes: [] } }])
   }
   const input = JSON.parse(content(body.messages.find(row => row.role === 'user')!.content))

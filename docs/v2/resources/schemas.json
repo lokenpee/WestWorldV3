@@ -306,7 +306,7 @@
                     "type": "string"
                   },
                   "personality": {
-                    "description": "性格。多条用「；」分隔。**不得遗漏任何快照里的独有信息**",
+                    "description": "性格。同义或近义信息只表述一次，独有信息继续保留；不同特征用分号分隔。",
                     "type": "string"
                   },
                   "background": {
@@ -316,7 +316,7 @@
                 }
               },
               "covered_fact_ids": {
-                "description": "本次输入 facts 中已完整保留的信息 ID，不能漏掉或新增。",
+                "description": "完整覆盖输入事实编号，多条同义事实可对应同一句展示文字，独有信息须保留。",
                 "type": "array",
                 "items": {
                   "type": "string"

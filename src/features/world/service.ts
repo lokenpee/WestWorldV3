@@ -66,7 +66,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     }
     try {
       await assertReady(bookId)
-      const [{ createAgentRuntime }, { needsOptimization, optimizationRequest }, { resolveModel }] = await Promise.all([import('../agents/runtime'), import('./optimization'), import('../models/registry')])
+      const [{ createAgentRuntime }, { needsOptimization, optimizationRequest, optimizationBudget }, { resolveModel }] = await Promise.all([import('../agents/runtime'), import('./optimization'), import('../models/registry')])
       const settings = await models.settings.load()
       if (!settings.apiKey || !settings.config.aggregationModel) throw new Error('请先在设置页保存整理模型与密钥。')
       const resolved = await resolveModel(settings.config, settings.apiKey, 'aggregation')
@@ -142,9 +142,9 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         if (!needsOptimization(kind, row)) { set(bookId, { processed: index + 1 }); continue }
         const request = await optimizationRequest(kind, row)
         if (row.optimizationFingerprint === request.fingerprint) { set(bookId, { processed: index + 1 }); continue }
-        const reserve = Math.min(8192, resolved.model.maxTokens, Math.floor(resolved.model.contextWindow * 0.35))
-        const capacity = resolved.model.contextWindow - reserve - 1024
-        if (request.estimatedTokens > Math.min(6000, Math.floor(capacity * 0.45))) { await addMessage('failed', `${row.name}：资料超出本次整编输入预算，保留原资料。`); continue }
+        const budget = optimizationBudget(request, resolved.model)
+        const reserve = budget.outputTokens
+        if (!budget.fits) { await addMessage('failed', `${row.name}：整编输入估算${budget.inputTokens} token，输出预留${budget.outputTokens} token，超出当前整理模型上下文${budget.contextWindow} token。请核对设置中的模型容量；原资料保留。`); continue }
         const result = await models.generate({ role: 'aggregation', context: { systemPrompt: request.prompt, messages: [{ role: 'user', content: JSON.stringify(request.input), timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交完整事实覆盖的整编资料', parameters: request.schema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] }, validate: request.validate, repairPrompt: '唯一一次修正机会，请完整保留全部事实编号及既有称呼，补齐有事实的字段。', signal: controller.signal, timeoutMs: 180000, requestTimeoutMs: 60000, maxTokens: reserve, temperature: 0 })
         await check()
         await db.transaction('rw', db.tables, async () => {
