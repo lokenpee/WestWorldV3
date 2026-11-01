@@ -33,6 +33,14 @@ afterEach(async () => {
 })
 
 describe('资产人工维护', () => {
+  it('修改其他字段保留别名核实状态，明确编辑别名后才确认新的别名清单', async () => {
+    const { service, db } = await setup()
+    await db.table('characters').put({ id: 'P1', bookId: 'a', name: '沈青', aliases: ['老沈'], confidence: 1, revision: 1, createdBy: 'P1', chapterIndex: '1', chapterName: '第一章' })
+    const first = await service.update('a', 'character', 'P1', 1, { personality: '沉稳', aliases: ['老沈'] })
+    expect(first.verifiedAliases).toEqual([])
+    const second = await service.update('a', 'character', 'P1', first.revision, { aliases: ['老沈', '沈先生'] })
+    expect(second.verifiedAliases).toEqual(['老沈', '沈先生'])
+  })
   it('统一人物表单保留两类归属、旧对象及事件字段，重复保存后可移除两类关联', async () => {
     const { service, db } = await setup()
     const actor = await service.create('a', 'character', { name: '沈青', aliases: ['老沈'], chapterIndex: '1' })

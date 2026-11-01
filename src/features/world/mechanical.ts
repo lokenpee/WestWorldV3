@@ -205,7 +205,7 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
             return true
           })
           if (!proceed) break
-          await assets.confirmMerge(bookId, item.kind, request, { runId, itemId: item.id, owner })
+          await assets.confirmMerge(bookId, item.kind, request, { runId, itemId: item.id, owner, automatic: item.confirmation === 'exact_name' && !item.manualSelection })
         } catch (error) {
           if (!(error instanceof AssetError) || !['CONFLICT', 'VALIDATION', 'NOT_FOUND'].includes(error.code)) throw error
           await db.transaction('rw', db.table('pipelineRuns'), async () => {
@@ -258,7 +258,7 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
         const prior = overlaps.find(item => group.memberIds.includes(item.request.keepId))
         const protectedRows = members.filter(row => row.manualKeep)
         const keepId = prior?.request.keepId ?? (protectedRows.length === 1 ? protectedRows[0].id : [...members].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))[0].id)
-        return { id: prior?.id ?? crypto.randomUUID(), kind: group.kind, request: { memberIds: group.memberIds, keepId, canonicalName: prior?.request.canonicalName ?? members[0].name.trim(), expectedRevisions: Object.fromEntries(members.map(row => [row.id, row.revision])) }, memberNames: members.map(row => row.name), approvalFingerprints: Object.fromEntries(await Promise.all(members.map(async row => [row.id, await coverageFingerprint(group.kind === 'character' ? 'characters' : 'locations', row as unknown as Row)]))), status: 'pending' as const, confirmedAt: new Date().toISOString(), confirmation: 'exact_name' as const }
+        return { id: prior?.id ?? crypto.randomUUID(), kind: group.kind, request: { memberIds: group.memberIds, keepId, canonicalName: prior?.request.canonicalName ?? members[0].name.trim(), expectedRevisions: Object.fromEntries(members.map(row => [row.id, row.revision])) }, memberNames: members.map(row => row.name), approvalFingerprints: Object.fromEntries(await Promise.all(members.map(async row => [row.id, await coverageFingerprint(group.kind === 'character' ? 'characters' : 'locations', row as unknown as Row)]))), status: 'pending' as const, confirmedAt: new Date().toISOString(), confirmation: 'exact_name' as const, protectionVersion: 1 as const, manualSelection: prior?.confirmation === 'manual' || prior?.manualSelection === true }
       })))
       if (prepared.length) await db.transaction('rw', db.tables, async () => {
         await available(bookId)

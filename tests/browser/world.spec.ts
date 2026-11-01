@@ -67,12 +67,59 @@ test('AI整编将短句同义描述写入统一展示，刷新后保留独有信
   const report = page.getByRole('dialog', { name: '世界资产整理报告', exact: true })
   await expect(report).toContainText('人物 7 → 5', { timeout: 20000 })
   await expect(report).toContainText('整编 2 条')
+  await expect(report).toContainText('已更新资料')
+  await expect(report).toContainText('独有事实保留，重复表述已归并。')
+  await report.getByText('性格 · 修改前后', { exact: true }).click()
+  await expect(report).toContainText('原资料：性情沉稳，处事果断；为人沉稳，遇事果决；精于谋略')
+  await expect(report).toContainText('当前资料：性情沉稳，处事果断，精于谋略')
   await report.getByRole('button', { name: '关闭报告', exact: true }).click()
   await page.getByRole('button', { name: '编辑 沈青', exact: true }).click()
   await expect(page.getByLabel('性格', { exact: true })).toHaveValue('性情沉稳，处事果断，精于谋略')
   await page.reload()
   await page.getByRole('button', { name: '编辑 沈青', exact: true }).click()
   await expect(page.getByLabel('性格', { exact: true })).toHaveValue('性情沉稳，处事果断，精于谋略')
+})
+
+test('AI整编稿复核未通过时报告保留依据，刷新继续后更新资料并适应手机布局', async ({ page }, testInfo) => {
+  let rejectReview = true
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    const body = route.request().postDataJSON(), schema = body.tools[0].function.parameters.properties
+    if (body.tools.length === 1 && schema.approved) {
+      const args = rejectReview ? { approved: false, summary: '性格稿遗漏精于谋略。', issues: [{ kind: 'omission', field: 'personality', factIds: [], message: '保留独有的谋略信息。' }] } : { approved: true, summary: '独有事实与语义均已核对。', issues: [] }
+      await route.fulfill({ contentType: 'text/event-stream', body: await agentStream([{ name: 'submit_result', args }]).text() }); return
+    }
+    if (body.tools.length === 1 && schema.entities) {
+      const content = body.messages.find((row: { role: string }) => row.role === 'user').content
+      const row = JSON.parse(typeof content === 'string' ? content : content.map((part: { text: string }) => part.text).join('')).entities[0]
+      await route.fulfill({ contentType: 'text/event-stream', body: await agentStream([{ name: 'submit_result', args: { entities: { [row.id]: { entity: { name: row.name, aliases: row.aliases, identity: '青石镇的船夫，亦称老沈', personality: rejectReview ? '沉稳果断' : '沉稳果断，精于谋略' }, covered_fact_ids: row.facts.map((fact: { id: string }) => fact.id), merge_notes: [] } } } }]).text() }); return
+    }
+    await route.fulfill({ contentType: 'text/event-stream', body: await worldResponse(body).text() })
+  })
+  await prepare(page)
+  const original = '性情沉稳，处事果断；为人沉稳，遇事果决；精于谋略'
+  await page.getByRole('button', { name: '编辑 沈青', exact: true }).first().click()
+  await page.getByLabel('性格', { exact: true }).fill(original)
+  await page.getByRole('button', { name: '保存', exact: true }).click()
+  await page.getByRole('button', { name: 'AI整理', exact: true }).click()
+  const report = page.getByRole('dialog', { name: '世界资产整理报告', exact: true })
+  await expect(report).toContainText('复核未通过，原资料保留', { timeout: 20000 })
+  await expect(report).toContainText('保留独有的谋略信息。')
+  await report.getByText('性格 · 原资料与稿件', { exact: true }).click()
+  await expect(report).toContainText(`原资料：${original}`)
+  await report.getByRole('button', { name: '关闭报告', exact: true }).click()
+  await page.getByRole('button', { name: '编辑 沈青', exact: true }).click()
+  await expect(page.getByLabel('性格', { exact: true })).toHaveValue(original)
+  await page.reload(); rejectReview = false
+  await page.getByRole('button', { name: '继续AI整理', exact: true }).click()
+  await expect(report).toContainText('已更新资料', { timeout: 20000 })
+  await expect(report).toContainText('独有事实与语义均已核对。')
+  await page.setViewportSize({ width: 375, height: 812 })
+  await report.locator('summary').filter({ hasText: /^资料整编与复核/ }).scrollIntoViewIfNeeded()
+  await report.screenshot({ path: testInfo.outputPath('world-quality-mobile.png') })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await report.getByRole('button', { name: '关闭报告', exact: true }).click()
+  await page.getByRole('button', { name: '编辑 沈青', exact: true }).click()
+  await expect(page.getByLabel('性格', { exact: true })).toHaveValue('沉稳果断，精于谋略')
 })
 test('代码整理选择成员后可直接确认并连续处理，预览为可选操作', async ({ page }, testInfo) => {
   let calls = 0

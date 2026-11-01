@@ -1,5 +1,4 @@
 import type { createWorkspace } from '../../lib/storage/workspace'
-import Dexie from 'dexie'
 import type { ModelService } from '../models/service'
 import type { AssetService } from '../assets/service'
 import type { Character, LocationAsset } from '../assets/types'
@@ -13,6 +12,7 @@ import { coverageFingerprint, identityBatchSize, identityDependencies, saveIdent
 import { createFrequencyCounter } from '../assets/derive'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { createMechanicalQueue } from './mechanical'
+import { repairAutomaticProtection } from './protection'
 import prompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-identity.md?raw'
 
 type Workspace = ReturnType<typeof createWorkspace>
@@ -78,7 +78,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     }
     try {
       await assertReady(bookId)
-      const [{ createAgentRuntime }, { needsOptimization, optimizationRequest, optimizationBudget }, { resolveModel }] = await Promise.all([import('../agents/runtime'), import('./optimization'), import('../models/registry')])
+      const [{ createAgentRuntime }, { needsOptimization, optimizeAsset }, { resolveModel }] = await Promise.all([import('../agents/runtime'), import('./optimizeAsset'), import('../models/registry')])
       const settings = await models.settings.load()
       if (!settings.apiKey || !settings.config.aggregationModel) throw new Error('请先在设置页保存整理模型与密钥。')
       const resolved = await resolveModel(settings.config, settings.apiKey, 'aggregation')
@@ -98,6 +98,8 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         await db.table('compileProgress').put({ bookId, stage: 'P2', status: 'running', runId, totalChapters: (await db.chapters.count()), completedChapters: [], failedChapters: [], updatedAt: now, scope: 'fullBook', planVersion: '2.2', unit: 'item', validity: 'current' })
       }); acquired = true
       timer = setInterval(() => { void db.transaction('rw', db.table('pipelineRuns'), async () => { const lease = await db.table('pipelineRuns').get('lease:world'); if (lease?.owner !== owner) throw new Error('执行权已变化'); await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 }) }).catch(() => controller.abort()) }, 8000)
+      set(bookId, { phase: '核对自动合并与人工保留来源' })
+      await repairAutomaticProtection(workspace, bookId, runId, owner)
       const repo = createBookAgentRepository(workspace, bookId); const runtime = createAgentRuntime(models.agent)
       const initialQueue = await saveIdentityQueue(repo, runId, { owner, signal: controller.signal })
       const remaining = initialQueue.pending.map(row => text(row.workItemId))
@@ -146,43 +148,24 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
       }
       set(bookId, { phase: '按需整编详细资料', processed: 0 })
       const identityCoverage = await saveIdentityQueue(repo, runId, { owner, signal: controller.signal })
+      await db.transaction('rw', db.table('pipelineRuns'), db.table('characters'), db.table('locations'), async () => {
+        await check()
+        const run = (await db.table<WorldRun>('pipelineRuns').get(runId))!
+        const optimizations = []
+        for (const draft of run.report.optimizations ?? []) {
+          const exists = draft.status !== 'pending_review' || await db.table(draft.kind === 'character' ? 'characters' : 'locations').get(draft.assetId)
+          optimizations.push(exists ? draft : { ...draft, status: 'stale' as const, reviewError: '该资产已合并或删除，旧稿已过期。' })
+        }
+        if (run.report.optimizations) await db.table('pipelineRuns').update(runId, { report: { ...run.report, optimizations } })
+      })
       const checked = new Set(identityCoverage.items.filter(item => item.status === 'checked').map(item => `${item.kind}:${item.id}`))
       const all: { kind: WorldKind; row: Entity }[] = [...(await db.table<Character>('characters').toArray()).map(row => ({ kind: 'character' as const, row })), ...(await db.table<LocationAsset>('locations').toArray()).map(row => ({ kind: 'location' as const, row }))].filter(({ kind, row }) => checked.has(`${kind}:${row.id}`))
+      const pendingDrafts = new Set((await db.table<WorldRun>('pipelineRuns').get(runId))?.report.optimizations?.filter(item => item.status === 'pending_review').map(item => `${item.kind}:${item.assetId}`) ?? [])
       set(bookId, { total: all.length })
       for (const [index, { kind, row }] of all.entries()) {
         await check()
-        if (!needsOptimization(kind, row)) { set(bookId, { processed: index + 1 }); continue }
-        const request = await optimizationRequest(kind, row)
-        if (row.optimizationFingerprint === request.fingerprint) { set(bookId, { processed: index + 1 }); continue }
-        const budget = optimizationBudget(request, resolved.model)
-        const reserve = budget.outputTokens
-        if (!budget.fits) { await addMessage('failed', `${row.name}：整编输入估算${budget.inputTokens} token，输出预留${budget.outputTokens} token，超出当前整理模型上下文${budget.contextWindow} token。请核对设置中的模型容量；原资料保留。`); continue }
-        const result = await models.generate({ role: 'aggregation', context: { systemPrompt: request.prompt, messages: [{ role: 'user', content: JSON.stringify(request.input), timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交完整事实覆盖的整编资料', parameters: request.schema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] }, validate: request.validate, repairPrompt: '唯一一次修正机会，请完整保留全部事实编号及既有称呼，补齐有事实的字段。', signal: controller.signal, timeoutMs: 180000, requestTimeoutMs: 60000, maxTokens: reserve, temperature: 0 })
-        await check()
-        await db.transaction('rw', db.tables, async () => {
-          await check()
-          const run = await db.table<WorldRun>('pipelineRuns').get(runId)
-          if (!run) throw new Error('整理报告不存在。')
-          const report = run.report
-          const usage = { input: report.usage.input + result.usage.input, output: report.usage.output + result.usage.output, totalTokens: report.usage.totalTokens + result.usage.totalTokens, cost: report.usage.cost + (result.usage.cost ?? 0), costStatus: result.usage.costStatus }
-          if (!result.ok || !result.value) { await db.table('pipelineRuns').update(runId, { report: { ...report, usage, cost: usage.cost, failed: [...report.failed, `${row.name}：${result.error?.message ?? '整编失败'}`] } }); return }
-          const table = kind === 'character' ? 'characters' : 'locations'; const current = await db.table<Entity>(table).get(row.id)
-          if (!current || current.revision !== row.revision) { await db.table('pipelineRuns').update(runId, { report: { ...report, usage, cost: usage.cost, conflicted: [...report.conflicted, `${row.id}：整编期间资料已变化。`] } }); return }
-          const output = result.value
-          if ('name' in output && current.nameSource === 'manual' && output.name !== current.name) throw new Error('整编须保留人工指定的主名。')
-          const next = { ...current, ...output.fields, ...('name' in output ? { name: output.name, aliases: [...new Set([current.name, ...(current.aliases ?? []), ...(output.aliases ?? [])])].filter(name => name !== output.name) } : {}), mergeFacts: request.facts, mergeNotes: [...new Set([...(current.mergeNotes ?? []), ...(output.notes ?? [])])], optimizedFactIds: request.facts.map(fact => fact.id), revision: current.revision + 1, updatedAt: new Date().toISOString() }
-          const nextRequest = await Dexie.waitFor(optimizationRequest(kind, next))
-          const optimized = { ...(kind === 'character' ? normalizeCharacterNames(next) : next), optimizationFingerprint: nextRequest.fingerprint }
-          await db.table(table).put(optimized)
-          const fingerprint = await Dexie.waitFor(coverageFingerprint(table, optimized as unknown as Row))
-          const coverageItems = records((run as unknown as Row).coverageItems).map(item => {
-            if (item.status !== 'checked') return item
-            const dependencies = structuredClone(item.dependencies) as Row
-            for (const dependency of records(dependencies.records)) if (dependency.table === table && (dependency.resolvedId ?? dependency.id) === row.id) dependency.factFingerprint = fingerprint
-            return { ...item, dependencies, ...(item.kind === kind && item.id === row.id ? { coveredFingerprint: fingerprint, coveredRevision: optimized.revision } : {}) }
-          })
-          await db.table('pipelineRuns').update(runId, { coverageItems, report: { ...report, usage, cost: usage.cost, optimizedIds: [...report.optimizedIds, row.id] } })
-        })
+        if (!needsOptimization(kind, row) && !pendingDrafts.has(`${kind}:${row.id}`)) { set(bookId, { processed: index + 1 }); continue }
+        await optimizeAsset(workspace, models, bookId, runId, owner, kind, row, resolved.model, controller.signal, phase => set(bookId, { phase }))
         set(bookId, { processed: index + 1 })
       }
 
@@ -190,7 +173,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     finally {
       if (acquired) try {
         const currentRun = await db.table('pipelineRuns').get(runId)
-        if (currentRun?.report.groups.length || currentRun?.report.optimizedIds.length) {
+        if (currentRun?.report.groups.length || currentRun?.report.optimizedIds.length || currentRun?.report.aliasChecks?.length) {
           set(bookId, { phase: '更新出场统计' })
           const people = await db.table<Character>('characters').toArray(), places = await db.table<LocationAsset>('locations').toArray()
           const peopleCounter = createFrequencyCounter(people, true), placeCounter = createFrequencyCounter(places, false)

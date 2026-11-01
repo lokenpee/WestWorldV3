@@ -9,6 +9,7 @@ export interface Fact { id: string; field: string; text: string; chapters: strin
 export interface Frequency { chapters: number; mentions: number; scopeChapters: number; percentile: number }
 interface WorldAsset extends BaseAsset {
   name: string; aliases?: string[]; confidence: number; chapterIndex?: string; chapterName?: string
+  verifiedAliases?: string[]
   sourceChapters?: string[]; manualSourceNote?: string; nameSource?: 'extracted' | 'automatic' | 'manual'; manualKeep?: boolean
   updatedAt?: string; mergeFacts?: Fact[]; mergeNotes?: string[]; optimizedFactIds?: string[]; optimizationFingerprint?: string; frequency?: Frequency
 }

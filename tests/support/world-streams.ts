@@ -9,6 +9,7 @@ export function worldResponse(body: { tools: { function: { parameters: { propert
   const content = (value: unknown) => typeof value === 'string' ? value : (value as { text: string }[]).map(part => part.text).join('')
   if (body.tools.length === 1) {
     const schema = body.tools[0].function.parameters
+    if (schema.properties.approved) return agentStream([{ name: 'submit_result', args: { approved: true, summary: '独有事实保留，重复表述已归并。', issues: [] } }])
     if (schema.properties.entities || schema.properties.coveredFactIds) {
       const input = JSON.parse(content(body.messages.find(row => row.role === 'user')!.content))
       if (input.entities) {

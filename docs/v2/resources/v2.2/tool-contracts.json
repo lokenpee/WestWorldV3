@@ -389,7 +389,7 @@
       },
       {
         "name": "commit_asset_changes",
-        "description": "P2判同写工具：验证已读同类ID分组并直接机械融合当前实体、生命周期和报告，返回持久提交凭据。",
+        "description": "P2判同写工具：验证已读同类ID分组并直接机械融合当前实体、生命周期和报告，返回持久提交凭据。 支持aliasChecks按原文依据确认或移除现有别名；无合并时groups传空数组。同一资产先合并，重新读取后再校对别名。",
         "kind": "write",
         "executionMode": "sequential",
         "parameters": {
@@ -494,6 +494,96 @@
                       }
                     }
                   }
+                },
+                "aliasChecks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "character",
+                          "location"
+                        ]
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "decisions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "alias": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "decision": {
+                              "type": "string",
+                              "enum": [
+                                "keep",
+                                "remove"
+                              ]
+                            },
+                            "confidence": {
+                              "type": "number",
+                              "minimum": 0.9,
+                              "maximum": 1
+                            },
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "evidence": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "chapterIndex": {
+                                    "type": "string"
+                                  },
+                                  "quote": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 1000
+                                  }
+                                },
+                                "required": [
+                                  "chapterIndex",
+                                  "quote"
+                                ]
+                              },
+                              "minItems": 1,
+                              "maxItems": 10
+                            },
+                            "referentId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "alias",
+                            "decision",
+                            "confidence",
+                            "reason",
+                            "evidence"
+                          ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 20
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id",
+                      "decisions"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 10
                 }
               }
             }

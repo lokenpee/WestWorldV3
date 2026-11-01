@@ -7,6 +7,7 @@ import type { Character, EventNode, LocationAsset } from '../assets/types'
 import { acceptIdentityMerge } from '../world/queue'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebaseStoryCoverage, saveStoryCoverage } from '../story/coverage'
+import { applyAliasChecks } from './assetAliases'
 
 export interface QueryRead { tool: string; args: Row; resultFingerprint: string }
 export interface RecordRead { table: string; id: string; resolvedId: string | null; revision: number; factFingerprint: string }
@@ -72,7 +73,7 @@ async function assertEvidence(store: AgentStore, evidence: Row[]) {
     if (!original || !text(original.text).includes(text(item.quote)) || !text(item.quote)) throw new Error('INVALID_ARGS:证据引文须连续存在于指定章节。')
   }
 }
-async function assertReadEvidence(store: AgentStore, item: Row, originalReads: Row[]) {
+async function assertReadEvidence(store: AgentStore, item: Row, originalReads: Row[], purpose = '合并') {
   const chapterIndex = text(item.chapterIndex), quote = text(item.quote)
   const original = text((await store.get('chapterTexts', chapterIndex))?.text)
   const first = quote ? original.indexOf(quote) : -1
@@ -91,9 +92,9 @@ async function assertReadEvidence(store: AgentStore, item: Row, originalReads: R
     if (covered.some(range => range.start <= at && range.end >= at + quote.length)) return
   }
   const args = { chapter_indices: [chapterIndex], cursor: { chapterIndex, offset: first }, maxChars: Math.min(quote.length + 200, 8000) }
-  throw new Error(`INVALID_ARGS:合并前须读取证据所在原文片段。第${chapterIndex}章引文位于${first}–${first + quote.length}字，已读范围：${covered.map(range => `${range.start}–${range.end}`).join('、') || '无'}。请调用read_original：${JSON.stringify(args)}，必要时按nextCursor续读；补读后使用新的operationKey提交。`)
+  throw new Error(`INVALID_ARGS:${purpose}前须读取证据所在原文片段。第${chapterIndex}章引文位于${first}–${first + quote.length}字，已读范围：${covered.map(range => `${range.start}–${range.end}`).join('、') || '无'}。请调用read_original：${JSON.stringify(args)}，必要时按nextCursor续读；补读后使用新的operationKey提交。`)
 }
-async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSet: ReadSet) {
+async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSet: ReadSet, commitId: string) {
   const originalReads = await Promise.all(readSet.queries.filter(read => read.tool === 'read_original').map(read => readTool(store, scope, read.tool, read.args)))
   const used = new Set<string>()
   for (const group of records(payload.groups)) {
@@ -127,7 +128,7 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
       : fuseWorldAssets('location', named as unknown as LocationAsset[], text(group.keepId), text(group.canonicalName), timestamp).result
     const beforePeople = kind === 'character' ? await store.rows('characters') : []
     const kept = named.find(row => row.id === group.keepId)!
-    await store.put(table, { ...merged, nameSource: kept.nameSource === 'manual' ? 'manual' : 'automatic', manualKeep: kept.manualKeep === true } as unknown as Row)
+    await store.put(table, { ...merged, nameSource: manualNames.length ? 'manual' : 'automatic', manualKeep: kept.manualKeep === true } as unknown as Row)
     for (const id of ids.filter(id => id !== merged.id)) await store.remove(table, id)
     const mappings = await store.rows('assetLifecycle')
     for (const id of ids) if (!mappings.some(row => row.kind === kind && row.originId === id)) mappings.push({ key: `${kind}:${id}`, bookId: scope.bookId, kind, originId: id, currentId: id, revision: 0, state: 'live', updatedAt: timestamp })
@@ -143,6 +144,10 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
       await store.put('pipelineRuns', { ...run, report: { ...report, groups: [...records(report.groups), { method: 'ai_identity', kind, memberIds: ids, memberNames: named.map(row => text(row.name)), keepId: merged.id, canonicalName: merged.name, aliases: merged.aliases ?? [], sourceChapters: merged.sourceChapters ?? [], conflicts: merged.mergeNotes ?? [], beforeTokens: named.reduce((sum, row) => sum + detailTokens(row as unknown as Character), 0), afterTokens: detailTokens(merged) }] } })
     }
   }
+  const aliasChecks = records(payload.aliasChecks)
+  if (!records(payload.groups).length && !aliasChecks.length) throw new Error('INVALID_ARGS:请提供合并组或明确的别名核实项。')
+  if (aliasChecks.some(item => used.has(`${item.kind}:${item.id}`))) throw new Error('INVALID_ARGS:同一资产请先合并，再重新读取后校对别名。')
+  await applyAliasChecks(store, scope, aliasChecks, readSet, commitId, async item => { await assertReadEvidence(store, item, originalReads, '别名核实'); await assertEvidence(store, [item]) })
 }
 async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet: ReadSet, queryResults: Map<QueryRead, Row>) {
   const timestamp = new Date().toISOString(); const remap = new Map<string, string>()
@@ -276,10 +281,11 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       const workTables: Record<string, string> = { character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' }
       const workItems = records((task.input as Row | undefined)?.workItems)
       const before = await Promise.all(workItems.map(item => workTables[text(item.kind)] ? store.get(workTables[text(item.kind)], text(item.id)) : undefined))
-      if (name === 'commit_asset_changes') await applyAssets(store, scope, payload, expected)
+      const commitId = crypto.randomUUID()
+      if (name === 'commit_asset_changes') await applyAssets(store, scope, payload, expected, commitId)
       else await applyStory(store, scope, payload, expected, queryResults)
       signal?.throwIfAborted()
-      const commitId = crypto.randomUUID(); const summary = name === 'commit_asset_changes' ? '世界资产修改已提交。' : '叙事资产与工作记忆已提交。'
+      const summary = name === 'commit_asset_changes' ? '世界资产修改已提交。' : '叙事资产与工作记忆已提交。'
       const latest = (await store.get('pipelineRuns', scope.runId))!
       const changed = [...records(task.reviewedItems)]
       const businessContent = (row: Row | undefined) => {

@@ -12,6 +12,11 @@ import { createBackupService } from '../src/features/backup/service'
 import { liveQuery } from 'dexie'
 import { aliasScore, findCandidates, findExactNameGroups } from '../src/features/world/candidates'
 import { characterMatchNames } from '../src/features/assets/characterNames'
+import { repairAutomaticProtection } from '../src/features/world/protection'
+import { emptyReport } from '../src/features/world/types'
+import { createBookAgentRepository } from '../src/features/agents/repository'
+import { createAgentTools } from '../src/features/agents/tools'
+import { commitCommand } from '../src/features/agents/commands'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
 afterEach(async () => { vi.restoreAllMocks(); for (const workspace of opened.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
@@ -43,6 +48,41 @@ async function setup() {
   }
   return { workspace, book, db, assets, models, service, add, validate, generate, agent }
 }
+
+it('自动同名融合保持自动来源，两份融合结果仍可按原文进行AI异名合并', async () => {
+  const { workspace, db, service } = await setup()
+  await service.organize('a')
+  for (const row of await db.table('characters').toArray()) expect(row).toMatchObject({ nameSource: 'automatic', manualKeep: false })
+  const original = '沈青又名顾衡，是同一人。'
+  await db.table('chapterTexts').update('1', { text: original })
+  const scope = { bookId: 'a', profile: 'asset_editor' as const, phase: 'ai_identity', runId: 'ai-run', taskId: 'ai-task', owner: 'ai-owner', workItemIds: [] }
+  await db.table('pipelineRuns').bulkPut([{ id: scope.runId, bookId: 'a', tasks: [{ taskId: scope.taskId, appliedCommitIds: [], readSet: { records: [], queries: [] } }], commandIntents: [], appliedCommands: [], report: emptyReport({ characters: 3, locations: 1 }) }, { id: 'lease:world', bookId: 'a', owner: scope.owner, runId: scope.runId, expiresAt: Date.now() + 30000 }])
+  const repo = createBookAgentRepository(workspace, 'a'), adapter = createAgentTools(repo, scope)
+  await adapter.tools.find(tool => tool.name === 'get_character_detail')!.execute('details', { ids: ['A1', 'B1'] })
+  await adapter.tools.find(tool => tool.name === 'read_original')!.execute('original', { chapter_indices: ['1'] })
+  await expect(commitCommand(repo, scope, 'commit_asset_changes', 'merge', { operationKey: 'merge-auto', payload: { groups: [{ kind: 'character', keepId: 'A1', memberIds: ['A1', 'B1'], canonicalName: '沈青', confidence: 1, reason: '原文明示异名同人', evidence: [{ chapterIndex: '1', quote: original, memberIds: ['A1', 'B1'] }] }] } }, adapter.reads)).resolves.toMatchObject({ ok: true })
+  expect(await db.table('characters').get('A1')).toMatchObject({ nameSource: 'automatic', manualKeep: false, verifiedAliases: ['顾衡'] })
+})
+
+it('旧人工保护标记只按完整自动提交记录纠正，人工操作及后续修改继续保留', async () => {
+  const { workspace, db, service, validate } = await setup()
+  await service.organize('a')
+  for (const id of ['A1', 'B1', 'C1']) await db.table('characters').update(id, { nameSource: 'manual', manualKeep: true })
+  for (const run of await db.table('pipelineRuns').where('stage').equals('P2').toArray()) if (run.mechanicalQueue) await db.table('pipelineRuns').put({ ...run, mechanicalQueue: { ...run.mechanicalQueue, items: run.mechanicalQueue.items.map(({ protectionVersion: _version, ...item }: import('../src/features/world/types').MechanicalQueueItem) => item) } })
+  const runs = await db.table('pipelineRuns').where('stage').equals('manual_merge').toArray()
+  const manual = runs.find(run => run.report.groups[0].keepId === 'B1')!
+  await db.table('pipelineRuns').put({ ...manual, id: 'real-manual-decision' })
+  await db.table('characters').update('C1', { updatedAt: '2099-01-01T00:00:00.000Z', identity: '后续人工修改' })
+  const runId = 'repair-run', owner = 'repair-owner', now = new Date().toISOString()
+  await db.table('pipelineRuns').bulkPut([{ id: runId, bookId: 'a', recordType: 'run', stage: 'P2', phase: 'ai_identity', status: 'running', startedAt: now, planVersion: '2.2', report: emptyReport({ characters: 3, locations: 1 }) }, { id: 'lease:world', recordType: 'lease', bookId: 'a', lockKey: 'world', runId, owner, expiresAt: Date.now() + 30000 }])
+  const repaired = await repairAutomaticProtection(workspace, 'a', runId, owner)
+  expect(repaired.map(row => row.id)).toEqual(['A1'])
+  expect(await db.table('characters').get('A1')).toMatchObject({ nameSource: 'automatic', manualKeep: false })
+  expect(await db.table('characters').get('B1')).toMatchObject({ nameSource: 'manual', manualKeep: true })
+  expect(await db.table('characters').get('C1')).toMatchObject({ nameSource: 'manual', manualKeep: true, identity: '后续人工修改' })
+  await db.table('pipelineRuns').delete('lease:world')
+  await validate()
+})
 
 it('只合并人工确认的组，逐组原子保存来源与人物关联，全书统计只读取一轮原文', async () => {
   const { service, assets, db, add, validate, generate, agent } = await setup()

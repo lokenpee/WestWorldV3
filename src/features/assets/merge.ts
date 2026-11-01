@@ -5,7 +5,7 @@ import { normalizeCharacterNames } from './characterNames'
 export type WorldKind = 'character' | 'location'
 export interface MergeOptions { memberIds: string[]; keepId: string; canonicalName: string }
 export interface MergeRequest extends MergeOptions { expectedRevisions: Record<string, number> }
-export interface MechanicalMergeContext { runId: string; itemId: string; owner: string }
+export interface MechanicalMergeContext { runId: string; itemId: string; owner: string; automatic?: boolean }
 export interface MergePreview<K extends WorldKind = WorldKind> {
   kind: K; members: AssetByKind[K][]; request: MergeRequest; result: AssetByKind[K]; conflicts: string[]
 }
@@ -65,7 +65,7 @@ export function fuseWorldAssets<K extends WorldKind>(kind: K, members: AssetByKi
   const sourceChapters = uniqueStrings(rows.flatMap(chaptersOf)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
   const result = {
     ...structuredClone(keep), name, aliases: uniqueStrings(rows.flatMap(row => [row.name, ...(row.aliases ?? [])])).filter(alias => alias !== name),
-    sourceChapters, manualSourceNote: fuseText(rows.map(row => row.manualSourceNote)), nameSource: 'manual' as const, manualKeep: true,
+    sourceChapters, manualSourceNote: fuseText(rows.map(row => row.manualSourceNote)), nameSource: keep.nameSource ?? 'extracted', manualKeep: keep.manualKeep === true,
     revision: keep.revision + 1, updatedAt: timestamp, optimizedFactIds: [],
   }
   delete result.optimizationFingerprint
@@ -104,6 +104,7 @@ export function fuseWorldAssets<K extends WorldKind>(kind: K, members: AssetByKi
   }
   result.mergeFacts = combinedFacts(rows, fields)
   if (kind === 'character') Object.assign(result, normalizeCharacterNames(result))
+  result.verifiedAliases = uniqueStrings(rows.flatMap(row => [row.name, ...(row.verifiedAliases ?? [])])).filter(alias => alias !== name && result.aliases.includes(alias))
   result.mergeNotes = uniqueStrings([...rows.flatMap(row => row.mergeNotes ?? []), ...conflicts])
   return { result: result as AssetByKind[K], conflicts }
 }

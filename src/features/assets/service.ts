@@ -124,6 +124,7 @@ export function createAssetService(workspace: Workspace) {
       const run = await db.table<WorldRun>('pipelineRuns').get(queued.runId)
       const item = run?.mechanicalQueue?.items.find(item => item.id === queued.itemId)
       if (run?.bookId !== bookId || run.phase !== 'mechanical_queue' || item?.status !== 'running' || item.kind !== kind || item.request.keepId !== options.keepId || item.request.canonicalName !== options.canonicalName || item.request.memberIds.length !== options.memberIds.length || item.request.memberIds.some(id => !options.memberIds.includes(id) || item.request.expectedRevisions[id] !== expected?.[id])) throw new AssetError('ASSET_DOMAIN_LOCKED', '本组不属于当前已确认的机械合并队列。')
+      if ((queued.automatic ?? false) !== (item.confirmation === 'exact_name' && !item.manualSelection)) throw new AssetError('ASSET_DOMAIN_LOCKED', '机械合并的确认来源已变化。')
       await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 })
     } else if (lockState(leases, bookId).world) throw new AssetError('ASSET_DOMAIN_LOCKED', '世界资产正在处理，请等待任务结束后合并。')
     if (expected && (Object.keys(expected).length !== options.memberIds.length || options.memberIds.some(id => !Number.isSafeInteger(expected[id]) || expected[id] < 1))) throw new AssetError('VALIDATION', '合并预览的修订信息不完整，请重新预览。')
@@ -152,6 +153,10 @@ export function createAssetService(workspace: Workspace) {
       const timestamp = new Date().toISOString()
       const beforeCounts = { characters: await db.table('characters').count(), locations: await db.table('locations').count() }
       const fusion = fuseWorldAssets(kind, members, request.keepId, request.canonicalName, timestamp)
+      if (queued?.automatic) {
+        fusion.result.nameSource = members.some(row => row.nameSource === 'manual') ? 'manual' : 'automatic'
+        fusion.result.manualKeep = members.some(row => row.manualKeep === true)
+      } else { fusion.result.nameSource = 'manual'; fusion.result.manualKeep = true }
       const table = db.table<AssetByKind[K]>(assetTables[kind])
       const before = await table.toArray()
       const memberSet = new Set(request.memberIds)
@@ -245,6 +250,9 @@ export function createAssetService(workspace: Workspace) {
         row.optimizedFactIds = (row.optimizedFactIds ?? []).filter(factId => row.mergeFacts!.some(fact => fact.id === factId))
         delete row.optimizationFingerprint
       }
+      const previousAliases = previous ? (kind === 'character' ? normalizeCharacterNames(previous).aliases : previous.aliases) ?? [] : []
+      const aliasesChanged = input.aliases !== undefined && (!previous || JSON.stringify([...(row.aliases ?? [])].sort()) !== JSON.stringify([...previousAliases].sort()))
+      row.verifiedAliases = (aliasesChanged ? row.aliases ?? [] : row.verifiedAliases ?? []).filter(alias => (row.aliases ?? []).includes(alias) && alias !== row.name)
       return row
     }
     if (kind === 'node') {

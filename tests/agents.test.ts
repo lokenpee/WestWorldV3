@@ -11,6 +11,7 @@ import { agentStream, createAgentFixture, scriptedAgentFetcher } from './support
 import { commitCommand, type ReadSet } from '../src/features/agents/commands'
 import type { Scope } from '../src/features/agents/queries'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
+import { emptyReport } from '../src/features/world/types'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
 async function setup(fetcher: typeof fetch) {
@@ -46,6 +47,51 @@ async function commandFixture(profile: 'asset_editor' | 'story_editor' = 'asset_
   const args = { operationKey: 'merge-a', payload: { groups: [{ kind: 'character', keepId: 'C1-P001', memberIds: ['C1-P001', 'C2-P001'], canonicalName: '沈青', reason: '原文明示', confidence: 1, evidence: [{ chapterIndex: '2', quote: '第二章的沈青就是第一章的沈青。', memberIds: ['C1-P001', 'C2-P001'] }] }] } }
   return { repo, scope, adapter, args }
 }
+
+async function aliasFixture(detail = true, original = true) {
+  const repo = createMemoryAgentRepository('book-a', createAgentFixture('book-a'))
+  const scope: Scope = { bookId: repo.bookId, profile: 'asset_editor', phase: 'ai_identity', runId: 'run-a', taskId: 'task-a', owner: 'owner-a', workItemIds: [] }
+  const quote = '老沈就是船夫沈青。顾衡是镖师，与沈青不同。'
+  await repo.transaction(true, async store => {
+    await store.put('pipelineRuns', { id: scope.runId, bookId: scope.bookId, tasks: [{ taskId: scope.taskId, appliedCommitIds: [], readSet: { records: [], queries: [] } }], commandIntents: [], appliedCommands: [], report: emptyReport({ characters: 2, locations: 0 }) })
+    await store.put('pipelineRuns', { id: 'lease:world', bookId: scope.bookId, owner: scope.owner, runId: scope.runId, expiresAt: Date.now() + 30000 })
+    const person = (await store.get('characters', 'C1-P001'))!
+    await store.put('characters', { ...person, aliases: ['老沈', '顾衡'], mergeFacts: [{ id: 'f1', field: 'background', text: '原始底稿', chapters: ['1'] }] })
+    const other = (await store.get('characters', 'C2-P001'))!
+    await store.put('characters', { ...other, name: '顾衡' })
+    await store.put('chapterTexts', { bookId: scope.bookId, chapterIndex: '1', text: quote })
+    await store.put('nodes', { id: 'N1', bookId: scope.bookId, actors: ['顾衡'], actorIds: ['C1-P001'] })
+  })
+  const adapter = createAgentTools(repo, scope)
+  await adapter.tools.find(tool => tool.name === (detail ? 'get_character_detail' : 'query_characters'))!.execute('read', detail ? { ids: ['C1-P001', 'C2-P001'] } : {})
+  if (original) await adapter.tools.find(tool => tool.name === 'read_original')!.execute('original', { chapter_indices: ['1'] })
+  const decisions = [{ alias: '老沈', decision: 'keep', confidence: 1, reason: '原文明示同一船夫', evidence: [{ chapterIndex: '1', quote: '老沈就是船夫沈青。' }] }, { alias: '顾衡', decision: 'remove', confidence: 1, reason: '原文明示另一人', referentId: 'C2-P001', evidence: [{ chapterIndex: '1', quote: '顾衡是镖师，与沈青不同。' }] }]
+  const args = { operationKey: 'alias-a', payload: { groups: [], aliasChecks: [{ kind: 'character', id: 'C1-P001', decisions }] } }
+  return { repo, scope, adapter, args }
+}
+
+it('别名确认与纠正原子保存依据和真实确认，保留底稿并提示可能受影响的节点', async () => {
+  const { repo, scope, adapter, args } = await aliasFixture()
+  const ack = await commitCommand(repo, scope, 'commit_asset_changes', 'alias', args, adapter.reads)
+  expect(await commitCommand(repo, scope, 'commit_asset_changes', 'replay', args, adapter.reads)).toMatchObject({ alreadyApplied: true, commitId: ack.commitId })
+  expect(await repo.transaction(false, store => store.get('characters', 'C1-P001'))).toMatchObject({ aliases: ['老沈'], verifiedAliases: ['老沈'], mergeFacts: [{ id: 'f1', text: '原始底稿' }], revision: 2 })
+  expect(await repo.transaction(false, store => store.get('nodes', 'N1'))).toMatchObject({ actorIds: ['C1-P001'] })
+  const run = await repo.transaction(false, store => store.get('pipelineRuns', scope.runId))
+  expect(run?.report).toMatchObject({ aliasChecks: [{ beforeAliases: ['老沈', '顾衡'], afterAliases: ['老沈'], verifiedAliases: ['老沈'], affectedNodeIds: ['N1'], commitId: ack.commitId }] })
+  const fresh = createAgentTools(repo, scope)
+  await expect(fresh.tools.find(tool => tool.name === 'get_character_detail')!.execute('read', { ids: ['C1-P001'] })).resolves.toBeDefined()
+})
+
+it.each(['detail', 'original', 'quote', 'duplicate', 'referent'] as const)('别名校对拒绝缺失或错误的%s依据，并完整回滚', async failure => {
+  const { repo, scope, adapter, args } = await aliasFixture(failure !== 'detail', failure !== 'original')
+  if (failure === 'quote') args.payload.aliasChecks[0].decisions[1].evidence[0].quote = '顾衡和沈青是同一人。'
+  if (failure === 'duplicate') args.payload.aliasChecks[0].decisions.push(args.payload.aliasChecks[0].decisions[0])
+  if (failure === 'referent') args.payload.aliasChecks[0].decisions[1].referentId = 'missing'
+  await expect(commitCommand(repo, scope, 'commit_asset_changes', 'alias', args, adapter.reads)).rejects.toThrow()
+  expect(await repo.transaction(false, store => store.get('characters', 'C1-P001'))).toMatchObject({ aliases: ['老沈', '顾衡'], revision: 1 })
+  const run = await repo.transaction(false, store => store.get('pipelineRuns', scope.runId))
+  expect((run!.report as { aliasChecks?: unknown[] }).aliasChecks).toBeUndefined()
+})
 it('同键同内容重放返回原确认，先核凭据再核已被合并的成员', async () => {
   const { repo, scope, adapter, args } = await commandFixture()
   const first = await commitCommand(repo, scope, 'commit_asset_changes', 'write-a', args, adapter.reads)

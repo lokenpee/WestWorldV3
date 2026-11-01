@@ -50,7 +50,7 @@ export async function optimizationRequest(kind: WorldKind, row: Entity) {
   if (kind === 'character') row = normalizeCharacterNames(row)
   const facts = entityFacts(kind, row)
   const prompt = `${withOutputDiscipline(kind === 'character' ? characterPrompt : locationPrompt)}\n本次任务为展示档案整编。保留事实指保留信息含义与来源，不要求逐字保留重复措辞；同义、近义及包含关系的表述须归并，独有信息、时间变化和真实分歧继续保留。\n`
-  const fingerprint = await hash({ version: 'semantic-merge-1', prompt, names: [row.name, ...(row.aliases ?? [])].map(name => name.trim()).sort(), facts, notes: row.mergeNotes ?? [] })
+  const fingerprint = await hash({ version: 'semantic-quality-1', prompt, names: [row.name, ...(row.aliases ?? [])].map(name => name.trim()).sort(), facts, notes: row.mergeNotes ?? [] })
   const shortFacts = facts.map((fact, i) => ({ ...fact, id: `F${i + 1}` }))
   const ids = shortFacts.map(fact => fact.id)
   let schema: Shape

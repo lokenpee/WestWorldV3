@@ -46,23 +46,26 @@ export function rebuildFacts(facts: Fact[], updates: Record<string, string>, cha
 }
 
 export function createFrequencyCounter<T extends Character | LocationAsset>(assets: T[], characters: boolean) {
-  const occurrences = new Map<string, number>()
-  for (const asset of assets) { const name = asset.name.trim().toLowerCase(); occurrences.set(name, (occurrences.get(name) ?? 0) + 1) }
-  const names = [...occurrences].filter(([name, count]) => count === 1 && (!characters || !isContextualName(name))).map(([name]) => name).sort((a, b) => b.length - a.length || a.localeCompare(b))
-  const stats = new Map(names.map(name => [name, { mentions: 0, chapters: new Set<string>() }]))
+  const owners = new Map<string, Set<string>>()
+  for (const asset of assets) for (const name of new Set([asset.name, ...(asset.verifiedAliases ?? [])].map(value => value.trim().toLowerCase()).filter(value => value && (!characters || !isContextualName(value))))) {
+    if (!owners.has(name)) owners.set(name, new Set()); owners.get(name)!.add(asset.id)
+  }
+  const names = [...owners.keys()].sort((a, b) => b.length - a.length || a.localeCompare(b))
+  const stats = new Map(assets.map(asset => [asset.id, { mentions: 0, chapters: new Set<string>() }]))
   const scope = new Set<string>()
   const expression = names.length ? new RegExp(names.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'gu') : undefined
   function add(row: { chapterIndex: string; text: string }) {
     scope.add(row.chapterIndex.split('.')[0])
     if (expression) for (const match of row.text.toLowerCase().matchAll(expression)) {
-      const stat = stats.get(match[0])!
+      if (owners.get(match[0])!.size !== 1) continue
+      const stat = stats.get([...owners.get(match[0])!][0])!
       stat.mentions += 1; stat.chapters.add(row.chapterIndex.split('.')[0])
     }
   }
   function result(): T[] {
     const scopeChapters = scope.size
     const measured = assets.map(asset => {
-      const stat = stats.get(asset.name.trim().toLowerCase())
+      const stat = stats.get(asset.id)
       return { asset, chapters: stat?.chapters.size ?? 0, mentions: stat?.mentions ?? 0 }
     })
     const flat = measured.length > 1 && measured.every(row => row.chapters === measured[0].chapters && row.mentions === measured[0].mentions)

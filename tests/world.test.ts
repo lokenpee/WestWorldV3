@@ -19,6 +19,8 @@ import { saveIdentityQueue } from '../src/features/world/queue'
 import { emptyReport } from '../src/features/world/types'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
 import { hash } from '../src/features/agents/contracts'
+import { createBackupService } from '../src/features/backup/service'
+import { createImportService } from '../src/lib/storage/importService'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
 const person = (id: string, name: string, extra = {}): Character => ({ id, bookId: 'a', name, aliases: [], confidence: 1, revision: 1, createdBy: 'P1', chapterIndex: '1', chapterName: '第1章', ...extra })
@@ -173,6 +175,7 @@ it('人物地点按需整编完整覆盖事实，保留底稿与人工主名，�
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
     const body = JSON.parse(init?.body as string)
     if (body.tools.length !== 1) return identify(url, init)
+    if (body.tools[0].function.parameters.properties.approved) return agentStream([{ name: 'submit_result', args: { approved: true, summary: '事实完整，表述清晰。', issues: [] } }])
     optimizationCalls++
     const user = body.messages.find((row: { role: string }) => row.role === 'user')
     const input = JSON.parse(typeof user.content === 'string' ? user.content : user.content.map((part: { text: string }) => part.text).join(''))
@@ -191,7 +194,8 @@ it('人物地点按需整编完整覆盖事实，保留底稿与人工主名，�
   expect(service.state('a')?.error).toBeUndefined()
   expect(optimizationCalls).toBe(2)
   expect(await db.table('characters').get('C1-P003')).toMatchObject({ name: '张三', background: '独有背景事实', mergeFacts: [{ id: 'F-original', field: 'background', text: '独有背景事实' }], optimizedFactIds: ['F-original'] })
-  expect((await service.reports('a'))[0].report.optimizedIds).toHaveLength(2)
+  expect((await service.reports('a'))[0].report.optimizedIds).toHaveLength(1)
+  expect((await service.reports('a'))[0].report.optimizations).toEqual(expect.arrayContaining([expect.objectContaining({ status: 'no_change' }), expect.objectContaining({ status: 'applied', review: expect.objectContaining({ approved: true }) })]))
   const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
   expect(await validateBookData({ book, tables })).toEqual([])
   await db.table('locations').update('C1-L001', { description: '新增事实需要整理', mergeFacts: [{ id: 'new-fact', field: 'description', text: '新增事实需要整理', chapters: ['1'] }] })
@@ -212,6 +216,7 @@ it('百万上下文整编超6000的长档案，归并短句且保留底稿，旧
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string)
     if (body.tools.length !== 1) return reviewedBatch(body)
+    if (body.tools[0].function.parameters.properties.approved) return agentStream([{ name: 'submit_result', args: { approved: true, summary: '独有事实保留，近义表述已归并。', issues: [] } }])
     optimizationCalls++
     const input = taskInput(body), row = input.entities[0]
     expect(row.facts).toHaveLength(4)
@@ -255,7 +260,7 @@ it('整编真正超出模型上下文时说明容量与预留，保留原档案�
   await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1', aggregationContextWindow: 8192 }, 'fake-key')
   await service.start('a')
   expect(optimizationCalls).toBe(0)
-  expect((await service.reports('a'))[0]).toMatchObject({ status: 'degraded', report: { failed: [expect.stringContaining('超出当前整理模型上下文8192 token')] } })
+  expect((await service.reports('a'))[0]).toMatchObject({ status: 'degraded', report: { failed: [expect.stringContaining('超出整理模型上下文8192 token')] } })
   expect(await db.table('characters').get('P1')).toMatchObject({ background: original })
 })
 function reviewedBatch(body: Parameters<typeof taskInput>[0], partial = false) {
@@ -268,6 +273,119 @@ function reviewedBatch(body: Parameters<typeof taskInput>[0], partial = false) {
 function withUsage(response: Response) {
   return response.text().then(text => new Response(text.replace('data: [DONE]', `data: ${JSON.stringify({ id: 'usage', object: 'chat.completion.chunk', model: 'fixture', choices: [], usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 } })}\n\ndata: [DONE]`), { headers: { 'Content-Type': 'text/event-stream' } }))
 }
+
+it.each(['rejected', 'failed'] as const)('整编复核%s时保留原资料并继续其他资产，继续处理复用待复核稿', async failure => {
+  let failReview = true
+  const generated: string[] = [], reviewed: string[] = []
+  const facts = [{ id: 'a', field: 'personality', text: '性情沉稳，处事果断', chapters: ['1'] }, { id: 'b', field: 'personality', text: '为人沉稳，遇事果决', chapters: ['1'] }]
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    if (body.tools.length !== 1) return reviewedBatch(body)
+    if (input.phase === 'quality_review') {
+      reviewed.push(input.name)
+      if (failReview && input.name === '甲') {
+        if (failure === 'failed') return new Response('{"error":{"message":"fixture rejected key"}}', { status: 401 })
+        return withUsage(agentStream([{ name: 'submit_result', args: { approved: false, summary: '遗漏了沉稳性格。', issues: [{ kind: 'omission', field: 'personality', factIds: ['F1', 'F2'], message: '稿件遗漏沉稳，须补回。' }] } }]))
+      }
+      return withUsage(agentStream([{ name: 'submit_result', args: { approved: true, summary: '事实保留且无近义重复。', issues: [] } }]))
+    }
+    const row = input.entities[0]; generated.push(row.name)
+    return withUsage(agentStream([{ name: 'submit_result', args: { entities: { [row.id]: { entity: { name: row.name, aliases: [], personality: failReview && failure === 'rejected' && row.name === '甲' ? '处事果断' : '性情沉稳，处事果断' }, covered_fact_ids: row.facts.map((fact: { id: string }) => fact.id), merge_notes: [] } } } }]))
+  })
+  const { service, models, db, book, workspace } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await db.table('characters').clear(); await db.table('locations').clear()
+  const original = '性情沉稳，处事果断；为人沉稳，遇事果决'
+  await db.table('characters').bulkPut(['甲', '乙'].map((name, index) => person(`P${index + 1}`, name, { personality: original, mergeFacts: facts })))
+  await service.start('a')
+  const first = (await service.reports('a'))[0]
+  expect(first.status).toBe('degraded'); expect(generated).toEqual(['甲', '乙']); expect(reviewed).toEqual(['甲', '乙'])
+  expect(await db.table('characters').get('P1')).toMatchObject({ personality: original, mergeFacts: facts })
+  expect(await db.table('characters').get('P2')).toMatchObject({ personality: '性情沉稳，处事果断', mergeFacts: facts })
+  expect(first.report.optimizations).toEqual([expect.objectContaining({ assetId: 'P1', status: failure === 'failed' ? 'pending_review' : 'rejected', before: { personality: original, identity: '', appearance: '', background: '' } }), expect.objectContaining({ assetId: 'P2', status: 'applied', review: { approved: true, summary: expect.any(String), issues: [] } })])
+  const pendingBackup = failure === 'failed' ? await (async () => {
+    const importer = createImportService(workspace)
+    try { return await createBackupService(workspace, importer).exportBook('a') } finally { importer.close() }
+  })() : undefined
+  failReview = false
+  await service.start('a')
+  const last = (await service.reports('a'))[0]
+  expect(last.id).toBe(first.id); expect(last.status).toBe('completed')
+  expect(generated).toHaveLength(failure === 'failed' ? 2 : 3)
+  expect(reviewed).toEqual(['甲', '乙', '甲'])
+  expect(last.report.optimizedIds).toEqual(['P2', 'P1'])
+  expect(last.report.usage.totalTokens).toBe(failure === 'failed' ? 48 : 72)
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+  if (failure === 'failed') {
+    const importer = createImportService(workspace), backups = createBackupService(workspace, importer)
+    try {
+      const copy = await backups.importBackup(pendingBackup!.bytes)
+      const before = generated.length
+      const restored = createWorldService(workspace, models, createAssetService(workspace))
+      await restored.start(copy.id)
+      expect(restored.state(copy.id)?.error).toBeUndefined()
+      expect(generated).toHaveLength(before)
+      expect((await restored.reports(copy.id))[0].report.optimizations?.map(item => item.status)).toEqual(['applied', 'applied'])
+    } finally { importer.close() }
+  }
+})
+
+it.each(['changed', 'cleared', 'deleted'] as const)('复核中取消保留稿件，人工资料%s后继续按当前资料处理且旧稿过期', async edit => {
+  let holdReview = true, generationCalls = 0, reviewCalls = 0
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    if (body.tools.length !== 1) return reviewedBatch(body)
+    if (input.phase === 'quality_review') {
+      reviewCalls++
+      if (holdReview) return new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('已取消', 'AbortError')), { once: true }))
+      return agentStream([{ name: 'submit_result', args: { approved: true, summary: '事实完整。', issues: [] } }])
+    }
+    generationCalls++
+    const row = input.entities[0]
+    return agentStream([{ name: 'submit_result', args: { entities: { [row.id]: { entity: { name: row.name, aliases: row.aliases, personality: generationCalls > 1 ? '沉稳果断，善于谋划' : '沉稳果断' }, covered_fact_ids: row.facts.map((fact: { id: string }) => fact.id), merge_notes: [] } } } }])
+  })
+  const { service, models, db, assets } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await db.table('characters').clear(); await db.table('locations').clear()
+  await db.table('characters').put(person('P1', '沈青', { personality: '沉稳；果断', mergeFacts: [{ id: 'f1', field: 'personality', text: '沉稳', chapters: ['1'] }, { id: 'f2', field: 'personality', text: '果断', chapters: ['1'] }] }))
+  const running = service.start('a'); await vi.waitFor(() => expect(reviewCalls).toBe(1))
+  service.cancel('a'); await running
+  expect((await service.reports('a'))[0]).toMatchObject({ status: 'cancelled', report: { optimizations: [expect.objectContaining({ status: 'pending_review' })] } })
+  const row = await db.table('characters').get('P1')
+  if (edit === 'deleted') await assets.remove('a', 'character', 'P1', row!.revision)
+  else await assets.update('a', 'character', 'P1', row!.revision, { personality: edit === 'changed' ? '沉稳；果断；善于谋划' : '' })
+  holdReview = false; await service.start('a')
+  expect(generationCalls).toBe(edit === 'changed' ? 2 : 1); expect(reviewCalls).toBe(edit === 'changed' ? 2 : 1)
+  if (edit === 'deleted') expect(await db.table('characters').get('P1')).toBeUndefined()
+  else expect(await db.table('characters').get('P1')).toMatchObject({ personality: edit === 'changed' ? '沉稳果断，善于谋划' : '' })
+  expect((await service.reports('a'))[0].report.optimizations?.map(item => item.status)).toEqual(edit === 'changed' ? ['stale', 'applied'] : ['stale'])
+})
+
+it('AI别名纠正使用真实提交，统计核实称呼且报告和备份保存纠正依据', async () => {
+  const quote = '沈青又叫老沈，两人所指均为同一位船夫。张三是另一个人，与沈青不同。'
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string), input = taskInput(body)
+    if (input.workItems[0].id !== 'C1-P001') return reviewedBatch(body)
+    const replies = body.messages.filter((row: { role: string }) => row.role === 'tool').map((row: { content: string }) => JSON.parse(row.content))
+    const commit = replies.find((row: { ok?: boolean }) => row.ok)
+    if (commit) return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: [commit.commitId], summary: '已核实并纠正别名。', remainingWorkIds: [], reviewedItems: [{ workItemId: input.workItems[0].workItemId, outcome: 'changed', reason: '核实老沈并移除张三。' }] } }])
+    if (!replies.length) return agentStream([{ name: 'get_character_detail', args: { ids: ['C1-P001', 'C1-P003'] } }, { name: 'read_original', args: { chapter_indices: ['1'] } }])
+    return agentStream([{ name: 'commit_asset_changes', args: { operationKey: input.resume.nextOperationKey, payload: { groups: [], aliasChecks: [{ kind: 'character', id: 'C1-P001', decisions: [{ alias: '老沈', decision: 'keep', confidence: 1, reason: '原文确指同一船夫', evidence: [{ chapterIndex: '1', quote: '沈青又叫老沈，两人所指均为同一位船夫。' }] }, { alias: '张三', decision: 'remove', confidence: 1, reason: '原文说明为另一人', referentId: 'C1-P003', evidence: [{ chapterIndex: '1', quote: '张三是另一个人，与沈青不同。' }] }] }] } } }])
+  })
+  const { service, models, db, book } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
+  await db.table('chapterTexts').update('1', { text: quote }); await db.chapters.update('1', { charCount: quote.length })
+  await db.table('characters').update('C1-P001', { aliases: ['老沈', '张三'] })
+  await db.table('characters').delete('C1-P002')
+  await service.start('a')
+  const run = (await service.reports('a'))[0]
+  expect(run.status).toBe('completed'); expect(run.report.aliasChecks).toHaveLength(1)
+  expect(run.report.aliasChecks![0]).toMatchObject({ beforeAliases: ['老沈', '张三'], afterAliases: ['老沈'], verifiedAliases: ['老沈'], commitId: expect.any(String) })
+  expect(await db.table('characters').get('C1-P001')).toMatchObject({ aliases: ['老沈'], verifiedAliases: ['老沈'], frequency: { mentions: 3 } })
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+})
 
 it.each([1, 3])('%i项证据提交失败后继续其余资产，重开时只处理失败项', async failedCount => {
   let rejectEvidence = true
@@ -317,7 +435,7 @@ it('有待办时成功资产仍完成整编，继续时保留成功项覆盖', a
   await db.table('characters').update('C1-P003', { background: '独有背景事实', mergeNotes: ['需整编'], mergeFacts: [{ id: 'F-original', field: 'background', text: '独有背景事实', chapters: ['1'] }] })
   await service.start('a')
   expect(service.state('a')?.error).toBeUndefined()
-  expect((await service.reports('a'))[0]).toMatchObject({ status: 'paused', coverage: { checked: 5 }, report: { optimizedIds: ['C1-P003'] } })
+  expect((await service.reports('a'))[0]).toMatchObject({ status: 'paused', coverage: { checked: 5 }, report: { optimizedIds: [], optimizations: [expect.objectContaining({ status: 'no_change' })] } })
   expect(optimizationCalls).toBe(1)
   const count = fetcher.mock.calls.length
   leavePending = false
