@@ -1,5 +1,7 @@
 # 决策索引
 
+- [逐章提取与失败补提取](extraction-queue.md)：持续队列、主动续期、共享请求预算与两类章节状态。
+
 - [按阶段锁定人工编辑，并统一实际请求预算](stage-edit-lock-and-request-budget.md)：已接受，业务落地分阶段验收。
 - [用 Dexie 分库保存书架，并隔离开发验收资料](local-bookshelf-storage.md)：阶段1存储、查询和样本隔离边界。
 - [保全文本并通过生命周期日志发布完整导入](transactional-text-import.md)：阶段2编码、分章、Worker与可恢复跨库导入。

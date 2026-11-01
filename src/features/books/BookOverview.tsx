@@ -25,14 +25,14 @@ export function BookOverview({ book, repository, assets, extraction, world, stor
       {summary.status === 'loading' && <p role="status" className="loading-note">正在读取本书资料…</p>}
       {summary.status === 'error' && <div role="alert" className="error-panel"><strong>无法读取本书资料</strong><p>{summary.message}</p><button className="secondary-button" onClick={() => setAttempt(value => value + 1)}>重新读取资料</button></div>}
       {summary.status === 'ready' && <>
+        <section className="chapter-card" aria-labelledby="chapter-heading"><div className="section-heading"><h2 id="chapter-heading">章节概览</h2><span>{summary.value.counts.chapters} 章 / 块</span></div>
+          <ChapterBrowser bookId={book.id} repository={repository} extraction={extraction} />
+        </section>
         {extraction && <ExtractionPanel bookId={book.id} service={extraction} />}
         {world && <WorldPanel key={`world:${book.id}`} bookId={book.id} service={world} assets={assets} />}
         {story && <StoryPanel key={`story:${book.id}`} bookId={book.id} service={story} />}
         <div className="asset-metrics">{metrics.map(([key, label]) => <div className="metric-card" key={key}><span>{label}</span><strong>{summary.value.counts[key]}</strong><small>当前记录</small></div>)}</div>
         <AssetsPanel bookId={book.id} repository={repository} service={assets} kind={assetKind} onKindChange={onAssetKindChange} />
-        <section className="chapter-card" aria-labelledby="chapter-heading"><div className="section-heading"><h2 id="chapter-heading">章节概览</h2><span>{summary.value.counts.chapters} 章 / 块</span></div>
-          <ChapterBrowser bookId={book.id} repository={repository} />
-        </section>
         <div className="next-stage-note"><span aria-hidden="true">○</span><div><strong>原文与资产保存在本地</strong><p>选择资产查看或编辑，点击章节名称查看完整原文。</p></div></div>
       </>}
     </section>

@@ -1,6 +1,7 @@
 import type { Chapter, createWorkspace } from '../../lib/storage/workspace'
 import type { ModelService } from '../models/service'
 import type { CallResult, CallProgress } from '../models/types'
+import { classifyError } from '../models/policy'
 import { bindNodeCharacters } from '../assets/characterLinks'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebuildFacts, updateFrequencies } from '../assets/derive'
@@ -13,32 +14,41 @@ export interface StepResult { chapterIndex: string; step: Substep; ok: boolean; 
 export interface ExtractionState { running: boolean; chapter?: string; step?: Substep; progress?: CallProgress; results: StepResult[]; error?: string }
 const canonical = (value: unknown): string => Array.isArray(value) ? `[${value.map(canonical).join(',')}]` : value && typeof value === 'object' ? `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(',')}}` : JSON.stringify(value)
 const distinct = (rows: ExtractedRow[]) => [...new Map(rows.map(row => [canonical(row), row])).values()]
+class ExecutionLost extends Error {}
+export type ExtractionStepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'interrupted'
+type Selection = { chapterIndex: string; step: Substep }
 
 export function createExtractionService(workspace: Workspace, models: Pick<ModelService, 'generate' | 'settings'>) {
   const states = new Map<string, ExtractionState>()
   const controllers = new Map<string, AbortController>()
   const listeners = new Set<() => void>()
   const set = (bookId: string, change: Partial<ExtractionState>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, results: [] }), ...change }); listeners.forEach(listener => listener()) }
-  async function execute(bookId: string) {
+  async function execute(bookId: string, selection?: Selection) {
     if (controllers.has(bookId)) return
     const controller = new AbortController(); controllers.set(bookId, controller)
     const db = workspace.openBook(bookId)
     let runId: string = crypto.randomUUID(); const owner = crypto.randomUUID()
     let acquired = false
     let heartbeat: ReturnType<typeof setInterval> | undefined
+    let heartbeatError: unknown
     let chapters: Chapter[] = []
     const usage: SavedUsage = { input: 0, output: 0, totalTokens: 0, cost: 0, costStatus: 'estimated' }
     const checkLease = async () => {
       controller.signal.throwIfAborted()
       const lease = await db.table<Lease>('pipelineRuns').get('lease:extraction')
-      if (lease?.owner !== owner || (lease.expiresAt ?? 0) <= Date.now()) throw new Error('提取任务的执行权已失效。')
+      if (lease?.owner !== owner || lease.runId !== runId) throw new ExecutionLost('提取任务已由其他执行者接管，当前任务已停止写入。')
       const progress = await db.table<Progress>('compileProgress').get('P1')
-      if (progress?.runId !== runId) throw new Error('当前书籍已有其他提取任务。')
+      if (progress?.runId !== runId) throw new ExecutionLost('当前书籍已有其他提取任务。')
+      const others = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
+      if (others.some(row => row.recordType === 'lease' && row.id !== lease.id && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new ExecutionLost('本书已有其他处理任务，当前提取已暂停。')
+      await db.table('pipelineRuns').update(lease.id, { expiresAt: Date.now() + 30000 })
     }
     async function saveProgress(status: string) {
       const receipts = await db.table<Receipt>('extractionReceipts').toArray()
       const previous = await db.table<Progress>('compileProgress').get('P1')
-      const failed = [...(previous?.failedChapters ?? []), ...(states.get(bookId)?.results ?? []).filter(row => !row.ok).map(row => row.chapterIndex)]
+      const run = await db.table<Run>('pipelineRuns').get(runId)
+      const latest = new Map((run?.tasks ?? []).map(task => [`${task.input.chapterIndex}:${task.phase}`, task]))
+      const failed = latest.size ? [...latest.values()].filter(task => task.status === 'failed' && !receipts.some(row => row.key === `${task.input.chapterIndex}:${task.phase}`)).map(task => task.input.chapterIndex) : previous?.failedChapters ?? []
       const { completedChapters, failedChapters, partialChapters } = coverage(chapters, receipts, failed)
       await db.table('compileProgress').put({ bookId, stage: 'P1', status, totalChapters: chapters.length, completedChapters, failedChapters, partialChapters, updatedAt: new Date().toISOString(), runId, scope: 'fullBook', planVersion: '2.2', unit: 'chapter', validity: 'current' })
       return completedChapters.length === chapters.length
@@ -51,9 +61,10 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       if (!configured.configured || !configured.config.extractionModel) throw new Error('请先在设置中保存提取模型和密钥。')
       chapters = await db.chapters.orderBy('order').toArray()
       if (!chapters.length) throw new Error('请先导入章节。')
+      if (selection && (!chapters.some(chapter => chapter.chapterIndex === selection.chapterIndex) || !substeps.includes(selection.step))) throw new Error('补提取的章节或步骤不存在。')
       await db.transaction('r', db.tables, () => checkReceiptSources(db, bookId))
       await db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), async () => {
-        const leases = await db.table<Lease>('pipelineRuns').toArray()
+        const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
         if (leases.some(row => row.recordType === 'lease' && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务，请等待其结束。')
         await db.table('pipelineRuns').put({ id: 'lease:extraction', recordType: 'lease', bookId, lockKey: 'extraction', owner, runId, expiresAt: Date.now() + 30000 })
         const previous = await db.table<Progress>('compileProgress').get('P1')
@@ -69,13 +80,14 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       }); acquired = true
       heartbeat = setInterval(() => { void db.transaction('rw', db.table('pipelineRuns'), async () => {
         const lease = await db.table<Lease>('pipelineRuns').get('lease:extraction')
-        if (lease?.owner !== owner) throw new Error('执行权已变化')
+        if (lease?.owner !== owner || lease.runId !== runId) throw new ExecutionLost('提取任务已由其他执行者接管。')
         await db.table('pipelineRuns').update(lease.id, { expiresAt: Date.now() + 30000 })
-      }).catch(() => controller.abort()) }, 8000)
-      await db.transaction('rw', db.table('extractionReceipts'), db.table('compileProgress'), () => saveProgress('running'))
+      }).catch(error => { if (error instanceof ExecutionLost) { heartbeatError = error; controller.abort() } }) }, 8000)
+      await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), () => saveProgress('running'))
       for (const chapter of chapters) for (const step of substeps) {
+        if (selection && (chapter.chapterIndex !== selection.chapterIndex || step !== selection.step)) continue
         controller.signal.throwIfAborted()
-        await db.transaction('r', db.table('pipelineRuns'), db.table('compileProgress'), checkLease)
+        await db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), checkLease)
         const key = `${chapter.chapterIndex}:${step}`
         if (await db.table('extractionReceipts').get(key)) continue
         set(bookId, { chapter: chapter.chapterName, step, progress: undefined })
@@ -91,21 +103,24 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
           const task: StoredTask = { taskId, ordinal: run.tasks?.length ?? 0, callId: crypto.randomUUID(), phase: step, status: 'running', workItemIds: [`P1:${step}:chapter:${chapter.chapterIndex}`], input: { chapterIndex: chapter.chapterIndex, chapterName: chapter.chapterName, text }, inputFingerprint, promptHash, attempt: 0, repairCount: 0, stepsUsed: 0, appliedCommitIds: [], reviewedItems: [], readSet: { records: [], queries: [] }, createdAt: timestamp, updatedAt: timestamp }
           await db.table('pipelineRuns').update(runId, { tasks: [...(run.tasks ?? []), task] })
         })
-        const result: CallResult & { value?: ExtractionData } = !text ? { ok: false, mode: 'direct', text: '', elapsedMs: 0, attempts: [], usage: { input: 0, output: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, costStatus: 'unknown' }, error: { kind: 'validation', message: '本章原文缺失。' } } : await models.generate<ExtractionData>({ role: 'extraction', signal: controller.signal,
+        const failedResult = (error: unknown): CallResult => ({ ok: false, mode: 'direct', text: '', elapsedMs: 0, attempts: [], usage: { input: 0, output: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, costStatus: 'unknown' }, error: classifyError(error) })
+        const result: CallResult & { value?: ExtractionData } = !text ? failedResult('本章原文缺失。') : await models.generate<ExtractionData>({ role: 'extraction', signal: controller.signal, maxRequests: 3, repairAttempts: 2,
           context: { systemPrompt: promptOf(step), messages: [{ role: 'user', content: `章节标识：${chapter.chapterIndex}\n章节名：${chapter.chapterName}\n\n--- 正文开始 ---\n${text}\n--- 正文结束 ---`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交本章提取结果', parameters: schemaOf(step), constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
-          validate: message => validateExtraction(step, message), repairPrompt: '这是唯一一次修正机会。请按字段要求调用唯一的 submit_result 提交本章结果；其他工具未执行。',
+          validate: message => validateExtraction(step, message), repairPrompt: '请按字段要求修正并调用唯一的 submit_result 提交本章结果；其他工具未执行。',
+          beforeRequest: () => db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), checkLease),
           onProgress: progress => set(bookId, { progress }),
-        })
+        }).catch(error => { if (error instanceof ExecutionLost || controller.signal.aborted) throw error; return failedResult(error) })
         usage.input += result.usage.input; usage.output += result.usage.output; usage.totalTokens += result.usage.totalTokens; usage.cost += result.usage.cost ?? 0
         if (result.usage.costStatus === 'unknown') usage.costStatus = 'unknown'
         controller.signal.throwIfAborted()
         const entry: StepResult = { chapterIndex: chapter.chapterIndex, step, ok: result.ok, message: result.ok ? `${stepLabels[step]}已保存` : result.error?.message ?? '提取失败', attempts: result.attempts.length, tokens: result.usage.totalTokens, cost: result.usage.cost, elapsedMs: result.elapsedMs }
         const finishTask = async () => {
           const run = (await db.table<Run>('pipelineRuns').get(runId))!
-          const tasks = (run.tasks ?? []).map(task => task.taskId === taskId ? { ...task, status: entry.ok ? 'completed' : 'failed', attempt: entry.attempts, repairCount: result.attempts.some(attempt => attempt.turn > 1) ? 1 : 0, stepsUsed: entry.attempts, updatedAt: new Date().toISOString(), ...(entry.ok ? {} : { lastError: { code: result.error?.kind ?? 'validation', message: entry.message } }) } : task)
+          const tasks = (run.tasks ?? []).map(task => task.taskId === taskId ? { ...task, status: entry.ok ? 'completed' : 'failed', attempt: entry.attempts, repairCount: Math.max(0, ...result.attempts.map(attempt => attempt.turn - 1)), stepsUsed: entry.attempts, updatedAt: new Date().toISOString(), ...(entry.ok ? {} : { lastError: { code: result.error?.kind ?? 'validation', message: entry.message } }) } : task)
           await db.table('pipelineRuns').update(runId, { tasks, usage, cost: usage.cost })
         }
         if (result.ok && result.value) {
+          try {
           await db.transaction('rw', db.tables, async () => {
             await checkLease()
             if (await db.table('extractionReceipts').get(key)) return
@@ -153,30 +168,38 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
             await finishTask()
             controller.signal.throwIfAborted()
           })
+          } catch (error) {
+            if (error instanceof ExecutionLost || controller.signal.aborted || !/^(ConstraintError|DataError|ValidationError)$/.test((error as Error)?.name ?? '')) throw error
+            entry.ok = false
+            entry.message = error instanceof Error ? error.message : '本章结果保存校验失败。'
+          }
         }
         set(bookId, { results: [...states.get(bookId)!.results, entry] })
         await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), async () => {
           await checkLease()
-          await saveProgress('running')
           await finishTask()
+          await saveProgress('running')
         })
       }
       await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), async () => {
         await checkLease()
         const complete = await saveProgress('running')
-        const status = complete ? 'completed' : 'failed'
+        const current = await db.table<Progress>('compileProgress').get('P1')
+        const status = complete ? 'completed' : current?.failedChapters.length ? 'failed' : 'paused'
         await db.table('compileProgress').update('P1', { status })
         await db.table('pipelineRuns').update(runId, { status, usage, cost: usage.cost, finishedAt: new Date().toISOString() })
       })
     } catch (error) {
-      const message = controller.signal.aborted ? '提取已取消，已保存的成果保留。' : error instanceof Error ? error.message : '提取失败，请重试。'
+      const cause = heartbeatError ?? error
+      const cancelled = controller.signal.aborted && !heartbeatError
+      const message = cancelled ? '提取已取消，已保存的成果保留。' : cause instanceof Error ? cause.message : '提取中断，已保存的成果保留。'
       set(bookId, { error: message })
       if (acquired) await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), async () => {
         if ((await db.table<Lease>('pipelineRuns').get('lease:extraction'))?.owner !== owner) return
-        const status = controller.signal.aborted ? 'cancelled' : 'failed'
+        const status = cancelled ? 'cancelled' : 'paused'
         await saveProgress(status)
         const run = await db.table<Run>('pipelineRuns').get(runId)
-        const tasks = (run?.tasks ?? []).map(task => task.status === 'running' ? { ...task, status: controller.signal.aborted ? 'cancelled' : 'partial', updatedAt: new Date().toISOString(), lastError: { code: controller.signal.aborted ? 'cancelled' : 'interrupted', message } } : task)
+        const tasks = (run?.tasks ?? []).map(task => task.status === 'running' ? { ...task, status: cancelled ? 'cancelled' : 'partial', updatedAt: new Date().toISOString(), lastError: { code: cancelled ? 'cancelled' : 'interrupted', message } } : task)
         await db.table('pipelineRuns').update(runId, { status, tasks, usage, cost: usage.cost, finishedAt: new Date().toISOString() })
       }).catch(() => set(bookId, { error: `${message}；进度保存失败，请检查本地存储。` }))
     } finally {
@@ -185,8 +208,8 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       controllers.delete(bookId); set(bookId, { running: false, progress: undefined })
     }
   }
-  async function start(bookId: string) {
-    await withExtractionLock(workspace.scope.settingsName, bookId, () => execute(bookId), () => { set(bookId, { error: '本书已有处理任务，请等待其结束。' }) })
+  async function start(bookId: string, selection?: Selection) {
+    await withExtractionLock(workspace.scope.settingsName, bookId, () => execute(bookId, selection), () => { set(bookId, { error: '本书已有处理任务，请等待其结束。' }) })
   }
   async function recover(bookId: string) {
     if (controllers.has(bookId)) return
@@ -220,7 +243,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       })
     }, () => undefined)
   }
-  return { start, recover, cancel: (bookId: string) => controllers.get(bookId)?.abort(), state: (bookId: string) => states.get(bookId),
+  return { start, retry: (bookId: string, chapterIndex: string, step: Substep) => start(bookId, { chapterIndex, step }), recover, cancel: (bookId: string) => controllers.get(bookId)?.abort(), state: (bookId: string) => states.get(bookId),
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
     async progress(bookId: string) {
       const db = workspace.openBook(bookId)
@@ -232,9 +255,15 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
         const receipts = await db.table<Receipt>('extractionReceipts').toArray()
         const lease = await db.table<Lease>('pipelineRuns').get('lease:extraction')
         const { allCovered, ...counts } = coverage(chapters, receipts, progress.failedChapters)
-        const status = progress.status === 'completed' && !allCovered ? 'paused' : progress.status
+        const status = progress.status === 'completed' && !allCovered || progress.status === 'failed' && !counts.failedChapters.length ? 'paused' : progress.status
         const failures = [...new Map((run?.tasks ?? []).filter(task => task.status === 'failed' || task.status === 'partial').filter(task => !receipts.some(receipt => receipt.key === `${task.input.chapterIndex}:${task.phase}`)).map(task => [`${task.input.chapterIndex}:${task.phase}`, { chapterIndex: task.input.chapterIndex, step: task.phase, message: task.lastError?.message ?? '任务中断，可继续提取。' }])).values()]
-        return { ...progress, ...counts, status, busy: !!lease, canOrganize: allCovered && status === 'completed' && !lease, usage: run?.usage, failures }
+        const latest = new Map((run?.tasks ?? []).map(task => [`${task.input.chapterIndex}:${task.phase}`, task]))
+        const steps = Object.fromEntries(chapters.map(chapter => [chapter.chapterIndex, Object.fromEntries(substeps.map(step => {
+          const key = `${chapter.chapterIndex}:${step}`, task = latest.get(key)
+          const state: ExtractionStepStatus = receipts.some(row => row.key === key) ? 'completed' : task?.status === 'running' && !!lease ? 'running' : task?.status === 'failed' ? 'failed' : task ? 'interrupted' : 'pending'
+          return [step, { status: state, message: task?.lastError?.message }]
+        }))])) as Record<string, Record<Substep, { status: ExtractionStepStatus; message?: string }>>
+        return { ...progress, ...counts, status, steps, busy: !!lease, canOrganize: allCovered && status === 'completed' && !lease, usage: run?.usage, failures }
 
       })
     },

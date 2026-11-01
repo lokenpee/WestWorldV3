@@ -30,6 +30,84 @@ async function setup(fetcher: typeof fetch, count = 1) {
 }
 afterEach(async () => { for (const workspace of workspaces.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
 
+it('续期延迟超过有效期时，同一执行者保存回复并继续所有章节', async () => {
+  const fetcher = vi.fn<typeof fetch>()
+  const { service, db } = await setup(fetcher, 2)
+  fetcher.mockImplementation(async (_url, init) => {
+    await db.table('pipelineRuns').update('lease:extraction', { expiresAt: 0 })
+    return stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative)
+  })
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(fetcher).toHaveBeenCalledTimes(4)
+  expect(await service.progress('a')).toMatchObject({ status: 'completed', completedSteps: 4 })
+})
+
+it('旧任务中断且没有失败章节时，显示已暂停而不是失败零章', async () => {
+  const { service, db } = await setup(vi.fn<typeof fetch>())
+  await db.table('compileProgress').update('P1', { status: 'failed', failedChapters: [] })
+  expect(await service.progress('a')).toMatchObject({ status: 'paused', failedChapters: [], completedSteps: 0 })
+})
+
+it('结构连续失败最多三次请求，后续步骤继续，点击重试只补指定失败项', async () => {
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(stream({ characters: [{ name: '', confidence: 1 }], locations: [] }))
+    .mockResolvedValueOnce(stream({ characters: [{ name: '', confidence: 1 }], locations: [] }))
+    .mockResolvedValueOnce(stream({ characters: [{ name: '', confidence: 1 }], locations: [] }))
+    .mockResolvedValueOnce(stream(narrative)).mockResolvedValueOnce(stream(world)).mockResolvedValueOnce(stream(narrative))
+  const { service, db, book } = await setup(fetcher, 2)
+  await service.start('a')
+  expect(fetcher).toHaveBeenCalledTimes(6)
+  expect(await service.progress('a')).toMatchObject({ status: 'failed', completedSteps: 3, failedChapters: ['1'], steps: { '1': { worldAssets: { status: 'failed' }, narrativeAssets: { status: 'completed' } }, '2': { worldAssets: { status: 'completed' }, narrativeAssets: { status: 'completed' } } } })
+  const before = await db.table('nodes').toArray()
+  fetcher.mockResolvedValue(stream(world))
+  await service.retry('a', '1', 'worldAssets')
+  expect(fetcher).toHaveBeenCalledTimes(7)
+  expect(await service.progress('a')).toMatchObject({ status: 'completed', completedSteps: 4, failedChapters: [] })
+  expect(await db.table('nodes').toArray()).toEqual(before)
+  await service.retry('a', '1', 'worldAssets')
+  expect(fetcher).toHaveBeenCalledTimes(7)
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+})
+
+it('两次结构修正可以成功，记录真实修正次数并保持三次总额度', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream({})).mockResolvedValueOnce(stream({})).mockResolvedValueOnce(stream(world)).mockResolvedValueOnce(stream(narrative))
+  const { service, db, book } = await setup(fetcher)
+  await service.start('a')
+  expect(fetcher).toHaveBeenCalledTimes(4)
+  const run = (await db.table('pipelineRuns').toArray()).find(row => row.stage === 'P1')!
+  expect(run.tasks[0]).toMatchObject({ status: 'completed', repairCount: 2, stepsUsed: 3 })
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+})
+
+it('单项模型异常及结果约束失败保留错误并继续后续章节', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db } = await setup(fetcher, 2)
+  let once = true
+  db.table('characters').hook('creating', () => { if (once) { once = false; throw new DOMException('本项数据约束失败', 'DataError') } })
+  await service.start('a')
+  expect(await service.progress('a')).toMatchObject({ status: 'failed', completedSteps: 3, completedChapters: ['2'] })
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(service.state('a')?.results[0]).toMatchObject({ ok: false, message: expect.stringContaining('本项数据约束失败') })
+})
+
+it('续期到期后其他阶段已取得资源时，旧提取停止写入', async () => {
+  const fetcher = vi.fn<typeof fetch>()
+  const { service, db } = await setup(fetcher)
+  fetcher.mockImplementation(async () => {
+    await db.table('pipelineRuns').update('lease:extraction', { expiresAt: 0 })
+    await db.table('pipelineRuns').put({ id: 'lease:world', bookId: 'a', recordType: 'lease', owner: 'new', runId: 'other', expiresAt: Date.now() + 30000 })
+    return stream(world)
+  })
+  await service.start('a')
+  expect(await db.table('extractionReceipts').count()).toBe(0)
+  expect(await db.table('characters').count()).toBe(0)
+  expect(await service.progress('a')).toMatchObject({ status: 'paused', failedChapters: [] })
+  expect(service.state('a')?.error).toContain('其他处理任务')
+})
+
 it('P1把通用称谓归入身份说明，保留稳定别名与只有称谓的人物', async () => {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream({ characters: [
     { name: '林如海', confidence: 1, aliases_mentioned: ['爸爸', '姑父', '林姑父'], identity: '官员' },
@@ -104,7 +182,7 @@ it('资产写入失败时资产、生命周期与凭证共同回滚', async () =
   await service.start('a')
   for (const table of ['characters', 'locations', 'assetLifecycle', 'extractionReceipts']) expect(await db.table(table).count()).toBe(0)
   expect(service.state('a')?.error).toContain('模拟磁盘写入失败')
-  expect(await service.progress('a')).toMatchObject({ status: 'failed', completedChapters: [] })
+  expect(await service.progress('a')).toMatchObject({ status: 'paused', completedChapters: [], failedChapters: [] })
 })
 
 it('取消在途请求不提交晚到结果，同书另一执行器无法启动', async () => {

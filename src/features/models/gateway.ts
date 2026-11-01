@@ -133,7 +133,7 @@ export async function executeDirect<T>(resolved: ResolvedModel, request: DirectR
         const value = request.validate ? request.validate(last) : undefined
         return { ...session.result(last), ...(value === undefined ? {} : { value }) }
       } catch (error) {
-        if (repair || !request.repairPrompt) throw error instanceof ModelError ? error : new ModelError('validation', '模型回复未通过结果校验。')
+        if (repair >= Math.min(2, request.repairAttempts ?? 1) || !request.repairPrompt) throw error instanceof ModelError ? error : new ModelError('validation', '模型回复未通过结果校验。')
         const results = last.content.flatMap(part => part.type === 'toolCall' ? [{ role: 'toolResult' as const, toolCallId: part.id, toolName: part.name, content: [{ type: 'text' as const, text: '结果校验未通过，请按要求修正。' }], isError: true, timestamp: Date.now() }] : [])
         context = { ...context, messages: [...context.messages, last, ...results, { role: 'user', content: request.repairPrompt, timestamp: Date.now() }] }
       }

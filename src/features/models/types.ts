@@ -31,7 +31,7 @@ export interface CallResult {
 export interface CallProgress { state: 'preparing' | 'requesting' | 'waiting'; attempts: number; delayMs?: number }
 export interface CallOptions { beforeRequest?: () => Promise<void>; signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; cooperativeTimeout?: boolean; requestTimeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number }
 export interface DirectRequest<T = string> extends CallOptions {
-  role: ModelRole; context: Context; validate?: (message: AssistantMessage) => T; repairPrompt?: string
+  role: ModelRole; context: Context; validate?: (message: AssistantMessage) => T; repairPrompt?: string; repairAttempts?: number
 }
 export class ModelError extends Error {
   readonly kind: ErrorKind

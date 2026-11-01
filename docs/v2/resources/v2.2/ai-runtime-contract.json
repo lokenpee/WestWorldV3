@@ -234,6 +234,7 @@
     "direct": {
       "maxProviderRequests": 3,
       "maxRepairs": 1,
+      "extractionMaxRepairs": 2,
       "repairsConsumeBudget": true
     },
     "retryableKinds": [

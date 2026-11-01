@@ -38,7 +38,7 @@ describe('阶段 0：跨文档契约回归（不代表业务已实现）', () =>
 
   it('direct 的网络重发和修正共用三次上限，章节不再叠加重试', () => {
     expect(runtime.requestBudget).toMatchObject({
-      direct: { maxProviderRequests: 3, maxRepairs: 1, repairsConsumeBudget: true },
+      direct: { maxProviderRequests: 3, maxRepairs: 1, extractionMaxRepairs: 2, repairsConsumeBudget: true },
       retryableKinds: ['network', 'server', 'rate_limit'],
       chapterRetryWrapper: false,
       agent: { maxRequestsPerTurn: 3, maxProviderRequests: 6, timeoutMs: 180000 },

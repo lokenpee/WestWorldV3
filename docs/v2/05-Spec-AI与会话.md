@@ -1,6 +1,6 @@
 # WestWorld V2 · 详细规格：AI、工具与会话
 
-> **阶段0修订（2026-10-24）：** P2持有world域锁时禁止同书人物/地点人工写入，P3持有narrative域锁时禁止节点/事件线人工写入；UI与命令事务均校验，拒绝返回`ASSET_DOMAIN_LOCKED`。取消须等在途提交停止并释放锁才恢复编辑。P1人工编辑、跨书编辑、只读和备份不受此域锁限制。P2/P3仍可并行，保留跨域实际读依赖校验。direct首次/网络重发/至多一次修正合计最多3次实际请求；P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾；P3预算见[叙事整理的排队与恢复](../decisions/story-organization.md)。详见[阶段0决策](../decisions/stage-edit-lock-and-request-budget.md)及当前机器契约。历史证据不代表新规则已在业务应用执行。
+> **阶段0修订（2026-10-24）：** P2持有world域锁时禁止同书人物/地点人工写入，P3持有narrative域锁时禁止节点/事件线人工写入；UI与命令事务均校验，拒绝返回`ASSET_DOMAIN_LOCKED`。取消须等在途提交停止并释放锁才恢复编辑。P1人工编辑、跨书编辑、只读和备份不受此域锁限制。P2/P3仍可并行，保留跨域实际读依赖校验。direct首次、网络重发与修正共用最多3次实际请求；P1修正规则见逐章提取决策；P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾；P3预算见[叙事整理的排队与恢复](../decisions/story-organization.md)。详见[阶段0决策](../decisions/stage-edit-lock-and-request-budget.md)及当前机器契约。历史证据不代表新规则已在业务应用执行。
 
 | 文档控制项 | 内容 |
 |---|---|
@@ -98,7 +98,7 @@ direct模式由pi-ai执行，无pi-agent-core循环。有Schema时可注册唯�
 
 返回usage每次尝试均累计。stopReason为error/aborted时按AI-05处理；没有Schema时把text块换行拼接返回。否则找首个submit_result调用，递归normalize可选null，TypeBox验证，再调用共用validateData业务引用/原文等校验。通过后由调用方调用共用命令服务直接提交当前实体；本模式不执行Agent查询或写工具。
 
-提交缺失、结构错或业务校验错共允许一次结果修正；direct首次、网络重发和修正共用最多3次实际Provider请求预算，额度耗尽不得再发修正。修正必须带回完整assistant原始响应（包含推理字段）、每个toolCall的配对toolResult错误，以及“唯一一次修正机会”用户指令。其他工具不执行，反馈“本请求只接收 submit_result，其他工具未执行。”；第二次仍错返回validation失败，不继续五次结构重试。
+提交缺失、结构错或业务校验错默认最多修正一次，P1提取最多修正两次。direct首次、网络重发和修正共用最多3次实际请求预算。修正带回完整assistant原始响应、每个工具调用的配对错误反馈及修正指令。P1失败隔离、主动续期和单项补提取以[逐章提取决策](../decisions/extraction-queue.md)为准。
 
 直接请求总硬上限=`max(各服务错误maxAttempts)+1`。可选字段null仅在非必填且原属性不允许null时移除；递归数组、对象和union分支，不改原响应、不强制类型、不删除必填。
 
