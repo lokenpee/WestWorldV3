@@ -1,0 +1,25 @@
+schema: project-local
+context: |
+  先读取根目录 AGENTS.md，它是需求分级、授权、验收、同步和归档规则的唯一来源。
+  总入口为 docs/v2/00-阅读入口与术语.md；材料归属为 docs/v2/文档与资源归属.json。
+  需求及整体状态从 openspec/需求池.md 进入；按 AGENTS.md 保存讨论结论及核对独立接手条件。
+  WestWorldV3 是本地小说资产工作台，使用 React、TypeScript、Vite、Dexie 和 Pi。
+  功能在 src/features/，共享存储在 src/lib/storage/；依赖版本以根目录锁文件为准。
+  中文编写产物，OpenSpec 结构标题和 SHALL、WHEN、THEN 标记保持英文。
+  根据 AGENTS.md 选择 project-local 或 project-full；小修改采用其简化路径。
+rules:
+  proposal:
+    - 按 AGENTS.md 记录需求池编号、讨论结论、影响、实施方法、术语、确认依据及接手说明；中型需求包含字段变化、数据流转和触发逻辑。
+  specs:
+    - 按 AGENTS.md 的规格与验收要求编写，引用唯一技术契约。
+  design:
+    - 按 AGENTS.md 提供字段变化、数据流转、触发逻辑及验收与接手内容。
+  tasks:
+    - 按 AGENTS.md 的实施和验收规则记录任务、需求关联与证据。
+operations:
+  apply:
+    guidance:
+      - 先读取 AGENTS.md，按对应需求级别和已确认范围执行。
+  archive:
+    guidance:
+      - 先按 AGENTS.md 检查验收、同步和归档条件。

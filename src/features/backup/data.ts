@@ -1,9 +1,11 @@
 import type { Book } from '../../lib/storage/workspace'
 import { bindNodeCharacters } from '../assets/characterLinks'
-import type { Character, EventNode } from '../assets/types'
+import { migrateCharacterRelations, migrateNodeBindings } from '../assets/migrate'
+import { resolveLifecycleId } from '../assets/relations'
+import type { Character, EventNode, Lifecycle } from '../assets/types'
 
 export const tableSchemas = {
-  chapters: 'Chapter', chapterTexts: 'ChapterText', characters: 'StoredCharacter', locations: 'StoredLocation', nodes: 'StoredNode', eventLines: 'StoredEventLine', compileProgress: 'CompileProgress', storyEditorMemory: 'StoryEditorMemory', storyEditorNotes: 'StoryEditorNote', storyEditorCheckpoints: 'StoryEditorCheckpoint', storySessions: 'StorySession', storySessionEntries: 'StorySessionEntry', extractionReceipts: 'ExtractionReceipt', assetLifecycle: 'AssetLifecycle', pipelineRuns: 'PipelineRun',
+  chapters: 'Chapter', chapterTexts: 'ChapterText', characters: 'StoredCharacter', locations: 'StoredLocation', nodes: 'StoredNode', eventLines: 'StoredEventLine', characterRelations: 'StoredRelation', compileProgress: 'CompileProgress', storyEditorMemory: 'StoryEditorMemory', storyEditorNotes: 'StoryEditorNote', storyEditorCheckpoints: 'StoryEditorCheckpoint', storySessions: 'StorySession', storySessionEntries: 'StorySessionEntry', extractionReceipts: 'ExtractionReceipt', assetLifecycle: 'AssetLifecycle', pipelineRuns: 'PipelineRun',
 } as const
 export type TableName = keyof typeof tableSchemas
 export type Row = Record<string, unknown>
@@ -88,6 +90,15 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
       if (!current) fail(`assetLifecycle/${mapping.key}`, '来源映射目标不存在。')
     }
   }
+  for (const [index, relation] of tables.characterRelations.entries()) {
+    const path = `characterRelations[${index}]`
+    const origin = String(relation.originCharacterId)
+    if (!characters.has(origin) && !lifecycle.has(`character:${origin}`)) fail(path, '原始来源人物不存在。')
+    for (const id of strings(relation.targetIds)) if (!characters.has(id)) fail(`${path}/targetIds`, `目标人物不存在：${id}`)
+    const resolved = resolveLifecycleId(origin, tables.assetLifecycle as unknown as Lifecycle[])
+    if ((relation.sourceId ?? null) !== (resolved && characters.has(resolved) ? resolved : null)) fail(`${path}/sourceId`, '当前来源与原始来源的生命周期映射不一致。')
+    for (const evidence of rows(relation.evidence)) if (typeof evidence.chapterIndex === 'string' && evidence.chapterIndex && !hasChapter(evidence.chapterIndex)) fail(`${path}/evidence`, '关系依据章节不存在。')
+  }
   const sessions = new Map(tables.storySessions.map(row => [row.id, row]))
   const entries = new Map(tables.storySessionEntries.map(row => [row.id, row]))
   for (const session of tables.storySessions) {
@@ -152,7 +163,7 @@ export function migrateLegacy(data: BookData, legacy: Record<string, unknown>): 
     const characters = data.tables.characters as unknown as Character[]
     const actorIds = strings(row.actorIds).filter(id => characters.some(person => person.id === id))
     const targetIds = strings(row.targetCharacterIds).filter(id => characters.some(person => person.id === id))
-    return bindNodeCharacters(row as unknown as EventNode, characters, actorIds, targetIds) as unknown as Row
+    return bindNodeCharacters({ ...row, legacyActorIds: actorIds, legacyTargetCharacterIds: targetIds } as unknown as EventNode, characters) as unknown as Row
   })
   for (const line of data.tables.eventLines) { line.revision ??= 1; line.createdBy ??= 'P3'; delete line.characterIds }
   const timestamp = new Date().toISOString()
@@ -163,4 +174,18 @@ export function migrateLegacy(data: BookData, legacy: Record<string, unknown>): 
     progress.planVersion = '2.2'
   }
   return pauseBookData(data)
+}
+
+/** 格式4、5读入后的关系结构转换；格式6本身已包含关系表和绑定来源。 */
+export function migrateRelationsData(data: BookData): BookData {
+  const characters = data.tables.characters as unknown as Character[]
+  const lifecycle = data.tables.assetLifecycle as unknown as Lifecycle[]
+  const timestamp = new Date().toISOString()
+  const relations = migrateCharacterRelations(characters.map(person => ({ ...person, relations: Array.isArray(person.relations) ? person.relations : [] })), lifecycle, timestamp)
+  const existing = new Set(data.tables.characterRelations.map(row => row.id))
+  data.tables.characterRelations.push(...relations.filter(row => !existing.has(row.id)) as unknown as Row[])
+  for (const person of characters) delete person.relations
+  const before = data.tables.nodes
+  data.tables.nodes = migrateNodeBindings(before as unknown as EventNode[], characters).map((node, index) => JSON.stringify(node) === JSON.stringify(before[index]) ? before[index] : { ...node, revision: Number(before[index].revision ?? 1) + 1 })
+  return data
 }

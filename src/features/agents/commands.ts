@@ -1,9 +1,10 @@
 import type { AgentRepository, AgentStore, Row } from './repository'
 import { canonical, hash, records, strings, text, toolContracts, validate } from './contracts'
 import { assertScope, noteFingerprint, readTool, resolveAsset, type Scope } from './queries'
-import { detailTokens, fuseWorldAssets } from '../assets/merge'
-import { remapCharacterLinks, bindNodeCharacters } from '../assets/characterLinks'
-import type { Character, EventNode, LocationAsset } from '../assets/types'
+import { detailTokens } from '../assets/merge'
+import { mergeWorldAssets } from '../assets/mergeCore'
+import { bindNodeCharacters } from '../assets/characterLinks'
+import type { Character, EventNode } from '../assets/types'
 import { acceptIdentityMerge } from '../world/queue'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebaseStoryCoverage, saveStoryCoverage } from '../story/coverage'
@@ -123,21 +124,13 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
     }
     await assertEvidence(store, evidence)
     const timestamp = new Date().toISOString()
-    const merged = kind === 'character'
-      ? fuseWorldAssets('character', named as unknown as Character[], text(group.keepId), text(group.canonicalName), timestamp).result
-      : fuseWorldAssets('location', named as unknown as LocationAsset[], text(group.keepId), text(group.canonicalName), timestamp).result
-    const beforePeople = kind === 'character' ? await store.rows('characters') : []
     const kept = named.find(row => row.id === group.keepId)!
-    await store.put(table, { ...merged, nameSource: manualNames.length ? 'manual' : 'automatic', manualKeep: kept.manualKeep === true } as unknown as Row)
-    for (const id of ids.filter(id => id !== merged.id)) await store.remove(table, id)
-    const mappings = await store.rows('assetLifecycle')
-    for (const id of ids) if (!mappings.some(row => row.kind === kind && row.originId === id)) mappings.push({ key: `${kind}:${id}`, bookId: scope.bookId, kind, originId: id, currentId: id, revision: 0, state: 'live', updatedAt: timestamp })
-    for (const row of mappings.filter(row => row.kind === kind && row.state !== 'deleted' && (ids.includes(text(row.originId)) || ids.includes(text(row.currentId))))) await store.put('assetLifecycle', { ...row, currentId: merged.id, state: row.originId === merged.id ? 'live' : 'merged', revision: Number(row.revision) + 1, updatedAt: timestamp })
-    if (kind === 'character') {
-      const nodes = await store.rows('nodes'); const people = await store.rows('characters')
-      const changed = remapCharacterLinks(nodes as unknown as EventNode[], beforePeople as unknown as Character[], people as unknown as Character[], new Map(ids.map(id => [id, merged.id])))
-      for (const [index, node] of changed.entries()) if (canonical(node) !== canonical(nodes[index])) await store.put('nodes', { ...node, revision: node.revision + 1 } as unknown as Row)
-    }
+    const core = await mergeWorldAssets(store, {
+      bookId: scope.bookId, kind: kind as 'character' | 'location', memberIds: ids, keepId: text(group.keepId), canonicalName: text(group.canonicalName), timestamp,
+      nameSource: manualNames.length ? 'manual' : 'automatic', manualKeep: kept.manualKeep === true,
+      expectedRevisions: Object.fromEntries(named.map(row => [text(row.id), Number(row.revision)])),
+    })
+    const merged = core.asset
     const { run } = await taskOf(store, scope)
     if (run.report) {
       const report = run.report as Row

@@ -1,0 +1,37 @@
+name: project-full
+version: 1
+description: 大型需求的完整方案，治理规则引用 AGENTS.md
+artifacts:
+  - id: proposal
+    generates: "proposal.md"
+    description: proposal，按根目录 AGENTS.md 执行
+    template: proposal.md
+    instruction: |
+      先按 AGENTS.md 判级并登记需求池；使用影响表写清讨论结论、需求、模块、验收及确认依据，提供独立接手说明。
+    requires: []
+  - id: specs
+    generates: "specs/**/*.md"
+    description: specs，按根目录 AGENTS.md 执行
+    template: spec.md
+    instruction: |
+      按 AGENTS.md 编写中文差异规格，保留 OpenSpec 标记。每条 SHALL 要求至少一个 Scenario，使用 WHEN 和 THEN；无行为变化按 skip_specs 处理。
+    requires: [proposal]
+  - id: design
+    generates: "design.md"
+    description: design，按根目录 AGENTS.md 执行
+    template: design.md
+    instruction: |
+      按 AGENTS.md 展示字段变化、数据流转、触发逻辑、接口、恢复、兼容和技术选择，引用唯一技术契约，补齐验收与接手条件。
+    requires: [proposal]
+  - id: tasks
+    generates: "tasks.md"
+    description: tasks，按根目录 AGENTS.md 执行
+    template: tasks.md
+    instruction: |
+      按 AGENTS.md 写带编号的复选框任务、对应需求、检查方法和证据；自动检查和用户验收分别登记。
+    requires: [specs, design]
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    先读取 AGENTS.md，从需求池编号核对独立接手材料、具体确认及当前任务，按依赖实施并记录检查证据。

@@ -17,19 +17,51 @@ export interface Character extends WorldAsset {
   identity?: string; appearance?: string; personality?: string; background?: string; speechStyleSample?: string
   profile?: { age?: number; gender?: string; ageText?: string }
   roleWeight?: RoleWeight; roleWeightSource?: 'frequency' | 'manual'
-  relations?: { target: string; relation_type: string; relation_label?: string; direction?: string }[]
+  /** 旧版内联关系；版本6起关系保存在 characterRelations，读取时由关系表投影。 */
+  relations?: LegacyRelation[]
 }
+export interface LegacyRelation { target: string; relation_type: string; relation_label?: string; direction?: string }
 export interface LocationAsset extends WorldAsset { description?: string }
 export interface EventNode extends BaseAsset {
   name: string; summary: string; process?: string; chapterIndex: string; chapterName: string; quote: string; offset?: number
   order: number; actors: string[]; targets?: string[]; eventLineIds?: string[]; confidence: number
-  actorIds?: string[]; targetCharacterIds?: string[]; quoteStatus?: 'matched' | 'unmatched' | 'empty'
+  actorIds?: string[]; targetCharacterIds?: string[]
+  actorBindings?: CharacterBinding[]; targetBindings?: CharacterBinding[]
+  manualActorIds?: string[]; manualTargetCharacterIds?: string[]
+  legacyActorIds?: string[]; legacyTargetCharacterIds?: string[]
+  quoteStatus?: 'matched' | 'unmatched' | 'empty'
   world_delta?: string[]; new_facts?: string[]; started_actions?: string[]; time_text?: string; time_hint?: string
   timeCoord?: string; timePrecision?: string
 }
 export interface EventLine extends BaseAsset {
   title: string; nodeIds: string[]; chapters: string[]; cause: string; process: string; result: string
   lineStatus: 'open' | 'closed'; updatedAt: string; timeRange?: string[]
+}
+/** 节点里的称呼绑定：一个原始称呼连同它命中的全部人物编号。 */
+export interface CharacterBinding { mention: string; ids: string[] }
+export type RelationDirection = 'directed' | 'bidirectional' | 'unspecified'
+export interface RelationEvidence { chapterIndex: string; quote: string }
+/** 一条人物关系事实：归属原始提取人物，目标为目标称呼的全部命中。 */
+export interface CharacterRelation {
+  id: string; bookId: string
+  originCharacterId: string; sourceName: string; targetName: string
+  relationType: string; forwardLabel: string; reverseLabel: string; direction: RelationDirection
+  evidence: RelationEvidence[]
+  sourceId: string | null; targetIds: string[]
+  revision: number; createdAt: string; updatedAt: string
+  legacyPayload?: LegacyRelation
+}
+/** 有向关系结果：一个有序端点对一条。 */
+export interface RelationEdge {
+  fromId: string; toId: string
+  labels: string[]; types: string[]
+  relationIds: string[]; evidence: RelationEvidence[]
+  directionUnclear: boolean
+}
+export interface UnresolvedRelation {
+  relationId: string; sourceName: string; targetName: string
+  forwardLabel: string; reverseLabel: string; direction: RelationDirection
+  reason: 'source_missing' | 'target_missing' | 'self'
 }
 export interface AssetByKind { character: Character; location: LocationAsset; node: EventNode; eventLine: EventLine }
 export type Asset = AssetByKind[AssetKind]
@@ -50,10 +82,11 @@ export interface References { actorIds: string[]; ambiguities: { name: string; c
 export interface AssetSnapshot {
   characters: Character[]; locations: LocationAsset[]; nodes: EventNode[]; eventLines: EventLine[]
   lifecycle: Lifecycle[]; locks: { world: boolean; narrative: boolean }; references: Record<string, References>; lineCharacterIds: Record<string, string[]>
+  relations: CharacterRelation[]; relationEdges: Record<string, RelationEdge[]>; unresolvedRelations: UnresolvedRelation[]
   manualMerges: import('./merge').ManualMergeRun[]
 }
 export class AssetError extends Error {
-  readonly code: 'VALIDATION' | 'CONFLICT' | 'NOT_FOUND' | 'ASSET_DOMAIN_LOCKED' | 'SOURCE_MISSING'
+  readonly code: 'VALIDATION' | 'CONFLICT' | 'NOT_FOUND' | 'ASSET_DOMAIN_LOCKED' | 'SOURCE_MISSING' | 'RULE_VIOLATION'
   readonly field?: keyof AssetInput
   constructor(code: AssetError['code'], message: string, field?: keyof AssetInput) { super(message); this.name = 'AssetError'; this.code = code; this.field = field }
 }

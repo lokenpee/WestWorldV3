@@ -13,7 +13,7 @@ export function NodeCharacters({ characters, ids, names, disabled, error, onChan
   const visible = characters.filter(person => [person.name, ...(person.aliases ?? []), person.identity ?? '', person.id].some(value => value.toLocaleLowerCase().includes(normalized)))
   const select = (person: Character, checked: boolean) => {
     const next = checked ? [...new Set([...ids, person.id])] : ids.filter(id => id !== person.id)
-    const retained = checked ? pending.filter(name => !characterCandidates(name, characters).some(candidate => candidate.id === person.id)) : pending
+    const retained = checked ? pending.filter(name => !characterCandidates(name, characters).includes(person.id)) : pending
     onChange(next, retained.join('\n'))
   }
   return <fieldset className="node-characters" disabled={disabled}>
@@ -35,9 +35,9 @@ export function NodeCharacters({ characters, ids, names, disabled, error, onChan
     </ul>
     <div className="asset-field"><label htmlFor="node-unlinked-characters">补充人物称呼</label><textarea id="node-unlinked-characters" rows={2} value={names} placeholder="资料中找不到的人物，每行一个称呼" onChange={event => onChange(ids, event.target.value)} /></div>
     {pending.map(name => {
-      const candidates = characterCandidates(name, characters)
+      const candidates = characterCandidates(name, characters).map(id => characters.find(person => person.id === id)).filter((person): person is Character => !!person)
       if (candidates.some(person => ids.includes(person.id))) return null
-      return <p className="field-help" key={name}>{candidates.length > 1 ? `同名人物：${name}，请搜索并选择具体身份。` : candidates.length === 1 ? `保存时关联：${name} → ${candidates[0].name}` : `待关联：${name}，称呼会随节点保存。`}<button className="text-button" type="button" aria-label={`移除暂存称呼 ${name}`} onClick={() => onChange(ids, pending.filter(value => value !== name).join('\n'))}>移除</button></p>
+      return <p className="field-help" key={name}>{candidates.length > 1 ? `同名人物：${name}，保存时将关联 ${candidates.length} 个编号。` : candidates.length === 1 ? `保存时关联：${name} → ${candidates[0].name}（${candidates[0].id}）` : `待关联：${name}，称呼会随节点保存。`}<button className="text-button" type="button" aria-label={`移除暂存称呼 ${name}`} onClick={() => onChange(ids, pending.filter(value => value !== name).join('\n'))}>移除</button></p>
     })}
     {error && <p className="field-error" role="alert">{error}</p>}
   </fieldset>

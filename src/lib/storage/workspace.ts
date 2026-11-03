@@ -1,4 +1,6 @@
 import Dexie, { type Table } from 'dexie'
+import { migrateCharacterRelations, migrateNodeBindings } from '../../features/assets/migrate'
+import type { Character, EventNode, Lifecycle } from '../../features/assets/types'
 
 export interface Book {
   id: string
@@ -73,6 +75,25 @@ class BookDatabase extends Dexie {
     }).upgrade(() => {
       // 升级事务中止时，浏览器保留原库。
       throw new Error('检测到旧版书库，需要完成数据迁移后打开。')
+    })
+    this.version(6).stores({
+      characterRelations: 'id, bookId, originCharacterId, sourceId, targetName, *targetIds',
+    }).upgrade(async transaction => {
+      // 人物行旧关系移出为独立记录；旧节点称呼变成绑定来源。事务失败时原库保持不变。
+      const characters = await transaction.table('characters').toArray() as unknown as Character[]
+      const lifecycle = await transaction.table('assetLifecycle').toArray() as unknown as Lifecycle[]
+      const relations = migrateCharacterRelations(characters, lifecycle)
+      if (relations.length) await transaction.table('characterRelations').bulkPut(relations)
+      for (const person of characters) if ('relations' in person) {
+        const { relations: _legacy, ...rest } = person
+        await transaction.table('characters').put(rest)
+      }
+      const nodes = await transaction.table('nodes').toArray() as unknown as EventNode[]
+      for (const [index, node] of nodes.entries()) {
+        const next = migrateNodeBindings([node], characters)[0]
+        if (JSON.stringify(next) === JSON.stringify(nodes[index])) continue
+        await transaction.table('nodes').put({ ...next, revision: (node.revision ?? 1) + 1 })
+      }
     })
   }
 }

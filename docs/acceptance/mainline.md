@@ -25,4 +25,4 @@
 - 表情与扩展汉字位于切块边界时，分章和UTF-8备份往返保持完整。
 - 当前备份结构、旧格式4备份、损坏文件、来源与关联、消息链和摘要边界检查。
 
-真实模型对人物身份、事件因果和伏笔回收的判断，由用户结合原文验收。游玩功能按施工计划后续接入。
+真实模型对人物身份、事件因果和伏笔回收的判断，由用户结合原文验收。游玩功能见[游玩变更](../../openspec/changes/play-session-foundation/proposal.md)，人工验收任务见[当前清单](../../openspec/changes/asset-mainline-acceptance/tasks.md)。

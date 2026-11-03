@@ -117,7 +117,7 @@ it('P1把通用称谓归入身份说明，保留稳定别名与只有称谓的�
   await service.start('a')
   expect(await db.table('characters').get('C1-P001')).toMatchObject({ aliases: ['林姑父'], identity: '官员；原文称谓：爸爸、姑父' })
   expect(await db.table('characters').get('C1-P002')).toMatchObject({ name: '太后', aliases: [], identity: '原文称谓：娘娘、哀家' })
-  expect(await db.table('nodes').get('C1-N001')).toMatchObject({ actors: ['爸爸', '太后'], actorIds: [] })
+  expect(await db.table('nodes').get('C1-N001')).toMatchObject({ actors: ['太后', '爸爸'], actorIds: ['C1-P002'] })
   const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
   expect(await validateBookData({ book, tables })).toEqual([])
 })
@@ -137,7 +137,7 @@ it('两章顺序执行独立请求，资产和凭证实时出现，完整资料�
   expect(await db.table('characters').count()).toBe(4)
   expect(await db.table('extractionReceipts').count()).toBe(4)
   expect(await service.progress('a')).toMatchObject({ status: 'completed', completedChapters: ['1', '2'] })
-  expect(await db.table('nodes').get('C1-N001')).toMatchObject({ quoteStatus: 'matched', offset: 0, actorIds: [] })
+  expect(await db.table('nodes').get('C1-N001')).toMatchObject({ quoteStatus: 'matched', offset: 0, actorIds: ['C1-P001', 'C1-P002'] })
   expect(await db.table('nodes').get('C1-N002')).toMatchObject({ quoteStatus: 'unmatched' })
   expect(await db.table('characters').get('C1-P001')).toMatchObject({ profile: {}, speechStyleSample: '你好', createdBy: 'P1' })
   const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
@@ -284,4 +284,36 @@ it('执行权变化后晚到的旧回复不写资产、不覆盖新进度、不�
   expect(await db.table('extractionReceipts').count()).toBe(0)
   expect(await db.table('compileProgress').get('P1')).toMatchObject({ runId: 'replacement-run', status: 'paused' })
   expect(await db.table('pipelineRuns').get('lease:extraction')).toMatchObject({ owner: 'replacement-owner' })
+})
+
+it('P1关系按落库人物编号保存，目标全部命中，人物行不再内联关系', async () => {
+  const withRelation = { characters: [
+    { name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'friendship', relation_label: '朋友', reverse_label: '朋友', direction: 'bidirectional', quote: '沈青送信' }] },
+    { name: '顾衡', confidence: 1 },
+  ], locations: [] }
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream(withRelation)).mockResolvedValueOnce(stream({ nodes: [] }))
+  const { service, db } = await setup(fetcher)
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  const relations = await db.table('characterRelations').toArray()
+  expect(relations).toHaveLength(1)
+  expect(relations[0]).toMatchObject({
+    originCharacterId: 'C1-P001', sourceName: '沈青', targetName: '顾衡', targetIds: ['C1-P002'],
+    relationType: 'friendship', forwardLabel: '朋友', reverseLabel: '朋友', direction: 'bidirectional',
+    evidence: [{ chapterIndex: '1', quote: '沈青送信' }], revision: 1,
+  })
+  expect(await db.table('characters').get('C1-P001')).not.toHaveProperty('relations')
+})
+
+it('关系引文不在本章原文时拒绝该子步骤，不留下半份关系', async () => {
+  const invalid = { characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'parent_child', relation_label: '父亲', reverse_label: '子女', direction: 'directed', quote: '本章没有这句话' }] }], locations: [] }
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string)
+    return stream(body.tools[0].function.parameters.properties.characters ? invalid : { nodes: [] })
+  })
+  const { service, db } = await setup(fetcher)
+  await service.start('a')
+  expect(await db.table('characterRelations').count()).toBe(0)
+  expect(await db.table('extractionReceipts').get('1:worldAssets')).toBeUndefined()
+  expect(service.state('a')?.results.find(row => row.step === 'worldAssets')?.ok).toBe(false)
 })

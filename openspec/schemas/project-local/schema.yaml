@@ -1,0 +1,30 @@
+name: project-local
+version: 1
+description: 局部逻辑变更的精简方案，治理规则引用 AGENTS.md
+artifacts:
+  - id: proposal
+    generates: "proposal.md"
+    description: proposal，按根目录 AGENTS.md 执行
+    template: proposal.md
+    instruction: |
+      先按 AGENTS.md 判级并登记需求池；写清讨论结论、影响、字段变化、数据流转、触发逻辑、验收及接手说明。中型需求将实施方法写入提案。
+    requires: []
+  - id: specs
+    generates: "specs/**/*.md"
+    description: specs，按根目录 AGENTS.md 执行
+    template: spec.md
+    instruction: |
+      按 AGENTS.md 编写中文差异规格，保留 OpenSpec 标记。每条 SHALL 要求至少一个 Scenario，使用 WHEN 和 THEN；无行为变化按 skip_specs 处理。
+    requires: [proposal]
+  - id: tasks
+    generates: "tasks.md"
+    description: tasks，按根目录 AGENTS.md 执行
+    template: tasks.md
+    instruction: |
+      按 AGENTS.md 写带编号的复选框任务、对应需求、检查方法和证据；自动检查和用户验收分别登记。
+    requires: [specs]
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    先读取 AGENTS.md，从需求池编号核对独立接手材料、具体确认及当前任务，按依赖实施并记录检查证据。

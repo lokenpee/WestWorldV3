@@ -8,14 +8,7 @@ decision-makers: 用户（批准阶段1及既定纯浏览器存储方案），Co
 
 ## 背景与决定
 
-阶段 1 需要持久书架、按书隔离、刷新恢复与跨标签刷新。沿用 2.2 规格的 IndexedDB/Dexie 方案，在现有 React/npm 工程增加 Dexie 4.4.6；不增加后端、云同步或另一份权威资产状态。
-
-- 正常库为 `westworld_settings` v2（3 表），书库为 `westworld_canon_{bookId}` v5（15 表）；只在查询该书资料时打开书库，空书架不创建书库、不预置内容。
-- `src/lib/storage/workspace.ts` 负责库 Schema 与查询；`BookRepository` 供页面查询。书架选择和当前标签仅存 App 内存；刷新回资产并选最新书，切标签保留当前选书。
-- `src/hooks/useLiveResult.ts` 管理 Dexie liveQuery 订阅和取消订阅；新查询不复用上一本书的结果，错误显示到用户明确重试。
-- 阶段 1 不承担旧库迁移：尝试升级旧书库时中止升级事务并给出提示，原内容保留；阶段 15 实现真实迁移。
-- `src/dev/Stage1Acceptance.tsx` 只在开发构建及明确的 `?acceptance=stage1` 入口加载，固定使用 `westworld_acceptance_stage1_*` 库。工具仅装载/清空固定两本样本，不能枚举清理用户库；生产构建移除模块及样本。
-- 页面沿用现有普通 CSS，使用规格约定的中性色、240px 书架和小于768px堆叠布局；本阶段无需新增 CSS 框架或全局状态库。
+本地书架需要持久保存、按书隔离和跨标签更新，采用 Dexie 管理独立数据库。当前行为见[书架与导入](../../openspec/specs/book-import/spec.md)，结构及当前技术实现见[架构](../v2/02-架构与技术规格.md)和[数据契约](../v2/03-Spec-数据与存储.md)。旧库原地升级见后续能力任务。
 
 ## 替代方案与后果
 
@@ -25,9 +18,4 @@ decision-makers: 用户（批准阶段1及既定纯浏览器存储方案），Co
 
 ## 验证
 
-- [x] `tests/workspace.test.ts` 验证空库、排序、持久化、书籍隔离、跨连接更新、15表与旧升级回滚。
-- [x] `tests/browser/workspace.spec.ts` 验证真实浏览器三入口、StrictMode无重复、跨标签更新、错误重试、窄屏与独立样本库。
-- [x] 生产验收入口隔离：`workspace.production.spec.ts` 已通过，执行结果登记阶段1验收单。
-- [x] 正式导入、资产写命令及备份恢复分别由业务与浏览器测试覆盖；旧库原地迁移遵循迁移规格。
-
-体积以本次构建实际结果为准，登记在阶段1验收单；若后续迁移改变数据库命名或版本，先更新本记录与目标契约。
+执行结果见[书架验收](../acceptance/stage-01.md)和[覆盖索引](../v2/12-验收执行与覆盖矩阵.md)。

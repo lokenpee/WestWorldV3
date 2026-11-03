@@ -77,13 +77,13 @@ describe('阶段 1：真实数据仓储契约', () => {
     } finally { subscription.unsubscribe() }
   })
 
-  it('新书库包含目标15表；旧v4不会被阶段1静默升级', async () => {
+  it('新书库包含目标16表；旧v4不会被阶段1静默升级', async () => {
     const workspace = setup()
     await workspace.settings.books.bulkPut(books)
     const fresh = workspace.openBook('a')
     opened.push(fresh)
     await fresh.open()
-    expect(fresh.tables).toHaveLength(15)
+    expect(fresh.tables).toHaveLength(16)
     const legacy = new Dexie(`${workspace.scope.bookPrefix}b`)
     legacy.version(4).stores({ characters: 'id', characterSnapshots: 'id' })
     await legacy.table('characterSnapshots').put({ id: 'keep-me', name: '旧资料' })
@@ -97,5 +97,31 @@ describe('阶段 1：真实数据仓储契约', () => {
     await inspect.open()
     expect(inspect.verno).toBe(4)
     expect(await inspect.table('characterSnapshots').get('keep-me')).toMatchObject({ name: '旧资料' })
+  })
+
+  it('版本5书库升级到6：人物关系移入关系表，旧节点补齐绑定来源', async () => {
+    const workspace = setup()
+    const legacy = new Dexie(`${workspace.scope.bookPrefix}legacy`)
+    legacy.version(5).stores({
+      chapters: 'chapterIndex, order', chapterTexts: 'chapterIndex', characters: 'id, chapterIndex, name', locations: 'id, chapterIndex, name', nodes: 'id, chapterIndex, order', eventLines: 'id, lineStatus', compileProgress: 'stage', storyEditorMemory: 'id, sessionId', storyEditorNotes: 'id, &[sessionId+key], sessionId, kind, status, updatedAt', storyEditorCheckpoints: 'id, sessionId, stage, phase, status, updatedAt', storySessions: 'id, status, createdAt, parentSessionId', storySessionEntries: 'id, &[sessionId+ordinal], sessionId, parentId, type', extractionReceipts: 'key, chapterIndex, substep', assetLifecycle: 'key, kind, originId, currentId, state', pipelineRuns: 'id, recordType, stage, status, startedAt, &lockKey',
+    })
+    await legacy.open()
+    await legacy.table('characters').bulkPut([
+      { id: 'A1', bookId: 'legacy', name: '张三', revision: 1, confidence: 1, createdBy: 'P1', chapterIndex: '1', relations: [{ target: '张蕾', relation_type: 'parent_child', relation_label: '父亲', direction: 'directed' }] },
+      { id: 'A2', bookId: 'legacy', name: '张三', revision: 1, confidence: 1, createdBy: 'P1', relations: [{ target: '张蕾', relation_type: 'enemy', relation_label: '仇人' }] },
+      { id: 'B1', bookId: 'legacy', name: '张蕾', revision: 1, confidence: 1, createdBy: 'P1' },
+    ])
+    await legacy.table('assetLifecycle').bulkPut(['A1', 'A2', 'B1'].map(id => ({ key: `character:${id}`, bookId: 'legacy', kind: 'character', originId: id, currentId: id, state: 'live', revision: 1, updatedAt: '' })))
+    await legacy.table('nodes').put({ id: 'N1', bookId: 'legacy', name: '会面', summary: '会面', chapterIndex: '1', chapterName: '第一章', actors: ['张三'], actorIds: ['A2'], order: 0, revision: 1, confidence: 1, createdBy: 'P1', quote: '' })
+    legacy.close()
+    const db = workspace.openBook('legacy')
+    opened.push(db)
+    await db.open()
+    const relations = await db.table('characterRelations').toArray()
+    expect(relations).toHaveLength(2)
+    expect(relations.map(row => row.originCharacterId).sort()).toEqual(['A1', 'A2'])
+    expect(relations.find(row => row.originCharacterId === 'A2')).toMatchObject({ direction: 'unspecified', sourceId: 'A2', targetIds: ['B1'], legacyPayload: { relation_label: '仇人' } })
+    expect(await db.table('characters').get('A1')).not.toHaveProperty('relations')
+    expect(await db.table('nodes').get('N1')).toMatchObject({ actorIds: ['A1', 'A2'], legacyActorIds: ['A2'], actorBindings: [{ mention: '张三', ids: ['A1', 'A2'] }] })
   })
 })

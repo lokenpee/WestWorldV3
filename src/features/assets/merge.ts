@@ -94,13 +94,8 @@ export function fuseWorldAssets<K extends WorldKind>(kind: K, members: AssetByKi
       character.roleWeight = manual[0].roleWeight; character.roleWeightSource = 'manual'
       if (new Set(manual.map(row => row.roleWeight)).size > 1) conflicts.push(`人物层级冲突：保留${character.roleWeight}`)
     }
-    const relations = new Map<string, NonNullable<Character['relations']>[number]>()
-    for (const person of people) for (const relation of person.relations ?? []) {
-      const key = `${relation.target}\0${relation.relation_type}\0${relation.direction ?? ''}`
-      const old = relations.get(key)
-      relations.set(key, old ? { ...old, relation_label: fuseText([old.relation_label, relation.relation_label]) } : { ...relation })
-    }
-    character.relations = [...relations.values()]
+    // 关系保存在独立关系表，融合结果不再写内联关系；端点收敛由共同合并核心处理。
+    delete character.relations
   }
   result.mergeFacts = combinedFacts(rows, fields)
   if (kind === 'character') Object.assign(result, normalizeCharacterNames(result))

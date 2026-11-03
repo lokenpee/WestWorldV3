@@ -3,9 +3,10 @@ import type { ModelService } from '../models/service'
 import type { CallResult, CallProgress } from '../models/types'
 import { classifyError } from '../models/policy'
 import { bindNodeCharacters } from '../assets/characterLinks'
+import { extractedRelation, syncRelations, type ExtractedRelationInput } from '../assets/relations'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebuildFacts, updateFrequencies } from '../assets/derive'
-import type { Character, EventNode, LocationAsset } from '../assets/types'
+import type { Character, CharacterRelation, EventNode, Lifecycle, LocationAsset } from '../assets/types'
 import { stepLabels, substeps, type ExtractionData, type ExtractedRow, type Substep } from './types'
 import { checkReceiptSources, coverage, withExtractionLock, type Lease, type Progress, type Receipt, type Run, type SavedUsage, type StoredTask } from './recovery'
 
@@ -106,7 +107,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
         const failedResult = (error: unknown): CallResult => ({ ok: false, mode: 'direct', text: '', elapsedMs: 0, attempts: [], usage: { input: 0, output: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, costStatus: 'unknown' }, error: classifyError(error) })
         const result: CallResult & { value?: ExtractionData } = !text ? failedResult('本章原文缺失。') : await models.generate<ExtractionData>({ role: 'extraction', signal: controller.signal, maxRequests: 3, repairAttempts: 2,
           context: { systemPrompt: promptOf(step), messages: [{ role: 'user', content: `章节标识：${chapter.chapterIndex}\n章节名：${chapter.chapterName}\n\n--- 正文开始 ---\n${text}\n--- 正文结束 ---`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交本章提取结果', parameters: schemaOf(step), constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
-          validate: message => validateExtraction(step, message), repairPrompt: '请按字段要求修正并调用唯一的 submit_result 提交本章结果；其他工具未执行。',
+          validate: message => validateExtraction(step, message, text), repairPrompt: '请按字段要求修正并调用唯一的 submit_result 提交本章结果；其他工具未执行。',
           beforeRequest: () => db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), checkLease),
           onProgress: progress => set(bookId, { progress }),
         }).catch(error => { if (error instanceof ExecutionLost || controller.signal.aborted) throw error; return failedResult(error) })
@@ -127,6 +128,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
             const currentText = await db.table<{ text: string }>('chapterTexts').get(chapter.chapterIndex)
             if (currentText?.text !== text) throw new Error('本章原文已变化，请重新提取。')
             const originIds: string[] = []
+            const pendingRelations: { person: Character; input: ExtractedRelationInput }[] = []
             const timestamp = new Date().toISOString()
             async function insert(table: 'characters' | 'locations' | 'nodes', kind: 'character' | 'location' | 'node', code: string, rows: ExtractedRow[]) {
               let sequence = 1
@@ -135,6 +137,8 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
                 let id: string
                 do { id = `C${chapter.chapterIndex}-${code}${String(sequence++).padStart(3, '0')}` } while (await db.table(table).get(id) || await db.table('assetLifecycle').get(`${kind}:${id}`))
                 const row: Record<string, unknown> = { ...source, id, bookId, revision: 1, createdBy: 'P1', chapterIndex: chapter.chapterIndex, chapterName: chapter.chapterName }
+                const relationInputs = kind === 'character' ? (Array.isArray(source.relations) ? source.relations as Record<string, unknown>[] : []) : []
+                delete row.relations
                 if (kind === 'node') {
                   const quote = source.quote as string; const offset = quote ? text.indexOf(quote) : -1
                   delete row.offset
@@ -152,11 +156,30 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
                 await db.table(table).add(row)
                 await db.table('assetLifecycle').add({ key: `${kind}:${id}`, bookId, kind, originId: id, currentId: id, state: 'live', revision: 1, updatedAt: timestamp, sourceChapterIndex: chapter.chapterIndex })
                 originIds.push(id)
+                for (const input of relationInputs) {
+                  const target = String(input.target ?? '').trim()
+                  if (!target) continue
+                  pendingRelations.push({ person: row as unknown as Character, input: {
+                    target, relationType: String(input.relation_type ?? ''), forwardLabel: String(input.relation_label ?? ''), reverseLabel: String(input.reverse_label ?? ''),
+                    direction: String(input.direction ?? ''), chapterIndex: chapter.chapterIndex, quote: String(input.quote ?? ''),
+                  } })
+                }
               }
             }
             await insert('characters', 'character', 'P', result.value!.characters ?? [])
             await insert('locations', 'location', 'L', result.value!.locations ?? [])
             await insert('nodes', 'node', 'N', result.value!.nodes ?? [])
+            if (pendingRelations.length) {
+              const people = await db.table<Character>('characters').toArray()
+              const mappings = await db.table<Lifecycle>('assetLifecycle').toArray()
+              const created = pendingRelations.map(item => extractedRelation(item.person, item.input, people, mappings, timestamp))
+              const existing = await db.table<CharacterRelation>('characterRelations').toArray()
+              const known = new Set(existing.map(row => row.id))
+              const fresh = created.filter(row => !known.has(row.id))
+              if (fresh.length) await db.table('characterRelations').bulkPut(fresh)
+              const synced = syncRelations([...existing, ...fresh], people, mappings, timestamp)
+              if (synced.changed.length) await db.table('characterRelations').bulkPut(synced.changed)
+            }
             const texts = await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()
             for (const [table, people] of [['characters', true], ['locations', false]] as const) {
               const before = await db.table<Character | LocationAsset>(table).toArray()

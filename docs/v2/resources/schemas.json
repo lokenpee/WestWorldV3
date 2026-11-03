@@ -458,33 +458,54 @@
           "type": "object",
           "required": [
             "target",
-            "relation_type"
+            "relation_type",
+            "relation_label",
+            "reverse_label",
+            "direction",
+            "quote"
           ],
           "properties": {
             "target": {
               "description": "关系指向的人。用本章原文的称呼，还没归并。",
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "relation_type": {
               "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "relation_label": {
-              "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
-              "type": "string"
+              "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+              "type": "string",
+              "minLength": 1
+            },
+            "reverse_label": {
+              "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+              "type": "string",
+              "minLength": 1
             },
             "direction": {
-              "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+              "description": "directed = 方向明确（父亲/子女）；bidirectional = 对称（夫妻/朋友）；unspecified = 原文方向未明确。",
               "anyOf": [
+                {
+                  "const": "directed",
+                  "type": "string"
+                },
                 {
                   "const": "bidirectional",
                   "type": "string"
                 },
                 {
-                  "const": "directed",
+                  "const": "unspecified",
                   "type": "string"
                 }
               ]
+            },
+            "quote": {
+              "description": "能解释这条关系的本章连续原文片段，逐字复制。",
+              "type": "string",
+              "minLength": 1
             }
           }
         }
@@ -568,33 +589,54 @@
           "type": "object",
           "required": [
             "target",
-            "relation_type"
+            "relation_type",
+            "relation_label",
+            "reverse_label",
+            "direction",
+            "quote"
           ],
           "properties": {
             "target": {
               "description": "关系指向的人。用本章原文的称呼，还没归并。",
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "relation_type": {
               "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "relation_label": {
-              "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
-              "type": "string"
+              "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+              "type": "string",
+              "minLength": 1
+            },
+            "reverse_label": {
+              "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+              "type": "string",
+              "minLength": 1
             },
             "direction": {
-              "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+              "description": "directed = 方向明确（父亲/子女）；bidirectional = 对称（夫妻/朋友）；unspecified = 原文方向未明确。",
               "anyOf": [
+                {
+                  "const": "directed",
+                  "type": "string"
+                },
                 {
                   "const": "bidirectional",
                   "type": "string"
                 },
                 {
-                  "const": "directed",
+                  "const": "unspecified",
                   "type": "string"
                 }
               ]
+            },
+            "quote": {
+              "description": "能解释这条关系的本章连续原文片段，逐字复制。",
+              "type": "string",
+              "minLength": 1
             }
           }
         }
@@ -2633,14 +2675,18 @@
     }
   },
   "RelationDirectionSchema": {
-    "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+    "description": "关系方向。directed = 方向明确（父亲/子女）；bidirectional = 对称（夫妻/朋友）；unspecified = 原文方向未明确。",
     "anyOf": [
+      {
+        "const": "directed",
+        "type": "string"
+      },
       {
         "const": "bidirectional",
         "type": "string"
       },
       {
-        "const": "directed",
+        "const": "unspecified",
         "type": "string"
       }
     ]
@@ -2651,33 +2697,54 @@
     "type": "object",
     "required": [
       "target",
-      "relation_type"
+      "relation_type",
+      "relation_label",
+      "reverse_label",
+      "direction",
+      "quote"
     ],
     "properties": {
       "target": {
         "description": "关系指向的人。用本章原文的称呼，还没归并。",
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       },
       "relation_type": {
         "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       },
       "relation_label": {
-        "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
-        "type": "string"
+        "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+        "type": "string",
+        "minLength": 1
+      },
+      "reverse_label": {
+        "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+        "type": "string",
+        "minLength": 1
       },
       "direction": {
-        "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+        "description": "directed = 方向明确（父亲/子女）；bidirectional = 对称（夫妻/朋友）；unspecified = 原文方向未明确。",
         "anyOf": [
+          {
+            "const": "directed",
+            "type": "string"
+          },
           {
             "const": "bidirectional",
             "type": "string"
           },
           {
-            "const": "directed",
+            "const": "unspecified",
             "type": "string"
           }
         ]
+      },
+      "quote": {
+        "description": "能解释这条关系的本章连续原文片段，逐字复制。",
+        "type": "string",
+        "minLength": 1
       }
     }
   },
@@ -2787,33 +2854,54 @@
           "type": "object",
           "required": [
             "target",
-            "relation_type"
+            "relation_type",
+            "relation_label",
+            "reverse_label",
+            "direction",
+            "quote"
           ],
           "properties": {
             "target": {
               "description": "关系指向的人。用本章原文的称呼，还没归并。",
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "relation_type": {
               "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
-              "type": "string"
+              "type": "string",
+              "minLength": 1
             },
             "relation_label": {
-              "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
-              "type": "string"
+              "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+              "type": "string",
+              "minLength": 1
+            },
+            "reverse_label": {
+              "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+              "type": "string",
+              "minLength": 1
             },
             "direction": {
-              "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+              "description": "directed = 方向明确（父亲/子女）；bidirectional = 对称（夫妻/朋友）；unspecified = 原文方向未明确。",
               "anyOf": [
+                {
+                  "const": "directed",
+                  "type": "string"
+                },
                 {
                   "const": "bidirectional",
                   "type": "string"
                 },
                 {
-                  "const": "directed",
+                  "const": "unspecified",
                   "type": "string"
                 }
               ]
+            },
+            "quote": {
+              "description": "能解释这条关系的本章连续原文片段，逐字复制。",
+              "type": "string",
+              "minLength": 1
             }
           }
         }
@@ -4176,33 +4264,54 @@
                 "type": "object",
                 "required": [
                   "target",
-                  "relation_type"
+                  "relation_type",
+                  "relation_label",
+                  "reverse_label",
+                  "direction",
+                  "quote"
                 ],
                 "properties": {
                   "target": {
                     "description": "关系指向的人。用本章原文的称呼，还没归并。",
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "relation_type": {
                     "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                   },
                   "relation_label": {
-                    "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
-                    "type": "string"
+                    "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reverse_label": {
+                    "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+                    "type": "string",
+                    "minLength": 1
                   },
                   "direction": {
-                    "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
+                    "description": "directed = 方向明确（父亲/子女）；bidirectional = 对称（夫妻/朋友）；unspecified = 原文方向未明确。",
                     "anyOf": [
+                      {
+                        "const": "directed",
+                        "type": "string"
+                      },
                       {
                         "const": "bidirectional",
                         "type": "string"
                       },
                       {
-                        "const": "directed",
+                        "const": "unspecified",
                         "type": "string"
                       }
                     ]
+                  },
+                  "quote": {
+                    "description": "能解释这条关系的本章连续原文片段，逐字复制。",
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               }

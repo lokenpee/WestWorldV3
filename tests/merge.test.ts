@@ -133,6 +133,8 @@ describe('人物地点批量合并', () => {
     const node = await service.create('book', 'node', { name: '另一人的事件', summary: '事件', chapterIndex: '1', actors: ['张三'], actorIds: [outsider.id] })
     const preview = await service.previewMerge('book', 'character', { memberIds: [first.id, keep.id], keepId: keep.id, canonicalName: '张清' })
     await service.confirmMerge('book', 'character', preview.request)
-    expect((await service.read('book')).nodes.find(row => row.id === node.id)).toMatchObject({ actors: ['张三'], actorIds: [outsider.id] })
+    const mergedNode = (await service.read('book')).nodes.find(row => row.id === node.id)!
+    expect([...(mergedNode.actorIds ?? [])].sort()).toEqual([keep.id, outsider.id].sort())
+    expect([...mergedNode.actors].sort()).toEqual(['张三', '张清'].sort())
   })
 })

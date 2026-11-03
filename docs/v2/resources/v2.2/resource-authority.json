@@ -1,61 +1,129 @@
 {
-  "documentVersion": "2.2",
-  "status": "target-not-implemented",
-  "currentSpecs": [
-    "00–13 main Markdown",
-    "resources/v2.2/*",
-    "resources/数据值-ID与备份格式.md"
+  "version": 1,
+  "authority": "../../文档与资源归属.json",
+  "behavior": "../../../../openspec/specs",
+  "governance": "../../../../AGENTS.md",
+  "runtimeAssets": [
+    {
+      "path": "../algorithm-parameters.json",
+      "consumers": [
+        "src/features/world/candidates.ts"
+      ]
+    },
+    {
+      "path": "../schemas.json",
+      "consumers": [
+        "src/features/agents/compaction.ts",
+        "src/features/extraction/contracts.ts",
+        "src/features/world/optimization.ts"
+      ]
+    },
+    {
+      "path": "model-output-contract.json",
+      "consumers": [
+        "src/features/agents/contracts.ts",
+        "src/features/world/optimization.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/agent-wrapper.txt",
+      "consumers": [
+        "src/features/agents/runtime.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/character-optimize.md",
+      "consumers": [
+        "src/features/world/optimization.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/compact.md",
+      "consumers": [
+        "src/features/agents/compaction.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/location-optimize.md",
+      "consumers": [
+        "src/features/world/optimization.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/output-discipline.txt",
+      "consumers": [
+        "src/features/agents/output-discipline.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p1-narrative.md",
+      "consumers": [
+        "src/features/extraction/contracts.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p1-world.md",
+      "consumers": [
+        "src/features/extraction/contracts.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p2-identity.md",
+      "consumers": [
+        "src/features/world/service.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p3-story.md",
+      "consumers": [
+        "src/features/story/review.ts",
+        "src/features/story/service.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/probe_asset.txt",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/probe_story.txt",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/probe_system.txt",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/story.txt",
+      "consumers": [
+        "src/features/story/review.ts",
+        "src/features/story/service.ts"
+      ]
+    },
+    {
+      "path": "storage.schema.json",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ]
+    },
+    {
+      "path": "tool-contracts.json",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ]
+    },
+    {
+      "path": "tool-results.schema.json",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ]
+    }
   ],
-  "legacyResourceRoot": "2.1-frozen-evidence-and-unchanged-base-fields",
-  "replacements": {
-    "resources/operation-catalog.json": "resources/v2.2/operation-catalog.json",
-    "resources/automatic-triggers.json": "resources/v2.2/automatic-triggers.json",
-    "resources/data-flows.json": "resources/v2.2/data-flows.json",
-    "resources/state-transitions.json": "resources/v2.2/state-transitions.json",
-    "resources/tool-contracts.json": "resources/v2.2/tool-contracts.json",
-    "resources/tool-results.schema.json": "resources/v2.2/tool-results.schema.json",
-    "resources/schemas.json": "未变基础DTO；完整目标存储见resources/v2.2/storage.schema.json，输出见model-output-contract.json",
-    "resources/algorithm-parameters.json": "unchanged normalization/formula only; new stage policy in resources/v2.2/pipeline-contract.json",
-    "resources/ui-copy-and-styles.json": "unchanged style only; changed workflow controls in 06/09",
-    "resources/prompts/merge/04-link-event-lines.md": "resources/v2.2/prompts/active/p3-story.md",
-    "resources/prompts/merge/05-detect-alias-groups.md": "resources/v2.2/prompts/active/p2-identity.md",
-    "resources/prompts/merge/06-merge-locations.md": "resources/v2.2/prompts/active/location-optimize.md",
-    "acceptance/cases.json": "2.1 executable suite only; target scenarios resources/v2.2/acceptance-cases.json",
-    "evidence/*": "按日期/报告kind区分；历史应用录制不能证明2026-10-24目标实现",
-    "resources/legacy-table-dictionary-2.1.md": "historical field reference only; not current lifecycle",
-    "resources/prompts/extraction/01-extract-world-assets.md": "resources/v2.2/prompts/active/p1-world.md",
-    "resources/prompts/extraction/02-extract-narrative-assets.md": "resources/v2.2/prompts/active/p1-narrative.md",
-    "resources/prompts/session/07-compact-story-session.md": "resources/v2.2/prompts/active/compact.md",
-    "resources/prompts/merge/08-optimize-characters.md": "resources/v2.2/prompts/active/character-optimize.md",
-    "resources/v2.2/prompts/p3-story-editor.md": "resources/v2.2/prompts/active/p3-story.md",
-    "resources/v2.2/prompts/p2-asset-editor.md": "resources/v2.2/prompts/active/p2-identity.md",
-    "resources/v2.2/prompts/optimize-locations.md": "resources/v2.2/prompts/active/location-optimize.md"
-  },
-  "reusedUnchanged": [
-    "resources/runtime/*",
-    "resources/assets/*",
-    "golden normalization/frequency/layout cases"
-  ],
-  "applicationStatus": "stage0-contract-and-sdk-probe-verified; business-application-not-implemented",
-  "clarificationDate": "2026-10-24",
-  "currentDataModel": "single-current-entity-layer; no draft/publish action",
-  "retiredTables": [
-    "characterSnapshots",
-    "locationSnapshots"
-  ],
-  "aiRuntimeContract": "resources/v2.2/ai-runtime-contract.json",
-  "aiBoundary": "pi-ai shared direct/agent model layer; pi-agent-core executes Agent; app persists memory/state and exposes controlled read/write tools",
-  "contractRevision": "2026-10-24",
-  "activePromptManifest": "resources/v2.2/prompt-call-manifest.json",
-  "targetAcceptance": "resources/v2.2/acceptance/README.md",
-  "bugfixPolicyRevision": "2026-10-24.fix-first",
-  "defectPolicy": "07/ALG-FIX corrected expectations override all historic bug-preservation assertions",
-  "bugfixAcceptance": "resources/v2.2/acceptance/bugfix-cases.json",
-  "stage0Revision": "2026-10-24.stage0",
-  "stage0Decision": "../../../decisions/stage-edit-lock-and-request-budget.md",
-  "currentManualEditPolicy": "pipeline-contract.json#/taskIsolation/manualEditPolicy",
-  "currentRequestBudget": "ai-runtime-contract.json#/requestBudget",
-  "bookSessionPolicy": "../../05-Spec-AI与会话.md#ai-16-按书运行与会话生命周期",
-  "bookSessionAcceptance": "acceptance/book-session-cases.json",
-  "playSessionDelivery": "../../../分阶段实现与人工验收计划.md#游玩会话接入安排"
+  "currentImplementation": "src；实现状态与人工验收分别见覆盖索引",
+  "pending": "openspec/changes"
 }

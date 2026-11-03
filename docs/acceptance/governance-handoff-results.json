@@ -1,0 +1,47 @@
+{
+  "date": "2026-11-03",
+  "scope": "需求池、字段与流程模板、独立接手结构检查",
+  "results": [
+    {
+      "name": "governance",
+      "exitCode": 0,
+      "output": "{\n  \"ok\": true,\n  \"counts\": {\n    \"capabilities\": 10,\n    \"pendingCapabilities\": 3,\n    \"requests\": 6,\n    \"documents\": 14,\n    \"sections\": 383,\n    \"requirementRows\": 156,\n    \"resources\": 253,\n    \"runtimeAssets\": 19,\n    \"markdown\": 75\n  },\n  \"issues\": []\n}"
+    },
+    {
+      "name": "openspec-strict",
+      "exitCode": 0,
+      "output": "{\n  \"items\": [\n    {\n      \"id\": \"adopt-openspec\",\n      \"type\": \"change\",\n      \"valid\": true,\n      \"issues\": [\n        {\n          \"level\": \"INFO\",\n          \"path\": \"file\",\n          \"message\": \"skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted\"\n        }\n      ],\n      \"durationMs\": 58\n    },\n    {\n      \"id\": \"agent-session\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 11\n    },\n    {\n      \"id\": \"asset-mainline-acceptance\",\n      \"type\": \"change\",\n      \"valid\": true,\n      \"issues\": [\n        {\n          \"level\": \"INFO\",\n          \"path\": \"file\",\n          \"message\": \"skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted\"\n        }\n      ],\n      \"durationMs\": 56\n    },\n    {\n      \"id\": \"asset-management\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 3\n    },\n    {\n      \"id\": \"book-backup\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 1\n    },\n    {\n      \"id\": \"book-import\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 0\n    },\n    {\n      \"id\": \"event-network\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 1\n    },\n    {\n      \"id\": \"extraction\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 0\n    },\n    {\n      \"id\": \"model-access\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 1\n    },\n    {\n      \"id\": \"play-session-foundation\",\n      \"type\": \"change\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 82\n    },\n    {\n      \"id\": \"review-remaining-baseline\",\n      \"type\": \"change\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 97\n    },\n    {\n      \"id\": \"story-organization\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 0\n    },\n    {\n      \"id\": \"task-recovery\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 2\n    },\n    {\n      \"id\": \"world-organization\",\n      \"type\": \"spec\",\n      \"valid\": true,\n      \"issues\": [],\n      \"durationMs\": 1\n    }\n  ],\n  \"summary\": {\n    \"totals\": {\n      \"items\": 14,\n      \"passed\": 14,\n      \"failed\": 0\n    },\n    \"byType\": {\n      \"change\": {\n        \"items\": 4,\n        \"passed\": 4,\n        \"failed\": 0\n      },\n      \"spec\": {\n        \"items\": 10,\n        \"passed\": 10,\n        \"failed\": 0\n      }\n    }\n  },\n  \"version\": \"1.0\",\n  \"root\": {\n    \"path\": \"D:\\\\mic\\\\WestWorldV3\",\n    \"source\": \"nearest\"\n  }\n}"
+    },
+    {
+      "name": "schema-project-local",
+      "exitCode": 0,
+      "output": "✓ Schema 'project-local' is valid"
+    },
+    {
+      "name": "schema-project-full",
+      "exitCode": 0,
+      "output": "✓ Schema 'project-full' is valid"
+    },
+    {
+      "name": "duplicate-id",
+      "expectedFailureDetected": true
+    },
+    {
+      "name": "incomplete-ready",
+      "expectedFailureDetected": true
+    },
+    {
+      "name": "missing-entry",
+      "expectedFailureDetected": true
+    },
+    {
+      "name": "missing-template-section",
+      "expectedFailureDetected": true
+    },
+    {
+      "name": "restored",
+      "exitCode": 0,
+      "output": "{\n  \"ok\": true,\n  \"counts\": {\n    \"capabilities\": 10,\n    \"pendingCapabilities\": 3,\n    \"requests\": 6,\n    \"documents\": 14,\n    \"sections\": 383,\n    \"requirementRows\": 156,\n    \"resources\": 253,\n    \"runtimeAssets\": 19,\n    \"markdown\": 75\n  },\n  \"issues\": []\n}"
+    }
+  ]
+}

@@ -62,7 +62,7 @@ describe('完整书籍备份与恢复', () => {
     await workspace.settings.appSettings.put({ key: 'assets.exportDirectory', value: { name: 'private-directory' } })
     const backup = await service.exportBook(book.id)
     const files = unzipSync(backup.bytes)
-    expect(backup.manifest.formatVersion).toBe(5)
+    expect(backup.manifest.formatVersion).toBe(6)
     expect(Object.keys(files)).not.toContain('data/credentials.json')
     expect(Object.values(files).map(value => strFromU8(value)).join('')).not.toMatch(/never-export-this-secret|private-directory/)
     const inspected = await service.inspectBackup(backup.bytes)

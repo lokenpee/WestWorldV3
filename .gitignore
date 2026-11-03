@@ -28,6 +28,7 @@ Thumbs.db
 .obsidian/
 /Pasted image *.png
 *.wwv2
+*.lnk
 *.pem
 *.key
 *.p12

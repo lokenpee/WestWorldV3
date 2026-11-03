@@ -1,9 +1,11 @@
 import type { createWorkspace } from '../../lib/storage/workspace'
-import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type EventLine, type EventNode, type Lifecycle, type LocationAsset } from './types'
+import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterRelation, type EventLine, type EventNode, type Lifecycle, type LocationAsset } from './types'
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
 import { normalizeCharacterNames } from './characterNames'
 import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRun, type MergeOptions, type MergePreview, type MergeRequest, type WorldKind, type MechanicalMergeContext } from './merge'
+import { dexieMergeStore, mergeWorldAssets } from './mergeCore'
+import { edgesFor, projectRelations, relationView, syncRelations } from './relations'
 import type { WorldRun } from '../world/types'
 
 type Workspace = ReturnType<typeof createWorkspace>
@@ -152,50 +154,23 @@ export function createAssetService(workspace: Workspace) {
       const members = await mergeMembers(db, bookId, kind, request, request.expectedRevisions, queued)
       const timestamp = new Date().toISOString()
       const beforeCounts = { characters: await db.table('characters').count(), locations: await db.table('locations').count() }
-      const fusion = fuseWorldAssets(kind, members, request.keepId, request.canonicalName, timestamp)
-      if (queued?.automatic) {
-        fusion.result.nameSource = members.some(row => row.nameSource === 'manual') ? 'manual' : 'automatic'
-        fusion.result.manualKeep = members.some(row => row.manualKeep === true)
-      } else { fusion.result.nameSource = 'manual'; fusion.result.manualKeep = true }
-      const table = db.table<AssetByKind[K]>(assetTables[kind])
-      const before = await table.toArray()
-      const memberSet = new Set(request.memberIds)
-      const after = before.filter(row => !memberSet.has(row.id))
-      after.push(fusion.result)
-      if (queued) await writeChanged(db, assetTables[kind], before, after)
-      else {
-        const texts = await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()
-        await writeChanged(db, assetTables[kind], before, updateFrequencies(after, texts, kind === 'character'))
-      }
-      const redirects = new Map(request.memberIds.map(id => [id, request.keepId]))
-      const mappings = await db.table<Lifecycle>('assetLifecycle').toArray()
-      for (const member of members) if (!mappings.some(row => row.kind === kind && row.originId === member.id)) mappings.push({ key: `${kind}:${member.id}`, bookId, kind, originId: member.id, currentId: member.id, state: 'live', revision: 0, updatedAt: timestamp })
-      const mappingById = new Map(mappings.filter(row => row.kind === kind).map(row => [row.originId, row]))
-      const targetsMergeGroup = (mapping: Lifecycle) => {
-        let currentId = mapping.currentId ?? mapping.originId
-        const visited = new Set<string>([mapping.originId])
-        while (!memberSet.has(currentId)) {
-          const next = mappingById.get(currentId)
-          if (!next || next.state === 'deleted' || next.currentId === currentId) return false
-          if (visited.has(currentId)) throw new AssetError('CONFLICT', '来源映射存在循环，请检查资料后再合并。')
-          visited.add(currentId); currentId = next.currentId ?? next.originId
-        }
-        return true
-      }
-      await db.table('assetLifecycle').bulkPut(mappings.filter(row => row.kind === kind && row.bookId === bookId && row.state !== 'deleted' && targetsMergeGroup(row)).map(mapping => ({ ...mapping, currentId: request.keepId, state: mapping.originId === request.keepId ? 'live' : 'merged', revision: mapping.revision + 1, updatedAt: timestamp })))
-      const invalidations: { kind: AssetKind; id: string }[] = request.memberIds.map(id => ({ kind, id }))
-      if (kind === 'character') {
-        const oldNodes = await db.table<EventNode>('nodes').toArray()
-        const newCharacters = await db.table<Character>('characters').toArray()
-        const changed = await writeChanged(db, 'nodes', oldNodes, remapCharacterLinks(oldNodes, before as Character[], newCharacters, redirects))
-        invalidations.push(...changed.map(node => ({ kind: 'node' as const, id: node.id })))
-      }
+      const texts = queued ? undefined : await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()
+      const automatic = queued?.automatic === true
+      const merged = await mergeWorldAssets(dexieMergeStore(db), {
+        bookId, kind, memberIds: request.memberIds, keepId: request.keepId, canonicalName: request.canonicalName, timestamp,
+        nameSource: automatic && !members.some(row => row.nameSource === 'manual') ? 'automatic' : 'manual',
+        manualKeep: automatic ? members.some(row => row.manualKeep === true) : true,
+        expectedRevisions: request.expectedRevisions,
+        ...(texts ? { frequencyTexts: texts } : {}),
+      })
+      const invalidations: { kind: AssetKind; id: string }[] = [...request.memberIds.map(id => ({ kind, id })), ...merged.changedNodeIds.map(id => ({ kind: 'node' as const, id })), ...merged.changedCharacterIds.map(id => ({ kind: 'character' as const, id }))]
       await invalidateProgressBatch(db, invalidations, timestamp)
+      const table = db.table<AssetByKind[K]>(assetTables[kind])
       const saved = (await table.get(request.keepId))!
       const run: ManualMergeRun = {
         id: crypto.randomUUID(), recordType: 'run', bookId, stage: 'manual_merge', status: 'completed', startedAt: timestamp, finishedAt: timestamp, planVersion: '2.2',
         report: { beforeCounts, afterCounts: { characters: await db.table('characters').count(), locations: await db.table('locations').count() },
-          groups: [{ method: 'manual', kind, memberIds: members.map(row => row.id), memberNames: members.map(row => row.name), keepId: saved.id, canonicalName: saved.name, aliases: saved.aliases ?? [], sourceChapters: saved.sourceChapters ?? [], conflicts: fusion.conflicts, beforeTokens: members.reduce((sum, row) => sum + detailTokens(row), 0), afterTokens: detailTokens(saved) }],
+          groups: [{ method: 'manual', kind, memberIds: members.map(row => row.id), memberNames: members.map(row => row.name), keepId: saved.id, canonicalName: saved.name, aliases: saved.aliases ?? [], sourceChapters: saved.sourceChapters ?? [], conflicts: merged.conflicts, beforeTokens: members.reduce((sum, row) => sum + detailTokens(row), 0), afterTokens: detailTokens(saved) }],
           optimizedIds: [], skipped: [], failed: [], conflicted: [], status: 'completed', cost: 0, usage: { input: 0, output: 0, totalTokens: 0, cost: 0 }, externalChanges: [] },
       }
       await db.table('pipelineRuns').add({ ...run, contractRevision: '2026-10-24', tasks: [], commandIntents: [], coverageItems: [], appliedCommands: [], nextTaskOrdinal: 0, reconciliationPass: 0, noProgressTasks: 0 })
@@ -263,22 +238,23 @@ export function createAssetService(workspace: Workspace) {
       const source = await db.table<{ text: string; bookId: string }>('chapterTexts').get(chapterIndex)
       if (!source) throw new AssetError('SOURCE_MISSING', '所选章节正文缺失，无法校验引文。', 'quote')
       if (source.bookId !== bookId) fail('quote', '引文来源不属于当前书籍。')
-      const name = (input.name ?? previous?.name ?? '').trim() || fail('name', '节点名称不能为空。')
-      const summary = (input.summary ?? previous?.summary ?? '').trim() || fail('summary', '概述不能为空。')
-      const quote = input.quote ?? previous?.quote ?? ''
+      const characters = await db.table<Character>('characters').toArray()
+      const bound = previous && previous.actorIds === undefined ? bindNodeCharacters(previous, characters) : previous
+      const name = (input.name ?? bound?.name ?? '').trim() || fail('name', '节点名称不能为空。')
+      const summary = (input.summary ?? bound?.summary ?? '').trim() || fail('summary', '概述不能为空。')
+      const quote = input.quote ?? bound?.quote ?? ''
       const matched = !!quote.trim() && source.text.includes(quote)
-      const row: EventNode = { ...previous, ...base, name, summary, quote, quoteStatus: !quote.trim() ? 'empty' : matched ? 'matched' : 'unmatched', chapterIndex, chapterName: chapter!.chapterName, order: previous?.order ?? await db.table<EventNode>('nodes').where('chapterIndex').equals(chapterIndex).count(), confidence: previous?.confidence ?? 0.5, actors: unique(input.actors ?? previous?.actors ?? []), eventLineIds: previous?.eventLineIds ?? [] }
+      const row: EventNode = { ...bound, ...base, name, summary, quote, quoteStatus: !quote.trim() ? 'empty' : matched ? 'matched' : 'unmatched', chapterIndex, chapterName: chapter!.chapterName, order: bound?.order ?? await db.table<EventNode>('nodes').where('chapterIndex').equals(chapterIndex).count(), confidence: bound?.confidence ?? 0.5, actors: unique(input.actors ?? bound?.actors ?? []), eventLineIds: bound?.eventLineIds ?? [] }
       if (matched) row.offset = source.text.indexOf(quote)
       else delete row.offset
       for (const field of ['process', 'time_text', 'time_hint'] as const) if (input[field] !== undefined) row[field] = input[field]
       for (const field of ['targets', 'world_delta', 'new_facts', 'started_actions'] as const) if (input[field] !== undefined) row[field] = unique(input[field]!)
-      const characters = await db.table<Character>('characters').toArray()
       if (input.participantIds !== undefined || input.unlinkedParticipants !== undefined) {
         const participants = nodeParticipants(row, characters)
         return setNodeParticipants(row, characters, input.participantIds ?? participants.ids, input.unlinkedParticipants ?? participants.names)
       }
-      if (input.actors === undefined && input.targets === undefined && previous?.actorIds !== undefined) return remapCharacterLinks([row], characters, characters)[0]
-      return bindNodeCharacters(row, characters, input.actorIds, input.targetCharacterIds)
+      if (input.actors === undefined && input.targets === undefined && bound?.actorIds !== undefined) return remapCharacterLinks([row], characters, characters)[0]
+      return bindNodeCharacters(row, characters, { actorIds: input.actorIds, targetCharacterIds: input.targetCharacterIds })
     }
     const previous = old as EventLine | undefined
     const title = (input.title ?? previous?.title ?? '').trim() || fail('title', '事件线标题不能为空。')
@@ -327,6 +303,15 @@ export function createAssetService(workspace: Workspace) {
       }
       if (!row) await markDeleted(db, bookId, kind, targetId, timestamp)
       else if (!old) await db.table('assetLifecycle').add({ key: `${kind}:${row.id}`, bookId, kind, originId: row.id, currentId: row.id, state: 'live', revision: 1, updatedAt: timestamp } satisfies Lifecycle)
+      if (kind === 'character') {
+        const currentRelations = await db.table<CharacterRelation>('characterRelations').toArray()
+        const currentCharacters = await db.table<Character>('characters').toArray()
+        const currentLifecycle = await db.table<Lifecycle>('assetLifecycle').toArray()
+        const synced = syncRelations(currentRelations, currentCharacters, currentLifecycle, timestamp)
+        if (synced.changed.length) await db.table('characterRelations').bulkPut(synced.changed)
+        const endpoints = new Set(synced.changed.flatMap(relation => [relation.sourceId, ...relation.targetIds]).filter((id): id is string => !!id))
+        for (const id of endpoints) await invalidateProgress(db, 'character', id, timestamp)
+      }
       await invalidateProgress(db, kind, targetId, timestamp)
       return row ? await table.get(row.id) as AssetByKind[K] : undefined
     })
@@ -336,14 +321,19 @@ export function createAssetService(workspace: Workspace) {
     async read(bookId: string): Promise<AssetSnapshot> {
       const db = await database(bookId)
       return db.transaction('r', db.tables, async () => {
-        const [characters, locations, storedNodes, eventLines, lifecycle, leases] = await Promise.all([
-          db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray(),
+        const [storedCharacters, locations, storedNodes, eventLines, lifecycle, leases, relationRows] = await Promise.all([
+          db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray(), db.table<CharacterRelation>('characterRelations').toArray(),
         ])
+        const characters = storedCharacters.map(normalizeCharacterNames)
+        const relations = relationRows
+        const view = relationView(relations, characters)
+        const relationEdges = Object.fromEntries(characters.map(person => [person.id, edgesFor(view.edges, person.id)]))
+        const projected = characters.map(person => ({ ...person, relations: projectRelations(view.edges, relations, view.unresolved, person.id, characters).relations }))
         const nodes = storedNodes.map(node => node.actorIds === undefined ? bindNodeCharacters(node, characters) : node)
         const references = resolveReferences(nodes, characters)
         const lineCharacterIds = Object.fromEntries(eventLines.map(line => [line.id, [...new Set(line.nodeIds.flatMap(id => references[id]?.actorIds ?? []))]]))
         const manualMerges = (await db.table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
-        return { characters: characters.map(normalizeCharacterNames), locations, nodes, eventLines, lifecycle, locks: lockState(leases, bookId), references, lineCharacterIds, manualMerges }
+        return { characters: projected, locations, nodes, eventLines, lifecycle, locks: lockState(leases, bookId), references, lineCharacterIds, relations, relationEdges, unresolvedRelations: view.unresolved, manualMerges }
       })
     },
     async create<K extends AssetKind>(bookId: string, kind: K, input: AssetInput) { validateInput(kind, input); return (await mutate(bookId, kind, input))! },

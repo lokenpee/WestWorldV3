@@ -6,7 +6,7 @@ const pipeline = JSON.parse(readFileSync(new URL('pipeline-contract.json', root)
 const runtime = JSON.parse(readFileSync(new URL('ai-runtime-contract.json', root), 'utf8'))
 const operations = JSON.parse(readFileSync(new URL('operation-catalog.json', root), 'utf8'))
 
-describe('阶段 0：跨文档契约回归（不代表业务已实现）', () => {
+describe('历史契约样例与当前规格入口', () => {
   it.each([
     ['idle', true, true], ['P1', true, true], ['P2', false, true],
     ['P3', true, false], ['P2+P3', false, false],
@@ -54,8 +54,13 @@ describe('阶段 0：跨文档契约回归（不代表业务已实现）', () =>
       expect(text).not.toContain('| rate_limit | 5 |')
       expect(text).not.toContain('与网络失败计数分离')
       expect(text).not.toContain('仅本地saving禁用')
-      expect(text).toContain('ASSET_DOMAIN_LOCKED')
     }
+  })
+
+  it('编辑域锁的行为规则由当前能力规格维护', () => {
+    const spec = readFileSync(new URL('../openspec/specs/task-recovery/spec.md', import.meta.url), 'utf8')
+    expect(spec).toContain('ASSET_DOMAIN_LOCKED')
+    expect(spec).toContain('P2与P3并行')
   })
 
   it('恢复测试必须先停稳释放锁再人工改同域，不能借测试绕过新守卫', () => {

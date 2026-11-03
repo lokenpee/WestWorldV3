@@ -1,0 +1,5490 @@
+{
+  "version": 1,
+  "governance": "AGENTS.md",
+  "entry": "docs/v2/00-阅读入口与术语.md",
+  "baselineCommit": "8299fa9dad75f1be4d1ffb10ad1d1790bf0ca19b",
+  "documents": [
+    {
+      "path": "docs/v2/00-阅读入口与术语.md",
+      "role": "入口与术语",
+      "baselineSha256": "d18ccea9fbc41485c6963c626099046c6b1d303d4c12cc923fe649cb438e89dc"
+    },
+    {
+      "path": "docs/v2/01-PRD.md",
+      "role": "产品目标及能力导航",
+      "baselineSha256": "f7061f7501dec6c7aaae54999aed758ea4bf9ce1f46ceb813daa7231d15c457d"
+    },
+    {
+      "path": "docs/v2/02-架构与技术规格.md",
+      "role": "架构与模块契约",
+      "baselineSha256": "7641d35c6ea1cbbe1805ef7517896615eb1c61c52bd5bcf3dc53dd66e64d9fb6"
+    },
+    {
+      "path": "docs/v2/03-Spec-数据与存储.md",
+      "role": "数据含义与生命周期",
+      "baselineSha256": "b7d29c95790d6cff55731b4132747080760720c632b233d971985862b8483b07"
+    },
+    {
+      "path": "docs/v2/04-Spec-流程接口与算法.md",
+      "role": "算法与接口技术约束",
+      "baselineSha256": "290ebb3e6bb809b43989f19e3135ec7723b87442a170039835349bdabe745fa2"
+    },
+    {
+      "path": "docs/v2/05-Spec-AI与会话.md",
+      "role": "模型与会话技术设计",
+      "baselineSha256": "418c60612d15d01f245c5d2f476c8d0a54734107023ecacf7d6af403bf9d7c7f"
+    },
+    {
+      "path": "docs/v2/06-界面与交互规格.md",
+      "role": "界面布局及交互细节",
+      "baselineSha256": "c4c5a25ce2186d20aa22714066c1647d41b04332b9644381638a663f4de0590c"
+    },
+    {
+      "path": "docs/v2/07-验收与兼容缺陷.md",
+      "role": "缺陷回归方法",
+      "baselineSha256": "71a94810a9a5ec306a5fd48422774ec39034a74f2afa35d94d815747158bbfe1"
+    },
+    {
+      "path": "docs/v2/08-追溯与验证记录.md",
+      "role": "历史证据索引",
+      "baselineSha256": "d4c32e12e999c28c5b72e626ec176043356eb81f967095084cb8b9d5ff0a94b5"
+    },
+    {
+      "path": "docs/v2/09-操作与自动触发契约.md",
+      "role": "操作参数与触发契约",
+      "baselineSha256": "b94ddb28184c151760e580510ecd37b1edbf69a5e5031979fc3981f53396899f"
+    },
+    {
+      "path": "docs/v2/10-字段级数据流与状态转移.md",
+      "role": "数据流和状态转换",
+      "baselineSha256": "3586f69166460a8a0ebd478aa1db81d00749446bd53942219086ff8567fb1710"
+    },
+    {
+      "path": "docs/v2/11-AI工具返回与回放契约.md",
+      "role": "工具参数与返回契约",
+      "baselineSha256": "6b27ce9fe2b9a5dfec84e8e7652fdb5e7c9bce37bdadbdfdb11b9c110ec113fe"
+    },
+    {
+      "path": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "role": "覆盖索引",
+      "baselineSha256": "7b45197354b562e9c658fe194282661f3de4bff0f45a5c2f90fc9ae7851b2211"
+    },
+    {
+      "path": "docs/v2/13-流程变更与冲突对照.md",
+      "role": "历史冲突记录",
+      "baselineSha256": "742a9fc6f77a1a7bdd0d0253fc7c464a389ee7033effe60c6b8d8987302fb9e0"
+    }
+  ],
+  "sections": [
+    {
+      "source": "docs/v2/00-阅读入口与术语.md",
+      "heading": "1. 文档目的与适用范围",
+      "anchor": "1-文档目的与适用范围",
+      "owner": "docs/v2/00-阅读入口与术语.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/00-阅读入口与术语.md",
+      "heading": "1.1 阅读顺序与内容归属",
+      "anchor": "11-阅读顺序与内容归属",
+      "owner": "docs/v2/00-阅读入口与术语.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/00-阅读入口与术语.md",
+      "heading": "1.2 交付资源",
+      "anchor": "12-交付资源",
+      "owner": "docs/v2/00-阅读入口与术语.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/00-阅读入口与术语.md",
+      "heading": "2. 术语、缩写与统一定义",
+      "anchor": "2-术语缩写与统一定义",
+      "owner": "docs/v2/00-阅读入口与术语.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/00-阅读入口与术语.md",
+      "heading": "3. 编号与版本纪律",
+      "anchor": "3-编号与版本纪律",
+      "owner": "docs/v2/00-阅读入口与术语.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/00-阅读入口与术语.md",
+      "heading": "4. 数据与验证入口",
+      "anchor": "4-数据与验证入口",
+      "owner": "docs/v2/00-阅读入口与术语.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "1. 产品定义与目标",
+      "anchor": "1-产品定义与目标",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "1.1 目标与成功条件",
+      "anchor": "11-目标与成功条件",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "1.2 范围",
+      "anchor": "12-范围",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "1.3 业务数据与表数量",
+      "anchor": "13-业务数据与表数量",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "2. 用户、权限与数据边界",
+      "anchor": "2-用户权限与数据边界",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "3. 信息架构与用户旅程",
+      "anchor": "3-信息架构与用户旅程",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "4. 功能需求",
+      "anchor": "4-功能需求",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-01 书架与切换",
+      "anchor": "fr-01-书架与切换",
+      "owner": "openspec/specs/book-import/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-02 TXT导入与预览",
+      "anchor": "fr-02-txt导入与预览",
+      "owner": "openspec/specs/book-import/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-03 模型、凭据与探测",
+      "anchor": "fr-03-模型凭据与探测",
+      "owner": "openspec/specs/model-access/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-04 逐章提取与即时可编辑",
+      "anchor": "fr-04-逐章提取与即时可编辑",
+      "owner": "openspec/specs/extraction/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-05 全书前置与独立恢复",
+      "anchor": "fr-05-全书前置与独立恢复",
+      "owner": "openspec/specs/extraction/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-07 世界资产整理P2",
+      "anchor": "fr-07-世界资产整理p2",
+      "owner": "openspec/specs/world-organization/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-08 事件组织P3",
+      "anchor": "fr-08-事件组织p3",
+      "owner": "openspec/specs/story-organization/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-09 人工编辑与批量合并",
+      "anchor": "fr-09-人工编辑与批量合并",
+      "owner": "openspec/specs/asset-management/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-10 直接持久化与即时生效",
+      "anchor": "fr-10-直接持久化与即时生效",
+      "owner": "openspec/specs/asset-management/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-11 事件网络",
+      "anchor": "fr-11-事件网络",
+      "owner": "openspec/specs/event-network/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-12 编辑记忆与会话",
+      "anchor": "fr-12-编辑记忆与会话",
+      "owner": "openspec/specs/agent-session/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-13 备份、恢复与删除",
+      "anchor": "fr-13-备份恢复与删除",
+      "owner": "openspec/specs/book-backup/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-14 按书独立的游玩会话",
+      "anchor": "fr-14-按书独立的游玩会话",
+      "owner": "openspec/changes/play-session-foundation/specs/play-session/spec.md",
+      "status": "待开发"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-15 统一Pi AI运行与可持久化Agent",
+      "anchor": "fr-15-统一pi-ai运行与可持久化agent",
+      "owner": "openspec/specs/model-access/spec.md",
+      "status": "当前行为"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "5. 状态与业务闭环",
+      "anchor": "5-状态与业务闭环",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "6. 非功能与兼容要求",
+      "anchor": "6-非功能与兼容要求",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "7. 验收与开放决策",
+      "anchor": "7-验收与开放决策",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "2026-10-23 · 字段与工具契约对接",
+      "anchor": "2026-10-23--字段与工具契约对接",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/01-PRD.md",
+      "heading": "FR-CLARIFY 可恢复、可判断完成的处理要求（2026-10-24）",
+      "anchor": "fr-clarify-可恢复可判断完成的处理要求2026-10-24",
+      "owner": "docs/v2/01-PRD.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-01 运行形态与系统边界",
+      "anchor": "ar-01-运行形态与系统边界",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-02 技术栈与依赖",
+      "anchor": "ar-02-技术栈与依赖",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-03 模块与依赖方向",
+      "anchor": "ar-03-模块与依赖方向",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-04 数据和状态归属",
+      "anchor": "ar-04-数据和状态归属",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-05 配置与凭据",
+      "anchor": "ar-05-配置与凭据",
+      "owner": "openspec/specs/model-access/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-06 核心时序与事务",
+      "anchor": "ar-06-核心时序与事务",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-07 并发、锁与事件",
+      "anchor": "ar-07-并发锁与事件",
+      "owner": "openspec/specs/task-recovery/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-08 构建、初始化和部署",
+      "anchor": "ar-08-构建初始化和部署",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-09 架构记录与范围",
+      "anchor": "ar-09-架构记录与范围",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-10 逐表与触发链规范",
+      "anchor": "ar-10-逐表与触发链规范",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-11 AI统一Pi边界与状态归属",
+      "anchor": "ar-11-ai统一pi边界与状态归属",
+      "owner": "openspec/specs/agent-session/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-12 Pi接入、coding包取舍与迁移顺序",
+      "anchor": "ar-12-pi接入coding包取舍与迁移顺序",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-12.1 包和能力逐项取舍",
+      "anchor": "ar-121-包和能力逐项取舍",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-12.2 原生工具及环境限制",
+      "anchor": "ar-122-原生工具及环境限制",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-12.3 当前模块到目标模块的迁移表",
+      "anchor": "ar-123-当前模块到目标模块的迁移表",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-12.4 实施顺序与完成门槛",
+      "anchor": "ar-124-实施顺序与完成门槛",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/02-架构与技术规格.md",
+      "heading": "AR-13 更松耦合的重建方案（目标接口已补全，尚未实施）",
+      "anchor": "ar-13-更松耦合的重建方案目标接口已补全尚未实施",
+      "owner": "docs/v2/02-架构与技术规格.md",
+      "status": "当前技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "1. 当前数据只有一层",
+      "anchor": "1-当前数据只有一层",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "2. 逐表清单与索引",
+      "anchor": "2-逐表清单与索引",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "3. 当前实体的逐字段约定",
+      "anchor": "3-当前实体的逐字段约定",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "3.1 公共元数据",
+      "anchor": "31-公共元数据",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "3.2 T10 characters",
+      "anchor": "32-t10-characters",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "3.3 T11 locations",
+      "anchor": "33-t11-locations",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "3.4 T08 nodes与T09 eventLines",
+      "anchor": "34-t08-nodes与t09-eventlines",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "4. 提取凭证、来源和报告",
+      "anchor": "4-提取凭证来源和报告",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "4.1 T18 extractionReceipts",
+      "anchor": "41-t18-extractionreceipts",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "4.2 T19 assetLifecycle",
+      "anchor": "42-t19-assetlifecycle",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "4.3 T20 pipelineRuns",
+      "anchor": "43-t20-pipelineruns",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "5. 进度、会话与事务",
+      "anchor": "5-进度会话与事务",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "5.1 会话与运行实例",
+      "anchor": "51-会话与运行实例",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "5.2 游玩会话持久化",
+      "anchor": "52-游玩会话持久化",
+      "owner": "openspec/changes/play-session-foundation/design.md",
+      "status": "待开发目标"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "6. 迁移与备份",
+      "anchor": "6-迁移与备份",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "6.1 v4→v5",
+      "anchor": "61-v4v5",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "6.2 v5备份",
+      "anchor": "62-v5备份",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "7. Pi运行时、应用持久化与写命令凭据",
+      "anchor": "7-pi运行时应用持久化与写命令凭据",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "8. 完整逐表字段字典（2026-10-23校订）",
+      "anchor": "8-完整逐表字段字典2026-10-23校订",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T01 · credentials",
+      "anchor": "t01--credentials",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T02 · appSettings",
+      "anchor": "t02--appsettings",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T03 · books",
+      "anchor": "t03--books",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T04 · chapters",
+      "anchor": "t04--chapters",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T05 · chapterTexts",
+      "anchor": "t05--chaptertexts",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T08 · nodes",
+      "anchor": "t08--nodes",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T09 · eventLines",
+      "anchor": "t09--eventlines",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T10 · characters",
+      "anchor": "t10--characters",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T11 · locations",
+      "anchor": "t11--locations",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T12 · compileProgress",
+      "anchor": "t12--compileprogress",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T13 · storyEditorMemory",
+      "anchor": "t13--storyeditormemory",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T14 · storyEditorNotes",
+      "anchor": "t14--storyeditornotes",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T15 · storyEditorCheckpoints",
+      "anchor": "t15--storyeditorcheckpoints",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T16 · storySessions",
+      "anchor": "t16--storysessions",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T17 · storySessionEntries",
+      "anchor": "t17--storysessionentries",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T18 · extractionReceipts",
+      "anchor": "t18--extractionreceipts",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T19 · assetLifecycle",
+      "anchor": "t19--assetlifecycle",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "T20 · pipelineRuns",
+      "anchor": "t20--pipelineruns",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "9. 入口赋值、关联与迁移补充",
+      "anchor": "9-入口赋值关联与迁移补充",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "10. 任务、命令意图与覆盖账本（2026-10-24）",
+      "anchor": "10-任务命令意图与覆盖账本2026-10-24",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "TaskRecord 字段",
+      "anchor": "taskrecord-字段",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "CommandIntent 字段",
+      "anchor": "commandintent-字段",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "CoverageItem 字段",
+      "anchor": "coverageitem-字段",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "RecordDependency 字段",
+      "anchor": "recorddependency-字段",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "QueryDependencyV2 字段",
+      "anchor": "querydependencyv2-字段",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "ReadSet 字段",
+      "anchor": "readset-字段",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "ReviewItem 字段",
+      "anchor": "reviewitem-字段",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "heading": "11. 修复所需的生命周期日志与只读字段",
+      "anchor": "11-修复所需的生命周期日志与只读字段",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "1. 接口边界与返回约定",
+      "anchor": "1-接口边界与返回约定",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-01 解码、正则和分章",
+      "anchor": "alg-01-解码正则和分章",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-02 P1逐章提交、即时刷新与恢复",
+      "anchor": "alg-02-p1逐章提交即时刷新与恢复",
+      "owner": "openspec/specs/extraction/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-03 阶段门槛、窗口与独立恢复",
+      "anchor": "alg-03-阶段门槛窗口与独立恢复",
+      "owner": "openspec/specs/story-organization/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "正式调度",
+      "anchor": "正式调度",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "P3窗口",
+      "anchor": "p3窗口",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "恢复和复核",
+      "anchor": "恢复和复核",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-04 名称归一化、聚组与融合",
+      "anchor": "alg-04-名称归一化聚组与融合",
+      "owner": "openspec/specs/world-organization/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "名称标准化",
+      "anchor": "名称标准化",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "两轮本地聚组",
+      "anchor": "两轮本地聚组",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "本地融合",
+      "anchor": "本地融合",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "P2 AI精简判同、详细整编及报告",
+      "anchor": "p2-ai精简判同详细整编及报告",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-05 主名出场与层级",
+      "anchor": "alg-05-主名出场与层级",
+      "owner": "openspec/specs/world-organization/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-06 串联、补点与批提交",
+      "anchor": "alg-06-串联补点与批提交",
+      "owner": "openspec/specs/story-organization/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-07 人工更新、合并与删除",
+      "anchor": "alg-07-人工更新合并与删除",
+      "owner": "openspec/specs/asset-management/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-08 当前实体及人物引用读取",
+      "anchor": "alg-08-当前实体及人物引用读取",
+      "owner": "openspec/specs/asset-management/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-09 图布局",
+      "anchor": "alg-09-图布局",
+      "owner": "openspec/specs/event-network/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-10 导出、恢复和删除",
+      "anchor": "alg-10-导出恢复和删除",
+      "owner": "openspec/specs/book-backup/spec.md",
+      "status": "当前行为与技术链接"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-11 进度与事件投影",
+      "anchor": "alg-11-进度与事件投影",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-12 共用Pi模型入口与写命令生命周期",
+      "anchor": "alg-12-共用pi模型入口与写命令生命周期",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-12.1 运行与子任务身份",
+      "anchor": "alg-121-运行与子任务身份",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-12.2 写入前意图与提交后确认",
+      "anchor": "alg-122-写入前意图与提交后确认",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-12.3 每个崩溃位置的恢复",
+      "anchor": "alg-123-每个崩溃位置的恢复",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-12.4 覆盖项身份、派发与排序",
+      "anchor": "alg-124-覆盖项身份派发与排序",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-12.5 版本、事实指纹与查询依赖",
+      "anchor": "alg-125-版本事实指纹与查询依赖",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-12.6 总结、删除/合并和全阶段完成",
+      "anchor": "alg-126-总结删除合并和全阶段完成",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "2026-10-23 · 字段与工具契约对接",
+      "anchor": "2026-10-23--字段与工具契约对接",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "ALG-FIX 已知缺陷的修复行为",
+      "anchor": "alg-fix-已知缺陷的修复行为",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "文本保全、文件入口和P1提交",
+      "anchor": "文本保全文件入口和p1提交",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "名称候选与有证据的融合",
+      "anchor": "名称候选与有证据的融合",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "备份验证与可恢复跨库生命周期",
+      "anchor": "备份验证与可恢复跨库生命周期",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/04-Spec-流程接口与算法.md",
+      "heading": "引用、取消、金额与显示",
+      "anchor": "引用取消金额与显示",
+      "owner": "docs/v2/04-Spec-流程接口与算法.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-00 统一Pi架构与两种执行模式",
+      "anchor": "ai-00-统一pi架构与两种执行模式",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-01 统一模型边界、配置与探测",
+      "anchor": "ai-01-统一模型边界配置与探测",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-02 有效Prompt与输入组装",
+      "anchor": "ai-02-有效prompt与输入组装",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-03 直接提交与修正",
+      "anchor": "ai-03-直接提交与修正",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-04 Pi Agent执行、读写工具与最终结果",
+      "anchor": "ai-04-pi-agent执行读写工具与最终结果",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-05 错误分类、退避与用量",
+      "anchor": "ai-05-错误分类退避与用量",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-06 查询工具完整行为",
+      "anchor": "ai-06-查询工具完整行为",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-07 工作记忆、依据和检查点",
+      "anchor": "ai-07-工作记忆依据和检查点",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-08 持久消息、投影与压缩",
+      "anchor": "ai-08-持久消息投影与压缩",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "原始记录",
+      "anchor": "原始记录",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "投影",
+      "anchor": "投影",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "Token估算与阈值",
+      "anchor": "token估算与阈值",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "压缩过程",
+      "anchor": "压缩过程",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-09 补齐输出与回放",
+      "anchor": "ai-09-补齐输出与回放",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-10 P3置信度、自由查询与覆盖证明",
+      "anchor": "ai-10-p3置信度自由查询与覆盖证明",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "精简资产遍历的稳定游标",
+      "anchor": "精简资产遍历的稳定游标",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-11 应用长期记忆与业务写工具",
+      "anchor": "ai-11-应用长期记忆与业务写工具",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-12 工具实现与Pi迁移的权威入口",
+      "anchor": "ai-12-工具实现与pi迁移的权威入口",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-13 提示词调用清单与重建缺口审查",
+      "anchor": "ai-13-提示词调用清单与重建缺口审查",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-13.1 十种有效调用",
+      "anchor": "ai-131-十种有效调用",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-13.2 已能独立描述的动态绑定",
+      "anchor": "ai-132-已能独立描述的动态绑定",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-13.3 Agent最终Prompt不等于一个md文件",
+      "anchor": "ai-133-agent最终prompt不等于一个md文件",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-14 完整请求组装与修正规范（2026-10-24）",
+      "anchor": "ai-14-完整请求组装与修正规范2026-10-24",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "输入绑定和默认值",
+      "anchor": "输入绑定和默认值",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "system、user、历史和工具的唯一顺序",
+      "anchor": "systemuser历史和工具的唯一顺序",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "预算、网络重试和一次修正",
+      "anchor": "预算网络重试和一次修正",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "完整请求样例及等价标准",
+      "anchor": "完整请求样例及等价标准",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-15 隔离模型与工具探测（2026-10-24）",
+      "anchor": "ai-15-隔离模型与工具探测2026-10-24",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/05-Spec-AI与会话.md",
+      "heading": "AI-16 按书运行与会话生命周期",
+      "anchor": "ai-16-按书运行与会话生命周期",
+      "owner": "docs/v2/05-Spec-AI与会话.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "1. 视觉基准与公共组件",
+      "anchor": "1-视觉基准与公共组件",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-01 外壳与状态生命周期",
+      "anchor": "ui-01-外壳与状态生命周期",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-02 书架、导出与整书删除",
+      "anchor": "ui-02-书架导出与整书删除",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-03 TXT导入页",
+      "anchor": "ui-03-txt导入页",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-04 工作台、阶段入口与进度",
+      "anchor": "ui-04-工作台阶段入口与进度",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-05 资产列表、增删改查与批量合并",
+      "anchor": "ui-05-资产列表增删改查与批量合并",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "新增与详情编辑",
+      "anchor": "新增与详情编辑",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "人物/地点批量手动合并",
+      "anchor": "人物地点批量手动合并",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "P2合并报告",
+      "anchor": "p2合并报告",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-06 事件网络",
+      "anchor": "ui-06-事件网络",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-07 编辑记忆和会话",
+      "anchor": "ui-07-编辑记忆和会话",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-08 单章试跑弹窗",
+      "anchor": "ui-08-单章试跑弹窗",
+      "owner": "openspec/changes/review-remaining-baseline/specs/chapter-preview-run/spec.md",
+      "status": "已确认待开发"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-09 设置页",
+      "anchor": "ui-09-设置页",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-10 游玩入口与书籍会话窗口",
+      "anchor": "ui-10-游玩入口与书籍会话窗口",
+      "owner": "openspec/changes/play-session-foundation/design.md",
+      "status": "待开发目标"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "2. 反馈与可访问性边界",
+      "anchor": "2-反馈与可访问性边界",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "3. 2.1历史画面参考（其中入库/草稿控件已移除）",
+      "anchor": "3-21历史画面参考其中入库草稿控件已移除",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "2026-10-23 · 字段与工具契约对接",
+      "anchor": "2026-10-23--字段与工具契约对接",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/06-界面与交互规格.md",
+      "heading": "UI-12 任务、恢复与探测反馈的明确规则（2026-10-24）",
+      "anchor": "ui-12-任务恢复与探测反馈的明确规则2026-10-24",
+      "owner": "docs/v2/06-界面与交互规格.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "heading": "1. 验收口径",
+      "anchor": "1-验收口径",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "heading": "2. 新流程端到端场景（30项，全部待应用执行）",
+      "anchor": "2-新流程端到端场景30项全部待应用执行",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "heading": "按书会话专项验收",
+      "anchor": "按书会话专项验收",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "heading": "3. 缺陷修复要求（当前权威）",
+      "anchor": "3-缺陷修复要求当前权威",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "heading": "4. 文档与应用验证的界线",
+      "anchor": "4-文档与应用验证的界线",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "heading": "2026-10-23 · 字段与工具契约对接",
+      "anchor": "2026-10-23--字段与工具契约对接",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "0. 2.2本次规格变更与验证边界",
+      "anchor": "0-22本次规格变更与验证边界",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "1. 基线与取证边界",
+      "anchor": "1-基线与取证边界",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "2. 验证记录",
+      "anchor": "2-验证记录",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "2.1 独立重建状态",
+      "anchor": "21-独立重建状态",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "3. 需求到实现与验收映射",
+      "anchor": "3-需求到实现与验收映射",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "4. 源码证据索引",
+      "anchor": "4-源码证据索引",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E01",
+      "anchor": "e01",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E02",
+      "anchor": "e02",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E03",
+      "anchor": "e03",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E04",
+      "anchor": "e04",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E05",
+      "anchor": "e05",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E06",
+      "anchor": "e06",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E07",
+      "anchor": "e07",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E08",
+      "anchor": "e08",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E09",
+      "anchor": "e09",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E10",
+      "anchor": "e10",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E11",
+      "anchor": "e11",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E12",
+      "anchor": "e12",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E13",
+      "anchor": "e13",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E14",
+      "anchor": "e14",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E15",
+      "anchor": "e15",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E16",
+      "anchor": "e16",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E17",
+      "anchor": "e17",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E18",
+      "anchor": "e18",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E19",
+      "anchor": "e19",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E20",
+      "anchor": "e20",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E21",
+      "anchor": "e21",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E22",
+      "anchor": "e22",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E23",
+      "anchor": "e23",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E24",
+      "anchor": "e24",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E25",
+      "anchor": "e25",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E26",
+      "anchor": "e26",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E27",
+      "anchor": "e27",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E28",
+      "anchor": "e28",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E29",
+      "anchor": "e29",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E30",
+      "anchor": "e30",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E31",
+      "anchor": "e31",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E32",
+      "anchor": "e32",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E33",
+      "anchor": "e33",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E34",
+      "anchor": "e34",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E35",
+      "anchor": "e35",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E36",
+      "anchor": "e36",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E37",
+      "anchor": "e37",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E38",
+      "anchor": "e38",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "E39",
+      "anchor": "e39",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "5. 可复查UI记录",
+      "anchor": "5-可复查ui记录",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "6. 资源和接口覆盖",
+      "anchor": "6-资源和接口覆盖",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "7. 2.1历史维护与检查命令（不得覆盖2.2）",
+      "anchor": "7-21历史维护与检查命令不得覆盖22",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "8. 2.1本轮验证",
+      "anchor": "8-21本轮验证",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "2026-10-23 · 字段、工具与Pi接入复核",
+      "anchor": "2026-10-23--字段工具与pi接入复核",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "2026-10-23 · 第二次可重建性审查",
+      "anchor": "2026-10-23--第二次可重建性审查",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "2026-10-24 · 需求补全与验证",
+      "anchor": "2026-10-24--需求补全与验证",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/08-追溯与验证记录.md",
+      "heading": "2026-10-24 · 缺陷优先修复规格",
+      "anchor": "2026-10-24--缺陷优先修复规格",
+      "owner": "docs/v2/08-追溯与验证记录.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "1. 操作清单与读写口径",
+      "anchor": "1-操作清单与读写口径",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-01 · 切换顶层标签",
+      "anchor": "op-01--切换顶层标签",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-02 · 选择书籍/进入",
+      "anchor": "op-02--选择书籍进入",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-03 · 打开导入页",
+      "anchor": "op-03--打开导入页",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-04 · 修改分章正则",
+      "anchor": "op-04--修改分章正则",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-05 · 应用/恢复默认正则",
+      "anchor": "op-05--应用恢复默认正则",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-06 · 选择或拖放TXT",
+      "anchor": "op-06--选择或拖放txt",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-07 · 按UTF8/GBK重读",
+      "anchor": "op-07--按utf8gbk重读",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-08 · 换一个文件",
+      "anchor": "op-08--换一个文件",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-09 · 仅导入",
+      "anchor": "op-09--仅导入",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-10 · 导入并开始P1提取",
+      "anchor": "op-10--导入并开始p1提取",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-11 · 切换资产分类",
+      "anchor": "op-11--切换资产分类",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-12 · 筛选人物层级",
+      "anchor": "op-12--筛选人物层级",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-13 · 打开资产详情",
+      "anchor": "op-13--打开资产详情",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-14 · 编辑表单输入",
+      "anchor": "op-14--编辑表单输入",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-15 · 保存人物",
+      "anchor": "op-15--保存人物",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-16 · 保存地点",
+      "anchor": "op-16--保存地点",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-17 · 保存事件节点",
+      "anchor": "op-17--保存事件节点",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-18 · 保存事件线",
+      "anchor": "op-18--保存事件线",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-19 · 即时改变人物层级",
+      "anchor": "op-19--即时改变人物层级",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-20 · 即时改变事件线状态",
+      "anchor": "op-20--即时改变事件线状态",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-21 · 批量手动合并与预览确认",
+      "anchor": "op-21--批量手动合并与预览确认",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-22 · 关闭详情",
+      "anchor": "op-22--关闭详情",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-23 · 删除人物/地点资产",
+      "anchor": "op-23--删除人物地点资产",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-24 · 删除节点",
+      "anchor": "op-24--删除节点",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-25 · 删除事件线",
+      "anchor": "op-25--删除事件线",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-26 · 展开只读字段/事实/经过",
+      "anchor": "op-26--展开只读字段事实经过",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-27 · 开始或继续全书P1",
+      "anchor": "op-27--开始或继续全书p1",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-28 · 独立启动P2或P3",
+      "anchor": "op-28--独立启动p2或p3",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-29 · 取消指定阶段",
+      "anchor": "op-29--取消指定阶段",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-32 · 打开/关闭单章试跑",
+      "anchor": "op-32--打开关闭单章试跑",
+      "owner": "openspec/changes/review-remaining-baseline/specs/chapter-preview-run/spec.md",
+      "status": "已确认待开发"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-33 · 开始/重跑单章",
+      "anchor": "op-33--开始重跑单章",
+      "owner": "openspec/changes/review-remaining-baseline/specs/chapter-preview-run/spec.md",
+      "status": "已确认待开发"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-34 · 图的高亮/全部",
+      "anchor": "op-34--图的高亮全部",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-35 · 图缩放/平移/全图/起点",
+      "anchor": "op-35--图缩放平移全图起点",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-36 · 选择故事会话",
+      "anchor": "op-36--选择故事会话",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-37 · 切换工作/完整会话视图",
+      "anchor": "op-37--切换工作完整会话视图",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-38 · 筛选与翻页工作记录",
+      "anchor": "op-38--筛选与翻页工作记录",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-39 · 历史翻页与长条目分段",
+      "anchor": "op-39--历史翻页与长条目分段",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-40 · 编辑模型配置",
+      "anchor": "op-40--编辑模型配置",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-41 · 保存模型配置",
+      "anchor": "op-41--保存模型配置",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-42 · 输入/保存Key",
+      "anchor": "op-42--输入保存key",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-43 · 清除Key",
+      "anchor": "op-43--清除key",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-44 · 拉取模型",
+      "anchor": "op-44--拉取模型",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-45 · 测试提取模型",
+      "anchor": "op-45--测试提取模型",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-46 · 测试归并工具",
+      "anchor": "op-46--测试归并工具",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-47 · 查看编译执行策略",
+      "anchor": "op-47--查看编译执行策略",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-48 · 清空日志",
+      "anchor": "op-48--清空日志",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-49 · 预览备份文件",
+      "anchor": "op-49--预览备份文件",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-50 · 确认/取消备份导入",
+      "anchor": "op-50--确认取消备份导入",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-51 · 设置页下载备份",
+      "anchor": "op-51--设置页下载备份",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-52 · 打开导出/删除弹窗",
+      "anchor": "op-52--打开导出删除弹窗",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-53 · 选择导出目录",
+      "anchor": "op-53--选择导出目录",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-54 · 保存到目录",
+      "anchor": "op-54--保存到目录",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-55 · 书架下载备份",
+      "anchor": "op-55--书架下载备份",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-56 · 删除弹窗先导出",
+      "anchor": "op-56--删除弹窗先导出",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-57 · 确认删除整书",
+      "anchor": "op-57--确认删除整书",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-58 · 取消导出/删除弹窗",
+      "anchor": "op-58--取消导出删除弹窗",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-59 · 输入与发送游玩消息",
+      "anchor": "op-59--输入与发送游玩消息",
+      "owner": "openspec/changes/play-session-foundation/design.md",
+      "status": "待开发目标"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-60 · 图节点打开详情",
+      "anchor": "op-60--图节点打开详情",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-61 · 人工新增四类资产",
+      "anchor": "op-61--人工新增四类资产",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "OP-62 · 查看/关闭合并报告",
+      "anchor": "op-62--查看关闭合并报告",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "自动触发清单",
+      "anchor": "自动触发清单",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "2026-10-23 · 字段与工具契约对接",
+      "anchor": "2026-10-23--字段与工具契约对接",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "heading": "AUTO-17 · 生命周期恢复",
+      "anchor": "auto-17--生命周期恢复",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "1. 字段级流转总览",
+      "anchor": "1-字段级流转总览",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-01 · 小说预览与保存",
+      "anchor": "df-01--小说预览与保存",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-02 · 全书P1、取消与恢复",
+      "anchor": "df-02--全书p1取消与恢复",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-03 · 独立P2与P3并行、事件原子提交",
+      "anchor": "df-03--独立p2与p3并行事件原子提交",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-04 · 单章试跑不保存资产",
+      "anchor": "df-04--单章试跑不保存资产",
+      "owner": "openspec/changes/review-remaining-baseline/specs/chapter-preview-run/spec.md",
+      "status": "已确认待开发"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-05 · P2机械、AI判同、按需整编与报告",
+      "anchor": "df-05--p2机械ai判同按需整编与报告",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-06 · 人工新增、修改与并发保护",
+      "anchor": "df-06--人工新增修改与并发保护",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-07 · 批量手动合并、来源映射与删除",
+      "anchor": "df-07--批量手动合并来源映射与删除",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-08 · 节点/线删除及引用清理",
+      "anchor": "df-08--节点线删除及引用清理",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-09 · 当前实体直接生效与人物引用读取",
+      "anchor": "df-09--当前实体直接生效与人物引用读取",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-10 · 备份与恢复",
+      "anchor": "df-10--备份与恢复",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-11 · 整书删除与资源边界",
+      "anchor": "df-11--整书删除与资源边界",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-12 · 全局配置与凭据",
+      "anchor": "df-12--全局配置与凭据",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-13 · 模型探测和工具返回",
+      "anchor": "df-13--模型探测和工具返回",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "DF-14 · 只读视图、持久会话与游玩",
+      "anchor": "df-14--只读视图持久会话与游玩",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "2. 状态转移",
+      "anchor": "2-状态转移",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "3. 写后断线的恢复实例",
+      "anchor": "3-写后断线的恢复实例",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/10-字段级数据流与状态转移.md",
+      "heading": "2026-10-23 · 字段与工具契约对接",
+      "anchor": "2026-10-23--字段与工具契约对接",
+      "owner": "docs/v2/10-字段级数据流与状态转移.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "1. 当前工具与直接存储",
+      "anchor": "1-当前工具与直接存储",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "2. 逐工具返回与边界",
+      "anchor": "2-逐工具返回与边界",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "3. 实际依赖、错误与提交",
+      "anchor": "3-实际依赖错误与提交",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "3.1 写工具、幂等与读写顺序",
+      "anchor": "31-写工具幂等与读写顺序",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "4. 消息变量与持续会话",
+      "anchor": "4-消息变量与持续会话",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "5. 样例与历史回放",
+      "anchor": "5-样例与历史回放",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "6. 可直接实现的工具定义",
+      "anchor": "6-可直接实现的工具定义",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "6.1 Pi适配及统一返回",
+      "anchor": "61-pi适配及统一返回",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "6.2 成功投影字段全集",
+      "anchor": "62-成功投影字段全集",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-01 · query_nodes",
+      "anchor": "tool-01--query_nodes",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-02 · get_node_detail",
+      "anchor": "tool-02--get_node_detail",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-03 · query_event_lines",
+      "anchor": "tool-03--query_event_lines",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-04 · get_event_line_detail",
+      "anchor": "tool-04--get_event_line_detail",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-05 · query_characters",
+      "anchor": "tool-05--query_characters",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-06 · get_character_detail",
+      "anchor": "tool-06--get_character_detail",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-07 · query_locations",
+      "anchor": "tool-07--query_locations",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-08 · read_original",
+      "anchor": "tool-08--read_original",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-09 · get_editor_memory",
+      "anchor": "tool-09--get_editor_memory",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-10 · query_editor_notes",
+      "anchor": "tool-10--query_editor_notes",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-11 · get_editor_note_detail",
+      "anchor": "tool-11--get_editor_note_detail",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-12 · list_editor_sessions",
+      "anchor": "tool-12--list_editor_sessions",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-13 · query_editor_session_history",
+      "anchor": "tool-13--query_editor_session_history",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-14 · get_location_detail",
+      "anchor": "tool-14--get_location_detail",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-15 · commit_asset_changes",
+      "anchor": "tool-15--commit_asset_changes",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "TOOL-16 · commit_story_changes",
+      "anchor": "tool-16--commit_story_changes",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "6.3 错误及调用方恢复",
+      "anchor": "63-错误及调用方恢复",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "6.4 submit_result：最终收集器",
+      "anchor": "64-submit_result最终收集器",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "6.5 具体回放（规范样例，未执行目标应用）",
+      "anchor": "65-具体回放规范样例未执行目标应用",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "7. 子任务绑定、最终逐项结果与恢复（2026-10-24）",
+      "anchor": "7-子任务绑定最终逐项结果与恢复2026-10-24",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/11-AI工具返回与回放契约.md",
+      "heading": "8. 防误合并与缺失原文的工具契约",
+      "anchor": "8-防误合并与缺失原文的工具契约",
+      "owner": "docs/v2/11-AI工具返回与回放契约.md",
+      "status": "技术契约"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "1. 2.2目标覆盖与实际验证状态",
+      "anchor": "1-22目标覆盖与实际验证状态",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "2. 2.1历史执行与覆盖记录",
+      "anchor": "2-21历史执行与覆盖记录",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "历史验收执行方式",
+      "anchor": "历史验收执行方式",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "2. 库表、字段与操作对账",
+      "anchor": "2-库表字段与操作对账",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "3. UI源模块到操作清单",
+      "anchor": "3-ui源模块到操作清单",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "4. 原验收清单到可执行场景",
+      "anchor": "4-原验收清单到可执行场景",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "5. 语义审阅与剩余范围",
+      "anchor": "5-语义审阅与剩余范围",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "还不能声称已验证的范围",
+      "anchor": "还不能声称已验证的范围",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "2026-10-23 · 字段及Pi迁移专项验收",
+      "anchor": "2026-10-23--字段及pi迁移专项验收",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "2026-10-23 · 可重建性复核结论",
+      "anchor": "2026-10-23--可重建性复核结论",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "RQ-01 · 高：目标Agent调用仍需要重建者自行设计",
+      "anchor": "rq-01--高目标agent调用仍需要重建者自行设计",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "RQ-02 · 高：旧规则残留曾与目标写入协议直接冲突",
+      "anchor": "rq-02--高旧规则残留曾与目标写入协议直接冲突",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "RQ-03 · 高：幂等凭据缺少子任务归属和P2在途恢复状态",
+      "anchor": "rq-03--高幂等凭据缺少子任务归属和p2在途恢复状态",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "RQ-04 · 高：覆盖计数不足以支持按版本恢复和完成证明",
+      "anchor": "rq-04--高覆盖计数不足以支持按版本恢复和完成证明",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "RQ-05 · 中：工具探针的旧协议与目标finalizer/写工具协议未对齐",
+      "anchor": "rq-05--中工具探针的旧协议与目标finalizer写工具协议未对齐",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "RQ-06 · 高：目标验收尚不能独立运行",
+      "anchor": "rq-06--高目标验收尚不能独立运行",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "RQ-07 · 中：模块职责已写，但循环依赖与注入边界仍不清晰",
+      "anchor": "rq-07--中模块职责已写但循环依赖与注入边界仍不清晰",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "RQ-08 · 中：复现缺陷与改进目标仍需明确分轨",
+      "anchor": "rq-08--中复现缺陷与改进目标仍需明确分轨",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "本轮覆盖与下一完成门槛",
+      "anchor": "本轮覆盖与下一完成门槛",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "2026-10-24 · 明显需求缺口的闭合状态",
+      "anchor": "2026-10-24--明显需求缺口的闭合状态",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "本轮交付的确定性验证材料",
+      "anchor": "本轮交付的确定性验证材料",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "缺陷优先修复验收基线",
+      "anchor": "缺陷优先修复验收基线",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "按书会话与游玩接入验收",
+      "anchor": "按书会话与游玩接入验收",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "heading": "阶段0规则修订与验证边界",
+      "anchor": "阶段0规则修订与验证边界",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "1. 用户意图与目标流程",
+      "anchor": "1-用户意图与目标流程",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "2. 本次补全的设计决定和解释",
+      "anchor": "2-本次补全的设计决定和解释",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "3. 冲突定位与替换范围",
+      "anchor": "3-冲突定位与替换范围",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "4. 资源和证据纪律",
+      "anchor": "4-资源和证据纪律",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "5. 本轮完成与后续实现边界",
+      "anchor": "5-本轮完成与后续实现边界",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "6. 2026-10-22用户澄清：删除草稿/入库双层",
+      "anchor": "6-2026-10-22用户澄清删除草稿入库双层",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "7. 2026-10-22用户澄清：AI统一Pi架构",
+      "anchor": "7-2026-10-22用户澄清ai统一pi架构",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "8. 2026-10-23字段、工具和Pi迁移校订",
+      "anchor": "8-2026-10-23字段工具和pi迁移校订",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "9. 2026-10-23再次审查：仍不满足独立重建完成条件",
+      "anchor": "9-2026-10-23再次审查仍不满足独立重建完成条件",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "10. 2026-10-24需求补全决定",
+      "anchor": "10-2026-10-24需求补全决定",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "11. 用户明确改变缺陷策略：规划时修复，禁止复现旧BUG",
+      "anchor": "11-用户明确改变缺陷策略规划时修复禁止复现旧bug",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "12. 阶段0：收紧人工编辑与统一重试",
+      "anchor": "12-阶段0收紧人工编辑与统一重试",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/13-流程变更与冲突对照.md",
+      "heading": "13. 阶段2：统一全部章节预览",
+      "anchor": "13-阶段2统一全部章节预览",
+      "owner": "docs/v2/13-流程变更与冲突对照.md",
+      "status": "历史证据"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "book-import",
+      "title": "书架与小说导入",
+      "spec": "openspec/specs/book-import/spec.md",
+      "modules": [
+        "src/features/books",
+        "src/features/import",
+        "src/lib/storage"
+      ],
+      "tests": [
+        "tests/import-text.test.ts",
+        "tests/import-storage.test.ts",
+        "tests/browser/import.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/stage-02.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "asset-management",
+      "title": "资产维护",
+      "spec": "openspec/specs/asset-management/spec.md",
+      "modules": [
+        "src/features/assets"
+      ],
+      "tests": [
+        "tests/assets.test.ts",
+        "tests/asset-search.test.ts",
+        "tests/browser/assets.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/assets.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "extraction",
+      "title": "逐章提取",
+      "spec": "openspec/specs/extraction/spec.md",
+      "modules": [
+        "src/features/extraction"
+      ],
+      "tests": [
+        "tests/extraction.test.ts",
+        "tests/browser/extraction.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/extraction.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "world-organization",
+      "title": "世界资产整理",
+      "spec": "openspec/specs/world-organization/spec.md",
+      "modules": [
+        "src/features/world",
+        "src/features/assets"
+      ],
+      "tests": [
+        "tests/world.test.ts",
+        "tests/world-optimization.test.ts",
+        "tests/mechanical-queue.test.ts",
+        "tests/browser/world.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/world.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "story-organization",
+      "title": "事件线串联与复核",
+      "spec": "openspec/specs/story-organization/spec.md",
+      "modules": [
+        "src/features/story"
+      ],
+      "tests": [
+        "tests/story.test.ts",
+        "tests/story-coverage.test.ts",
+        "tests/story-retrieval.test.ts",
+        "tests/browser/story.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/story.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "model-access",
+      "title": "模型配置与调用",
+      "spec": "openspec/specs/model-access/spec.md",
+      "modules": [
+        "src/features/models"
+      ],
+      "tests": [
+        "tests/models.test.ts",
+        "tests/browser/models.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/models.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "agent-session",
+      "title": "智能体会话与工具",
+      "spec": "openspec/specs/agent-session/spec.md",
+      "modules": [
+        "src/features/agents"
+      ],
+      "tests": [
+        "tests/agents.test.ts",
+        "tests/session-context.test.ts",
+        "tests/browser/agents.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/agents.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "task-recovery",
+      "title": "并行执行与恢复",
+      "spec": "openspec/specs/task-recovery/spec.md",
+      "modules": [
+        "src/features/agents",
+        "src/features/extraction",
+        "src/features/world",
+        "src/features/story",
+        "src/lib/storage"
+      ],
+      "tests": [
+        "tests/browser/workspace.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/parallel.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "event-network",
+      "title": "事件网络",
+      "spec": "openspec/specs/event-network/spec.md",
+      "modules": [
+        "src/features/network"
+      ],
+      "tests": [
+        "tests/network.test.ts",
+        "tests/browser/network.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/network.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    },
+    {
+      "id": "book-backup",
+      "title": "备份与书籍删除",
+      "spec": "openspec/specs/book-backup/spec.md",
+      "modules": [
+        "src/features/backup",
+        "src/lib/storage"
+      ],
+      "tests": [
+        "tests/backup.test.ts",
+        "tests/backup-files.test.ts",
+        "tests/browser/backup-transfer.spec.ts"
+      ],
+      "acceptance": "docs/acceptance/backup.md",
+      "implementation": "已有实现，人工结论见验收记录"
+    }
+  ],
+  "resources": [
+    {
+      "path": "docs/v2/resources/acceptance-cases.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/ai-message-templates.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/algorithm-parameters.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/candidates.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/assets/favicon.svg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/assets/icons.svg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/assets/index.css",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/assets/PI-MIT.txt",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/automatic-triggers.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/compatibility-cases.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/contracts.d.ts",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/coverage-matrix.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/data-flows.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/dynamic-schema-examples.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/field-coverage.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/fixtures/graph-input.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/fixtures/UI导出结果.wwv2",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/fixtures/人工资产样本.wwv2",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/fixtures/逆推验证样本.txt",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/golden-results.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/internal-contracts.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/internal-contracts.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/legacy-table-dictionary-2.1.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/operation-catalog.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/prompts/extraction/01-extract-world-assets.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/prompts/extraction/02-extract-narrative-assets.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/prompts/merge/04-link-event-lines.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/prompts/merge/05-detect-alias-groups.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/prompts/merge/06-merge-locations.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/prompts/merge/08-optimize-characters.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/prompts/session/07-compact-story-session.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/README.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/replays/agent-query-submit.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/replays/agent-submit-failure.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/replays/agent-submit-repair.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/replays/link-invalid-repair.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/replays/link-query-commit.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/replays/p1-world-and-narrative.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/resource-manifest.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/eslint.config.js",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/index.html",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/package.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/pnpm-lock.yaml",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/resolved-dependencies.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/tsconfig.app.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/tsconfig.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/tsconfig.node.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/runtime/vite.config.ts",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/scenarios/table-flow-seed.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/schema-dictionary-v2.0.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/schemas.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/compaction.ts",
+        "src/features/extraction/contracts.ts",
+        "src/features/world/optimization.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/screenshots/01-network.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/02-editor-after-reload.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/03-play-placeholder.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/04-import-empty.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/05-settings-default.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/06-backup-preview.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/07-workspace-draft.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/08-location-editor.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/09-line-editor.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/10-memory-empty.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/11-export-dialog.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/12-delete-confirm.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/13-import-error.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/14-chapter-preview.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/15-node-editor.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/16-try-one-idle.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/screenshots/17-history-empty.jpg",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/state-transitions.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/storage-inventory.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/stores.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/appSettings.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/books.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/chapters.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/chapterTexts.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/characters.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/characterSnapshots.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/compileProgress.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/credentials.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/eventLines.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/locations.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/locationSnapshots.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/nodes.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/storyEditorCheckpoints.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/storyEditorMemory.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/storyEditorNotes.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/storySessionEntries.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/table-examples/storySessions.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/tool-contracts.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/tool-response-examples.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/tool-results.schema.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/ui-copy-and-styles.json",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/acceptance/book-session-cases.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/acceptance/bugfix-cases.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/acceptance/README.md",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/acceptance/recovery-cases.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/acceptance/run.mjs",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/acceptance/stage0-cases.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/acceptance-cases.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/ai-runtime-contract.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/architecture-ports.ts",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/automatic-triggers.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/bugfix-contract.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/data-contract.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/data-flows.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/examples.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/execution-examples.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/execution.schema.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/manual-command-error.schema.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/model-output-contract.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/contracts.ts",
+        "src/features/world/optimization.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/node-reference-contract.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/operation-catalog.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/pipeline-contract.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompt-call-manifest.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompt-inputs.schema.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/agent-wrapper.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/runtime.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/character-optimize.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/optimization.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/compact.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/compaction.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/compacted_history.txt",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/conflict.txt",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/final_only.txt",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/identity.txt",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/location-optimize.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/optimization.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/output-discipline.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/output-discipline.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p1-narrative.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/extraction/contracts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p1-world.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/extraction/contracts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-identity.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/service.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-story.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/review.ts",
+        "src/features/story/service.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/probe_asset.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/probe_story.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/probe_system.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/README.md",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/recovery.txt",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/repair_direct.txt",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/repair_final.txt",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/repair_write.txt",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/story.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/review.ts",
+        "src/features/story/service.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/optimize-locations.md",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/p2-asset-editor.md",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/p3-story-editor.md",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/index.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-COMPACT.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P1-NARRATIVE.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P1-WORLD.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P2-CHARACTER.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P2-IDENTITY.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P2-LOCATION.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-GLOBAL.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-WINDOW.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-PROBE-AGENT-STORY.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-PROBE-AGENT.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-PROBE-DIRECT.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/VARIANT-DIRECT-REPAIR.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/VARIANT-P3-FINAL-ONLY.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/VARIANT-P3-FINAL-REPAIR.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/VARIANT-P3-RECOVERY.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/VARIANT-P3-WRITE-REPAIR.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/resource-authority.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/state-transitions.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/storage.schema.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/appSettings.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/assetLifecycle.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/books.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/chapters.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/chapterTexts.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/characters.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/compileProgress.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/credentials.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/eventLines.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/extractionReceipts.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/locations.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/nodes.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/pipelineRuns.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/storyEditorCheckpoints.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/storyEditorMemory.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/storyEditorNotes.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/storySessionEntries.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/table-examples/storySessions.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/tool-contracts.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/tool-results.schema.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/数据值-ID与备份格式.md",
+      "role": "历史取证或基础参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/2026-10-23-app-before.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/2026-10-23-contract-validation.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/2026-10-23-reconstruction-audit-before.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/2026-10-23-reconstruction-review.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/2026-10-24-bugfix-spec-validation.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/2026-10-24-gap-validation.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/baseline.adapter.ts",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/baseline.config.ts",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/baseline.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/baseline.test.ts",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/capture-tools.test.ts",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/contract-validation.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/coverage-validation.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/package-validation.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/package.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/portable-baseline-results.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/portable-baseline.log",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/resource-manifest-2.1.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/semantic-coverage-review.md",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/source-hashes.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/source-references.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/spec-quality-review.md",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/tool-contracts-2.1.md",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/type-contract-validation.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/ui-editor.txt",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/ui-export-check.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/ui-memory.txt",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/ui-network.txt",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/ui-play-after-switch.txt",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/ui-play.txt",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/ui-role-change.txt",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/v2.2-change-summary.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/v2.2-document-validation.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/v2.2-pi-change-summary.json",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/evidence/vitest-current.txt",
+      "role": "历史证据",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/add-boundary-cases.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/add-pipeline-cases.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/audit-reconstructability.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/build-bugfix-cases.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/build-recovery-cases.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/build-request-examples.mjs",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/close-requirement-gaps.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/complete-coverage.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/complete-flows.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/complete-operations.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/complete-spec.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/complete-tools.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/create-acceptance-cases.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/expand-data-dictionary.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/expand-tool-dictionary.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/extract-contracts.ts",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/finalize-2.1.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/finalize-bugfix-spec.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/finalize-field-tool-clarification.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/finalize-gap-clarification.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/package.json",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/README.md",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/specify-bug-fixes.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/validate-bugfix-spec.mjs",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/validate-coverage.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/validate-expanded-contracts.mjs",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/validate-gap-contracts.mjs",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/validate-package.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/validate-v2.2.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/verify-contracts.ts",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/write-behavior-specs.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/write-data-spec.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/write-fix-first-spec.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/write-specifications.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/write-trace.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/write-ui-acceptance.py",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/scripts/__pycache__/complete-spec.cpython-310.pyc",
+      "role": "历史重建维护脚本",
+      "consumers": []
+    }
+  ],
+  "runtimeAssets": [
+    {
+      "path": "docs/v2/resources/algorithm-parameters.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/candidates.ts"
+      ],
+      "sha256": "68b0f3782e51050477d191be3fd437c5b5d4c0f6b607c3b135f90c17a8640131"
+    },
+    {
+      "path": "docs/v2/resources/schemas.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/compaction.ts",
+        "src/features/extraction/contracts.ts",
+        "src/features/world/optimization.ts"
+      ],
+      "sha256": "6bd59b4dd03834e9e1da67dc54540fd58c7b3637d06ad987f3cbc532596df101"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/model-output-contract.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/contracts.ts",
+        "src/features/world/optimization.ts"
+      ],
+      "sha256": "cceba4171dcf6e51a811dfdddef0cf5f1c787373e204e401e979bb1cc01ae1ed"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/agent-wrapper.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/runtime.ts"
+      ],
+      "sha256": "ec14ce61d25852ab511aaec53d95d17cd0eba08bf647cabc9a87603aa90769c7"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/character-optimize.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/optimization.ts"
+      ],
+      "sha256": "d69abd16cf395154bba38a1f61e6120a23a92562e463fff419344797ea9066e8"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/compact.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/compaction.ts"
+      ],
+      "sha256": "55f76b7513cf1524d912374b9d244935fa0fb050a72319d69c8609c8f30e38f2"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/location-optimize.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/optimization.ts"
+      ],
+      "sha256": "f0549c0531c7f4bf0cd26f91baf0c5ab36cab9583d897d1fbca9f9f83e3e5b9f"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/output-discipline.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/output-discipline.ts"
+      ],
+      "sha256": "3e71adc61ecadda4753f316371ab3cf8f0ec90a2408975747da37c4c7e583578"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p1-narrative.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/extraction/contracts.ts"
+      ],
+      "sha256": "46fbecb56eba356b932c7a995364db7d45742d5ac5d6f894feba56835bffaef0"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p1-world.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/extraction/contracts.ts"
+      ],
+      "sha256": "404d6b158ae95cda5d152e229a66249a6eb428789c9b2585b15a6980bf4d865e"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-identity.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/service.ts"
+      ],
+      "sha256": "a61388666cb7f6e7e15ebea24b4e238870cadec13ae3067bf9824c05a67ded45"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-story.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/review.ts",
+        "src/features/story/service.ts"
+      ],
+      "sha256": "20921fd650201736751983fd0e1ed6cae732d2b6e93e89135fa7e1c7bacebf6a"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/probe_asset.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ],
+      "sha256": "71525aefcefa696cc51341e53935e1a0499513b9546c57296a33b4cbf66db1f5"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/probe_story.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ],
+      "sha256": "cfdb7f15280ee714ecfa33efe0fa9180ced3460df7b9fdbbf6079e76256c570c"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/probe_system.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/probe.ts"
+      ],
+      "sha256": "b59b73d71acb8753e3b22671a6717285093c8fe8612ad00af08b9587af161a07"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/story.txt",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/review.ts",
+        "src/features/story/service.ts"
+      ],
+      "sha256": "234589a98bdc920228e45428b0930749a0135c363c9bf1806371192434a47d91"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/storage.schema.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ],
+      "sha256": "46daf8b2f412ff20874db76034b425a2b00c6acbb6adea598f866c0c3906796c"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/tool-contracts.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ],
+      "sha256": "3c99643ac710e5fae875fd911e77392a862cd127aa77dacc8660ab28622ce894"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/tool-results.schema.json",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/agents/contracts.ts"
+      ],
+      "sha256": "b3eb33fbc3f1e4005550694b0de4c04cb0beb202aff830978174d715e563473e"
+    }
+  ],
+  "decisions": [
+    {
+      "source": "docs/decisions/manual-asset-editing.md",
+      "target": "openspec/specs/asset-management/spec.md",
+      "requirements": [
+        "MANUAL-ASSET-EDITING-01 人工资产维护"
+      ]
+    },
+    {
+      "source": "docs/decisions/batch-merge.md",
+      "target": "openspec/specs/asset-management/spec.md",
+      "requirements": [
+        "BATCH-MERGE-01 人物与地点批量合并"
+      ]
+    },
+    {
+      "source": "docs/decisions/node-references.md",
+      "target": "openspec/specs/asset-management/spec.md",
+      "requirements": [
+        "NODE-REFERENCES-01 节点参考引文与人物关联"
+      ]
+    },
+    {
+      "source": "docs/decisions/character-names.md",
+      "target": "openspec/specs/asset-management/spec.md",
+      "requirements": [
+        "CHARACTER-NAMES-01 人物别名与通用称谓",
+        "CHARACTER-NAMES-02 人物别名与通用称谓",
+        "CHARACTER-NAMES-03 人物别名与通用称谓",
+        "CHARACTER-NAMES-04 人物别名与通用称谓",
+        "CHARACTER-NAMES-05 人物别名与通用称谓",
+        "CHARACTER-NAMES-06 人物别名与通用称谓",
+        "CHARACTER-NAMES-07 人物别名与通用称谓"
+      ]
+    },
+    {
+      "source": "docs/decisions/extraction-queue.md",
+      "target": "openspec/specs/extraction/spec.md",
+      "requirements": [
+        "EXTRACTION-QUEUE-01 逐章提取与失败补提取",
+        "EXTRACTION-QUEUE-02 逐章提取与失败补提取",
+        "EXTRACTION-QUEUE-03 逐章提取与失败补提取"
+      ]
+    },
+    {
+      "source": "docs/decisions/world-organization.md",
+      "target": "openspec/specs/world-organization/spec.md",
+      "requirements": [
+        "WORLD-ORGANIZATION-01 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-02 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-03 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-04 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-05 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-06 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-07 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-08 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-09 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-10 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-11 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-12 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-13 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-14 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-15 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-16 世界资产整理的两个入口",
+        "WORLD-ORGANIZATION-17 世界资产整理的两个入口"
+      ]
+    },
+    {
+      "source": "docs/decisions/mechanical-merge-queue.md",
+      "target": "openspec/specs/world-organization/spec.md",
+      "requirements": [
+        "MECHANICAL-MERGE-QUEUE-01 已确认组的机械合并队列",
+        "MECHANICAL-MERGE-QUEUE-02 已确认组的机械合并队列",
+        "MECHANICAL-MERGE-QUEUE-03 已确认组的机械合并队列",
+        "MECHANICAL-MERGE-QUEUE-04 已确认组的机械合并队列",
+        "MECHANICAL-MERGE-QUEUE-05 已确认组的机械合并队列",
+        "MECHANICAL-MERGE-QUEUE-06 已确认组的机械合并队列"
+      ]
+    },
+    {
+      "source": "docs/decisions/story-organization.md",
+      "target": "openspec/specs/story-organization/spec.md",
+      "requirements": [
+        "STORY-ORGANIZATION-01 P3叙事整理的排队与恢复",
+        "STORY-ORGANIZATION-02 P3叙事整理的排队与恢复",
+        "STORY-ORGANIZATION-03 P3叙事整理的排队与恢复",
+        "STORY-ORGANIZATION-04 P3叙事整理的排队与恢复",
+        "STORY-ORGANIZATION-05 P3叙事整理的排队与恢复",
+        "STORY-ORGANIZATION-06 P3叙事整理的排队与恢复",
+        "STORY-ORGANIZATION-07 P3叙事整理的排队与恢复",
+        "STORY-ORGANIZATION-08 P3叙事整理的排队与恢复"
+      ]
+    },
+    {
+      "source": "docs/decisions/story-window-linking.md",
+      "target": "openspec/specs/story-organization/spec.md",
+      "requirements": [
+        "STORY-WINDOW-LINKING-01 叙事窗口串联",
+        "STORY-WINDOW-LINKING-02 叙事窗口串联",
+        "STORY-WINDOW-LINKING-03 叙事窗口串联",
+        "STORY-WINDOW-LINKING-04 叙事窗口串联"
+      ]
+    },
+    {
+      "source": "docs/decisions/model-connection.md",
+      "target": "openspec/specs/model-access/spec.md",
+      "requirements": [
+        "MODEL-CONNECTION-01 统一模型配置与 Pi 调用"
+      ]
+    },
+    {
+      "source": "docs/decisions/agent-runtime-adaptation.md",
+      "target": "openspec/specs/agent-session/spec.md",
+      "requirements": [
+        "AGENT-RUNTIME-ADAPTATION-01 智能体运行与项目适配",
+        "AGENT-RUNTIME-ADAPTATION-02 智能体运行与项目适配",
+        "AGENT-RUNTIME-ADAPTATION-03 智能体运行与项目适配",
+        "AGENT-RUNTIME-ADAPTATION-04 智能体运行与项目适配",
+        "AGENT-RUNTIME-ADAPTATION-05 智能体运行与项目适配"
+      ]
+    },
+    {
+      "source": "docs/decisions/event-network.md",
+      "target": "openspec/specs/event-network/spec.md",
+      "requirements": [
+        "EVENT-NETWORK-01 事件网络展示",
+        "EVENT-NETWORK-02 事件网络展示"
+      ]
+    },
+    {
+      "source": "docs/decisions/book-backup-and-lifecycle.md",
+      "target": "openspec/specs/book-backup/spec.md",
+      "requirements": [
+        "BOOK-BACKUP-AND-LIFECYCLE-01 完整备份与可恢复的书籍操作"
+      ]
+    }
+  ],
+  "requirementRows": [
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T01",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T02",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T03",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T04",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T05",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T08",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T09",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T10",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T11",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T12",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T13",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T14",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T15",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T16",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T17",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T18",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T19",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T20",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T08",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T09",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T12",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T13",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T14",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T15",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T18",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/03-Spec-数据与存储.md",
+      "id": "T19",
+      "owner": "docs/v2/03-Spec-数据与存储.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-01",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-02",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-03",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-04",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-05",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-06",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-07",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-08",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-09",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-10",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-11",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-12",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-13",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-14",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-15",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-16",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-17",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-18",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-19",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-20",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-21",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-22",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-23",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-24",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-25",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-26",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-27",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-28",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-29",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "AC-V22-30",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-01",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-02",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-03",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-04",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-05",
+      "owner": "openspec/changes/review-remaining-baseline/specs/credential-optional-model/spec.md",
+      "status": "已确认待开发"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-06",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-07",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-08",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-09",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-10",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-11",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-12",
+      "owner": "openspec/changes/play-session-foundation/specs/play-session/spec.md",
+      "status": "待开发目标"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-13",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-14",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-15",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-16",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-17",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-18",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-19",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/07-验收与兼容缺陷.md",
+      "id": "BUG-20",
+      "owner": "docs/v2/07-验收与兼容缺陷.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-01",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-02",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-03",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-04",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-05",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-06",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-07",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-08",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-09",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-10",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-11",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-12",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-13",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-14",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-15",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/09-操作与自动触发契约.md",
+      "id": "AUTO-16",
+      "owner": "docs/v2/09-操作与自动触发契约.md",
+      "status": "技术或验收条目"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T01",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T02",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T03",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T04",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T05",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T06",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T07",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T08",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T09",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T10",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T11",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T12",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T13",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T14",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T15",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T16",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "T17",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-01",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-02",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-03",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-04",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-05",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-06",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-07",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-08",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-09",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-10",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-11",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-12",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-13",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-14",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-15",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-16",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-17",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-18",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-19",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-20",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-21",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-22",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-23",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-24",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-25",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-26",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-27",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-28",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-29",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-30",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-31",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-32",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-33",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-34",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-35",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-36",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-37",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-38",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-39",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-PI-DOC-01",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-PI-DOC-02",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-PI-DOC-03",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-PI-DOC-04",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-PI-DOC-05",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-PI-DOC-06",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-PI-DOC-07",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    },
+    {
+      "source": "docs/v2/12-验收执行与覆盖矩阵.md",
+      "id": "AC-PI-DOC-08",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
+      "status": "历史证据"
+    }
+  ],
+  "pendingCapabilities": [
+    {
+      "id": "play-session",
+      "spec": "openspec/changes/play-session-foundation/specs/play-session/spec.md",
+      "status": "目标已定义，首批业务工具待确认"
+    },
+    {
+      "id": "chapter-preview-run",
+      "spec": "openspec/changes/review-remaining-baseline/specs/chapter-preview-run/spec.md",
+      "status": "用户确认保留待开发"
+    },
+    {
+      "id": "credential-optional-model",
+      "spec": "openspec/changes/review-remaining-baseline/specs/credential-optional-model/spec.md",
+      "status": "用户确认保留待开发"
+    },
+    {
+      "id": "character-relations",
+      "spec": "openspec/changes/unify-character-relations/specs/character-relations/spec.md",
+      "status": "来源绑定具体人物、目标及节点全同名规则已确认；关联设计待审核",
+      "requests": [
+        "REQ-007",
+        "REQ-008",
+        "REQ-009",
+        "REQ-010"
+      ]
+    }
+  ]
+}

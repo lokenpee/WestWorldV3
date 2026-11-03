@@ -1,10 +1,11 @@
 import type { AgentStore, Row } from './repository'
 import { hash, strings, text, type AgentProfile } from './contracts'
 import { characterCandidates } from '../assets/characterLinks'
+import { edgesFor, projectRelations, relationView, syncRelations } from '../assets/relations'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { storyContent } from '../story/coverage'
 import { searchStoryContext } from '../story/retrieval'
-import type { Character } from '../assets/types'
+import type { Character, CharacterRelation, Lifecycle } from '../assets/types'
 
 export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[] }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
@@ -70,8 +71,9 @@ async function references(store: AgentStore, scope: Scope, names: string[], ids:
   const people = await scopedRows(store, scope, 'characters') as unknown as Character[]
   return [...new Set([...names, ...ids.map(id => people.find(row => row.id === id)?.name ?? id)])].map(name => {
     const candidates = characterCandidates(name, people)
-    const chosen = candidates.find(row => ids.includes(row.id)) ?? (candidates.length === 1 ? candidates[0] : undefined)
-    return { name, status: chosen ? 'resolved' : candidates.length > 1 ? 'ambiguous' : 'not_found', candidateIds: candidates.map(row => row.id), ...(chosen ? { characterId: chosen.id } : {}) }
+    return candidates.length
+      ? { name, status: 'resolved', candidateIds: candidates, ...(candidates.length === 1 ? { characterId: candidates[0] } : {}) }
+      : { name, status: 'not_found', candidateIds: [] }
   })
 }
 export async function readTool(store: AgentStore, scope: Scope, name: string, args: Row, maxResults = 100): Promise<Row> {
@@ -162,12 +164,26 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
   const detail = name.startsWith('get_')
   if (detail && args.include_facts && (scope.profile !== 'asset_editor' || scope.phase !== 'optimize')) throw new Error('INVALID_ARGS:事实底稿仅供世界资产整编读取。')
   if (detail) {
+    let characterRelations: { people: Character[]; rows: CharacterRelation[]; view: ReturnType<typeof relationView> } | undefined
+    if (table === 'characters') {
+      const people = (await scopedRows(store, scope, 'characters')) as unknown as Character[]
+      const lifecycle = (await scopedRows(store, scope, 'assetLifecycle')) as unknown as Lifecycle[]
+      const rows = (await scopedRows(store, scope, 'characterRelations')) as unknown as CharacterRelation[]
+      const normalized = people.map(normalizeCharacterNames)
+      characterRelations = { people: normalized, rows, view: relationView(syncRelations(rows, normalized, lifecycle).relations, normalized) }
+    }
     const rows: Row[] = []; const missing: string[] = []
     for (const id of strings(args.ids)) {
       const found = await resolveAsset(store, scope, table, id)
       if (!found) { missing.push(id); continue }
       const row: Row = table === 'characters' ? normalizeCharacterNames({ ...found, name: text(found.name), aliases: strings(found.aliases), identity: text(found.identity) }) : { ...found }
       if (!args.include_facts) for (const key of ['mergeFacts', 'optimizedFactIds', 'optimizationFingerprint']) delete row[key]
+      if (characterRelations && characterRelations.people.some(person => person.id === row.id)) {
+        const projection = projectRelations(characterRelations.view.edges, characterRelations.rows, characterRelations.view.unresolved, text(row.id), characterRelations.people)
+        row.relations = projection.relations
+        row.relationEdges = edgesFor(characterRelations.view.edges, text(row.id))
+        row.unresolvedRelations = projection.unresolvedRelations
+      }
       if (table === 'nodes') row.characterReferences = await references(store, scope, [...strings(row.actors), ...strings(row.targets)], [...strings(row.actorIds), ...strings(row.targetCharacterIds)])
       if (table === 'eventLines') {
         const nodes = (await scopedRows(store, scope, 'nodes')).filter(node => strings(row.nodeIds).includes(text(node.id)))

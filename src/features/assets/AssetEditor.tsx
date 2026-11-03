@@ -4,6 +4,7 @@ import { ChapterTextDialog } from '../books/ChapterTextDialog'
 import type { AssetService } from './service'
 import { AssetError, assetLabels, assetName, roleWeights, type Asset, type AssetInput, type AssetKind, type AssetSnapshot, type Character } from './types'
 import { formInput, formValues, labels, memberIds, type FormValues } from './form'
+import { paginateEdges } from './relations'
 import { NodeCharacters } from './NodeCharacters'
 
 function DeleteDialog({ name, busy, onConfirm, onClose }: { name: string; busy: boolean; onConfirm: () => void; onClose: () => void }) {
@@ -25,6 +26,7 @@ export function AssetEditor({ kind, asset, creating, snapshot, chapters, service
   const [reader, setReader] = useState<{ title: string; text: string }>()
   const [savedMessage, setSavedMessage] = useState('')
   const [expandedFields, setExpandedFields] = useState<Partial<Record<keyof FormValues, boolean>>>({})
+  const [relationLimit, setRelationLimit] = useState(100)
   const editorRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (kind !== 'character') return
@@ -131,6 +133,15 @@ export function AssetEditor({ kind, asset, creating, snapshot, chapters, service
         {fieldError?.field === 'nodeIds' && <p role="alert" className="field-error">{fieldError.message}</p>}
         {field('cause', true)}{field('process', true)}{field('result', true)}
       </>}
+      {baseline && kind === 'character' && (() => {
+        const person = baseline as Character
+        const edges = snapshot.relationEdges[baseline.id] ?? []
+        const page = paginateEdges(edges, 0, relationLimit)
+        const name = (id: string) => snapshot.characters.find(row => row.id === id)?.name ?? id
+        const names = new Set([person.name, ...(person.aliases ?? [])])
+        const unresolved = snapshot.unresolvedRelations.filter(item => names.has(item.sourceName) || item.targetName === person.name)
+        return <details className="asset-metadata" open><summary>人物关系</summary>{!edges.length && !unresolved.length && <p>暂无关系记录。</p>}{page.items.map(edge => <p key={`${edge.fromId}>${edge.toId}`}>{edge.fromId === baseline.id ? `${name(edge.toId)}：${edge.labels.join('、')}` : `来自 ${name(edge.fromId)}：${edge.labels.join('、')}`}{edge.directionUnclear ? '（方向未明确）' : ''}</p>)}{page.nextOffset !== null && <button className="text-button" type="button" onClick={() => setRelationLimit(value => value + 100)}>加载更多（共 {page.total} 条）</button>}{unresolved.map(item => <p key={item.relationId}>{item.sourceName} → {item.targetName}：{item.forwardLabel}（{item.reason === 'source_missing' ? '来源已失效' : item.reason === 'self' ? '两端合为同一人物' : '目标尚未入库'}）</p>)}</details>
+      })()}
       {baseline && <details className="asset-metadata"><summary>来源与事实底稿</summary><p>创建来源：{baseline.createdBy === 'manual' ? '人工' : '提取'}；修订：{baseline.revision}</p>{'sourceChapters' in baseline && <p>来源章节：{baseline.sourceChapters?.join('、') || '无'}</p>}{'mergeNotes' in baseline && baseline.mergeNotes?.map((note, index) => <p key={index}>{note}</p>)}{'mergeFacts' in baseline && baseline.mergeFacts?.map(fact => <p key={fact.id}>{fact.text}（来源：{fact.chapters.join('、') || '人工'}）</p>)}{kind === 'character' && (baseline as Character).relations?.map((relation, index) => <p key={index}>{relation.target}：{relation.relation_label ?? relation.relation_type}</p>)}</details>}
       {baseline && kind === 'character' && <p className="field-help">基础资料：年龄 {(baseline as Character).profile?.age ?? '未记录'}；性别 {(baseline as Character).profile?.gender || '未记录'}</p>}
       {baseline && kind === 'eventLine' && <p className="field-help">当前可确定人物：{(snapshot.lineCharacterIds[baseline.id] ?? []).map(id => snapshot.characters.find(row => row.id === id)?.name ?? id).join('、') || '无'}；来源章节：{'chapters' in baseline ? baseline.chapters.join('、') : ''}</p>}

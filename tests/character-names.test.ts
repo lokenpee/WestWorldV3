@@ -12,11 +12,12 @@ import type { Character, EventNode } from '../src/features/assets/types'
 const person = (id: string, name: string, aliases: string[] = []): Character => ({ id, name, aliases, bookId: 'book', revision: 1, confidence: 1, createdBy: 'P1', sourceChapters: ['1'] })
 it('旧档案的通用别称不再自动绑定，限定称呼与人工选择仍有效', () => {
   const people = [person('a', '林如海', ['爸爸', '姑父', '林姑父']), person('b', '太后', ['娘娘'])]
-  for (const name of ['爸爸', '姑父', '太后', '娘娘']) expect(characterCandidates(name, people)).toEqual([])
-  expect(characterCandidates('林姑父', people).map(row => row.id)).toEqual(['a'])
+  for (const name of ['爸爸', '姑父', '娘娘']) expect(characterCandidates(name, people)).toEqual([])
+  expect(characterCandidates('太后', people)).toEqual(['b'])
+  expect(characterCandidates('林姑父', people)).toEqual(['a'])
   expect(bindCharacterNames(['太后'], people, ['b'])).toEqual({ ids: ['b'], names: ['太后'] })
   const node = { id: 'n', actors: ['爸爸', '太后'], targets: [] } as unknown as EventNode
-  expect(resolveReferences([node], people).n.actorIds).toEqual([])
+  expect(resolveReferences([node], people).n.actorIds).toEqual(['b'])
   expect(resolveReferences([{ ...node, actorIds: ['b'] }], people).n.actorIds).toEqual(['b'])
 })
 

@@ -69,12 +69,15 @@ stage: P1（每章第 1 次调用）
 | `relations` | object[] | ⬜ | 本章观察到的关系。 |
 | `relations[].target` | string | ✅ | 关系指向的人。用本章原文的称呼，还没归并。 |
 | `relations[].relation_type` | string | ✅ | 关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship |
-| `relations[].relation_label` | string | ⬜ | 关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。 |
-| `relations[].direction` | "bidirectional" \\| "directed" | ⬜ | 关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。 |
+| `relations[].relation_label` | string | ✅ | 本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。 |
+| `relations[].reverse_label` | string | ✅ | 目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。 |
+| `relations[].direction` | "directed" \\| "bidirectional" \\| "unspecified" | ✅ | directed = 方向明确（父亲/子女）；bidirectional = 对称（夫妻/朋友）；unspecified = 原文方向未明确。 |
+| `relations[].quote` | string | ✅ | 能解释这条关系的本章连续原文片段，逐字复制。 |
 | `confidence` | number | ✅ | 抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。 |
 <!-- AUTO-GENERATED:END -->
 
 
+**人物关系写法**：`relation_label` 写本人物对目标的说法，`reverse_label` 写目标对本人物这一关系的说法。例：张三是张蕾的父亲 → 正向“父亲”、反向“子女”；暗恋 → 正向“暗恋”、反向“被暗恋”；夫妻、朋友等对称关系两边写法相同。原文没有表明方向时用 `unspecified`，保留原文说法，不猜定角色。`quote` 必须是本章逐字连续的原文片段。
 
 ### locations[] · 地点
 

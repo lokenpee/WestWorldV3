@@ -12,12 +12,7 @@ decision-makers: 用户（按域锁定人工编辑并授权统一重试），Cod
 
 ## 决策
 
-- 同书 P2 持有 world 锁时拒绝人物/地点所有人工写；P3 持有 narrative 锁时拒绝节点/事件线所有人工写，包含即时字段与合并。任务自身绑定 owner 的合法写入仍允许。
-- UI 与领域命令事务同时校验，拒绝返回 `ASSET_DOMAIN_LOCKED`，不改变数据。启动/写入竞争在事务内判定；取消在途工作停稳并释放 owner 锁后才开放编辑。
-- 保留 P1 期间人工编辑、跨书编辑、只读、备份和 P2/P3 并行。跨域实际读依赖、revision、幂等账本不能删除。崩溃沿用有界租约恢复，不在刷新时盲目解锁。
-- direct 每逻辑调用最多 3 次实际 Provider 请求，首次、网络重发和结果修正共用预算；结果修正默认最多一次，P1最多两次，章节层保持单次排队。P1规则见[逐章提取与失败补提取](extraction-queue.md)，P2身份核实按[世界资产整理决策](world-organization.md)收尾；P3按[叙事整理的排队与恢复](story-organization.md)执行预算；更小的探测预算优先。
-- 暂时错误为 network/server/rate_limit；鉴权、内容限制、不支持等不自动重试。取消可中断退避；预算耗尽不补发免费修正。
-- 采用阶段验收用例先行；核心业务测试失败→实现通过→回归→用户验收。每阶段验收后再推进。
+编辑与并行行为由[任务恢复规格](../../openspec/specs/task-recovery/spec.md)维护，请求与修正预算分别见[模型](../../openspec/specs/model-access/spec.md)、[提取](../../openspec/specs/extraction/spec.md)、[世界整理](../../openspec/specs/world-organization/spec.md)和[叙事整理](../../openspec/specs/story-organization/spec.md)。
 
 ## 替代方案
 
@@ -31,14 +26,4 @@ decision-makers: 用户（按域锁定人工编辑并授权统一重试），Cod
 
 ## 实施与验证
 
-- 规格：`docs/v2/00–13` 当前条款、`resources/v2.2` pipeline/runtime/operation/state/flow/acceptance；2.1历史证据保持历史身份。
-- 实现：后续 `src/lib` 的任务、命令和模型边界，`src/features` 的表单/阶段入口；不复制旧应用或覆盖 npm 工程配置。
-- 验证：`tests/stage0-contracts.test.ts` 防规格回退；`tests/browser/pi.spec.ts` 验证锁定 SDK。后续阶段接真实事务、UI、多标签及实际请求计数测试。
-- 依赖：Pi 两包锁定 1.0.2，工具 Schema 直接使用同代 `typebox` 1.3.27，避免再引入旧 `@sinclair/typebox` 的双包类型边界。Vitest/Playwright 为开发依赖；保留 React/Vite/npm。
-
-- [x] 新编辑矩阵、操作守卫与请求预算已同步，并有失败后通过的契约检查。
-- [x] Pi 指定版本通过严格类型检查与生产模式浏览器探针。
-- [ ] 实际业务锁、取消解锁、跨标签和事务保护通过阶段 8–13 验收。
-- [ ] 实际业务重试与人工补缺通过阶段 6–9 验收。
-
-阶段 0 检查只证明规格一致及 SDK 集成可行，不能把未实现业务的勾选提前完成。若用户取消并行要求或更换模型协议/SDK，再复核本决策。
+当前实现与检查见[覆盖索引](../v2/12-验收执行与覆盖矩阵.md)，人工验收见[活动任务](../../openspec/changes/asset-mainline-acceptance/tasks.md)。开发流程统一按[仓库指令](../../AGENTS.md)。

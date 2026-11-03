@@ -5,7 +5,7 @@ export function resolveReferences(nodes: EventNode[], characters: Character[]): 
   const index = new Map<string, Set<string>>()
   const byId = new Map(characters.map(person => [person.id, person]))
   const knownNames = new Map(characters.map(person => [person.id, new Set([person.name, ...(person.aliases ?? [])])]))
-  for (const character of characters) for (const name of characterMatchNames(character)) {
+  for (const character of characters) for (const name of new Set([character.name, ...characterMatchNames(character)])) {
     const normalized = name.trim()
     if (!index.has(normalized)) index.set(normalized, new Set())
     index.get(normalized)!.add(character.id)
@@ -18,8 +18,7 @@ export function resolveReferences(nodes: EventNode[], characters: Character[]): 
       if (bound.some(id => knownNames.get(id)!.has(name))) continue
       const ids = [...(index.get(name.trim()) ?? [])].sort()
       if (bound.some(id => ids.includes(id))) continue
-      if (ids.length === 1 && node.actorIds === undefined) result.actorIds.push(ids[0])
-      else if (ids.length > 1) result.ambiguities.push({ name, candidateIds: ids })
+      if (ids.length) result.actorIds.push(...ids)
       else result.missingNames.push(name)
     }
     result.actorIds = [...new Set(result.actorIds)]

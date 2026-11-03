@@ -1279,11 +1279,10 @@
                       "type": "string"
                     },
                     "relations": {
-                      "description": "本章观察到的关系。",
+                      "description": "由关系表投影的兼容关系字段；聚合后的 targetId 与依据用于展示。",
                       "type": "array",
                       "items": {
                         "additionalProperties": false,
-                        "description": "一条人物关系。",
                         "type": "object",
                         "required": [
                           "target",
@@ -1291,29 +1290,51 @@
                         ],
                         "properties": {
                           "target": {
-                            "description": "关系指向的人。用本章原文的称呼，还没归并。",
+                            "type": "string"
+                          },
+                          "targetId": {
                             "type": "string"
                           },
                           "relation_type": {
-                            "description": "关系的英文类型标记，小写下划线风格。例：spouse / parent_child / mentor / friendship",
                             "type": "string"
                           },
                           "relation_label": {
-                            "description": "关系的中文说法，用原文里的词。例：夫妻 / 父子 / 知己。原文没写就留空。",
                             "type": "string"
                           },
                           "direction": {
-                            "description": "关系方向。bidirectional = 对称（如夫妻、朋友）；directed = 有向（如父子、师徒）。",
                             "anyOf": [
+                              {
+                                "const": "directed",
+                                "type": "string"
+                              },
                               {
                                 "const": "bidirectional",
                                 "type": "string"
                               },
                               {
-                                "const": "directed",
+                                "const": "unspecified",
                                 "type": "string"
                               }
                             ]
+                          },
+                          "evidence": {
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "chapterIndex",
+                                "quote"
+                              ],
+                              "properties": {
+                                "chapterIndex": {
+                                  "type": "string"
+                                },
+                                "quote": {
+                                  "type": "string"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -1497,6 +1518,128 @@
                       "type": "array",
                       "items": {
                         "type": "string"
+                      }
+                    },
+                    "relationEdges": {
+                      "description": "本人物有关的有向关系；每个有序端点对一条。",
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "fromId",
+                          "toId",
+                          "labels",
+                          "types",
+                          "relationIds",
+                          "evidence",
+                          "directionUnclear"
+                        ],
+                        "properties": {
+                          "fromId": {
+                            "type": "string"
+                          },
+                          "toId": {
+                            "type": "string"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "types": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "relationIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "evidence": {
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "chapterIndex",
+                                "quote"
+                              ],
+                              "properties": {
+                                "chapterIndex": {
+                                  "type": "string"
+                                },
+                                "quote": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "directionUnclear": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "unresolvedRelations": {
+                      "description": "仍有未命中端点或两端合为同一人物的原关系记录摘要。",
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "relationId",
+                          "sourceName",
+                          "targetName",
+                          "forwardLabel",
+                          "reverseLabel",
+                          "direction",
+                          "reason"
+                        ],
+                        "properties": {
+                          "relationId": {
+                            "type": "string"
+                          },
+                          "sourceName": {
+                            "type": "string"
+                          },
+                          "targetName": {
+                            "type": "string"
+                          },
+                          "forwardLabel": {
+                            "type": "string"
+                          },
+                          "reverseLabel": {
+                            "type": "string"
+                          },
+                          "direction": {
+                            "anyOf": [
+                              {
+                                "const": "directed",
+                                "type": "string"
+                              },
+                              {
+                                "const": "bidirectional",
+                                "type": "string"
+                              },
+                              {
+                                "const": "unspecified",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "reason": {
+                            "enum": [
+                              "source_missing",
+                              "target_missing",
+                              "self"
+                            ]
+                          }
+                        }
                       }
                     }
                   }

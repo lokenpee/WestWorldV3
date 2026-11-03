@@ -1,41 +1,10 @@
-# WestWorld V2 · 逐库逐表数据与生命周期
+# 逐库逐表数据与生命周期
 
-> **阶段0修订（2026-10-24）：** P2持有world域锁时禁止同书人物/地点人工写入，P3持有narrative域锁时禁止节点/事件线人工写入；UI与命令事务均校验，拒绝返回`ASSET_DOMAIN_LOCKED`。取消须等在途提交停止并释放锁才恢复编辑。P1人工编辑、跨书编辑、只读和备份不受此域锁限制。P2/P3仍可并行，保留跨域实际读依赖校验。direct首次、网络重发与修正共用最多3次实际请求；P1修正规则见逐章提取决策；P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾；P3预算见[叙事整理的排队与恢复](../decisions/story-organization.md)。详见[阶段0决策](../decisions/stage-edit-lock-and-request-budget.md)及当前机器契约。历史证据不代表新规则已在业务应用执行。
-
-| 文档控制项 | 内容 |
-|---|---|
-| 文档编号 | WW-DATA |
-| 文档版本 | 2.2 |
-| 产品 / 应用包版本 | WestWorld V2 / 1.0.0 |
-| 复现基线 | WWV2-WORKTREE-20261021；实际工作区含未提交文件 |
-| 文档状态 | 2.2 目标规格待评审；本次只改文档，未宣称应用已实现 |
-| 编写 / 维护 | Codex；后续维护负责人待指定 |
-| 创建 / 更新 | 2026-10-21 / 2026-10-24（Asia/Shanghai） |
-| 适用范围 | 资产数据、整理会话及游玩会话的持久化要求；游玩接入同步其数据契约 |
-| 共同术语 / 关联 | [统一入口](00-阅读入口与术语.md)、[PRD](01-PRD.md)、[覆盖矩阵](12-验收执行与覆盖矩阵.md) |
-
-### 修订记录
-
-| 版本 | 日期 | 内容 | 影响 |
-|---|---|---|---|
-| 2.0 | 2026-10-21 | 建立正式规格包 | 保留历史约束 |
-| 2.1 | 2026-10-21 | 按17种实际表、操作链、字段流及独立验收补全 | 不改变应用行为；校正覆盖结论 |
-| 2.2 | 2026-10-21 | 全书P1先行；P2世界资产整理与P3事件组织解耦；补实时编辑、批量合并和同书持续会话 | 目标设计变更；旧实现证据不作新验收结论 |
-| 2.2 | 2026-10-22 | 用户澄清：提取直接存实体，后续直接CRUD/合并；删除草稿/入库双层 | 单书15表，无发布按钮或重编号 |
-| 2.2 | 2026-10-22 | AI统一Pi：direct/agent共用模型层、校验与错误；Agent受控工具读写，应用持久化长期记忆 | 目标规格澄清；未改应用代码 |
-| 2.2 | 2026-10-23 | 补18表完整字段与样例、16业务工具契约、Pi迁移/coding取舍与禁用能力 | 明确当前实现与目标补充；专项验收待应用执行 |
-| 2.2 | 2026-10-24 | 明确任务身份、命令意图、逐项覆盖、完整Prompt组装和隔离探测；补接口与验收夹具 | 目标需求补全；应用及独立重建仍待执行 |
-| 2.2 | 2026-10-24 | 用户明确要求规划时修复已知缺陷，撤销错误行为兼容义务 | 修复后结果作为重建验收；旧失败只作历史证据 |
-
-> **版本边界：** 本文为2.2目标规格。2.1源码取证、旧机器契约、截图和51项历史验收只证明旧实现；新流程的权威机器补充见[2.2契约](resources/v2.2/pipeline-contract.json)，变更对照见[13](13-流程变更与冲突对照.md)。未涉及的字段与算法沿用旧定义；不得把旧资源的流程、锁、会话和按钮规则用于覆盖2.2。
+职责和有效来源见[统一入口](00-阅读入口与术语.md)。实现及验收状态见[覆盖索引](12-验收执行与覆盖矩阵.md)。
 
 ## 1. 当前数据只有一层
 
-2.2采用直接实体存储：P1成功提交直接写characters、locations、nodes；P3直接写nodes、eventLines；用户与P2/P3直接对同一份记录增删改查或合并。不存在独立草稿、固定实体副本、发布版本、入库按钮或发布重编号。
-
-数据库有全局设置库3表和每书资产库15表，共18种表定义；N本书通常`3+15N`表实例。单书目标v5，原characterSnapshots/locationSnapshots两表迁入characters/locations后退出目标模型。T06/T07编号退役，避免把它们误当新增表。
-
-“尚未完成P2/P3”只说明整理任务没跑完，不影响已提交数据的使用；stale只说明某项整理依据变了，不表示实体尚未生效。
+数据生效行为见[资产维护](../../openspec/specs/asset-management/spec.md)。设置库3表、单书15表；库和索引由[共享存储](../../src/lib/storage/workspace.ts)定义，字段结构由[存储结构](resources/v2.2/storage.schema.json)维护。下文解释业务含义，精确类型以指定结构文件为准。
 
 ## 2. 逐表清单与索引
 
@@ -147,7 +116,7 @@ bookId（书籍编号）确定资料归属，sessionId（逻辑会话编号）�
 
 ### 5.2 游玩会话持久化
 
-每本书保存自己的游玩历史、工具结果和压缩摘要，整理与游玩按各自职责加载上下文。当前T13–T17定义整理会话；游玩接入时配套交付其会话标识、字段、存储升级和备份校验，并复用已验收的追加、恢复和压缩机制。
+每本书保存自己的游玩历史、工具结果和压缩摘要，整理与游玩按各自职责加载上下文。T13–T17定义整理会话；游玩接口及待开发存储要求见[游玩设计](../../openspec/changes/play-session-foundation/design.md)。
 
 验收核对切书后原书晚到的回复、刷新重建、工具提交后反馈丢失，以及压缩前后完整历史。导出与恢复须保留会话归属、消息顺序、摘要边界和提交确认；恢复为新书后按新书编号隔离。
 
@@ -158,6 +127,8 @@ P1实体+凭证+生命周期+进度+run覆盖同事务；P2/手工每组目标�
 ## 6. 迁移与备份
 
 ### 6.1 v4→v5
+
+本节描述旧格式备份的转换要求；旧数据库原地升级列入[后续能力](../../openspec/changes/review-remaining-baseline/proposal.md)，当前打开旧库时保留原库并提示升级。
 
 原characters/locations曾是发布副本，原characterSnapshots/locationSnapshots才是用户最新编辑数据。迁移优先以旧可编辑表作为当前实体来源：该表存在且为空也按空处理，不能从旧固定副本复活用户删除的数据；仅旧可编辑表确实不存在时才回退固定实体。
 
@@ -887,7 +858,7 @@ run为每次运行/手动合并一行；lease为资源互斥行；编排器和�
 
 > 缺陷修复补充：T02新增动态键book.lifecycle:{operationId}，详见本文件第11节；模型费用状态和引用歧义是新增明确字段。表数量不变。
 
-本节为目标规格补充，T20仍是一张表，不增加数据库/表数量。完整结构见[execution.schema.json](resources/v2.2/execution.schema.json)，已同步合入storage.schema及data-contract。旧2026-10-23表样例仅说明旧字段；新运行必须contractRevision=2026-10-24并初始化tasks/commandIntents/coverageItems=[]、nextTaskOrdinal=0、reconciliationPass=0、noProgressTasks=0。已有目标试验数据缺这些字段时只能保留历史/暂停重查，不能推断覆盖完成。
+本节说明任务字段与生命周期，T20仍是一张表，不增加数据库/表数量。完整结构见[execution.schema.json](resources/v2.2/execution.schema.json)，已同步合入storage.schema及data-contract。旧2026-10-23表样例仅说明旧字段；新运行必须contractRevision=2026-10-24并初始化tasks/commandIntents/coverageItems=[]、nextTaskOrdinal=0、reconciliationPass=0、noProgressTasks=0。已有目标试验数据缺这些字段时只能保留历史/暂停重查，不能推断覆盖完成。
 
 ### TaskRecord 字段
 
@@ -999,7 +970,6 @@ run为每次运行/手动合并一行；lease为资源互斥行；编排器和�
 appliedCommands每项新增必填taskId，必须指向同run的tasks项。operationKey在run内唯一，taskId不同即使payload相同也拒绝复用原键。命令意图、确认、任务状态、覆盖清单进入v5备份；租约/活动Agent对象不导出。导入新bookId须重写所有任务input中的bookId并重新计算inputFingerprint，保留旧run/task/operationKey作为导入库内的历史身份，禁止自动继续prepared意图；它们变abandoned，活动task变partial、run变paused，用户继续时重查后创建新task。
 
 覆盖统计仍存coverage={total,checked,pendingIds,cursor?}作为可重建缓存；权威是coverageItems。total只计当前phase清单，checked仅计有效checked项；skipped单独从清单计数，不伪装checked；pendingIds为pending/assigned/stale项。phase切换后UI统计重置到新phase，但旧phase清单保留。覆盖/恢复/事务细则见04 ALG-12。
-
 
 ## 11. 修复所需的生命周期日志与只读字段
 

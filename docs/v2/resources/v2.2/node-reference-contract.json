@@ -11,6 +11,14 @@
       "actorIds",
       "targetCharacterIds"
     ],
+    "provenance": [
+      "actorBindings",
+      "targetBindings",
+      "manualActorIds",
+      "manualTargetCharacterIds",
+      "legacyActorIds",
+      "legacyTargetCharacterIds"
+    ],
     "display": [
       "actors",
       "targets"
@@ -21,7 +29,7 @@
     "originalChapterAndQuote": "unchanged",
     "transaction": "world-change-and-associated-node-update-atomic",
     "narrativeLease": "allows-deterministic-link-maintenance; model submissions still compare node revisions",
-    "homonyms": "explicit-ID-selection-for-ambiguous-name",
+    "homonyms": "every-complete-main-name-or-alias-hit-is-bound; manual-and-legacy-IDs-kept-independently",
     "lineCharacterIds": "derived-from-current-node-links"
   }
 }

@@ -1,34 +1,6 @@
-# WestWorld V2 · 详细规格：AI、工具与会话
+# 详细规格：AI、工具与会话
 
-> **阶段0修订（2026-10-24）：** P2持有world域锁时禁止同书人物/地点人工写入，P3持有narrative域锁时禁止节点/事件线人工写入；UI与命令事务均校验，拒绝返回`ASSET_DOMAIN_LOCKED`。取消须等在途提交停止并释放锁才恢复编辑。P1人工编辑、跨书编辑、只读和备份不受此域锁限制。P2/P3仍可并行，保留跨域实际读依赖校验。direct首次、网络重发与修正共用最多3次实际请求；P1修正规则见逐章提取决策；P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾；P3预算见[叙事整理的排队与恢复](../decisions/story-organization.md)。详见[阶段0决策](../decisions/stage-edit-lock-and-request-budget.md)及当前机器契约。历史证据不代表新规则已在业务应用执行。
-
-| 文档控制项 | 内容 |
-|---|---|
-| 文档编号 | WW-AI |
-| 文档版本 | 2.2 |
-| 产品 / 应用包版本 | WestWorld V2 / 1.0.0 |
-| 复现基线 | WWV2-WORKTREE-20261021；实际工作区快照，含未提交文件 |
-| 文档状态 | 2.2 目标规格待评审；本次只改文档，未宣称应用已实现 |
-| 编写 / 维护 | Codex 编写；后续维护责任人待指定 |
-| 产品决策 / 审核 | 用户；本文尚未标记为已审核通过 |
-| 创建 / 更新 | 2026-10-21 / 2026-10-24（Asia/Shanghai） |
-| 共同术语 / 文档导航 | [统一入口](00-阅读入口与术语.md) |
-| 缺陷策略 | 已知缺陷优先修复，禁止复现旧错误；07修复条款优先 |
-
-### 修订记录
-
-| 版本 | 日期 | 变更 | 影响 |
-|---|---|---|---|
-| 2.0 | 2026-10-21 | 建立正式重建规格、机器契约、交互与兼容验收 | 确立2.0规格基线与忠实复现范围；不修改应用 |
-| 2.1 | 2026-10-21 | 补17张实际表、60组UI动作、14字段流、完整工具返回及独立验收 | 保留应用与兼容行为 |
-| 2.2 | 2026-10-21 | 全书P1先行；P2世界资产整理与P3事件组织解耦；补实时编辑、批量合并和同书持续会话 | 目标设计变更；旧实现证据不作新验收结论 |
-| 2.2 | 2026-10-22 | 用户澄清：提取直接存实体，后续直接CRUD/合并；删除草稿/入库双层 | 单书15表，无发布按钮或重编号 |
-| 2.2 | 2026-10-22 | AI统一Pi：direct/agent共用模型层、校验与错误；Agent受控工具读写，应用持久化长期记忆 | 目标规格澄清；未改应用代码 |
-| 2.2 | 2026-10-23 | 补18表完整字段与样例、16业务工具契约、Pi迁移/coding取舍与禁用能力 | 明确当前实现与目标补充；专项验收待应用执行 |
-| 2.2 | 2026-10-24 | 明确任务身份、命令意图、逐项覆盖、完整Prompt组装和隔离探测；补接口与验收夹具 | 目标需求补全；应用及独立重建仍待执行 |
-| 2.2 | 2026-10-24 | 用户明确要求规划时修复已知缺陷，撤销错误行为兼容义务 | 修复后结果作为重建验收；旧失败只作历史证据 |
-
-> **版本边界：** 本文为2.2目标规格。2.1源码取证、旧机器契约、截图和51项历史验收只证明旧实现；新流程的权威机器补充见[2.2契约](resources/v2.2/pipeline-contract.json)，变更对照见[13](13-流程变更与冲突对照.md)。未涉及的字段与算法沿用旧定义；不得把旧资源的流程、锁、会话和按钮规则用于覆盖2.2。
+职责和有效来源见[统一入口](00-阅读入口与术语.md)。实现及验收状态见[覆盖索引](12-验收执行与覆盖矩阵.md)。
 
 ## AI-00 统一Pi架构与两种执行模式
 
@@ -57,15 +29,15 @@ deepseek和当前模型名仍为默认值，不是所有自定义地址都必须
 |---|---|
 | 拉取模型目录 | 配置/目录适配器可GET /models；它属于发现接口，不是模型推理，不表示生成成功 |
 | 提取模型快速测试 | 与正式direct相同的Pi解析/调用/错误处理，发送“回复一个字：好”；须Pi正常结束且有非空文本，HTTP 2xx本身不算通过 |
-| 归并工具探测 | 同一Pi解析→pi-agent-core Agent，每套maxSteps3/timeout30000/maxTokens1024；隔离探针工具与真实声明校验，不写真实书库 |
+| 归并工具探测 | 同一Pi解析→pi-agent-core Agent，每套使用模型探测规定的请求、时间和输出预算；隔离探针工具与真实声明校验，不写真实书库 |
 | P1/直接整编/摘要 | pi-ai direct模式，结构化与业务校验见AI-03/05 |
 | P2判同/P3 | pi-agent-core Agent，streamFn绑定同一pi-ai实例；工具参数/结果与业务写入同样校验 |
 
-原OpenAI兼容chat-completions协议可继续作为Pi适配器内部实现；Provider特有字段、tool_choice和thinking设置也只放在该边界内，不向业务层暴露。探测读取保存配置，不读取未保存输入；消息/用量/stream事件对外统一为Pi形状，不输出原生Provider对象给业务判断。
+原OpenAI兼容chat-completions协议可继续作为Pi适配器内部实现；Provider特有字段、tool_choice和thinking设置也只放在该边界内，不向业务层暴露。设置页先按明确的“保存并测试”动作保存修改，再读取固定配置快照；消息/用量/stream事件对外统一为Pi形状，不输出原生Provider对象给业务判断。
 
 ## AI-02 有效Prompt与输入组装
 
-2026-10-24起所有有效Prompt使用resources/v2.2/prompts/active的目标版本，完整组装见AI-14。旧Prompt只用于历史回放，不得覆盖2.2阶段分工。`03-merge-world-assets`为旧资源，不属于当前有效人物处理步骤；不得因名称相似把它接入替代现有分层/整编。
+有效提示词使用resources/v2.2/prompts/active中的版本，完整组装见AI-14。旧Prompt只用于历史回放，不得覆盖2.2阶段分工。`03-merge-world-assets`为旧资源，不属于当前有效人物处理步骤；不得因名称相似把它接入替代现有分层/整编。
 
 | 调用 | 随包Prompt | 常驻输入与输出 |
 |---|---|---|
@@ -100,7 +72,7 @@ direct模式由pi-ai执行，无pi-agent-core循环。有Schema时可注册唯�
 
 提交缺失、结构错或业务校验错默认最多修正一次，P1提取最多修正两次。direct首次、网络重发和修正共用最多3次实际请求预算。修正带回完整assistant原始响应、每个工具调用的配对错误反馈及修正指令。P1失败隔离、主动续期和单项补提取以[逐章提取决策](../decisions/extraction-queue.md)为准。
 
-直接请求总硬上限=`max(各服务错误maxAttempts)+1`。可选字段null仅在非必填且原属性不允许null时移除；递归数组、对象和union分支，不改原响应、不强制类型、不删除必填。
+实际请求预算见[逐章提取](../../openspec/specs/extraction/spec.md)及[模型配置与调用](../../openspec/specs/model-access/spec.md)。可选字段null仅在非必填且原属性不允许null时移除；递归数组、对象和union分支，不改原响应、不强制类型、不删除必填。
 
 ## AI-04 Pi Agent执行、读写工具与最终结果
 
@@ -241,7 +213,7 @@ pipelineRuns.appliedCommands记录(runId,operationKey)、payloadFingerprint、co
 
 Pi只管理当前进程AgentState与循环。应用持久化会话、工作记忆、业务状态和命令凭据，恢复时重新创建Pi Agent运行对象并装入该书规范上下文；长时记忆不是SDK自动落盘，也不靠服务商保存对话实现。
 
-鉴权需求由Pi适配描述声明：需要Key的Provider缺凭据报auth；明确无鉴权的受支持端点可无Key探测，不注入虚构anonymous Key。SDK和适配器能力范围之外返回统一不支持错误。
+当前适配器要求保存凭据，缺少时返回鉴权错误。免密钥端点的目标要求见[后续能力](../../openspec/changes/review-remaining-baseline/specs/credential-optional-model/spec.md)。SDK与适配器范围外的能力返回明确不支持错误。
 
 幂等检查顺序为：参数结构/当前书角色作用域校验→在事务中检查(runId,operationKey)账本→同payload已应用则直接返回原凭据→仅新命令继续核当前记录、实际读集/revision、引文和写事务。不能先因旧成员已被合并/删除而拒绝已成功命令的重放。原凭据只确认此前提交，不保证当前实体未被后续人工更改；返回后仍按需重查当前数据。
 
@@ -261,22 +233,22 @@ Pi包取舍、coding层不接入的具体能力、浏览器限制和逐模块迁
 
 > 以下保留2026-10-23审查时的缺口记录；其中“缺失/未交付”不是当前状态。2026-10-24的完整定义与当前状态以AI-14/15、03第10节和12闭合表为准。
 
-**2026-10-23历史审查结论：当时不是完整的2.2 Prompt调用包。** 存在Prompt文件只说明静态正文已提供；实际请求还包括调用入口、角色/阶段包装、动态变量、输出Schema、工具声明、历史、末轮收束和错误修正。逐调用审查清单见[prompt-call-manifest.json](resources/v2.2/prompt-call-manifest.json)，所有未确定部分显式记为missing，不由开发者猜成统一字符串。
+调用正文、动态输入、结构和工具共同组成实际请求。运行时资源及消费者见[归属清单](文档与资源归属.json)，历史请求样例用于参考。
 
 ### AI-13.1 十种有效调用
 
-| 调用编号 | 触发/模式/模型角色 | 消息与Schema | 审查状态 |
+| 调用编号 | 触发/模式/模型角色 | 消息与Schema | 执行来源 |
 |---|---|---|---|
-| PROMPT-P1-WORLD | P1世界子步骤或单章试跑；direct/extraction | 01世界Prompt+完整ChapterTask；唯一submit_result=WorldAssetsExtractionSchema；不包含前次叙事/世界响应 | 静态定义可追踪；未独立重建 |
-| PROMPT-P1-NARRATIVE | P1叙事子步骤或单章试跑；direct/extraction | 02叙事Prompt+独立同一ChapterTask；唯一submit_result=NarrativeAssetsExtractionSchema | 静态定义可追踪；未独立重建 |
-| PROMPT-P2-IDENTITY | P2 ai_identity人物或地点；agent/aggregation | P2目标Prompt+asset_editor包装+IdentityTask；写工具IdentityGroupsSchema，最终AgentTaskSummarySchema | 缺目标完整包装、任务绑定/恢复上下文，RQ-01/03 |
-| PROMPT-P2-CHARACTER | P2按需人物整编；direct/aggregation | 08人物整编Prompt+JSON CharacterOptimizationTask；动态固定人物键及事实枚举 | 输入字段/动态Schema可追踪；未独立重建 |
-| PROMPT-P2-LOCATION | P2按需地点整编；direct/aggregation | 新地点整编Prompt；LocationOptimizationSchema返回description/coveredFactIds/conflicts | 缺精确输入对象和事实映射，RQ-01 |
-| PROMPT-P3-WINDOW | P3窗口子任务；agent/aggregation | P3 Prompt+story_editor包装+phase=window_link任务+同书历史；写Link payload，最终Summary | 缺目标任务消息/覆盖单元/完整请求回放，RQ-01/03/04 |
-| PROMPT-P3-GLOBAL | P3全书复核子任务；agent/aggregation | 同一P3 Prompt及session，phase=global_review；输入孤点/线/事项当前页 | 缺队列绑定/继续选择规则及完整回放，RQ-01/03/04 |
-| PROMPT-COMPACT | 超预算或一次强制恢复；direct/aggregation | 07压缩Prompt+旧摘要+指定历史；SessionCompactionResultSchema；不调用Agent业务工具 | 静态定义可追踪；目标写后中断投影未执行 |
-| PROMPT-PROBE-DIRECT | 设置生成测试；direct/选定模型角色 | user“回复一个字：好”，maxTokens=8；无Schema；要求有效Pi文本 | 当前代码仍raw HTTP；目标已要求Pi但未实现 |
-| PROMPT-PROBE-AGENT | 设置工具测试；独立probe Agent/aggregation | 当前旧实现要求submit_result({ok:true})；目标要求真实工具声明/隔离写入验证 | 不能把旧探针当新finalizer；目标探针流程缺定义，RQ-05 |
+| PROMPT-P1-WORLD | P1世界子步骤；试跑为待开发能力；direct/extraction | 01世界Prompt+完整ChapterTask；唯一submit_result=WorldAssetsExtractionSchema；不包含前次叙事/世界响应 | 实现与检查见覆盖索引 |
+| PROMPT-P1-NARRATIVE | P1叙事子步骤；试跑为待开发能力；direct/extraction | 02叙事Prompt+独立同一ChapterTask；唯一submit_result=NarrativeAssetsExtractionSchema | 实现与检查见覆盖索引 |
+| PROMPT-P2-IDENTITY | P2 ai_identity人物或地点；agent/aggregation | P2目标Prompt+asset_editor包装+IdentityTask；写工具IdentityGroupsSchema，最终AgentTaskSummarySchema | 实现与检查见覆盖索引 |
+| PROMPT-P2-CHARACTER | P2按需人物整编；direct/aggregation | 08人物整编Prompt+JSON CharacterOptimizationTask；动态固定人物键及事实枚举 | 实现与检查见覆盖索引 |
+| PROMPT-P2-LOCATION | P2按需地点整编；direct/aggregation | 新地点整编Prompt；LocationOptimizationSchema返回description/coveredFactIds/conflicts | 实现与检查见覆盖索引 |
+| PROMPT-P3-WINDOW | P3窗口子任务；agent/aggregation | P3 Prompt+story_editor包装+phase=window_link任务+同书历史；写Link payload，最终Summary | 实现与检查见覆盖索引 |
+| PROMPT-P3-GLOBAL | P3全书复核子任务；agent/aggregation | 同一P3 Prompt及session，phase=global_review；输入孤点/线/事项当前页 | 实现与检查见覆盖索引 |
+| PROMPT-COMPACT | 超预算或一次强制恢复；direct/aggregation | 07压缩Prompt+旧摘要+指定历史；SessionCompactionResultSchema；不调用Agent业务工具 | 实现与检查见覆盖索引 |
+| PROMPT-PROBE-DIRECT | 设置生成测试；direct/选定模型角色 | user“回复一个字：好”，maxTokens=8；无Schema；要求有效Pi文本 | 实现与检查见覆盖索引 |
+| PROMPT-PROBE-AGENT | 设置工具测试；独立probe Agent/aggregation | 使用真实工具声明、隔离读写及提交确认校验 | 实现与检查见覆盖索引 |
 
 旧merge-world、旧按名称分组、旧地点snapshots融合和旧P2/P3串联Prompt用于旧回放。试跑复用P1契约；导入、图布局、文件导出和机械融合按本地流程执行。游玩接入时单独定义任务提示词与工具清单，使用AI-16的按书会话机制。
 
@@ -370,7 +342,7 @@ timestamp、UUID、真实模型名称配置按夹具替换规则比较；system/
 
 ## AI-15 隔离模型与工具探测（2026-10-24）
 
-文本探测走正式DirectExecutor/ModelGateway，user固定“回复一个字：好”，maxTokens=8，temperature省略；stopReason error/aborted、空文本均失败，HTTP 2xx不单独表示成功。只用已保存配置，未保存输入不参与。界面显示耗时及无密钥的错误/回复片段。
+文本探测走正式DirectExecutor/ModelGateway，user固定“回复一个字：好”，maxTokens=8，temperature省略；stopReason error/aborted、空文本均失败，HTTP 2xx不单独表示成功。调用固定已保存配置；表单有修改时先执行明确的“保存并测试”。界面显示耗时及无密钥的错误/回复片段。
 
 归并工具探测依次运行asset、story两套，每套新建内存仓储及任务上下文，不调用getCanonDb、不创建书架项或真实会话。每套最多3轮、30000ms、maxTokens=1024、temperature=0；取消立即终止余下套，测试结束无论成功失败都释放引用销毁fixture。它不覆盖生产大书性能/全部业务分支。
 

@@ -215,7 +215,7 @@
       },
       {
         "name": "get_character_detail",
-        "description": "按ID读取本书人物详细信息及revision；include_facts=true仅P2整编允许，返回事实底稿以校验覆盖。",
+        "description": "按ID读取本书人物详细信息、revision及按来源编号生成的有向关系与未命中关系；include_facts=true仅P2整编允许，返回事实底稿以校验覆盖。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -240,7 +240,7 @@
         "kind": "read",
         "maxResults": 20,
         "maxBytes": 65536,
-        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; relation-results-included-in-result-fingerprint; read_original-records-text-fingerprint"
       },
       {
         "name": "query_locations",
