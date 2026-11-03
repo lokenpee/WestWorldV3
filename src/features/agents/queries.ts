@@ -1,11 +1,11 @@
 import type { AgentStore, Row } from './repository'
 import { hash, strings, text, type AgentProfile } from './contracts'
 import { characterCandidates } from '../assets/characterLinks'
-import { edgesFor, projectRelations, relationView, syncRelations } from '../assets/relations'
+import { edgesFor, effectivePairs, pairFromPerspective, pairView, projectRelations, relationView, syncRelations } from '../assets/relations'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { storyContent } from '../story/coverage'
 import { searchStoryContext } from '../story/retrieval'
-import type { Character, CharacterRelation, Lifecycle } from '../assets/types'
+import type { Character, CharacterRelation, CharacterRelationEdit, Lifecycle } from '../assets/types'
 
 export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[] }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
@@ -160,17 +160,35 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     if (args.mode !== 'full') rows = rows.map(row => ({ id: row.id, ordinal: row.ordinal, type: row.type, createdAt: row.createdAt, preview: JSON.stringify(row.message ?? row.summary ?? row.reason ?? '').slice(0, 300) }))
     return page(rows, args, args.mode === 'full' ? 20 : 50)
   }
+  if (name === 'get_character_relation') {
+    const fromId = text(args.fromId), toId = text(args.toId)
+    if (!fromId || !toId || fromId === toId) throw new Error('INVALID_ARGS:请给出两个不同的人物编号。')
+    const people = (await scopedRows(store, scope, 'characters')) as unknown as Character[]
+    if (!people.some(person => person.id === fromId) || !people.some(person => person.id === toId)) throw new Error('NOT_FOUND:人物不存在或已删除。')
+    const lifecycle = (await scopedRows(store, scope, 'assetLifecycle')) as unknown as Lifecycle[]
+    const relations = (await scopedRows(store, scope, 'characterRelations')) as unknown as CharacterRelation[]
+    const edits = (await scopedRows(store, scope, 'characterRelationEdits')) as unknown as CharacterRelationEdit[]
+    const normalized = people.map(normalizeCharacterNames)
+    const pairs = effectivePairs(syncRelations(relations, normalized, lifecycle).relations, edits, normalized)
+    return { data: pairFromPerspective(pairs, fromId, toId, normalized) }
+  }
   const table = name.includes('character') ? 'characters' : name.includes('location') ? 'locations' : name.includes('event_line') ? 'eventLines' : 'nodes'
   const detail = name.startsWith('get_')
   if (detail && args.include_facts && (scope.profile !== 'asset_editor' || scope.phase !== 'optimize')) throw new Error('INVALID_ARGS:事实底稿仅供世界资产整编读取。')
   if (detail) {
-    let characterRelations: { people: Character[]; rows: CharacterRelation[]; view: ReturnType<typeof relationView> } | undefined
+    let characterRelations: { people: Character[]; rows: CharacterRelation[]; view: ReturnType<typeof pairView>; unresolved: ReturnType<typeof relationView>['unresolved'] } | undefined
     if (table === 'characters') {
       const people = (await scopedRows(store, scope, 'characters')) as unknown as Character[]
       const lifecycle = (await scopedRows(store, scope, 'assetLifecycle')) as unknown as Lifecycle[]
       const rows = (await scopedRows(store, scope, 'characterRelations')) as unknown as CharacterRelation[]
+      const edits = (await scopedRows(store, scope, 'characterRelationEdits')) as unknown as CharacterRelationEdit[]
       const normalized = people.map(normalizeCharacterNames)
-      characterRelations = { people: normalized, rows, view: relationView(syncRelations(rows, normalized, lifecycle).relations, normalized) }
+      const synced = syncRelations(rows, normalized, lifecycle).relations
+      const pairs = effectivePairs(synced, edits, normalized)
+      const types = new Map(synced.map(relation => [relation.id, relation.relationType]))
+      const view = pairView(pairs, normalized)
+      view.edges = view.edges.map(edge => ({ ...edge, types: [...new Set(edge.relationIds.flatMap(id => types.get(id) ?? []))] }))
+      characterRelations = { people: normalized, rows: synced, view, unresolved: relationView(synced, normalized).unresolved }
     }
     const rows: Row[] = []; const missing: string[] = []
     for (const id of strings(args.ids)) {
@@ -179,7 +197,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
       const row: Row = table === 'characters' ? normalizeCharacterNames({ ...found, name: text(found.name), aliases: strings(found.aliases), identity: text(found.identity) }) : { ...found }
       if (!args.include_facts) for (const key of ['mergeFacts', 'optimizedFactIds', 'optimizationFingerprint']) delete row[key]
       if (characterRelations && characterRelations.people.some(person => person.id === row.id)) {
-        const projection = projectRelations(characterRelations.view.edges, characterRelations.rows, characterRelations.view.unresolved, text(row.id), characterRelations.people)
+        const projection = projectRelations(characterRelations.view.edges, characterRelations.rows, characterRelations.unresolved, text(row.id), characterRelations.people)
         row.relations = projection.relations
         row.relationEdges = edgesFor(characterRelations.view.edges, text(row.id))
         row.unresolvedRelations = projection.unresolvedRelations

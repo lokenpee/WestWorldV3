@@ -343,7 +343,7 @@
       "steps": [
         {
           "input": "导出",
-          "read": "T03 book；单书16张当前表（T06/T07退役，含人物关系表）",
+          "read": "T03 book；单书17张当前表（T06/T07退役，含人物关系表和关系编辑表）",
           "transform": "单书只读事务快照→JSON/章节TXT→每文件SHA256→manifest→ZIP",
           "write": "独立wwv2文件；不写单书",
           "commit": "单书读事务；文件后写",

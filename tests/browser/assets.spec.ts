@@ -102,6 +102,8 @@ test('即时保存保留其他脏输入；世界锁与叙事锁分别生效', as
   await expect(page.getByRole('button', { name: '新增人物', exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: '手动合并', exact: true })).toBeDisabled()
   await tab(page, '事件节点')
+  await expect(page.getByRole('alertdialog', { name: '未保存的人物修改' })).toBeVisible()
+  await page.getByRole('button', { name: '放弃并继续', exact: true }).click()
   await expect(page.getByRole('button', { name: '新增事件节点', exact: true })).toBeEnabled()
   await page.getByRole('button', { name: '编辑 码头收信', exact: true }).click()
   await expect(page.getByLabel('搜索人物', { exact: true })).toBeEnabled()

@@ -122,6 +122,12 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ]
+    },
+    {
+      "path": "prompts/active/p2-asset-review.md",
+      "consumers": [
+        "src/features/world/assetReview.ts"
+      ]
     }
   ],
   "currentImplementation": "src；实现状态与人工验收分别见覆盖索引",

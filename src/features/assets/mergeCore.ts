@@ -1,8 +1,8 @@
-import type { Character, CharacterRelation, EventNode, Lifecycle, LocationAsset } from './types'
+import type { Character, CharacterRelation, CharacterRelationEdit, EventNode, Lifecycle, LocationAsset } from './types'
 import { assetTables } from './types'
 import { fuseWorldAssets, validateMergeOptions, type WorldKind } from './merge'
 import { remapCharacterLinks } from './characterLinks'
-import { syncRelations } from './relations'
+import { effectivePairs, pairKeyOf, syncRelations } from './relations'
 import { updateFrequencies } from './derive'
 
 export type Row = Record<string, unknown>
@@ -23,6 +23,9 @@ export interface MergeCoreOptions {
   expectedRevisions?: Record<string, number>
   /** 人工入口的频次重算范围；队列与智能体入口不重算。 */
   frequencyTexts?: { chapterIndex: string; text: string }[]
+  /** 本次合并的持久确认号与修改者；用于关系编辑结果。 */
+  commitId?: string
+  actor?: 'manual' | 'agent'
 }
 export interface MergeCoreResult {
   asset: Character | LocationAsset
@@ -55,6 +58,53 @@ function stripRelations<T extends object>(row: T): T {
   const copy = structuredClone(row) as Row
   delete copy.relations
   return copy as T
+}
+
+/** 合并前读取受影响人物对的有效结果，合并后按保留编号重写编辑结果。 */
+async function remapPairEdits(store: MergeStore, bookId: string, fromCharacters: Character[], redirects: ReadonlyMap<string, string>, memberIds: string[], options: MergeCoreOptions, timestamp: string) {
+  const relations = await store.rows('characterRelations') as unknown as CharacterRelation[]
+  const edits = await store.rows('characterRelationEdits') as unknown as CharacterRelationEdit[]
+  if (!edits.length) return
+  const before = effectivePairs(relations, edits, fromCharacters)
+  const editsByKey = new Map(edits.map(edit => [edit.pairKey, edit]))
+  const mapId = (id: string) => redirects.get(id) ?? id
+  const affected = before.filter(pair => memberIds.includes(pair.fromId) || memberIds.includes(pair.toId))
+  if (!affected.length) return
+  const groups = new Map<string, { aId: string; bId: string; aLabels: string[]; bLabels: string[]; evidence: CharacterRelation['evidence']; sourceIds: string[]; active: boolean; anyEdit: boolean; unclear: boolean; revision: number; updatedBy: 'manual' | 'agent' }>()
+  for (const pair of affected) {
+    const fromId = mapId(pair.fromId), toId = mapId(pair.toId)
+    if (fromId === toId) continue
+    const [aId, bId] = [fromId, toId].sort()
+    const pairKey = pairKeyOf(aId, bId)
+    const group = groups.get(pairKey) ?? { aId, bId, aLabels: [], bLabels: [], evidence: [], sourceIds: [], active: false, anyEdit: false, unclear: false, revision: 0, updatedBy: 'manual' }
+    const forward = fromId === aId
+    group.aLabels = [...new Set([...group.aLabels, ...(forward ? pair.forwardLabels : pair.reverseLabels)])]
+    group.bLabels = [...new Set([...group.bLabels, ...(forward ? pair.reverseLabels : pair.forwardLabels)])]
+    for (const item of pair.evidence) if (!group.evidence.some(row => row.chapterIndex === item.chapterIndex && row.quote === item.quote)) group.evidence.push(item)
+    group.sourceIds = [...new Set([...group.sourceIds, ...pair.sourceRelationIds])]
+    if (pair.state === 'active') { group.active = true; group.unclear = group.unclear || pair.directionUnclear }
+    const edit = editsByKey.get(pair.pairKey)
+    if (edit) { group.anyEdit = true; group.revision = Math.max(group.revision, edit.revision); if (edit.updatedBy === 'agent' && !editsByKey.get(pairKey)?.updatedBy) group.updatedBy = 'agent' }
+    groups.set(pairKey, group)
+  }
+  for (const [pairKey, group] of groups) {
+    if (!group.anyEdit) continue
+    const state = group.active && (group.aLabels.length || group.bLabels.length) ? 'active' : 'deleted'
+    const previous = editsByKey.get(pairKey)
+    await store.put('characterRelationEdits', {
+      pairKey, bookId, aId: group.aId, bId: group.bId, state,
+      aToBLabels: state === 'active' ? group.aLabels : [], bToALabels: state === 'active' ? group.bLabels : [],
+      directionUnclear: state === 'active' ? group.unclear : false, evidence: group.evidence,
+      sourceRelationIds: [...new Set([...group.sourceIds, ...(previous?.sourceRelationIds ?? [])])],
+      revision: Math.max(group.revision, previous?.revision ?? 0) + 1, updatedAt: timestamp,
+      updatedBy: options.actor ?? group.updatedBy, commitId: options.commitId ?? crypto.randomUUID(),
+    } as unknown as Row)
+  }
+  for (const pair of affected) {
+    const fromId = mapId(pair.fromId), toId = mapId(pair.toId)
+    const mapped = fromId === toId ? null : pairKeyOf(fromId, toId)
+    if (mapped !== pair.pairKey) await store.remove('characterRelationEdits', pair.pairKey)
+  }
 }
 
 /**
@@ -111,10 +161,12 @@ export async function mergeWorldAssets(store: MergeStore, options: MergeCoreOpti
     if (JSON.stringify(before) !== JSON.stringify(mapping)) await store.put('assetLifecycle', mapping as unknown as Row)
   }
 
+  if (kind === 'character') await remapPairEdits(store, bookId, beforeCharacters, redirects, memberIds, options, timestamp)
+
   const afterCharacters = kind === 'character' ? finalRows as Character[] : beforeCharacters
 
   const relations = await store.rows('characterRelations') as unknown as CharacterRelation[]
-  const synced = syncRelations(relations, afterCharacters, afterLifecycle, timestamp)
+  const synced = kind === 'character' ? syncRelations(relations, afterCharacters, afterLifecycle, timestamp) : { changed: [] as CharacterRelation[] }
   for (const relation of synced.changed) await store.put('characterRelations', relation as unknown as Row)
 
   const changedNodeIds: string[] = []

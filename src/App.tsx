@@ -4,6 +4,7 @@ import type { ExtractionService } from './features/extraction/service'
 import { useCallback, useState, type ReactNode } from 'react'
 import { Bookshelf } from './features/books/Bookshelf'
 import { BookOverview } from './features/books/BookOverview'
+import { requestLeave } from './features/assets/leaveGuard'
 import { useLiveResult } from './hooks/useLiveResult'
 import type { BookRepository } from './lib/storage/workspace'
 import './App.css'
@@ -45,11 +46,11 @@ export default function App({ repository, importer, assets, backups, models, ext
   }
 
   const selectedBook = books.status === 'ready' ? books.value.find(book => book.id === bookId) : undefined
-  const selectBook = (id: string) => { setBookId(id); setShowImport(false) }
+  const selectBook = (id: string) => requestLeave(() => { setBookId(id); setShowImport(false) })
 
   return <div className="app-shell">
     <header className="app-header"><a className="brand" href="#" onClick={event => { event.preventDefault(); setActiveView('assets') }} aria-label="WestWorld 回到资产"><span className="brand-mark" aria-hidden="true">W</span><span>WESTWORLD <small>V3</small></span></a>
-      <nav aria-label="主导航">{navigation.map(view => <button key={view.id} className={activeView === view.id ? 'nav-active' : ''} aria-current={activeView === view.id ? 'page' : undefined} onClick={() => setActiveView(view.id)}>{view.label}</button>)}</nav>
+      <nav aria-label="主导航">{navigation.map(view => <button key={view.id} className={activeView === view.id ? 'nav-active' : ''} aria-current={activeView === view.id ? 'page' : undefined} onClick={() => requestLeave(() => setActiveView(view.id))}>{view.label}</button>)}</nav>
       <span className="header-local"><span className="local-dot" />本地工作空间</span>
     </header>
     {acceptanceTools}

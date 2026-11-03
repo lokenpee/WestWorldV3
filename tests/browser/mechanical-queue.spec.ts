@@ -30,6 +30,7 @@ async function add(page: Page, name: string, kind = '人物') {
   await candidate(page, name, kind).click()
   await page.getByLabel('合并后主名', { exact: true }).selectOption(name)
   await page.getByRole('button', { name: '加入待合并', exact: true }).click()
+  await expect(page.getByText(`已确认“${name}”并加入待合并队列。可继续核对其他候选。`, { exact: true })).toBeVisible()
 }
 
 test('逐组确认后统一顺序合并，草稿与预览选择保留，刷新后队列继续且报告无模型调用', async ({ page }, testInfo) => {

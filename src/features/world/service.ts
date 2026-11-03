@@ -13,12 +13,13 @@ import { createFrequencyCounter } from '../assets/derive'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { createMechanicalQueue } from './mechanical'
 import { repairAutomaticProtection } from './protection'
+import { runAssetReview } from './assetReview'
 import prompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-identity.md?raw'
 
 type Workspace = ReturnType<typeof createWorkspace>
 type Entity = Character | LocationAsset
 interface WorldState { running: boolean; phase: string; processed: number; total: number; error?: string; reportId?: string; reportType?: 'code' | 'ai'; mode?: 'ai' | 'mechanical' }
-export function createWorldService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'generate' | 'settings'>, assets: AssetService) {
+export function createWorldService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'generate' | 'settings'>, assets: AssetService, options: { assetReview?: boolean } = {}) {
   const states = new Map<string, WorldState>(); const controllers = new Map<string, AbortController>(); const listeners = new Set<() => void>()
   const set = (bookId: string, change: Partial<WorldState>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, phase: '', processed: 0, total: 0 }), ...change }); listeners.forEach(listener => listener()) }
   const mechanical = createMechanicalQueue(workspace, assets, (bookId, state) => set(bookId, { ...state, mode: 'mechanical' }), bookId => controllers.has(bookId))
@@ -89,7 +90,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         const now = new Date().toISOString()
         const previous = await db.table('compileProgress').get('P2')
         const existing = previous?.runId ? await db.table('pipelineRuns').get(previous.runId) : undefined
-        if (existing?.stage === 'P2' && ['ai', 'ai_identity', 'optimize'].includes(existing.phase) && existing.status !== 'completed' && existing.report) {
+        if (existing?.stage === 'P2' && ['ai', 'ai_identity', 'optimize', 'asset_review'].includes(existing.phase) && existing.status !== 'completed' && existing.report) {
           runId = String(existing.id); initialAgentUsage = existing.usage
           const { finishedAt: _finishedAt, ...restored } = existing
           await db.table('pipelineRuns').put({ ...restored, phase: 'ai_identity', status: 'running', report: { ...existing.report, status: 'running', failed: [] }, tasks: records(existing.tasks).map(task => task.status === 'running' ? { ...task, status: 'partial' } : task) })
@@ -146,8 +147,21 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         if (result.itemFailure) await addMessage('failed', `${batch[0].id}：${result.itemFailure}`)
         if (!result.ok && !exhausted) { await addMessage('failed', result.error ?? '身份核实失败'); throw new Error(result.error ?? '身份核实失败。') }
       }
-      set(bookId, { phase: '按需整编详细资料', processed: 0 })
+      set(bookId, { phase: '读取已保存的核实进度' })
       const identityCoverage = await saveIdentityQueue(repo, runId, { owner, signal: controller.signal })
+      if (options.assetReview !== false && !identityCoverage.pending.length) {
+        set(bookId, { phase: '核对全部资产与人物关系', processed: 0, total: 0 })
+        const review = await runAssetReview(repo, runId, {
+          owner, signal: controller.signal, models,
+          onPhase: phase => set(bookId, { phase }),
+          onProgress: (processed, total) => set(bookId, { processed, total }),
+        })
+        if (review.deferred) {
+          paused = true
+          await addMessage('skipped', `全资产核对已完成 ${review.checked}/${review.total} 项，剩余项待继续；若叙事任务正在运行，请在其结束后继续。`)
+        }
+      }
+      set(bookId, { phase: '按需整编详细资料', processed: 0 })
       await db.transaction('rw', db.table('pipelineRuns'), db.table('characters'), db.table('locations'), async () => {
         await check()
         const run = (await db.table<WorldRun>('pipelineRuns').get(runId))!

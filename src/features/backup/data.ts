@@ -2,10 +2,11 @@ import type { Book } from '../../lib/storage/workspace'
 import { bindNodeCharacters } from '../assets/characterLinks'
 import { migrateCharacterRelations, migrateNodeBindings } from '../assets/migrate'
 import { resolveLifecycleId } from '../assets/relations'
-import type { Character, EventNode, Lifecycle } from '../assets/types'
+import type { Character, CharacterRelation, EventNode, Lifecycle } from '../assets/types'
+import { hasClearedEndpoints, repairRelationBindings } from '../assets/repair'
 
 export const tableSchemas = {
-  chapters: 'Chapter', chapterTexts: 'ChapterText', characters: 'StoredCharacter', locations: 'StoredLocation', nodes: 'StoredNode', eventLines: 'StoredEventLine', characterRelations: 'StoredRelation', compileProgress: 'CompileProgress', storyEditorMemory: 'StoryEditorMemory', storyEditorNotes: 'StoryEditorNote', storyEditorCheckpoints: 'StoryEditorCheckpoint', storySessions: 'StorySession', storySessionEntries: 'StorySessionEntry', extractionReceipts: 'ExtractionReceipt', assetLifecycle: 'AssetLifecycle', pipelineRuns: 'PipelineRun',
+  chapters: 'Chapter', chapterTexts: 'ChapterText', characters: 'StoredCharacter', locations: 'StoredLocation', nodes: 'StoredNode', eventLines: 'StoredEventLine', characterRelations: 'StoredRelation', characterRelationEdits: 'CharacterRelationEdit', compileProgress: 'CompileProgress', storyEditorMemory: 'StoryEditorMemory', storyEditorNotes: 'StoryEditorNote', storyEditorCheckpoints: 'StoryEditorCheckpoint', storySessions: 'StorySession', storySessionEntries: 'StorySessionEntry', extractionReceipts: 'ExtractionReceipt', assetLifecycle: 'AssetLifecycle', pipelineRuns: 'PipelineRun',
 } as const
 export type TableName = keyof typeof tableSchemas
 export type Row = Record<string, unknown>
@@ -38,7 +39,7 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
   const { book, tables } = data
   if (!book.id.trim() || !book.title.trim()) fail('book', '书籍编号和名称须有内容。', 'SCHEMA')
   for (const name of tableNames) {
-    const key = name === 'chapters' || name === 'chapterTexts' ? 'chapterIndex' : name === 'compileProgress' ? 'stage' : name === 'extractionReceipts' || name === 'assetLifecycle' ? 'key' : 'id'
+    const key = name === 'chapters' || name === 'chapterTexts' ? 'chapterIndex' : name === 'compileProgress' ? 'stage' : name === 'characterRelationEdits' ? 'pairKey' : name === 'extractionReceipts' || name === 'assetLifecycle' ? 'key' : 'id'
     const keys = new Set<unknown>()
     for (const [index, row] of tables[name].entries()) {
       if (row.bookId !== book.id) fail(`${name}[${index}].bookId`, '记录归属与书籍编号不一致。')
@@ -99,6 +100,22 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
     if ((relation.sourceId ?? null) !== (resolved && characters.has(resolved) ? resolved : null)) fail(`${path}/sourceId`, '当前来源与原始来源的生命周期映射不一致。')
     for (const evidence of rows(relation.evidence)) if (typeof evidence.chapterIndex === 'string' && evidence.chapterIndex && !hasChapter(evidence.chapterIndex)) fail(`${path}/evidence`, '关系依据章节不存在。')
   }
+  for (const [index, edit] of tables.characterRelationEdits.entries()) {
+    const path = `characterRelationEdits[${index}]`
+    let endpoints: string[] = []
+    try { const value = JSON.parse(String(edit.pairKey)); if (Array.isArray(value) && value.length === 2) endpoints = value.map(String) } catch { /* 由下方统一报键格式错误 */ }
+    if (endpoints.length !== 2 || endpoints[0] === endpoints[1] || [...endpoints].sort()[0] !== endpoints[0] || edit.pairKey !== JSON.stringify(endpoints)) fail(`${path}/pairKey`, '人物对键格式或排序不符。')
+    if (endpoints[0] !== edit.aId || endpoints[1] !== edit.bId) fail(`${path}`, '人物对键与端点编号不一致。')
+    for (const id of endpoints) if (!characters.has(id) && !lifecycle.has(`character:${id}`)) fail(`${path}`, `人物对端点既不存在也没有生命周期记录：${id}`)
+    const forward = strings(edit.aToBLabels), reverse = strings(edit.bToALabels)
+    if (edit.state !== 'active' && edit.state !== 'deleted') fail(`${path}/state`, '关系编辑状态无效。')
+    if (edit.state === 'active' && !forward.length && !reverse.length) fail(`${path}`, '有效关系至少一个方向要有标签。')
+    if (edit.state === 'deleted' && (forward.length || reverse.length)) fail(`${path}`, '已删除关系不能保留标签。')
+    if (forward.length > 20 || reverse.length > 20 || [...forward, ...reverse].some(label => !label.trim() || label.length > 100)) fail(`${path}`, '关系标签数量或长度不符。')
+    for (const evidence of rows(edit.evidence)) if (!hasChapter(evidence.chapterIndex)) fail(`${path}/evidence`, '关系编辑依据章节不存在。')
+    if (!Number.isSafeInteger(edit.revision) || Number(edit.revision) < 1) fail(`${path}/revision`, '关系编辑修订号无效。')
+    if (!['manual', 'agent'].includes(String(edit.updatedBy)) || !String(edit.commitId ?? '').trim()) fail(`${path}`, '关系编辑来源或确认号缺失。')
+  }
   const sessions = new Map(tables.storySessions.map(row => [row.id, row]))
   const entries = new Map(tables.storySessionEntries.map(row => [row.id, row]))
   for (const session of tables.storySessions) {
@@ -136,7 +153,7 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
 
 export function pauseBookData(data: BookData): BookData {
   const result = structuredClone(data)
-  result.tables.pipelineRuns = result.tables.pipelineRuns.filter(row => row.recordType === 'run')
+  result.tables.pipelineRuns = result.tables.pipelineRuns.filter(row => row.recordType === 'run' || row.recordType === 'asset_edit')
   for (const name of ['storySessions', 'compileProgress', 'pipelineRuns'] as const) for (const row of result.tables[name]) {
     delete row.leaseOwner; delete row.leaseUntil; delete row.owner; delete row.expiresAt; delete row.lockKey
     if (row.status === 'running' || row.status === 'cancelling') row.status = 'paused'
@@ -145,6 +162,29 @@ export function pauseBookData(data: BookData): BookData {
     for (const item of rows((row.mechanicalQueue as Row | undefined)?.items)) if (item.status === 'running') item.status = 'pending'
   }
   return result
+}
+
+/** 先拒绝非法资料，仅放行能由原始编号证明的已知端点清空缺陷，再共用书库修复规则。 */
+export async function repairValidatedBookData(data: BookData): Promise<BackupError[]> {
+  const errors = await validateBookData(data)
+  const unexpected = errors.filter(error => {
+    const match = /^characterRelations\[(\d+)\]\/sourceId$/.exec(error.path)
+    if (error.code !== 'REFERENCE' || !match) return true
+    const relation = data.tables.characterRelations[Number(match[1])] as unknown as CharacterRelation
+    return !hasClearedEndpoints(relation, data.tables.characters as unknown as Character[], data.tables.assetLifecycle as unknown as Lifecycle[])
+  })
+  if (unexpected.length) return errors
+  const key = (table: string) => table === 'compileProgress' ? 'stage' : table === 'assetLifecycle' ? 'key' : 'id'
+  await repairRelationBindings({
+    rows: async table => data.tables[table as TableName],
+    get: async (table, id) => data.tables[table as TableName].find(row => row[key(table)] === id),
+    put: async (table, row) => {
+      const values = data.tables[table as TableName], index = values.findIndex(prior => prior[key(table)] === row[key(table)])
+      if (index < 0) values.push(row); else values[index] = row
+    },
+    remove: async (table, id) => { data.tables[table as TableName] = data.tables[table as TableName].filter(row => row[key(table)] !== id) },
+  }, data.book.id)
+  return validateBookData(data)
 }
 
 export function migrateLegacy(data: BookData, legacy: Record<string, unknown>): BookData {

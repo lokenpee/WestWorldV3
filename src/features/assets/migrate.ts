@@ -2,9 +2,24 @@ import type { Character, CharacterRelation, EventNode, LegacyRelation, Lifecycle
 import { bindNodeCharacters } from './characterLinks'
 import { bindTargetIds, characterNameIndex, normalizeDirection, normalizeRelationType, relationId, resolveSourceId } from './relations'
 
-interface LegacyRelationInput extends LegacyRelation {
+export interface LegacyRelationInput extends LegacyRelation {
   reverse_label?: unknown
   quote?: unknown
+}
+
+const legacyInverseLabels = new Map([
+  ['父亲', '子女'], ['母亲', '子女'], ['儿子', '父母'], ['女儿', '父母'], ['子女', '父母'], ['暗恋', '被暗恋'],
+])
+
+/** 只推导可确定的反向称呼；不能确定时保留原词并标记方向未明确。 */
+export function legacyRelationLabels(legacy: LegacyRelationInput) {
+  const relationType = normalizeRelationType(legacy.relation_type) || 'unknown'
+  const forwardLabel = (typeof legacy.relation_label === 'string' ? legacy.relation_label.trim() : '') || relationType
+  const explicitReverse = typeof legacy.reverse_label === 'string' ? legacy.reverse_label.trim() : ''
+  const direction = normalizeDirection(legacy.direction)
+  if (explicitReverse || direction === 'bidirectional') return { relationType, forwardLabel, reverseLabel: explicitReverse || forwardLabel, direction }
+  const reverseLabel = direction === 'directed' ? legacyInverseLabels.get(forwardLabel) : undefined
+  return { relationType, forwardLabel, reverseLabel: reverseLabel || forwardLabel, direction: reverseLabel ? direction : 'unspecified' as const }
 }
 
 /**
@@ -19,10 +34,7 @@ export function migrateCharacterRelations(characters: Character[], lifecycle: Li
     for (const legacy of (person.relations ?? []) as LegacyRelationInput[]) {
       const targetName = typeof legacy.target === 'string' ? legacy.target.trim() : ''
       if (!targetName) continue
-      const relationType = normalizeRelationType(legacy.relation_type) || 'unknown'
-      const forwardLabel = (typeof legacy.relation_label === 'string' ? legacy.relation_label.trim() : '') || relationType
-      const reverseLabel = (typeof legacy.reverse_label === 'string' ? legacy.reverse_label.trim() : '') || forwardLabel
-      const direction = normalizeDirection(legacy.direction)
+      const { relationType, forwardLabel, reverseLabel, direction } = legacyRelationLabels(legacy)
       const chapterIndex = person.chapterIndex ?? person.sourceChapters?.[0] ?? ''
       const id = relationId({ bookId: person.bookId, originCharacterId: person.id, targetName, relationType, forwardLabel, reverseLabel, direction, chapterIndex })
       if (seen.has(id)) continue

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { BookRepository, Chapter } from '../../lib/storage/workspace'
 import { ChapterTextDialog } from '../books/ChapterTextDialog'
 import type { AssetService } from './service'
 import { AssetError, assetLabels, assetName, roleWeights, type Asset, type AssetInput, type AssetKind, type AssetSnapshot, type Character } from './types'
 import { formInput, formValues, labels, memberIds, type FormValues } from './form'
-import { paginateEdges } from './relations'
+import { RelationEditor, type RelationEditorHandle } from './RelationEditor'
 import { NodeCharacters } from './NodeCharacters'
 
 function DeleteDialog({ name, busy, onConfirm, onClose }: { name: string; busy: boolean; onConfirm: () => void; onClose: () => void }) {
@@ -13,20 +13,22 @@ function DeleteDialog({ name, busy, onConfirm, onClose }: { name: string; busy: 
   return <dialog ref={ref} className="delete-asset-dialog" onCancel={event => event.preventDefault()} aria-labelledby="delete-title"><h2 id="delete-title">删除 {name}？</h2><p>删除后会同步清理事件线关联。提取来源记录会保留。</p><div className="editor-actions"><button className="secondary-button" disabled={busy} onClick={onClose}>取消</button><button className="danger-button" disabled={busy} onClick={onConfirm}>{busy ? '正在删除…' : '确认删除'}</button></div></dialog>
 }
 
-export function AssetEditor({ kind, asset, creating, snapshot, chapters, service, repository, bookId, onClose, onSaved, onSelect }: {
+export interface AssetEditorHandle { isDirty: () => boolean; save: () => Promise<boolean>; discard: () => void }
+export const AssetEditor = forwardRef<AssetEditorHandle, {
   kind: AssetKind; asset?: Asset; creating: boolean; snapshot: AssetSnapshot; chapters: Chapter[]; service: AssetService; repository: BookRepository; bookId: string
   onClose: () => void; onSaved: (row: Asset) => void; onSelect: (id: string) => void
-}) {
+}>(function AssetEditor({ kind, asset, creating, snapshot, chapters, service, repository, bookId, onClose, onSaved, onSelect }, ref) {
   const [baseline, setBaseline] = useState(asset)
   const [initialValues, setInitialValues] = useState(() => formValues(asset, snapshot.characters))
   const [values, setValues] = useState(initialValues)
   const [fieldError, setFieldError] = useState<{ field?: keyof AssetInput; message: string }>()
   const [busy, setBusy] = useState(false)
+  const [relationDirty, setRelationDirty] = useState(false)
+  const relationRef = useRef<RelationEditorHandle>(null)
   const [deleteTarget, setDeleteTarget] = useState<Asset>()
   const [reader, setReader] = useState<{ title: string; text: string }>()
   const [savedMessage, setSavedMessage] = useState('')
   const [expandedFields, setExpandedFields] = useState<Partial<Record<keyof FormValues, boolean>>>({})
-  const [relationLimit, setRelationLimit] = useState(100)
   const editorRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (kind !== 'character') return
@@ -46,8 +48,20 @@ export function AssetEditor({ kind, asset, creating, snapshot, chapters, service
   }, [kind])
   const submitting = useRef(false)
   const dirty = JSON.stringify(values) !== JSON.stringify(initialValues)
+  useEffect(() => {
+    if (!dirty && !relationDirty) return
+    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty, relationDirty])
   const loadValues = (row?: Asset) => { const next = formValues(row, snapshot.characters); setBaseline(row); setInitialValues(next); setValues(next) }
-  if (asset && baseline && asset.revision > baseline.revision && !dirty) loadValues(asset)
+  if (asset && baseline && asset.revision > baseline.revision) {
+    if (!dirty) loadValues(asset)
+    else {
+      // 关系投影及修订号变化不代表表单业务字段冲突。
+      if (JSON.stringify(formValues(asset, snapshot.characters)) === JSON.stringify(formValues(baseline, snapshot.characters))) { setBaseline(asset); setInitialValues(formValues(asset, snapshot.characters)) }
+    }
+  }
   const conflict = !!asset && !!baseline && asset.revision > baseline.revision && dirty
   const missing = !creating && !asset
   const mapping = baseline ? snapshot.lifecycle.find(row => row.key === `${kind}:${baseline.id}`) : undefined
@@ -57,14 +71,22 @@ export function AssetEditor({ kind, asset, creating, snapshot, chapters, service
   const update = (key: keyof FormValues, value: string) => { setValues(current => ({ ...current, [key]: value, ...(key === 'actors' ? { actorIds: '' } : key === 'targets' ? { targetCharacterIds: '' } : {}) })); setFieldError(undefined); setSavedMessage('') }
   const error = (failure: unknown) => { setFieldError({ field: failure instanceof AssetError ? failure.field : undefined, message: failure instanceof Error ? failure.message : '操作失败，请重试。' }) }
 
-  async function save() {
-    if (disabled || conflict || submitting.current) return
+  async function save(): Promise<boolean> {
+    if (disabled || conflict || submitting.current) return false
     submitting.current = true; setBusy(true); setFieldError(undefined)
     try {
+      let saveBaseline = baseline
+      if (relationRef.current?.isDirty()) {
+        if (!await relationRef.current.save()) return false
+        if (!dirty) return true
+        const latest = (await service.read(bookId)).characters.find(row => row.id === baseline?.id)
+        if (!latest || JSON.stringify(formValues(latest, snapshot.characters)) !== JSON.stringify(initialValues)) throw new AssetError('CONFLICT', '此条目已被更新，请重新载入后保存。')
+        saveBaseline = latest
+      }
       const input = formInput(kind, values, creating)
-      const saved = creating ? await service.create(bookId, kind, input) : await service.update(bookId, kind, baseline!.id, baseline!.revision, input)
-      loadValues(saved); setSavedMessage('已保存'); onSaved(saved)
-    } catch (failure) { error(failure) }
+      const saved = creating ? await service.create(bookId, kind, input) : await service.update(bookId, kind, saveBaseline!.id, saveBaseline!.revision, input)
+      loadValues(saved); setSavedMessage('已保存'); onSaved(saved); return true
+    } catch (failure) { error(failure); return false }
     finally { setBusy(false); submitting.current = false }
   }
 
@@ -86,6 +108,8 @@ export function AssetEditor({ kind, asset, creating, snapshot, chapters, service
     catch (failure) { error(failure); setDeleteTarget(undefined) }
     finally { setBusy(false); submitting.current = false }
   }
+
+  useImperativeHandle(ref, () => ({ isDirty: () => dirty || relationDirty, save, discard: () => { relationRef.current?.discard(); loadValues(baseline) } }))
 
   function field(key: keyof FormValues, multiline = false) {
     const compact = kind === 'character' && multiline
@@ -133,16 +157,8 @@ export function AssetEditor({ kind, asset, creating, snapshot, chapters, service
         {fieldError?.field === 'nodeIds' && <p role="alert" className="field-error">{fieldError.message}</p>}
         {field('cause', true)}{field('process', true)}{field('result', true)}
       </>}
-      {baseline && kind === 'character' && (() => {
-        const person = baseline as Character
-        const edges = snapshot.relationEdges[baseline.id] ?? []
-        const page = paginateEdges(edges, 0, relationLimit)
-        const name = (id: string) => snapshot.characters.find(row => row.id === id)?.name ?? id
-        const names = new Set([person.name, ...(person.aliases ?? [])])
-        const unresolved = snapshot.unresolvedRelations.filter(item => names.has(item.sourceName) || item.targetName === person.name)
-        return <details className="asset-metadata" open><summary>人物关系</summary>{!edges.length && !unresolved.length && <p>暂无关系记录。</p>}{page.items.map(edge => <p key={`${edge.fromId}>${edge.toId}`}>{edge.fromId === baseline.id ? `${name(edge.toId)}：${edge.labels.join('、')}` : `来自 ${name(edge.fromId)}：${edge.labels.join('、')}`}{edge.directionUnclear ? '（方向未明确）' : ''}</p>)}{page.nextOffset !== null && <button className="text-button" type="button" onClick={() => setRelationLimit(value => value + 100)}>加载更多（共 {page.total} 条）</button>}{unresolved.map(item => <p key={item.relationId}>{item.sourceName} → {item.targetName}：{item.forwardLabel}（{item.reason === 'source_missing' ? '来源已失效' : item.reason === 'self' ? '两端合为同一人物' : '目标尚未入库'}）</p>)}</details>
-      })()}
-      {baseline && <details className="asset-metadata"><summary>来源与事实底稿</summary><p>创建来源：{baseline.createdBy === 'manual' ? '人工' : '提取'}；修订：{baseline.revision}</p>{'sourceChapters' in baseline && <p>来源章节：{baseline.sourceChapters?.join('、') || '无'}</p>}{'mergeNotes' in baseline && baseline.mergeNotes?.map((note, index) => <p key={index}>{note}</p>)}{'mergeFacts' in baseline && baseline.mergeFacts?.map(fact => <p key={fact.id}>{fact.text}（来源：{fact.chapters.join('、') || '人工'}）</p>)}{kind === 'character' && (baseline as Character).relations?.map((relation, index) => <p key={index}>{relation.target}：{relation.relation_label ?? relation.relation_type}</p>)}</details>}
+      {baseline && kind === 'character' && <RelationEditor ref={relationRef} bookId={bookId} character={baseline as Character} snapshot={snapshot} service={service} locked={locked || busy} onDirtyChange={setRelationDirty} />}
+      {baseline && <details className="asset-metadata"><summary>来源与事实底稿</summary><p>创建来源：{baseline.createdBy === 'manual' ? '人工' : '提取'}；修订：{baseline.revision}</p>{'sourceChapters' in baseline && <p>来源章节：{baseline.sourceChapters?.join('、') || '无'}</p>}{'mergeNotes' in baseline && baseline.mergeNotes?.map((note, index) => <p key={index}>{note}</p>)}{'mergeFacts' in baseline && baseline.mergeFacts?.map(fact => <p key={fact.id}>{fact.text}（来源：{fact.chapters.join('、') || '人工'}）</p>)}</details>}
       {baseline && kind === 'character' && <p className="field-help">基础资料：年龄 {(baseline as Character).profile?.age ?? '未记录'}；性别 {(baseline as Character).profile?.gender || '未记录'}</p>}
       {baseline && kind === 'eventLine' && <p className="field-help">当前可确定人物：{(snapshot.lineCharacterIds[baseline.id] ?? []).map(id => snapshot.characters.find(row => row.id === id)?.name ?? id).join('、') || '无'}；来源章节：{'chapters' in baseline ? baseline.chapters.join('、') : ''}</p>}
       </div>
@@ -151,4 +167,4 @@ export function AssetEditor({ kind, asset, creating, snapshot, chapters, service
     {deleteTarget && <DeleteDialog name={assetName(deleteTarget)} busy={busy} onClose={() => setDeleteTarget(undefined)} onConfirm={() => void remove()} />}
     {reader && <ChapterTextDialog title={reader.title} text={reader.text} onClose={() => setReader(undefined)} />}
   </section>
-}
+})

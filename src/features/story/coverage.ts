@@ -10,7 +10,7 @@ export function storyContent(table: string, value: Row | null) {
   }
   if (table === 'characters' || table === 'locations') {
     delete row.frequency
-    if (row.roleWeightSource !== 'manual') { delete row.roleWeight; delete row.roleWeightSource }
+    if (!['manual', 'agent'].includes(String(row.roleWeightSource ?? ''))) { delete row.roleWeight; delete row.roleWeightSource }
   }
   if (table === 'storyEditorNotes') delete row.validity
   return row

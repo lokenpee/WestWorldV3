@@ -623,6 +623,12 @@
               "status"
             ]
           }
+        },
+        "assetEdits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AssetEditRecord"
+          }
         }
       },
       "required": [
@@ -644,7 +650,10 @@
       "type": "object",
       "properties": {
         "recordType": {
-          "const": "run"
+          "enum": [
+            "run",
+            "asset_edit"
+          ]
         },
         "id": {
           "type": "string"
@@ -657,7 +666,8 @@
             "P1",
             "P2",
             "P3",
-            "manual_merge"
+            "manual_merge",
+            "asset_edit"
           ]
         },
         "status": {
@@ -791,6 +801,50 @@
         },
         "mechanicalQueue": {
           "$ref": "#/$defs/MechanicalQueue"
+        },
+        "operationKey": {
+          "type": "string"
+        },
+        "payloadFingerprint": {
+          "type": "string"
+        },
+        "assetEdits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AssetEditRecord"
+          }
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "result": {
+          "type": "object"
+        },
+        "assetReview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "items",
+            "updatedAt"
+          ],
+          "properties": {
+            "version": {
+              "const": 1
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/AssetReviewItem"
+              }
+            },
+            "updatedAt": {
+              "type": "string"
+            }
+          }
         }
       },
       "required": [
@@ -1083,6 +1137,10 @@
             },
             {
               "const": "manual",
+              "type": "string"
+            },
+            {
+              "const": "agent",
               "type": "string"
             }
           ]
@@ -4108,6 +4166,9 @@
             },
             {
               "$ref": "#/$defs/AgentProbeTask"
+            },
+            {
+              "$ref": "#/$defs/AssetReviewTask"
             }
           ]
         },
@@ -5371,6 +5432,347 @@
         },
         "legacyPayload": {
           "type": "object"
+        }
+      }
+    },
+    "CharacterRelationEdit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pairKey",
+        "bookId",
+        "aId",
+        "bId",
+        "state",
+        "aToBLabels",
+        "bToALabels",
+        "directionUnclear",
+        "evidence",
+        "sourceRelationIds",
+        "revision",
+        "updatedAt",
+        "updatedBy",
+        "commitId"
+      ],
+      "properties": {
+        "pairKey": {
+          "type": "string",
+          "minLength": 2
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "active",
+            "deleted"
+          ]
+        },
+        "aToBLabels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "bToALabels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "directionUnclear": {
+          "type": "boolean"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "chapterIndex",
+              "quote"
+            ],
+            "properties": {
+              "chapterIndex": {
+                "type": "string"
+              },
+              "quote": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "sourceRelationIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "updatedBy": {
+          "enum": [
+            "manual",
+            "agent"
+          ]
+        },
+        "commitId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "AssetEditRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commitId",
+        "tool",
+        "kind",
+        "id",
+        "fieldChanges",
+        "reason",
+        "evidence",
+        "timestamp",
+        "actor"
+      ],
+      "properties": {
+        "commitId": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "character",
+            "location",
+            "node",
+            "eventLine",
+            "relation"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "fieldChanges": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "reason": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "chapterIndex",
+              "quote"
+            ],
+            "properties": {
+              "chapterIndex": {
+                "type": "string"
+              },
+              "quote": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "actor": {
+          "enum": [
+            "manual",
+            "agent"
+          ]
+        }
+      }
+    },
+    "AssetReviewTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bookId",
+        "runId",
+        "taskId",
+        "planVersion",
+        "stage",
+        "phase",
+        "remainingCount",
+        "resume",
+        "workItems",
+        "afterWorkItemId",
+        "pageLimit"
+      ],
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planVersion": {
+          "const": "2.2"
+        },
+        "stage": {
+          "const": "P2"
+        },
+        "phase": {
+          "const": "asset_review"
+        },
+        "remainingCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeInfo"
+        },
+        "workItems": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "workItemId",
+              "kind",
+              "id",
+              "revision",
+              "factFingerprint"
+            ],
+            "properties": {
+              "workItemId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "enum": [
+                  "character",
+                  "location",
+                  "node",
+                  "eventLine",
+                  "relation"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "factFingerprint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fromId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "toId": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "afterWorkItemId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pageLimit": {
+          "const": 50
+        }
+      }
+    },
+    "AssetReviewItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workItemId",
+        "kind",
+        "id",
+        "revision",
+        "factFingerprint",
+        "status",
+        "updatedAt"
+      ],
+      "properties": {
+        "workItemId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "fromId": {
+          "type": "string"
+        },
+        "toId": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "factFingerprint": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "checked",
+            "deferred",
+            "skipped"
+          ]
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
         }
       }
     }

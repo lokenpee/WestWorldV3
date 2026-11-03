@@ -2,7 +2,9 @@ import type { Chapter, createWorkspace } from '../../lib/storage/workspace'
 import type { ModelService } from '../models/service'
 import type { CallResult, CallProgress } from '../models/types'
 import { classifyError } from '../models/policy'
-import { bindNodeCharacters } from '../assets/characterLinks'
+import { bindNodeCharacters, remapCharacterLinks } from '../assets/characterLinks'
+import { dexieMergeStore } from '../assets/mergeCore'
+import { invalidateAssetProgress, type AssetChange } from '../assets/invalidate'
 import { extractedRelation, syncRelations, type ExtractedRelationInput } from '../assets/relations'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebuildFacts, updateFrequencies } from '../assets/derive'
@@ -128,6 +130,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
             const currentText = await db.table<{ text: string }>('chapterTexts').get(chapter.chapterIndex)
             if (currentText?.text !== text) throw new Error('本章原文已变化，请重新提取。')
             const originIds: string[] = []
+            const beforeCharacters = await db.table<Character>('characters').toArray()
             const pendingRelations: { person: Character; input: ExtractedRelationInput }[] = []
             const timestamp = new Date().toISOString()
             async function insert(table: 'characters' | 'locations' | 'nodes', kind: 'character' | 'location' | 'node', code: string, rows: ExtractedRow[]) {
@@ -169,7 +172,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
             await insert('characters', 'character', 'P', result.value!.characters ?? [])
             await insert('locations', 'location', 'L', result.value!.locations ?? [])
             await insert('nodes', 'node', 'N', result.value!.nodes ?? [])
-            if (pendingRelations.length) {
+            if (step === 'worldAssets') {
               const people = await db.table<Character>('characters').toArray()
               const mappings = await db.table<Lifecycle>('assetLifecycle').toArray()
               const created = pendingRelations.map(item => extractedRelation(item.person, item.input, people, mappings, timestamp))
@@ -179,6 +182,16 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
               if (fresh.length) await db.table('characterRelations').bulkPut(fresh)
               const synced = syncRelations([...existing, ...fresh], people, mappings, timestamp)
               if (synced.changed.length) await db.table('characterRelations').bulkPut(synced.changed)
+              const nodes = await db.table<EventNode>('nodes').toArray()
+              const changedNodes = remapCharacterLinks(nodes, beforeCharacters, people).filter((node, i) => node !== nodes[i])
+              for (const node of changedNodes) await db.table('nodes').put({ ...node, revision: node.revision + 1 })
+              const changes: AssetChange[] = changedNodes.map(node => ({ kind: 'node', id: node.id }))
+              for (const relation of [...fresh, ...synced.changed]) {
+                const before = existing.find(row => row.id === relation.id)
+                for (const id of [before?.sourceId, ...(before?.targetIds ?? []), relation.sourceId, ...relation.targetIds]) if (id) changes.push({ kind: 'character', id })
+              }
+              for (const person of people) if (!beforeCharacters.some(row => row.id === person.id)) changes.push({ kind: 'character', id: person.id })
+              await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp)
             }
             const texts = await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()
             for (const [table, people] of [['characters', true], ['locations', false]] as const) {

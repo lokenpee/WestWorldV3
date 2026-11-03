@@ -625,6 +625,644 @@
             }
           }
         }
+      },
+      {
+        "name": "edit_character",
+        "description": "编辑人物业务字段；省略不改，显式清空按字段类型处理，人工主名和层级允许有据修改。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "operationKey",
+            "id",
+            "expectedRevision",
+            "patch",
+            "reason",
+            "evidence"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapterIndex",
+                  "quote"
+                ],
+                "properties": {
+                  "chapterIndex": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "patch": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "identity": {
+                  "type": "string"
+                },
+                "ageText": {
+                  "type": "string"
+                },
+                "age": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gender": {
+                  "type": "string"
+                },
+                "appearance": {
+                  "type": "string"
+                },
+                "personality": {
+                  "type": "string"
+                },
+                "background": {
+                  "type": "string"
+                },
+                "speechStyleSample": {
+                  "type": "string"
+                },
+                "roleWeight": {
+                  "enum": [
+                    "主要人物",
+                    "重要配角",
+                    "NPC",
+                    "路人"
+                  ]
+                },
+                "chapterIndex": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "manualSourceNote": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "dependencyTracking": "actual-read-object-and-original-quote"
+      },
+      {
+        "name": "edit_location",
+        "description": "编辑地点业务字段；省略不改，显式清空按字段类型处理。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "operationKey",
+            "id",
+            "expectedRevision",
+            "patch",
+            "reason",
+            "evidence"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapterIndex",
+                  "quote"
+                ],
+                "properties": {
+                  "chapterIndex": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "patch": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "description": {
+                  "type": "string"
+                },
+                "chapterIndex": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "manualSourceNote": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "dependencyTracking": "actual-read-object-and-original-quote"
+      },
+      {
+        "name": "edit_event_node",
+        "description": "编辑事件节点业务字段；省略不改，参与人物必须按编号或统一称呼规则完整替换。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "operationKey",
+            "id",
+            "expectedRevision",
+            "patch",
+            "reason",
+            "evidence"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapterIndex",
+                  "quote"
+                ],
+                "properties": {
+                  "chapterIndex": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "patch": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "summary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "process": {
+                  "type": "string"
+                },
+                "chapterIndex": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "participantIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "unlinkedParticipants": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "actors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "targets": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "actorIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "targetCharacterIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "time_text": {
+                  "type": "string"
+                },
+                "time_hint": {
+                  "type": "string"
+                },
+                "world_delta": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "new_facts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "started_actions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "timeCoord": {
+                  "type": "string"
+                },
+                "timePrecision": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "dependencyTracking": "actual-read-object-and-original-quote"
+      },
+      {
+        "name": "edit_event_line",
+        "description": "编辑事件线业务字段；节点成员为完整有序替换。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "operationKey",
+            "id",
+            "expectedRevision",
+            "patch",
+            "reason",
+            "evidence"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapterIndex",
+                  "quote"
+                ],
+                "properties": {
+                  "chapterIndex": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "patch": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 1,
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "nodeIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "cause": {
+                  "type": "string"
+                },
+                "process": {
+                  "type": "string"
+                },
+                "result": {
+                  "type": "string"
+                },
+                "lineStatus": {
+                  "enum": [
+                    "open",
+                    "closed"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "dependencyTracking": "actual-read-object-and-original-quote"
+      },
+      {
+        "name": "set_character_relation",
+        "description": "保存两个具体人物编号之间的双向关系；允许单向，清空双向请使用删除工具。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "operationKey",
+            "fromId",
+            "toId",
+            "expectedFingerprint",
+            "forwardLabels",
+            "reverseLabels",
+            "directionUnclear",
+            "reason",
+            "evidence"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fromId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "toId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedFingerprint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapterIndex",
+                  "quote"
+                ],
+                "properties": {
+                  "chapterIndex": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "forwardLabels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "reverseLabels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "directionUnclear": {
+              "type": "boolean"
+            }
+          }
+        },
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "dependencyTracking": "actual-pair-and-endpoint-reads; original-quote"
+      },
+      {
+        "name": "delete_character_relation",
+        "description": "删除两个具体人物编号之间的双向整组关系；无变化时返回合法确认。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "operationKey",
+            "fromId",
+            "toId",
+            "expectedFingerprint",
+            "reason",
+            "evidence"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fromId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "toId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedFingerprint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapterIndex",
+                  "quote"
+                ],
+                "properties": {
+                  "chapterIndex": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "quote": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "dependencyTracking": "actual-pair-and-endpoint-reads; original-quote"
+      },
+      {
+        "name": "get_character_relation",
+        "description": "读取两个具体人物编号之间的当前关系、编辑版本、指纹和依据；没有连接返回 absent 或 deleted。",
+        "parameters": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "fromId",
+            "toId"
+          ],
+          "properties": {
+            "fromId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "toId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "kind": "read",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "dependencyTracking": "pair-result-and-endpoint-record-fingerprint"
       }
     ],
     "story_editor": [

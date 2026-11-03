@@ -79,7 +79,7 @@ export function createFrequencyCounter<T extends Character | LocationAsset>(asse
     return measured.map(row => {
       const percentile = percentiles.get(`${row.chapters}:${row.mentions}`)!
       const result = { ...row.asset, frequency: { chapters: row.chapters, mentions: row.mentions, scopeChapters, percentile } }
-      if (characters && (!('roleWeightSource' in result) || result.roleWeightSource !== 'manual')) {
+      if (characters && !['manual', 'agent'].includes(String((result as { roleWeightSource?: string }).roleWeightSource ?? ''))) {
         const roleWeight: RoleWeight = flat ? 'NPC' : percentile < 0.1 ? '主要人物' : percentile < 0.3 ? '重要配角' : percentile < 0.8 ? 'NPC' : '路人'
         Object.assign(result, { roleWeight, roleWeightSource: 'frequency' })
       }

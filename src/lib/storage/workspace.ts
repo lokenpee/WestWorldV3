@@ -1,6 +1,8 @@
 import Dexie, { type Table } from 'dexie'
 import { migrateCharacterRelations, migrateNodeBindings } from '../../features/assets/migrate'
 import type { Character, EventNode, Lifecycle } from '../../features/assets/types'
+import { dexieMergeStore } from '../../features/assets/mergeCore'
+import { repairRelationBindings } from '../../features/assets/repair'
 
 export interface Book {
   id: string
@@ -54,7 +56,7 @@ class SettingsDatabase extends Dexie {
 class BookDatabase extends Dexie {
   declare chapters: Table<Chapter, string>
 
-  constructor(name: string) {
+  constructor(name: string, bookId: string) {
     super(name)
     this.version(5).stores({
       chapters: 'chapterIndex, order',
@@ -95,6 +97,12 @@ class BookDatabase extends Dexie {
         await transaction.table('nodes').put({ ...next, revision: (node.revision ?? 1) + 1 })
       }
     })
+    this.version(7).stores({
+      characterRelationEdits: 'pairKey, aId, bId, state',
+    })
+    this.on('ready', () => this.transaction('rw', this.tables, async () => {
+      await repairRelationBindings(dexieMergeStore(this), bookId)
+    }))
   }
 }
 
@@ -106,7 +114,7 @@ export function createWorkspace(scope: DatabaseScope = MAIN_SCOPE) {
     if (!bookId) throw new Error('缺少书籍标识')
     let db = bookDatabases.get(bookId)
     if (!db) {
-      db = new BookDatabase(`${scope.bookPrefix}${bookId}`)
+      db = new BookDatabase(`${scope.bookPrefix}${bookId}`, bookId)
       bookDatabases.set(bookId, db)
     }
     return db

@@ -1,4 +1,4 @@
-import type { Character, CharacterRelation, Lifecycle, RelationDirection, RelationEdge, RelationEvidence, UnresolvedRelation } from './types'
+import type { Character, CharacterPairResult, CharacterRelation, CharacterRelationEdit, Lifecycle, RelationDirection, RelationEdge, RelationEvidence, UnresolvedRelation } from './types'
 import { characterMatchNames } from './characterNames'
 
 export const relationDirections: RelationDirection[] = ['directed', 'bidirectional', 'unspecified']
@@ -189,4 +189,131 @@ export function paginateEdges(edges: RelationEdge[], offset = 0, limit = 100): R
   const items = edges.slice(start, start + size)
   const next = start + items.length < edges.length ? start + items.length : null
   return { items, total: edges.length, offset: start, nextOffset: next }
+}
+
+/** 人物对键：两个编号按稳定字符串序排序后序列化，避免分隔符碰撞。 */
+export const pairKeyOf = (aId: string, bId: string) => JSON.stringify([aId, bId].sort())
+export const pairEndpointIds = (pairKey: string) => JSON.parse(pairKey) as [string, string]
+
+export interface PairAccumulator {
+  aId: string; bId: string; aToBLabels: string[]; bToALabels: string[]
+  evidence: RelationEvidence[]; sourceRelationIds: string[]; directionUnclear: boolean
+}
+
+function addEvidence(target: RelationEvidence[], items: RelationEvidence[]) {
+  for (const item of items) if (!target.some(row => evidenceKey(row) === evidenceKey(item))) target.push(item)
+}
+
+/** 原始事实按有向端点聚合成人物对；来源或目标缺失的事实不进入当前连接。 */
+export function basePairs(relations: CharacterRelation[], characters: Character[]): Map<string, PairAccumulator> {
+  const known = new Set(characters.map(person => person.id))
+  const pairs = new Map<string, PairAccumulator>()
+  for (const relation of relations) {
+    if (!relation.sourceId || !known.has(relation.sourceId)) continue
+    for (const targetId of relation.targetIds ?? []) {
+      if (!known.has(targetId) || targetId === relation.sourceId) continue
+      const [aId, bId] = [relation.sourceId, targetId].sort()
+      const pairKey = pairKeyOf(aId, bId)
+      if (!pairs.has(pairKey)) pairs.set(pairKey, { aId, bId, aToBLabels: [], bToALabels: [], evidence: [], sourceRelationIds: [], directionUnclear: false })
+      const pair = pairs.get(pairKey)!
+      const [forward, reverse] = aId === relation.sourceId ? [relation.forwardLabel, relation.reverseLabel] : [relation.reverseLabel, relation.forwardLabel]
+      pair.aToBLabels = uniqueStrings([...pair.aToBLabels, forward])
+      pair.bToALabels = uniqueStrings([...pair.bToALabels, reverse])
+      addEvidence(pair.evidence, relation.evidence)
+      if (!pair.sourceRelationIds.includes(relation.id)) pair.sourceRelationIds.push(relation.id)
+      pair.directionUnclear = pair.directionUnclear || relation.direction === 'unspecified'
+    }
+  }
+  return pairs
+}
+
+const pairCanonical = (pair: CharacterPairResult) => JSON.stringify([pair.pairKey, pair.state, pair.fromId, pair.toId, pair.forwardLabels, pair.reverseLabels, pair.directionUnclear, pair.evidence.map(item => [item.chapterIndex, item.quote]), pair.sourceRelationIds, pair.endpointRevisions])
+
+/** 人物对指纹包含当前结果与两端修订号；读取、保存和 AI 提交共用。 */
+export function pairFingerprint(pair: Omit<CharacterPairResult, 'fingerprint'>) {
+  let hash = 2166136261
+  for (const character of pairCanonical({ ...pair, fingerprint: '' })) hash = Math.imul(hash ^ character.codePointAt(0)!, 16777619)
+  return `P${(hash >>> 0).toString(16)}`
+}
+
+/** 原始事实叠加编辑结果：active 采用编辑标签，deleted 不输出连接。 */
+export function effectivePairs(relations: CharacterRelation[], edits: CharacterRelationEdit[], characters: Character[]): CharacterPairResult[] {
+  const known = new Map(characters.map(person => [person.id, person]))
+  const pairs = new Map<string, CharacterPairResult>()
+  for (const [pairKey, base] of basePairs(relations, characters)) pairs.set(pairKey, {
+    pairKey, fromId: base.aId, toId: base.bId, forwardLabels: base.aToBLabels, reverseLabels: base.bToALabels,
+    state: 'active', editRevision: 0, fingerprint: '', evidence: base.evidence, sourceRelationIds: base.sourceRelationIds,
+    directionUnclear: base.directionUnclear, endpointRevisions: {},
+  })
+  for (const edit of edits) {
+    const pairKey = edit.pairKey
+    const [aId, bId] = pairEndpointIds(pairKey)
+    if (!known.has(aId) || !known.has(bId) || aId === bId) continue
+    pairs.set(pairKey, {
+      pairKey, fromId: aId, toId: bId,
+      forwardLabels: edit.state === 'active' ? uniqueStrings(edit.aToBLabels) : [],
+      reverseLabels: edit.state === 'active' ? uniqueStrings(edit.bToALabels) : [],
+      state: edit.state, editRevision: edit.revision, fingerprint: '', evidence: edit.evidence,
+      sourceRelationIds: edit.sourceRelationIds, directionUnclear: edit.directionUnclear, endpointRevisions: {},
+    })
+  }
+  const result = [...pairs.values()].map(pair => {
+    const withRevisions = { ...pair, endpointRevisions: { [pair.fromId]: Number(known.get(pair.fromId)?.revision ?? 0), [pair.toId]: Number(known.get(pair.toId)?.revision ?? 0) } }
+    return { ...withRevisions, fingerprint: pairFingerprint(withRevisions) }
+  })
+  return result.sort((a, b) => a.fromId.localeCompare(b.fromId, undefined, { numeric: true }) || a.toId.localeCompare(b.toId, undefined, { numeric: true }))
+}
+
+/** 从调用方视角返回人物对；deleted/absent 也返回状态，不当作未找到。 */
+export function pairFromPerspective(pairs: CharacterPairResult[], fromId: string, toId: string, characters: Character[] = []): CharacterPairResult {
+  const pairKey = pairKeyOf(fromId, toId)
+  const pair = pairs.find(row => row.pairKey === pairKey)
+  if (!pair) {
+    const revisions = new Map(characters.map(person => [person.id, Number(person.revision ?? 0)]))
+    const absent: Omit<CharacterPairResult, 'fingerprint'> = { pairKey, fromId, toId, forwardLabels: [], reverseLabels: [], state: 'absent', editRevision: 0, evidence: [], sourceRelationIds: [], directionUnclear: false, endpointRevisions: { [fromId]: revisions.get(fromId) ?? 0, [toId]: revisions.get(toId) ?? 0 } }
+    return { ...absent, fingerprint: pairFingerprint(absent) }
+  }
+  if (pair.fromId === fromId) return { ...pair, fromId, toId }
+  return { ...pair, fromId, toId, forwardLabels: pair.reverseLabels, reverseLabels: pair.forwardLabels }
+}
+
+/** 有向结果仅由当前有效人物对生成；空标签方向不生成假边。 */
+export function pairView(pairs: CharacterPairResult[], characters: Character[]): RelationView {
+  const known = new Set(characters.map(person => person.id))
+  const edges = new Map<string, RelationEdge>()
+  const add = (fromId: string, toId: string, labels: string[], pair: CharacterPairResult) => {
+    if (!labels.length) return
+    const key = `${fromId}\u0000${toId}`
+    const existing = edges.get(key)
+    if (!existing) {
+      edges.set(key, { fromId, toId, labels: uniqueStrings(labels), types: [], relationIds: [...pair.sourceRelationIds], evidence: [...pair.evidence], directionUnclear: pair.directionUnclear })
+      return
+    }
+    existing.labels = uniqueStrings([...existing.labels, ...labels])
+    for (const id of pair.sourceRelationIds) if (!existing.relationIds.includes(id)) existing.relationIds.push(id)
+    addEvidence(existing.evidence, pair.evidence)
+    existing.directionUnclear = existing.directionUnclear || pair.directionUnclear
+  }
+  for (const pair of pairs) {
+    if (pair.state !== 'active' || !known.has(pair.fromId) || !known.has(pair.toId)) continue
+    add(pair.fromId, pair.toId, pair.forwardLabels, pair)
+    add(pair.toId, pair.fromId, pair.reverseLabels, pair)
+  }
+  return {
+    edges: [...edges.values()].sort((a, b) => a.fromId.localeCompare(b.fromId, undefined, { numeric: true }) || a.toId.localeCompare(b.toId, undefined, { numeric: true })),
+    unresolved: [],
+  }
+}
+
+export interface PairPage { items: CharacterPairResult[]; total: number; offset: number; nextOffset: number | null }
+
+/** 人物对列表按对方主名拼音、编号稳定分页，不按内部 UUID。 */
+export function paginateCharacterPairs(pairs: CharacterPairResult[], characters: Character[], ownerId: string, offset = 0, limit = 50): PairPage {
+  const nameOf = (id: string) => characters.find(person => person.id === id)?.name ?? id
+  const rows = pairs.filter(pair => pair.state === 'active' && (pair.fromId === ownerId || pair.toId === ownerId))
+    .sort((a, b) => nameOf(a.fromId === ownerId ? a.toId : a.fromId).localeCompare(nameOf(b.fromId === ownerId ? b.toId : b.fromId), 'zh-CN-u-co-pinyin') || (a.fromId === ownerId ? a.toId : a.fromId).localeCompare(b.fromId === ownerId ? b.toId : b.fromId, undefined, { numeric: true }))
+  const start = Math.max(0, Math.trunc(offset) || 0)
+  const size = Math.max(1, Math.trunc(limit) || 50)
+  const items = rows.slice(start, start + size)
+  return { items, total: rows.length, offset: start, nextOffset: start + items.length < rows.length ? start + items.length : null }
 }

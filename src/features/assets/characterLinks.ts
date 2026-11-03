@@ -103,7 +103,10 @@ export function setNodeParticipants(node: EventNode, characters: Character[], se
   const boundMentions = [...(node.actorBindings ?? []), ...(node.targetBindings ?? [])].filter(group => group.ids.length).map(group => group.mention)
   const pendingMentions = [...(node.actorBindings ?? []).filter(group => !group.ids.length), ...(node.targetBindings ?? []).filter(group => !group.ids.length && characterCandidates(group.mention, characters).length > 0)].map(group => group.mention)
   const dropped = unique([...boundMentions, ...pendingMentions]).filter(mention => !kept.includes(mention))
-  return bindNodeCharacters({ ...node, actors: nextActor, targets: [...nextTarget, ...previous.objects.filter(object => !kept.includes(object))] }, characters, {
+  return bindNodeCharacters({ ...node, actors: nextActor, targets: [...nextTarget, ...previous.objects.filter(object => !kept.includes(object))],
+    legacyActorIds: (node.legacyActorIds ?? []).filter(id => manual.includes(id)),
+    legacyTargetCharacterIds: (node.legacyTargetCharacterIds ?? []).filter(id => manual.includes(id)),
+  }, characters, {
     actorIds: nextActorIds, targetCharacterIds: nextTargetIds, removedMentions, droppedMentions: dropped,
   })
 }

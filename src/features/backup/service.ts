@@ -3,6 +3,7 @@ import type { createWorkspace } from '../../lib/storage/workspace'
 import type { ImportService } from '../../lib/storage/importService'
 import { emptyTables, tableNames } from './data'
 import { encodeBackup, inspectBackup, restoredTables } from './codec'
+import { clearCharacterNetworkCache } from '../character-network/cache'
 
 export function createBackupService(workspace: ReturnType<typeof createWorkspace>, importer: ImportService) {
   async function exportBook(bookId: string) {
@@ -30,7 +31,7 @@ export function createBackupService(workspace: ReturnType<typeof createWorkspace
       if (!await Dexie.exists(workspace.scope.bookPrefix + bookId)) return []
       return (await workspace.openBook(bookId).table('pipelineRuns').toArray()).filter(row => row.recordType === 'lease' && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now())).map(row => String(row.resource ?? row.lockKey ?? row.stage ?? '任务'))
     },
-    deleteBook: importer.deleteBook,
+    async deleteBook(bookId: string) { await importer.deleteBook(bookId); clearCharacterNetworkCache(bookId) },
     settings: workspace.settings,
   }
 }

@@ -5026,6 +5026,674 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "name": "edit_character",
+      "success": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "changed",
+          "summary",
+          "affected"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string"
+          },
+          "operationKey": {
+            "type": "string"
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "affected": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "kind",
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "character",
+                    "location",
+                    "node",
+                    "eventLine"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "pair": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "pairKey",
+              "state",
+              "editRevision",
+              "fingerprint"
+            ],
+            "properties": {
+              "pairKey": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "absent"
+                ]
+              },
+              "editRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fingerprint": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "edit_location",
+      "success": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "changed",
+          "summary",
+          "affected"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string"
+          },
+          "operationKey": {
+            "type": "string"
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "affected": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "kind",
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "character",
+                    "location",
+                    "node",
+                    "eventLine"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "pair": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "pairKey",
+              "state",
+              "editRevision",
+              "fingerprint"
+            ],
+            "properties": {
+              "pairKey": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "absent"
+                ]
+              },
+              "editRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fingerprint": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "edit_event_node",
+      "success": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "changed",
+          "summary",
+          "affected"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string"
+          },
+          "operationKey": {
+            "type": "string"
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "affected": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "kind",
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "character",
+                    "location",
+                    "node",
+                    "eventLine"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "pair": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "pairKey",
+              "state",
+              "editRevision",
+              "fingerprint"
+            ],
+            "properties": {
+              "pairKey": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "absent"
+                ]
+              },
+              "editRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fingerprint": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "edit_event_line",
+      "success": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "changed",
+          "summary",
+          "affected"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string"
+          },
+          "operationKey": {
+            "type": "string"
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "affected": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "kind",
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "character",
+                    "location",
+                    "node",
+                    "eventLine"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "pair": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "pairKey",
+              "state",
+              "editRevision",
+              "fingerprint"
+            ],
+            "properties": {
+              "pairKey": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "absent"
+                ]
+              },
+              "editRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fingerprint": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "set_character_relation",
+      "success": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "changed",
+          "summary",
+          "affected"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string"
+          },
+          "operationKey": {
+            "type": "string"
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "affected": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "kind",
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "character",
+                    "location",
+                    "node",
+                    "eventLine"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "pair": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "pairKey",
+              "state",
+              "editRevision",
+              "fingerprint"
+            ],
+            "properties": {
+              "pairKey": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "absent"
+                ]
+              },
+              "editRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fingerprint": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "delete_character_relation",
+      "success": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "changed",
+          "summary",
+          "affected"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string"
+          },
+          "operationKey": {
+            "type": "string"
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "affected": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "kind",
+                "id",
+                "revision"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "character",
+                    "location",
+                    "node",
+                    "eventLine"
+                  ]
+                },
+                "id": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "pair": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "pairKey",
+              "state",
+              "editRevision",
+              "fingerprint"
+            ],
+            "properties": {
+              "pairKey": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "absent"
+                ]
+              },
+              "editRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fingerprint": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "get_character_relation",
+      "success": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "pairKey",
+              "fromId",
+              "toId",
+              "state",
+              "forwardLabels",
+              "reverseLabels",
+              "directionUnclear",
+              "editRevision",
+              "fingerprint",
+              "evidence",
+              "sourceRelationIds",
+              "endpointRevisions"
+            ],
+            "properties": {
+              "pairKey": {
+                "type": "string"
+              },
+              "fromId": {
+                "type": "string"
+              },
+              "toId": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "active",
+                  "deleted",
+                  "absent"
+                ]
+              },
+              "forwardLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reverseLabels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "directionUnclear": {
+                "type": "boolean"
+              },
+              "editRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "fingerprint": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "chapterIndex",
+                    "quote"
+                  ],
+                  "properties": {
+                    "chapterIndex": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "quote": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "sourceRelationIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "endpointRevisions": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "note": "14 read tools + 2 controlled write tools. submit_result is separate finalization; write tools commit inside Pi Agent execution."

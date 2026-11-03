@@ -1,15 +1,23 @@
 import type { createWorkspace } from '../../lib/storage/workspace'
-import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterRelation, type EventLine, type EventNode, type Lifecycle, type LocationAsset } from './types'
+import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterPairResult, type CharacterRelation, type CharacterRelationEdit, type EventLine, type EventNode, type Lifecycle, type LocationAsset, type RelationEvidence } from './types'
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
 import { normalizeCharacterNames } from './characterNames'
 import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRun, type MergeOptions, type MergePreview, type MergeRequest, type WorldKind, type MechanicalMergeContext } from './merge'
 import { dexieMergeStore, mergeWorldAssets } from './mergeCore'
-import { edgesFor, projectRelations, relationView, syncRelations } from './relations'
+import { invalidateAssetProgress } from './invalidate'
+import { deleteCharacterPair, saveCharacterPair, type PairWriteInput, type PairWriteResult } from './relationEdits'
+import { edgesFor, effectivePairs, paginateCharacterPairs, pairFromPerspective, pairView, projectRelations, relationView, syncRelations } from './relations'
 import type { WorldRun } from '../world/types'
 
 type Workspace = ReturnType<typeof createWorkspace>
 type Database = ReturnType<Workspace['openBook']>
+export interface RelationPairInput {
+  fromId: string; toId: string
+  forwardLabels: string[]; reverseLabels: string[]
+  directionUnclear?: boolean; evidence?: RelationEvidence[]
+  reason: string; expectedFingerprint?: string; operationKey?: string
+}
 interface Lease { id: string; bookId: string; recordType?: string; lockKey?: string; resource?: string }
 const worldKinds = new Set<AssetKind>(['character', 'location'])
 const listFields = new Set(['aliases', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
@@ -91,23 +99,8 @@ async function synchronizeNarrative(db: Database, bookId: string, beforeNodes: E
 }
 
 async function invalidateProgressBatch(db: Database, changes: { kind: AssetKind; id: string }[], timestamp: string) {
-  interface Coverage { kind: string; id: string; status: string; invalidations: number; updatedAt: string; dependencies?: { records: { table: string; id: string; resolvedId: string | null }[] } }
-  interface Run { id: string; recordType: string; stage?: string; coverageItems?: Coverage[] }
-  const runs = await db.table<Run>('pipelineRuns').where('stage').anyOf(['P2', 'P3']).toArray()
-  const own = new Set(changes.map(change => `${change.kind}:${change.id}`))
-  const dependencies = new Set(changes.map(change => `${assetTables[change.kind]}:${change.id}`))
-  const affected = new Set<string>(changes.map(change => worldKinds.has(change.kind) ? 'P2' : 'P3'))
-  for (const run of runs.filter(row => row.recordType === 'run' && row.coverageItems)) {
-    let dirty = false
-    const coverageItems = run.coverageItems!.map(item => {
-      const hit = own.has(`${item.kind}:${item.id}`) || item.dependencies?.records.some(record => dependencies.has(`${record.table}:${record.id}`) || dependencies.has(`${record.table}:${record.resolvedId}`))
-      if (!hit || item.status === 'pending' || item.status === 'stale') return item
-      dirty = true
-      return { ...item, status: 'stale', invalidations: item.invalidations + 1, updatedAt: timestamp }
-    })
-    if (dirty) { await db.table('pipelineRuns').put({ ...run, coverageItems }); if (run.stage) affected.add(run.stage) }
-  }
-  for (const stage of affected) if (await db.table('compileProgress').get(stage)) await db.table('compileProgress').update(stage, { validity: 'stale', updatedAt: timestamp })
+  const runs = await db.table('pipelineRuns').where('stage').anyOf(['P2', 'P3']).toArray()
+  await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp, runs)
 }
 const invalidateProgress = (db: Database, kind: AssetKind, id: string, timestamp: string) => invalidateProgressBatch(db, [{ kind, id }], timestamp)
 
@@ -161,6 +154,7 @@ export function createAssetService(workspace: Workspace) {
         nameSource: automatic && !members.some(row => row.nameSource === 'manual') ? 'automatic' : 'manual',
         manualKeep: automatic ? members.some(row => row.manualKeep === true) : true,
         expectedRevisions: request.expectedRevisions,
+        commitId: crypto.randomUUID(), actor: queued ? 'agent' : 'manual',
         ...(texts ? { frequencyTexts: texts } : {}),
       })
       const invalidations: { kind: AssetKind; id: string }[] = [...request.memberIds.map(id => ({ kind, id })), ...merged.changedNodeIds.map(id => ({ kind: 'node' as const, id })), ...merged.changedCharacterIds.map(id => ({ kind: 'character' as const, id }))]
@@ -317,28 +311,86 @@ export function createAssetService(workspace: Workspace) {
     })
   }
 
+  async function relationContext(db: Database, bookId: string, fromId: string, toId: string) {
+    const characters = await db.table<Character>('characters').toArray()
+    if (!characters.some(row => row.id === fromId && row.bookId === bookId) || !characters.some(row => row.id === toId && row.bookId === bookId)) throw new AssetError('NOT_FOUND', '人物不存在或已删除。')
+    const relations = await db.table<CharacterRelation>('characterRelations').toArray()
+    const edits = await db.table<CharacterRelationEdit>('characterRelationEdits').toArray()
+    return { characters, relations, edits, pairs: effectivePairs(relations, edits, characters) }
+  }
+
+  async function getRelationPair(bookId: string, fromId: string, toId: string): Promise<CharacterPairResult> {
+    const db = await database(bookId)
+    return db.transaction('r', db.tables, async () => {
+      const { characters, pairs } = await relationContext(db, bookId, fromId, toId)
+      return pairFromPerspective(pairs, fromId, toId, characters)
+    })
+  }
+
+  async function mutateRelationPair(bookId: string, input: RelationPairInput, action: 'save' | 'delete'): Promise<PairWriteResult> {
+    const db = await database(bookId)
+    return db.transaction('rw', db.tables, async () => {
+      const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
+      if (lockState(leases, bookId).world) throw new AssetError('ASSET_DOMAIN_LOCKED', '世界资产正在处理，请等待任务结束后再保存关系。')
+      if (input.operationKey) {
+        const previous = await db.table<Record<string, unknown>>('pipelineRuns').filter(row => row.recordType === 'asset_edit' && row.operationKey === input.operationKey).first()
+        if (previous?.result) return previous.result as PairWriteResult
+      }
+      await relationContext(db, bookId, input.fromId, input.toId)
+      const commitId = crypto.randomUUID()
+      const timestamp = new Date().toISOString()
+      const write: PairWriteInput = {
+        bookId, fromId: input.fromId, toId: input.toId,
+        forwardLabels: input.forwardLabels, reverseLabels: input.reverseLabels,
+        directionUnclear: input.directionUnclear, evidence: input.evidence,
+        reason: input.reason, expectedFingerprint: input.expectedFingerprint,
+        actor: 'manual', commitId, tool: action === 'save' ? 'manual_set_relation' : 'manual_delete_relation',
+        operationKey: input.operationKey,
+      }
+      const result = await (action === 'save' ? saveCharacterPair : deleteCharacterPair)(dexieMergeStore(db), write)
+      const row = await db.table<Record<string, unknown>>('pipelineRuns').get(`asset-edit:${commitId}`)
+      if (row) await db.table('pipelineRuns').put({ ...row, result, updatedAt: timestamp })
+      for (const item of result.affected) await invalidateProgress(db, 'character', item.id, timestamp)
+      return result
+    })
+  }
+
   return {
     async read(bookId: string): Promise<AssetSnapshot> {
       const db = await database(bookId)
       return db.transaction('r', db.tables, async () => {
-        const [storedCharacters, locations, storedNodes, eventLines, lifecycle, leases, relationRows] = await Promise.all([
-          db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray(), db.table<CharacterRelation>('characterRelations').toArray(),
+        const [storedCharacters, locations, storedNodes, eventLines, lifecycle, leases, relationRows, editRows] = await Promise.all([
+          db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray(), db.table<CharacterRelation>('characterRelations').toArray(), db.table<CharacterRelationEdit>('characterRelationEdits').toArray(),
         ])
         const characters = storedCharacters.map(normalizeCharacterNames)
         const relations = relationRows
-        const view = relationView(relations, characters)
-        const relationEdges = Object.fromEntries(characters.map(person => [person.id, edgesFor(view.edges, person.id)]))
-        const projected = characters.map(person => ({ ...person, relations: projectRelations(view.edges, relations, view.unresolved, person.id, characters).relations }))
+        const pairs = effectivePairs(relations, editRows, characters)
+        const view = pairView(pairs, characters)
+        const types = new Map(relations.map(relation => [relation.id, relation.relationType]))
+        const edges = view.edges.map(edge => ({ ...edge, types: [...new Set(edge.relationIds.flatMap(id => types.get(id) ?? []))] }))
+        const unresolved = relationView(relations, characters).unresolved
+        const relationEdges = Object.fromEntries(characters.map(person => [person.id, edgesFor(edges, person.id)]))
+        const projected = characters.map(person => ({ ...person, relations: projectRelations(edges, relations, unresolved, person.id, characters).relations }))
         const nodes = storedNodes.map(node => node.actorIds === undefined ? bindNodeCharacters(node, characters) : node)
         const references = resolveReferences(nodes, characters)
         const lineCharacterIds = Object.fromEntries(eventLines.map(line => [line.id, [...new Set(line.nodeIds.flatMap(id => references[id]?.actorIds ?? []))]]))
         const manualMerges = (await db.table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
-        return { characters: projected, locations, nodes, eventLines, lifecycle, locks: lockState(leases, bookId), references, lineCharacterIds, relations, relationEdges, unresolvedRelations: view.unresolved, manualMerges }
+        return { characters: projected, locations, nodes, eventLines, lifecycle, locks: lockState(leases, bookId), references, lineCharacterIds, relations, relationEdges, unresolvedRelations: unresolved, pairs, manualMerges }
       })
     },
     async create<K extends AssetKind>(bookId: string, kind: K, input: AssetInput) { validateInput(kind, input); return (await mutate(bookId, kind, input))! },
     async update<K extends AssetKind>(bookId: string, kind: K, id: string, expectedRevision: number, input: AssetInput) { validateInput(kind, input); return (await mutate(bookId, kind, input, id, expectedRevision))! },
     async remove(bookId: string, kind: AssetKind, id: string, expectedRevision: number) { await mutate(bookId, kind, null, id, expectedRevision) },
+    getRelationPair,
+    async listRelationPairs(bookId: string, ownerId: string, offset = 0, limit = 50) {
+      const db = await database(bookId)
+      return db.transaction('r', db.tables, async () => {
+        const { characters, pairs } = await relationContext(db, bookId, ownerId, ownerId)
+        return paginateCharacterPairs(pairs, characters, ownerId, offset, limit)
+      })
+    },
+    saveRelationPair: (bookId: string, input: RelationPairInput) => mutateRelationPair(bookId, input, 'save'),
+    deleteRelationPair: (bookId: string, input: RelationPairInput) => mutateRelationPair(bookId, input, 'delete'),
     previewMerge, confirmMerge,
   }
 }

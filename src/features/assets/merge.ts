@@ -89,9 +89,9 @@ export function fuseWorldAssets<K extends WorldKind>(kind: K, members: AssetByKi
     }
     profile.ageText = fuseText(people.map(row => row.profile?.ageText))
     character.profile = profile
-    const manual = people.filter(row => row.roleWeightSource === 'manual' && row.roleWeight)
+    const manual = people.filter(row => ['manual', 'agent'].includes(String(row.roleWeightSource ?? '')) && row.roleWeight)
     if (manual.length) {
-      character.roleWeight = manual[0].roleWeight; character.roleWeightSource = 'manual'
+      character.roleWeight = manual[0].roleWeight; character.roleWeightSource = manual[0].roleWeightSource
       if (new Set(manual.map(row => row.roleWeight)).size > 1) conflicts.push(`人物层级冲突：保留${character.roleWeight}`)
     }
     // 关系保存在独立关系表，融合结果不再写内联关系；端点收敛由共同合并核心处理。

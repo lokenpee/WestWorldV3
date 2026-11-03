@@ -3,14 +3,17 @@ import type { JsonValue } from '@earendil-works/pi-ai'
 import type { AgentRepository, Row } from './repository'
 import { canonical, hash, records, resultContracts, strings, summarySchema, text, toolContracts, validate, type Summary } from './contracts'
 import { assertScope, readTool, toolBytes, type Scope } from './queries'
-import { checkLease, commitCommand, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
+import { assetReviewTools, checkLease, commitCommand, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
 
 const tableOf: Record<string, string> = { get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
 export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
   const reads: ReadSet = structuredClone(options.initialReadSet ?? { records: [], queries: [] })
   let summary: Summary | undefined
   let readCalls = 0; let writeCalls = 0
-  const tools: AgentTool[] = toolContracts[scope.profile].map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
+  const contracts = toolContracts[scope.profile].filter(contract => scope.phase === 'asset_review'
+    ? contract.name !== 'commit_asset_changes'
+    : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
+  const tools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
     parameters: scope.phase !== 'optimize' && ((contract.parameters as { properties?: Row }).properties)?.include_facts ? { ...contract.parameters, properties: { ...((contract.parameters as { properties?: Row }).properties), include_facts: { type: 'boolean', const: false } } } : contract.parameters,
     outputSchema: resultContracts.get(contract.name),
     async execute(toolCallId, parameters, signal) {
@@ -56,6 +59,15 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
             const index = reads.records.findIndex(read => read.table === dependency.table && read.id === id)
             if (index < 0) reads.records.push(dependency); else reads.records[index] = dependency
           }
+          if (contract.name === 'get_character_relation') {
+            const data = value.data as Row
+            for (const id of [text(data.fromId), text(data.toId)]) {
+              const row = await store.get('characters', id)
+              const dependency = { table: 'characters', id, resolvedId: row ? id : null, revision: Number(row?.revision ?? 0), factFingerprint: await store.wait(hash(row ?? null)) }
+              const index = reads.records.findIndex(read => read.table === 'characters' && read.id === id)
+              if (index < 0) reads.records.push(dependency); else reads.records[index] = dependency
+            }
+          }
           await saveTask(store, scope, { readSet: reads })
         }); readCalls++
       }
@@ -83,9 +95,16 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         if (unreadLines.length && proposed.status === 'completed') throw new Error(`INVALID_ARGS:已有事件线目录尚未读全，请分页查询后总结；待查询编号：${unreadLines.slice(0, 50).join('、')}`)
         if (!scope.probe) for (const item of proposed.reviewedItems) {
           const work = records((task.input as Row).workItems).find(work => work.workItemId === item.workItemId)
-          const table = ({ character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[text(work?.kind)]
-          if (!work || !reads.records.some(read => read.table === table && (read.id === work.id || read.resolvedId === work.id))) throw new Error('INVALID_ARGS:完成总结须有实际读取依据。')
+          const kind = text(work?.kind)
           const changed = records(task.reviewedItems).some(row => row.workItemId === item.workItemId && row.outcome === 'changed')
+          if (kind === 'relation') {
+            if (!work || !reads.queries.some(query => query.tool === 'get_character_relation')) throw new Error('INVALID_ARGS:关系结论须有实际读取依据。')
+            if (item.outcome === 'changed' && (!actual.length || !changed)) throw new Error('INVALID_ARGS:修改结论缺少该项的真实写入依据。')
+            if (item.outcome === 'no_change' && changed) throw new Error('INVALID_ARGS:该项关系已修改，请在总结中如实说明。')
+            continue
+          }
+          const table = ({ character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[kind]
+          if (!work || !reads.records.some(read => read.table === table && (read.id === work.id || read.resolvedId === work.id))) throw new Error('INVALID_ARGS:完成总结须有实际读取依据。')
           if (item.outcome === 'changed' && (!actual.length || !changed)) throw new Error('INVALID_ARGS:修改结论缺少该项的真实写入依据。')
           if (item.outcome === 'no_change' && changed) throw new Error('INVALID_ARGS:该项资料已修改，请在总结中如实说明。')
         }

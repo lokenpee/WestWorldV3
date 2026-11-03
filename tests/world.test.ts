@@ -68,7 +68,7 @@ async function setup(fetcher = vi.fn<typeof fetch>(), complete = true) {
   await db.table('locations').bulkPut([{ ...person('C1-L001', '青石客栈'), description: '镇上的客栈' }, { ...person('C1-L002', '青石栈'), description: '同一家客栈' }])
   if (complete) await db.table('extractionReceipts').bulkPut(['worldAssets', 'narrativeAssets'].map(step => ({ key: `1:${step}`, bookId: 'a', chapterIndex: '1', substep: step, inputFingerprint: 'fixture', originIds: [], committedAt: book.createdAt, runId: 'extract-fixture' })))
   const assets = createAssetService(workspace); const models = createModelService(workspace, { fetch: fetcher, wait: async (_ms, signal) => signal.throwIfAborted() })
-  const service = createWorldService(workspace, models, assets)
+  const service = createWorldService(workspace, models, assets, { assetReview: false })
   return { workspace, db, book, models, assets, service, fetcher }
 }
 afterEach(async () => { for (const workspace of opened.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
@@ -322,7 +322,7 @@ it.each(['rejected', 'failed'] as const)('整编复核%s时保留原资料并继
     try {
       const copy = await backups.importBackup(pendingBackup!.bytes)
       const before = generated.length
-      const restored = createWorldService(workspace, models, createAssetService(workspace))
+      const restored = createWorldService(workspace, models, createAssetService(workspace), { assetReview: false })
       await restored.start(copy.id)
       expect(restored.state(copy.id)?.error).toBeUndefined()
       expect(generated).toHaveLength(before)
@@ -449,7 +449,7 @@ it('41人物和20地点每批三条排队核实，全部完成后不留待办', 
   const calls = new Map<string, number>(), sizes = new Map<string, number>()
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string); const input = taskInput(body)
-    calls.set(input.taskId, (calls.get(input.taskId) ?? 0) + 1); sizes.set(input.taskId, input.workItems.length)
+    calls.set(input.taskId, (calls.get(input.taskId) ?? 0) + 1); if (input.phase === 'ai_identity') sizes.set(input.taskId, input.workItems.length)
     return reviewedBatch(body, true)
   })
   const { service, db, models, book } = await setup(fetcher)
@@ -487,7 +487,7 @@ it('取消后重建服务从未处理队列继续，复用报告和已核实范�
   expect(previous.coverage?.checked).toBe(1)
   expect(previous.report.usage.totalTokens).toBe(24)
   gate = false
-  const restored = createWorldService(workspace, models, assets)
+  const restored = createWorldService(workspace, models, assets, { assetReview: false })
   await restored.start('a')
   expect(restored.state('a')?.error).toBeUndefined()
   const report = (await restored.reports('a'))[0]

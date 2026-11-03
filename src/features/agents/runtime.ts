@@ -41,7 +41,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     const controller = new AbortController(); const abort = () => controller.abort()
     options.signal?.addEventListener('abort', abort, { once: true }); if (options.signal?.aborted) abort()
     const identity = !options.probe && options.profile === 'asset_editor' && options.phase === 'ai_identity'
-    const resumable = identity || !options.probe && options.profile === 'story_editor'
+    const resumable = identity || !options.probe && (options.profile === 'story_editor' || options.phase === 'asset_review')
     const ceiling = options.probe ? 3 : identity ? 8 : resumable ? 20 : 6
     const maxRequests = Math.min(options.maxRequests ?? ceiling, ceiling)
     const started = Date.now(), duration = identity ? 180000 : resumable ? 300000 : options.timeoutMs ?? 180000
@@ -52,7 +52,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     try {
       controller.signal.throwIfAborted()
       if (!options.probe && (!options.workItems.length || new Set(scope.workItemIds).size !== scope.workItemIds.length || scope.workItemIds.some(id => !id))) throw new Error('INVALID_ARGS:正式任务须提供明确、唯一的分配项。')
-      if (scope.profile === 'asset_editor' && !['ai_identity', 'optimize'].includes(scope.phase) || scope.profile === 'story_editor' && !['window_link', 'global_review'].includes(scope.phase)) throw new Error('SCOPE:职责与任务阶段不一致。')
+      if (scope.profile === 'asset_editor' && !['ai_identity', 'optimize', 'asset_review'].includes(scope.phase) || scope.profile === 'story_editor' && !['window_link', 'global_review'].includes(scope.phase)) throw new Error('SCOPE:职责与任务阶段不一致。')
       await repo.transaction(true, async store => {
         const leases = await store.rows('pipelineRuns')
         if (leases.some(row => row.recordType === 'lease' && (row.lockKey === domainOf(scope) || row.lockKey === 'extraction') && Number(row.expiresAt ?? Infinity) > Date.now() && !(options.retainLease && row.owner === scope.owner && row.runId === scope.runId))) throw new Error('CONFLICT:本书已有任务占用所需资料。')
@@ -65,7 +65,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           loadedMessages = projectSession((await store.rows('storySessionEntries')).filter(row => row.sessionId === scope.sessionId), text(session.leafId) || undefined).messages
         }
         let run = await store.get('pipelineRuns', scope.runId)
-        validate(inputSchema(scope.probe ? 'AgentProbeTask' : scope.profile === 'asset_editor' ? 'IdentityTask' : 'StoryTask'), options.input, 'INVALID_ARGS:任务输入不符合当前职责的契约。')
+        validate(inputSchema(scope.probe ? 'AgentProbeTask' : scope.profile === 'asset_editor' ? (scope.phase === 'asset_review' ? 'AssetReviewTask' : 'IdentityTask') : 'StoryTask'), options.input, 'INVALID_ARGS:任务输入不符合当前职责的契约。')
         if (!scope.probe && (options.input.bookId !== scope.bookId || options.input.runId !== scope.runId || options.input.taskId !== scope.taskId || options.input.phase !== scope.phase || scope.sessionId && options.input.sessionId !== scope.sessionId)) throw new Error('SCOPE:任务输入与绑定范围不一致。')
         if (run && (run.bookId !== scope.bookId || run.stage !== (scope.profile === 'asset_editor' ? 'P2' : 'P3'))) throw new Error('SCOPE:运行编号不属于当前书籍或职责。')
         if (!run) run = { id: scope.runId, recordType: 'run', bookId: scope.bookId, stage: scope.profile === 'asset_editor' ? 'P2' : 'P3', status: 'running', startedAt: timestamp(), planVersion: '2.2', scope: 'fullBook', tasks: [], commandIntents: [], appliedCommands: [], aiMode: 'agent' }

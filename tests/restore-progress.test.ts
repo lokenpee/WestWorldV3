@@ -43,7 +43,7 @@ it('当前格式全流程备份恢复保留有效P2待办、P3完成状态和原
   const book = await importer.importNovel({ fileName: '书信.txt', text: source, byteLength: new TextEncoder().encode(source).length, encoding: 'UTF-8', pattern: DEFAULT_CHAPTER_PATTERN, chapters: splitChapters(source, DEFAULT_CHAPTER_PATTERN) })
   const models = createModelService(workspace, { fetch: fetcher })
   await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://restore-proof.invalid/v1', aggregationContextWindow: 65536 }, 'fake-key')
-  const assets = createAssetService(workspace), extraction = createExtractionService(workspace, models), world = createWorldService(workspace, models, assets), story = createStoryService(workspace, models)
+  const assets = createAssetService(workspace), extraction = createExtractionService(workspace, models), world = createWorldService(workspace, models, assets, { assetReview: false }), story = createStoryService(workspace, models)
   await extraction.start(book.id)
   const person = (await assets.read(book.id)).characters.find(row => row.id === 'C1-P001')!
   await assets.update(book.id, 'character', person.id, person.revision, { background: '人工补充保留' })
@@ -73,7 +73,7 @@ it('当前格式全流程备份恢复保留有效P2待办、P3完成状态和原
   expect(restoredStory.state(restored.id)?.error).toBeUndefined()
   expect(fetcher).toHaveBeenCalledTimes(calls)
   finishWorld = true
-  await createWorldService(workspace, models, assets).start(restored.id)
+  await createWorldService(workspace, models, assets, { assetReview: false }).start(restored.id)
   expect(fetcher.mock.calls.length - calls).toBe(2)
   expect(await copy.table('eventLines').count()).toBe(1)
   expect((await backups.inspectBackup((await backups.exportBook(restored.id)).bytes)).ok).toBe(true)

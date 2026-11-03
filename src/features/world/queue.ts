@@ -9,7 +9,7 @@ export const identityWorkId = (kind: string, id: string) => `ai_identity:fullBoo
 export function identityContent(row: Row | null) {
   if (!row) return null
   const { revision: _revision, updatedAt: _updatedAt, frequency: _frequency, ...content } = row
-  if (row.roleWeightSource !== 'manual') { delete content.roleWeight; delete content.roleWeightSource }
+  if (!['manual', 'agent'].includes(String(row.roleWeightSource ?? ''))) { delete content.roleWeight; delete content.roleWeightSource }
   return content
 }
 export const coverageFingerprint = (table: string, row: Row | null) => hash(['characters', 'locations'].includes(table) ? identityContent(row) : ['nodes', 'eventLines'].includes(table) ? storyContent(table, row) : row)

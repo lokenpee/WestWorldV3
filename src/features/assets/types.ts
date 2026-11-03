@@ -1,5 +1,6 @@
 export type AssetKind = 'character' | 'location' | 'node' | 'eventLine'
 export type RoleWeight = '主要人物' | '重要配角' | 'NPC' | '路人'
+export type RoleWeightSource = 'frequency' | 'manual' | 'agent'
 export const assetLabels: Record<AssetKind, string> = { character: '人物', location: '地点', node: '事件节点', eventLine: '事件线' }
 export const assetTables = { character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines' } as const
 export const roleWeights: RoleWeight[] = ['主要人物', '重要配角', 'NPC', '路人']
@@ -16,7 +17,7 @@ interface WorldAsset extends BaseAsset {
 export interface Character extends WorldAsset {
   identity?: string; appearance?: string; personality?: string; background?: string; speechStyleSample?: string
   profile?: { age?: number; gender?: string; ageText?: string }
-  roleWeight?: RoleWeight; roleWeightSource?: 'frequency' | 'manual'
+  roleWeight?: RoleWeight; roleWeightSource?: RoleWeightSource
   /** 旧版内联关系；版本6起关系保存在 characterRelations，读取时由关系表投影。 */
   relations?: LegacyRelation[]
 }
@@ -63,6 +64,32 @@ export interface UnresolvedRelation {
   forwardLabel: string; reverseLabel: string; direction: RelationDirection
   reason: 'source_missing' | 'target_missing' | 'self'
 }
+/** 一个具体人物对的当前编辑结果；删除仍保存该行。 */
+export interface CharacterRelationEdit {
+  pairKey: string; bookId: string; aId: string; bId: string
+  state: 'active' | 'deleted'
+  aToBLabels: string[]; bToALabels: string[]
+  directionUnclear: boolean
+  evidence: RelationEvidence[]
+  sourceRelationIds: string[]
+  revision: number; updatedAt: string; updatedBy: 'manual' | 'agent'; commitId: string
+}
+/** 人物对的当前有效结果，由原始事实叠加编辑结果生成。 */
+export interface CharacterPairResult {
+  pairKey: string; fromId: string; toId: string
+  forwardLabels: string[]; reverseLabels: string[]
+  state: 'active' | 'deleted' | 'absent'
+  editRevision: number; fingerprint: string
+  evidence: RelationEvidence[]; sourceRelationIds: string[]
+  directionUnclear: boolean
+  endpointRevisions: Record<string, number>
+}
+export interface AssetFieldChange { field: string; before: unknown; after: unknown }
+export interface AssetEditRecord {
+  commitId: string; tool: string; kind: AssetKind | 'relation'; id: string
+  fieldChanges: AssetFieldChange[]; reason: string; evidence: RelationEvidence[]
+  timestamp: string; actor: 'manual' | 'agent'
+}
 export interface AssetByKind { character: Character; location: LocationAsset; node: EventNode; eventLine: EventLine }
 export type Asset = AssetByKind[AssetKind]
 export interface Lifecycle {
@@ -83,6 +110,7 @@ export interface AssetSnapshot {
   characters: Character[]; locations: LocationAsset[]; nodes: EventNode[]; eventLines: EventLine[]
   lifecycle: Lifecycle[]; locks: { world: boolean; narrative: boolean }; references: Record<string, References>; lineCharacterIds: Record<string, string[]>
   relations: CharacterRelation[]; relationEdges: Record<string, RelationEdge[]>; unresolvedRelations: UnresolvedRelation[]
+  pairs: CharacterPairResult[]
   manualMerges: import('./merge').ManualMergeRun[]
 }
 export class AssetError extends Error {
