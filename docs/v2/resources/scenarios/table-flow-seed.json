@@ -1,0 +1,163 @@
+{
+  "bookId": "bk_acceptance",
+  "books": [
+    {
+      "id": "bk_acceptance",
+      "title": "逆推验证样本",
+      "createdAt": "2026-10-21T00:00:00.000Z",
+      "sourceFileName": "逆推验证样本.txt"
+    }
+  ],
+  "canon": {
+    "chapters": [
+      {
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头会面",
+        "charCount": 28,
+        "order": 0
+      },
+      {
+        "bookId": "bk_acceptance",
+        "chapterIndex": "2",
+        "chapterName": "第二章 携信离开",
+        "charCount": 18,
+        "order": 1
+      },
+      {
+        "bookId": "bk_acceptance",
+        "chapterIndex": "3",
+        "chapterName": "第三章 书铺候客",
+        "charCount": 19,
+        "order": 2
+      }
+    ],
+    "chapterTexts": [
+      {
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "text": "第一章 码头会面\n沈青在码头见到顾衡。顾衡将信交给沈青。"
+      }
+    ],
+    "characterSnapshots": [
+      {
+        "id": "C1-P001",
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头会面",
+        "name": "沈青",
+        "confidence": 1,
+        "identity": "人工验证样本人物",
+        "roleWeight": "NPC",
+        "aliases": []
+      },
+      {
+        "id": "C1-P002",
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头会面",
+        "name": "顾衡",
+        "confidence": 1,
+        "identity": "人工验证样本人物",
+        "roleWeight": "NPC",
+        "aliases": []
+      },
+      {
+        "id": "C1-P003",
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头会面",
+        "name": "阿宁",
+        "confidence": 1,
+        "identity": "人工验证样本人物",
+        "roleWeight": "NPC",
+        "aliases": []
+      }
+    ],
+    "locationSnapshots": [
+      {
+        "id": "C1-L001",
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头会面",
+        "name": "码头",
+        "confidence": 1,
+        "description": "人工验证样本地点",
+        "aliases": []
+      },
+      {
+        "id": "C1-L002",
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头会面",
+        "name": "书铺",
+        "confidence": 1,
+        "description": "人工验证样本地点",
+        "aliases": []
+      }
+    ],
+    "nodes": [
+      {
+        "id": "C1-N001",
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头会面",
+        "order": 0,
+        "name": "码头会面",
+        "summary": "沈青在码头见到顾衡。",
+        "process": "沈青在码头见到顾衡。",
+        "quote": "沈青在码头见到顾衡。",
+        "actors": [
+          "沈青",
+          "顾衡"
+        ],
+        "confidence": 1,
+        "createdBy": "P1",
+        "eventLineIds": [
+          "L01"
+        ]
+      },
+      {
+        "id": "C1-N002",
+        "bookId": "bk_acceptance",
+        "chapterIndex": "1",
+        "chapterName": "第一章 码头会面",
+        "order": 1,
+        "name": "交付书信",
+        "summary": "顾衡将信交给沈青。",
+        "process": "顾衡将信交给沈青。",
+        "quote": "顾衡将信交给沈青。",
+        "actors": [
+          "顾衡",
+          "沈青"
+        ],
+        "confidence": 1,
+        "createdBy": "P1",
+        "eventLineIds": [
+          "L01",
+          "L02"
+        ]
+      }
+    ],
+    "eventLines": [
+      {
+        "id": "L01",
+        "bookId": "bk_acceptance",
+        "title": "书信交付",
+        "nodeIds": [
+          "C1-N001",
+          "C1-N002"
+        ],
+        "chapters": [
+          "1"
+        ],
+        "cause": "双方会面",
+        "process": "顾衡交信，沈青离开",
+        "result": "书信交付完成",
+        "lineStatus": "closed",
+        "characterIds": [],
+        "updatedAt": "2026-10-21T00:00:00.000Z"
+      }
+    ]
+  }
+}

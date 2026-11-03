@@ -1,0 +1,12 @@
+{
+  "id": "session_example",
+  "bookId": "bk_acceptance",
+  "profile": "story_editor",
+  "kind": "initial",
+  "title": "初次故事编辑",
+  "status": "active",
+  "leafId": "entry_example",
+  "nextOrdinal": 1,
+  "createdAt": "2000-01-01T00:00:00.000Z",
+  "updatedAt": "2000-01-01T00:00:00.000Z"
+}

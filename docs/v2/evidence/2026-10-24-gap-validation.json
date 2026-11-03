@@ -1,0 +1,841 @@
+{
+  "date": "2026-10-24 Asia/Shanghai",
+  "kind": "contract-validation-not-application-execution",
+  "passed": 206,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "ten-call-definitions",
+      "passed": true
+    },
+    {
+      "name": "no-missing-bindings",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-P1-WORLD",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-P1-WORLD",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-P1-NARRATIVE",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-P1-NARRATIVE",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-P2-IDENTITY",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-P2-IDENTITY",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-P2-CHARACTER",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-P2-CHARACTER",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-P2-LOCATION",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-P2-LOCATION",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-P3-WINDOW",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-P3-WINDOW",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-P3-GLOBAL",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-P3-GLOBAL",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-COMPACT",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-COMPACT",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-PROBE-DIRECT",
+      "passed": true
+    },
+    {
+      "name": "prompt-hash:PROMPT-PROBE-AGENT",
+      "passed": true
+    },
+    {
+      "name": "input-schema:PROMPT-PROBE-AGENT",
+      "passed": true
+    },
+    {
+      "name": "sixteen-request-fixtures",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-P1-WORLD",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P1-WORLD:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-P1-WORLD",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-P1-WORLD",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-P1-NARRATIVE",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P1-NARRATIVE:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-P1-NARRATIVE",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-P1-NARRATIVE",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-P2-IDENTITY",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:query_characters",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:query_locations",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:read_original",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-IDENTITY:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-P2-IDENTITY",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-P2-IDENTITY",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-P2-CHARACTER",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-CHARACTER:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-P2-CHARACTER",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-P2-CHARACTER",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-P2-LOCATION",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P2-LOCATION:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-P2-LOCATION",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-P2-LOCATION",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-P3-WINDOW",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:query_characters",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:query_locations",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:read_original",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-WINDOW:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-P3-WINDOW",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-P3-WINDOW",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-P3-GLOBAL",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:query_characters",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:query_locations",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:read_original",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-P3-GLOBAL:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-P3-GLOBAL",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-P3-GLOBAL",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-COMPACT",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-COMPACT:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-COMPACT",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-COMPACT",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-PROBE-DIRECT",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-PROBE-DIRECT",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-PROBE-DIRECT",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-PROBE-AGENT",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:query_characters",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:query_locations",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:read_original",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-PROBE-AGENT",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-PROBE-AGENT",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:PROMPT-PROBE-AGENT-STORY",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:query_characters",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:query_locations",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:read_original",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:PROMPT-PROBE-AGENT-STORY:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:PROMPT-PROBE-AGENT-STORY",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:PROMPT-PROBE-AGENT-STORY",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:VARIANT-P3-FINAL-ONLY",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-FINAL-ONLY:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:VARIANT-P3-FINAL-ONLY",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:VARIANT-P3-FINAL-ONLY",
+      "passed": true
+    },
+    {
+      "name": "final-only-tools:VARIANT-P3-FINAL-ONLY",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:VARIANT-DIRECT-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-DIRECT-REPAIR:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:VARIANT-DIRECT-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:VARIANT-DIRECT-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:VARIANT-P3-RECOVERY",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:query_characters",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:query_locations",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:read_original",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-RECOVERY:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:VARIANT-P3-RECOVERY",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:VARIANT-P3-RECOVERY",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:VARIANT-P3-WRITE-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:query_characters",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:query_locations",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:read_original",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-WRITE-REPAIR:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:VARIANT-P3-WRITE-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:VARIANT-P3-WRITE-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "fixture-input:VARIANT-P3-FINAL-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "tool-schema:VARIANT-P3-FINAL-REPAIR:submit_result",
+      "passed": true
+    },
+    {
+      "name": "tool-message-pairs:VARIANT-P3-FINAL-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "templates-rendered:VARIANT-P3-FINAL-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "final-only-tools:VARIANT-P3-FINAL-REPAIR",
+      "passed": true
+    },
+    {
+      "name": "execution-record:task",
+      "passed": true
+    },
+    {
+      "name": "execution-record:coverageItem",
+      "passed": true
+    },
+    {
+      "name": "execution-record:preparedIntent",
+      "passed": true
+    },
+    {
+      "name": "new-run-record",
+      "passed": true
+    },
+    {
+      "name": "reject-new-run-without-tasks",
+      "passed": true
+    },
+    {
+      "name": "reject-old-four-field-summary",
+      "passed": true
+    },
+    {
+      "name": "accept-five-field-summary",
+      "passed": true
+    },
+    {
+      "name": "six-recovery-fixtures",
+      "passed": true
+    },
+    {
+      "name": "case-run-schema:GAP-REC-01",
+      "passed": true
+    },
+    {
+      "name": "case-fixed-expectations:GAP-REC-01",
+      "passed": true
+    },
+    {
+      "name": "case-run-schema:GAP-REC-02",
+      "passed": true
+    },
+    {
+      "name": "case-fixed-expectations:GAP-REC-02",
+      "passed": true
+    },
+    {
+      "name": "case-run-schema:GAP-REC-03",
+      "passed": true
+    },
+    {
+      "name": "case-fixed-expectations:GAP-REC-03",
+      "passed": true
+    },
+    {
+      "name": "case-run-schema:GAP-REC-04",
+      "passed": true
+    },
+    {
+      "name": "case-fixed-expectations:GAP-REC-04",
+      "passed": true
+    },
+    {
+      "name": "case-run-schema:GAP-REC-05",
+      "passed": true
+    },
+    {
+      "name": "case-fixed-expectations:GAP-REC-05",
+      "passed": true
+    },
+    {
+      "name": "case-run-schema:GAP-REC-06",
+      "passed": true
+    },
+    {
+      "name": "case-fixed-expectations:GAP-REC-06",
+      "passed": true
+    },
+    {
+      "name": "architecture-ports-typecheck",
+      "passed": true
+    },
+    {
+      "name": "acceptance-runner-syntax",
+      "passed": true
+    },
+    {
+      "name": "runner-refuses-missing-adapter",
+      "passed": true
+    },
+    {
+      "name": "151-application-files-unchanged",
+      "passed": true
+    }
+  ],
+  "applicationExecuted": false,
+  "recoveryCasesExecuted": false,
+  "realModelCalled": false,
+  "independentRebuild": false,
+  "limitations": [
+    "Ajv6 checks the draft-07 compatible subset plus $defs pointers, not all draft2020 features",
+    "Six recovery cases have no rebuilt adapter yet",
+    "Message pairing/Schema checks do not prove provider compatibility or transactional behavior"
+  ]
+}

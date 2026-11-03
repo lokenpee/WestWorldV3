@@ -1,0 +1,184 @@
+{
+  "aliasInput": [
+    "沈青",
+    "青郎"
+  ],
+  "aliasResult": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "groups"
+    ],
+    "properties": {
+      "groups": {
+        "description": "识别出的同人分组。单人不用输出，没有就返回空数组。",
+        "type": "array",
+        "items": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "canonicalName",
+            "names"
+          ],
+          "properties": {
+            "canonicalName": {
+              "anyOf": [
+                {
+                  "const": "沈青",
+                  "type": "string"
+                },
+                {
+                  "const": "青郎",
+                  "type": "string"
+                }
+              ],
+              "description": "从 names 中选择一个本批档案主名，不能使用仅存在于 aliases 中的称呼。"
+            },
+            "names": {
+              "minItems": 2,
+              "uniqueItems": true,
+              "description": "需要合并的至少两份档案的主名。仅填输入 name，已有别名无需再列，代码会保留。",
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "const": "沈青",
+                    "type": "string"
+                  },
+                  {
+                    "const": "青郎",
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "optimizationInput": [
+    {
+      "id": "C1-P001",
+      "name": "沈青",
+      "aliases": [
+        "青郎"
+      ],
+      "facts": [
+        {
+          "id": "F1"
+        },
+        {
+          "id": "F2"
+        }
+      ]
+    }
+  ],
+  "optimizationResult": {
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "entities"
+    ],
+    "properties": {
+      "entities": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "C1-P001"
+        ],
+        "properties": {
+          "C1-P001": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "entity",
+              "covered_fact_ids",
+              "merge_notes"
+            ],
+            "properties": {
+              "entity": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "aliases"
+                ],
+                "properties": {
+                  "name": {
+                    "anyOf": [
+                      {
+                        "const": "沈青",
+                        "type": "string"
+                      },
+                      {
+                        "const": "青郎",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "const": "沈青",
+                          "type": "string"
+                        },
+                        {
+                          "const": "青郎",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  },
+                  "identity": {
+                    "description": "身份 / 职务 / 归属",
+                    "type": "string"
+                  },
+                  "appearance": {
+                    "description": "外貌",
+                    "type": "string"
+                  },
+                  "personality": {
+                    "description": "性格。多条用「；」分隔。**不得遗漏任何快照里的独有信息**",
+                    "type": "string"
+                  },
+                  "background": {
+                    "description": "背景 / 来历",
+                    "type": "string"
+                  }
+                }
+              },
+              "covered_fact_ids": {
+                "minItems": 2,
+                "maxItems": 2,
+                "uniqueItems": true,
+                "description": "列全本人物本次事实编号，即使合并为一句也逐个列出，不得遗漏或重复。",
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "const": "F1",
+                      "type": "string"
+                    },
+                    {
+                      "const": "F2",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "merge_notes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

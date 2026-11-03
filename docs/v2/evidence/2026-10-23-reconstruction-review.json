@@ -1,0 +1,89 @@
+{
+  "scope": "prompt-and-reconstruction-contract-review",
+  "applicationModified": false,
+  "independentRebuildExecuted": false,
+  "realModelCalled": false,
+  "promptCallCount": 10,
+  "promptChecks": [
+    {
+      "callId": "PROMPT-P1-WORLD",
+      "promptExists": true,
+      "hashMatches": true
+    },
+    {
+      "callId": "PROMPT-P1-NARRATIVE",
+      "promptExists": true,
+      "hashMatches": true
+    },
+    {
+      "callId": "PROMPT-P2-IDENTITY",
+      "promptExists": true,
+      "hashMatches": true
+    },
+    {
+      "callId": "PROMPT-P2-CHARACTER",
+      "promptExists": true,
+      "hashMatches": true
+    },
+    {
+      "callId": "PROMPT-P2-LOCATION",
+      "promptExists": true,
+      "hashMatches": true
+    },
+    {
+      "callId": "PROMPT-P3-WINDOW",
+      "promptExists": true,
+      "hashMatches": true
+    },
+    {
+      "callId": "PROMPT-P3-GLOBAL",
+      "promptExists": true,
+      "hashMatches": true
+    },
+    {
+      "callId": "PROMPT-COMPACT",
+      "promptExists": true,
+      "hashMatches": true
+    }
+  ],
+  "findings": {
+    "RQ-01": "partial-prompt-bindings-open",
+    "RQ-02": "two-document-contradictions-corrected-application-not-changed",
+    "RQ-03": "subtask-command-ownership-open",
+    "RQ-04": "versioned-coverage-ledger-open",
+    "RQ-05": "target-probe-protocol-open",
+    "RQ-06": "target-independent-acceptance-open",
+    "RQ-07": "decoupling-proposal-not-implemented",
+    "RQ-08": "known-compatibility-risk-reproduced-pure-function"
+  },
+  "pureProbe": {
+    "function": "twoPassAssetGroups",
+    "input": [
+      {
+        "id": "A",
+        "name": "张三",
+        "aliases": []
+      },
+      {
+        "id": "B",
+        "name": "张三丰",
+        "aliases": []
+      }
+    ],
+    "observedFirst": [
+      [
+        "A",
+        "B"
+      ]
+    ],
+    "observedSecond": [
+      [
+        "A",
+        "B"
+      ]
+    ],
+    "databaseWrites": false,
+    "networkCalls": false
+  },
+  "conclusion": "Not yet a complete unambiguous independent reconstruction package; see 12 RQ-01–08"
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "example-checkpoint-hash",
+    "bookId": "bk_acceptance",
+    "sessionId": "session_example",
+    "stage": "P3",
+    "phase": "window_link",
+    "scopeIds": [
+      "C1-N001"
+    ],
+    "sourceFingerprint": "example-fingerprint",
+    "status": "completed",
+    "memberships": {
+      "C1-N001": [
+        "L01"
+      ]
+    },
+    "updatedAt": "2000-01-01T00:00:00.000Z",
+    "window": {
+      "start": 0,
+      "end": 1
+    },
+    "worldDependencies": [],
+    "queryDependencies": []
+  }
+]

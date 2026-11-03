@@ -1,0 +1,213 @@
+{
+  "documentVersion": "2.2",
+  "date": "2026-10-22 Asia/Shanghai",
+  "scope": "docs/reverse-prd/v2 only",
+  "request": "统一Pi模型调用与Pi Agent执行，应用持久化长期记忆/业务状态并用工具读写",
+  "conflictsResolved": [
+    "raw generation probe bypass",
+    "read-only-only Agent tools",
+    "provider identity and unknown model metadata hard-coded",
+    "Agent final response replaying business writes",
+    "runtime state confused with persistence"
+  ],
+  "addedTargetCases": [
+    "AC-V22-26",
+    "AC-V22-27",
+    "AC-V22-28",
+    "AC-V22-29",
+    "AC-V22-30"
+  ],
+  "applicationSourceChanged": false,
+  "changes": [
+    {
+      "path": "00-阅读入口与术语.md",
+      "change": "modified",
+      "addedLines": 8,
+      "removedLines": 3
+    },
+    {
+      "path": "01-PRD.md",
+      "change": "modified",
+      "addedLines": 10,
+      "removedLines": 1
+    },
+    {
+      "path": "02-架构与技术规格.md",
+      "change": "modified",
+      "addedLines": 33,
+      "removedLines": 4
+    },
+    {
+      "path": "03-Spec-数据与存储.md",
+      "change": "modified",
+      "addedLines": 15,
+      "removedLines": 2
+    },
+    {
+      "path": "04-Spec-流程接口与算法.md",
+      "change": "modified",
+      "addedLines": 15,
+      "removedLines": 4
+    },
+    {
+      "path": "05-Spec-AI与会话.md",
+      "change": "modified",
+      "addedLines": 75,
+      "removedLines": 30
+    },
+    {
+      "path": "06-界面与交互规格.md",
+      "change": "modified",
+      "addedLines": 4,
+      "removedLines": 1
+    },
+    {
+      "path": "07-验收与兼容缺陷.md",
+      "change": "modified",
+      "addedLines": 10,
+      "removedLines": 3
+    },
+    {
+      "path": "08-追溯与验证记录.md",
+      "change": "modified",
+      "addedLines": 3,
+      "removedLines": 0
+    },
+    {
+      "path": "09-操作与自动触发契约.md",
+      "change": "modified",
+      "addedLines": 12,
+      "removedLines": 11
+    },
+    {
+      "path": "10-字段级数据流与状态转移.md",
+      "change": "modified",
+      "addedLines": 11,
+      "removedLines": 9
+    },
+    {
+      "path": "11-AI工具返回与回放契约.md",
+      "change": "modified",
+      "addedLines": 20,
+      "removedLines": 5
+    },
+    {
+      "path": "12-验收执行与覆盖矩阵.md",
+      "change": "modified",
+      "addedLines": 3,
+      "removedLines": 1
+    },
+    {
+      "path": "13-流程变更与冲突对照.md",
+      "change": "modified",
+      "addedLines": 19,
+      "removedLines": 2
+    },
+    {
+      "path": "evidence/v2.2-document-validation.json",
+      "change": "modified",
+      "addedLines": 57,
+      "removedLines": 2
+    },
+    {
+      "path": "resources/README.md",
+      "change": "modified",
+      "addedLines": 3,
+      "removedLines": 1
+    },
+    {
+      "path": "resources/resource-manifest.json",
+      "change": "modified",
+      "addedLines": 34,
+      "removedLines": 28
+    },
+    {
+      "path": "resources/v2.2/acceptance-cases.json",
+      "change": "modified",
+      "addedLines": 65,
+      "removedLines": 0
+    },
+    {
+      "path": "resources/v2.2/ai-runtime-contract.json",
+      "change": "added"
+    },
+    {
+      "path": "resources/v2.2/automatic-triggers.json",
+      "change": "modified",
+      "addedLines": 1,
+      "removedLines": 1
+    },
+    {
+      "path": "resources/v2.2/data-contract.json",
+      "change": "modified",
+      "addedLines": 51,
+      "removedLines": 1
+    },
+    {
+      "path": "resources/v2.2/data-flows.json",
+      "change": "modified",
+      "addedLines": 30,
+      "removedLines": 21
+    },
+    {
+      "path": "resources/v2.2/examples.json",
+      "change": "modified",
+      "addedLines": 23,
+      "removedLines": 1
+    },
+    {
+      "path": "resources/v2.2/model-output-contract.json",
+      "change": "modified",
+      "addedLines": 40,
+      "removedLines": 1
+    },
+    {
+      "path": "resources/v2.2/operation-catalog.json",
+      "change": "modified",
+      "addedLines": 11,
+      "removedLines": 10
+    },
+    {
+      "path": "resources/v2.2/pipeline-contract.json",
+      "change": "modified",
+      "addedLines": 11,
+      "removedLines": 3
+    },
+    {
+      "path": "resources/v2.2/prompts/p2-asset-editor.md",
+      "change": "modified",
+      "addedLines": 6,
+      "removedLines": 2
+    },
+    {
+      "path": "resources/v2.2/prompts/p3-story-editor.md",
+      "change": "modified",
+      "addedLines": 6,
+      "removedLines": 2
+    },
+    {
+      "path": "resources/v2.2/resource-authority.json",
+      "change": "modified",
+      "addedLines": 3,
+      "removedLines": 1
+    },
+    {
+      "path": "resources/v2.2/tool-contracts.json",
+      "change": "modified",
+      "addedLines": 701,
+      "removedLines": 2
+    },
+    {
+      "path": "resources/v2.2/tool-results.schema.json",
+      "change": "modified",
+      "addedLines": 726,
+      "removedLines": 1
+    },
+    {
+      "path": "scripts/validate-v2.2.py",
+      "change": "modified",
+      "addedLines": 17,
+      "removedLines": 3
+    }
+  ]
+}

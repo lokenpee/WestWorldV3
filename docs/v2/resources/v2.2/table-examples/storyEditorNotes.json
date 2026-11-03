@@ -1,0 +1,30 @@
+[
+  {
+    "id": "SN000001",
+    "bookId": "bk_acceptance",
+    "sessionId": "session_example",
+    "revision": 1,
+    "stage": "P3",
+    "key": "会面",
+    "kind": "decision",
+    "status": "active",
+    "statement": "会面属于书信交付线。",
+    "nodeIds": [
+      "C1-N001"
+    ],
+    "lineIds": [
+      "L01"
+    ],
+    "evidence": [],
+    "basisFingerprint": "example-fingerprint",
+    "createdAt": "2000-01-01T00:00:00.000Z",
+    "updatedAt": "2000-01-01T00:00:00.000Z",
+    "phase": "window_link",
+    "window": {
+      "start": 0,
+      "end": 1
+    },
+    "worldDependencies": [],
+    "queryDependencies": []
+  }
+]

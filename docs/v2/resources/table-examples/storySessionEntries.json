@@ -1,0 +1,14 @@
+{
+  "id": "entry_example",
+  "bookId": "bk_acceptance",
+  "sessionId": "session_example",
+  "ordinal": 0,
+  "parentId": null,
+  "createdAt": "2000-01-01T00:00:00.000Z",
+  "type": "message",
+  "message": {
+    "role": "user",
+    "content": "核对第一章。",
+    "timestamp": 946684800000
+  }
+}

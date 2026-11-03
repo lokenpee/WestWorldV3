@@ -1,0 +1,9 @@
+- banner:
+  - generic: WestWorld V2
+  - button "资产"
+  - button "游玩" [active]
+  - button "设置"
+- main:
+  - paragraph: 还没有开始游玩。这里将来是对话窗口。
+  - textbox "我想做什么…"
+  - button "发送" [disabled]

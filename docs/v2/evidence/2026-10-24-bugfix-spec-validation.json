@@ -1,0 +1,78 @@
+{
+  "kind": "fix-first-specification-validation",
+  "policyRevision": "2026-10-24.fix-first",
+  "passed": 16,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "twenty-dispositions",
+      "passed": true
+    },
+    {
+      "name": "fix-first-policy",
+      "passed": true
+    },
+    {
+      "name": "names-only-candidates",
+      "passed": true
+    },
+    {
+      "name": "reject-old-no-evidence-group",
+      "passed": true
+    },
+    {
+      "name": "reject-low-confidence",
+      "passed": true
+    },
+    {
+      "name": "accept-structurally-valid-evidence",
+      "passed": true
+    },
+    {
+      "name": "reject-empty-evidence",
+      "passed": true
+    },
+    {
+      "name": "journal-uses-existing-settings-table",
+      "passed": true
+    },
+    {
+      "name": "reject-unowned-journal",
+      "passed": true
+    },
+    {
+      "name": "reject-ready-without-book",
+      "passed": true
+    },
+    {
+      "name": "seventeen-triggers",
+      "passed": true
+    },
+    {
+      "name": "missing-original-error",
+      "passed": true
+    },
+    {
+      "name": "reference-projection:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "reference-projection:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "six-frozen-regressions",
+      "passed": true
+    },
+    {
+      "name": "application-files-unchanged",
+      "passed": true
+    }
+  ],
+  "applicationTestsRun": false,
+  "modelCalls": 0,
+  "limitations": [
+    "JSON Schema checks do not validate literary identity or quote existence against a live database",
+    "Six regression fixtures require a rebuilt application adapter; not executed here"
+  ]
+}

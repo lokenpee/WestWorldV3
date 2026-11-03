@@ -1,0 +1,703 @@
+{
+  "seed": {
+    "bookId": "bk_acceptance",
+    "books": [
+      {
+        "id": "bk_acceptance",
+        "title": "逆推验证样本",
+        "createdAt": "2026-10-21T00:00:00.000Z",
+        "sourceFileName": "逆推验证样本.txt"
+      }
+    ],
+    "canon": {
+      "chapters": [
+        {
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "chapterName": "第一章 码头会面",
+          "charCount": 28,
+          "order": 0
+        },
+        {
+          "bookId": "bk_acceptance",
+          "chapterIndex": "2",
+          "chapterName": "第二章 携信离开",
+          "charCount": 18,
+          "order": 1
+        },
+        {
+          "bookId": "bk_acceptance",
+          "chapterIndex": "3",
+          "chapterName": "第三章 书铺候客",
+          "charCount": 19,
+          "order": 2
+        }
+      ],
+      "chapterTexts": [
+        {
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "text": "第一章 码头会面\n沈青在码头见到顾衡。顾衡将信交给沈青。"
+        }
+      ],
+      "characterSnapshots": [
+        {
+          "id": "C1-P001",
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "chapterName": "第一章 码头会面",
+          "name": "沈青",
+          "confidence": 1,
+          "identity": "人工验证样本人物",
+          "roleWeight": "NPC",
+          "aliases": []
+        },
+        {
+          "id": "C1-P002",
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "chapterName": "第一章 码头会面",
+          "name": "顾衡",
+          "confidence": 1,
+          "identity": "人工验证样本人物",
+          "roleWeight": "NPC",
+          "aliases": []
+        },
+        {
+          "id": "C1-P003",
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "chapterName": "第一章 码头会面",
+          "name": "阿宁",
+          "confidence": 1,
+          "identity": "人工验证样本人物",
+          "roleWeight": "NPC",
+          "aliases": []
+        }
+      ],
+      "locationSnapshots": [
+        {
+          "id": "C1-L001",
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "chapterName": "第一章 码头会面",
+          "name": "码头",
+          "confidence": 1,
+          "description": "人工验证样本地点",
+          "aliases": []
+        },
+        {
+          "id": "C1-L002",
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "chapterName": "第一章 码头会面",
+          "name": "书铺",
+          "confidence": 1,
+          "description": "人工验证样本地点",
+          "aliases": []
+        }
+      ],
+      "nodes": [
+        {
+          "id": "C1-N001",
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "chapterName": "第一章 码头会面",
+          "order": 0,
+          "name": "码头会面",
+          "summary": "沈青在码头见到顾衡。",
+          "process": "沈青在码头见到顾衡。",
+          "quote": "沈青在码头见到顾衡。",
+          "actors": [
+            "沈青",
+            "顾衡"
+          ],
+          "confidence": 1,
+          "createdBy": "P1",
+          "eventLineIds": [
+            "L01"
+          ]
+        },
+        {
+          "id": "C1-N002",
+          "bookId": "bk_acceptance",
+          "chapterIndex": "1",
+          "chapterName": "第一章 码头会面",
+          "order": 1,
+          "name": "交付书信",
+          "summary": "顾衡将信交给沈青。",
+          "process": "顾衡将信交给沈青。",
+          "quote": "顾衡将信交给沈青。",
+          "actors": [
+            "顾衡",
+            "沈青"
+          ],
+          "confidence": 1,
+          "createdBy": "P1",
+          "eventLineIds": [
+            "L01",
+            "L02"
+          ]
+        }
+      ],
+      "eventLines": [
+        {
+          "id": "L01",
+          "bookId": "bk_acceptance",
+          "title": "书信交付",
+          "nodeIds": [
+            "C1-N001",
+            "C1-N002"
+          ],
+          "chapters": [
+            "1"
+          ],
+          "cause": "双方会面",
+          "process": "顾衡交信，沈青离开",
+          "result": "书信交付完成",
+          "lineStatus": "closed",
+          "characterIds": [],
+          "updatedAt": "2026-10-21T00:00:00.000Z"
+        }
+      ],
+      "storyEditorMemory": [
+        {
+          "id": "session_example",
+          "bookId": "bk_acceptance",
+          "sessionId": "session_example",
+          "revision": 1,
+          "workingSummary": "已核对第一章。",
+          "dataFingerprint": "example-fingerprint",
+          "updatedAt": "2000-01-01T00:00:00.000Z"
+        }
+      ],
+      "storyEditorNotes": [
+        {
+          "id": "SN000001",
+          "bookId": "bk_acceptance",
+          "sessionId": "session_example",
+          "revision": 1,
+          "stage": "P2",
+          "key": "会面",
+          "kind": "decision",
+          "status": "active",
+          "statement": "会面属于书信交付线。",
+          "nodeIds": [
+            "C1-N001"
+          ],
+          "lineIds": [
+            "L01"
+          ],
+          "evidence": [],
+          "basisFingerprint": "example-fingerprint",
+          "createdAt": "2000-01-01T00:00:00.000Z",
+          "updatedAt": "2000-01-01T00:00:00.000Z"
+        }
+      ],
+      "storyEditorCheckpoints": [
+        {
+          "id": "example-checkpoint-hash",
+          "bookId": "bk_acceptance",
+          "sessionId": "session_example",
+          "stage": "P2",
+          "phase": "link",
+          "scopeIds": [
+            "C1-N001"
+          ],
+          "sourceFingerprint": "example-fingerprint",
+          "status": "completed",
+          "memberships": {
+            "C1-N001": [
+              "L01"
+            ]
+          },
+          "updatedAt": "2000-01-01T00:00:00.000Z"
+        }
+      ],
+      "storySessions": [
+        {
+          "id": "session_example",
+          "bookId": "bk_acceptance",
+          "profile": "story_editor",
+          "kind": "initial",
+          "title": "初次故事编辑",
+          "status": "active",
+          "leafId": "entry_example",
+          "nextOrdinal": 1,
+          "createdAt": "2000-01-01T00:00:00.000Z",
+          "updatedAt": "2000-01-01T00:00:00.000Z"
+        }
+      ],
+      "storySessionEntries": [
+        {
+          "id": "entry_example",
+          "bookId": "bk_acceptance",
+          "sessionId": "session_example",
+          "ordinal": 0,
+          "parentId": null,
+          "createdAt": "2000-01-01T00:00:00.000Z",
+          "type": "message",
+          "message": {
+            "role": "user",
+            "content": "核对第一章。",
+            "timestamp": 946684800000
+          }
+        }
+      ]
+    }
+  },
+  "records": [
+    {
+      "name": "query_nodes",
+      "args": {},
+      "success": {
+        "data": [
+          {
+            "id": "C1-N001",
+            "name": "码头会面",
+            "summary": "沈青在码头见到顾衡。",
+            "actors": [
+              "沈青",
+              "顾衡"
+            ],
+            "chapterIndex": "1"
+          },
+          {
+            "id": "C1-N002",
+            "name": "交付书信",
+            "summary": "顾衡将信交给沈青。",
+            "actors": [
+              "顾衡",
+              "沈青"
+            ],
+            "chapterIndex": "1"
+          }
+        ],
+        "totalCount": 2,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "get_node_detail",
+      "args": {
+        "ids": [
+          "C1-N001"
+        ]
+      },
+      "success": {
+        "data": [
+          {
+            "id": "C1-N001",
+            "bookId": "bk_acceptance",
+            "chapterIndex": "1",
+            "chapterName": "第一章 码头会面",
+            "order": 0,
+            "name": "码头会面",
+            "summary": "沈青在码头见到顾衡。",
+            "process": "沈青在码头见到顾衡。",
+            "quote": "沈青在码头见到顾衡。",
+            "actors": [
+              "沈青",
+              "顾衡"
+            ],
+            "confidence": 1,
+            "createdBy": "P1",
+            "eventLineIds": [
+              "L01"
+            ]
+          }
+        ],
+        "totalCount": 1,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "query_event_lines",
+      "args": {},
+      "success": {
+        "data": [
+          {
+            "id": "L01",
+            "title": "书信交付",
+            "chapters": [
+              "1"
+            ],
+            "lineStatus": "closed",
+            "cause": "双方会面",
+            "result": "书信交付完成",
+            "nodeCount": 2
+          }
+        ],
+        "totalCount": 1,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "get_event_line_detail",
+      "args": {
+        "ids": [
+          "L01"
+        ]
+      },
+      "success": {
+        "data": [
+          {
+            "id": "L01",
+            "bookId": "bk_acceptance",
+            "title": "书信交付",
+            "nodeIds": [
+              "C1-N001",
+              "C1-N002"
+            ],
+            "chapters": [
+              "1"
+            ],
+            "cause": "双方会面",
+            "process": "顾衡交信，沈青离开",
+            "result": "书信交付完成",
+            "lineStatus": "closed",
+            "characterIds": [],
+            "updatedAt": "2026-10-21T00:00:00.000Z"
+          }
+        ],
+        "totalCount": 1,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "query_characters",
+      "args": {},
+      "success": {
+        "data": [
+          {
+            "id": "C1-P001",
+            "name": "沈青",
+            "aliases": [],
+            "identity": "人工验证样本人物",
+            "sourceChapters": [
+              "1"
+            ]
+          },
+          {
+            "id": "C1-P002",
+            "name": "顾衡",
+            "aliases": [],
+            "identity": "人工验证样本人物",
+            "sourceChapters": [
+              "1"
+            ]
+          },
+          {
+            "id": "C1-P003",
+            "name": "阿宁",
+            "aliases": [],
+            "identity": "人工验证样本人物",
+            "sourceChapters": [
+              "1"
+            ]
+          }
+        ],
+        "totalCount": 3,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "get_character_detail",
+      "args": {
+        "ids": [
+          "C1-P001"
+        ]
+      },
+      "success": {
+        "data": [
+          {
+            "id": "C1-P001",
+            "bookId": "bk_acceptance",
+            "chapterIndex": "1",
+            "chapterName": "第一章 码头会面",
+            "name": "沈青",
+            "confidence": 1,
+            "identity": "人工验证样本人物",
+            "roleWeight": "NPC",
+            "aliases": []
+          }
+        ],
+        "totalCount": 1,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "query_locations",
+      "args": {},
+      "success": {
+        "data": [
+          {
+            "id": "C1-L001",
+            "bookId": "bk_acceptance",
+            "chapterIndex": "1",
+            "chapterName": "第一章 码头会面",
+            "name": "码头",
+            "confidence": 1,
+            "description": "人工验证样本地点",
+            "aliases": []
+          },
+          {
+            "id": "C1-L002",
+            "bookId": "bk_acceptance",
+            "chapterIndex": "1",
+            "chapterName": "第一章 码头会面",
+            "name": "书铺",
+            "confidence": 1,
+            "description": "人工验证样本地点",
+            "aliases": []
+          }
+        ],
+        "totalCount": 2,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "read_original",
+      "args": {
+        "chapter_range": [
+          "1",
+          "1"
+        ],
+        "maxChars": 12
+      },
+      "success": {
+        "text": "\n【章节 1：第一章 码",
+        "totalChars": 45,
+        "truncated": true,
+        "nextOffset": 12
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "get_editor_memory",
+      "args": {
+        "session_id": "session_example"
+      },
+      "success": {
+        "memory": {
+          "id": "session_example",
+          "bookId": "bk_acceptance",
+          "sessionId": "session_example",
+          "revision": 1,
+          "workingSummary": "已核对第一章。",
+          "dataFingerprint": "example-fingerprint",
+          "updatedAt": "2000-01-01T00:00:00.000Z"
+        },
+        "dataChanged": true,
+        "pendingCount": 0,
+        "staleCount": 1,
+        "notes": [
+          {
+            "id": "SN000001",
+            "key": "会面",
+            "kind": "decision",
+            "status": "active",
+            "statement": "会面属于书信交付线。",
+            "nodeIds": [
+              "C1-N001"
+            ],
+            "lineIds": [
+              "L01"
+            ],
+            "validity": "stale",
+            "truncated": false
+          }
+        ],
+        "recentCheckpoints": [
+          {
+            "id": "example-checkpoint-hash",
+            "stage": "P2",
+            "phase": "link",
+            "status": "completed",
+            "scopeCount": 1,
+            "updatedAt": "2000-01-01T00:00:00.000Z"
+          }
+        ]
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "query_editor_notes",
+      "args": {
+        "session_id": "session_example"
+      },
+      "success": {
+        "data": [
+          {
+            "id": "SN000001",
+            "bookId": "bk_acceptance",
+            "sessionId": "session_example",
+            "revision": 1,
+            "stage": "P2",
+            "key": "会面",
+            "kind": "decision",
+            "status": "active",
+            "statement": "会面属于书信交付线。",
+            "nodeIds": [
+              "C1-N001"
+            ],
+            "lineIds": [
+              "L01"
+            ],
+            "evidence": [],
+            "basisFingerprint": "example-fingerprint",
+            "createdAt": "2000-01-01T00:00:00.000Z",
+            "updatedAt": "2000-01-01T00:00:00.000Z",
+            "validity": "stale"
+          }
+        ],
+        "totalCount": 1,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "get_editor_note_detail",
+      "args": {
+        "ids": [
+          "SN000001"
+        ],
+        "session_id": "session_example"
+      },
+      "success": {
+        "data": [
+          {
+            "id": "SN000001",
+            "bookId": "bk_acceptance",
+            "sessionId": "session_example",
+            "revision": 1,
+            "stage": "P2",
+            "key": "会面",
+            "kind": "decision",
+            "status": "active",
+            "statement": "会面属于书信交付线。",
+            "nodeIds": [
+              "C1-N001"
+            ],
+            "lineIds": [
+              "L01"
+            ],
+            "evidence": [],
+            "basisFingerprint": "example-fingerprint",
+            "createdAt": "2000-01-01T00:00:00.000Z",
+            "updatedAt": "2000-01-01T00:00:00.000Z",
+            "validity": "stale"
+          }
+        ],
+        "totalCount": 1,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "list_editor_sessions",
+      "args": {},
+      "success": {
+        "data": [
+          {
+            "id": "session_example",
+            "title": "初次故事编辑",
+            "kind": "initial",
+            "status": "active",
+            "entryCount": 1,
+            "createdAt": "2000-01-01T00:00:00.000Z",
+            "updatedAt": "2000-01-01T00:00:00.000Z"
+          }
+        ],
+        "totalCount": 1,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    },
+    {
+      "name": "query_editor_session_history",
+      "args": {
+        "session_id": "session_example",
+        "mode": "full"
+      },
+      "success": {
+        "data": [
+          {
+            "id": "entry_example",
+            "bookId": "bk_acceptance",
+            "sessionId": "session_example",
+            "ordinal": 0,
+            "parentId": null,
+            "createdAt": "2000-01-01T00:00:00.000Z",
+            "type": "message",
+            "message": {
+              "role": "user",
+              "content": "核对第一章。",
+              "timestamp": 946684800000
+            }
+          }
+        ],
+        "totalCount": 1,
+        "truncated": false,
+        "nextOffset": null
+      },
+      "invalid": {
+        "error": "INVALID_ARGS",
+        "message": "/unsupported_parameter: Unexpected property"
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "checksumPass": true,
+  "formatVersion": 4,
+  "counts": {
+    "chapters": 3,
+    "characterSnapshots": 3,
+    "locationSnapshots": 2,
+    "characters": 3,
+    "locations": 2,
+    "nodes": 4,
+    "eventLines": 2
+  },
+  "editedIdentity": "逆推验证：已编辑并保存",
+  "ageText": "约二十岁",
+  "nodeActorIds": [
+    [
+      "P001",
+      "P002"
+    ],
+    [
+      "P002",
+      "P001"
+    ],
+    [
+      "P001"
+    ],
+    [
+      "P003"
+    ]
+  ],
+  "lineCharacterIds": [
+    [
+      "P001",
+      "P002"
+    ],
+    [
+      "P002",
+      "P001"
+    ]
+  ],
+  "noCredentialFiles": true,
+  "note": "Synthetic fixture; no real AI extraction was executed."
+}

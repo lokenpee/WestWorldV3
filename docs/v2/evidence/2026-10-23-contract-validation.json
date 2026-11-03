@@ -1,0 +1,1316 @@
+{
+  "checkedAt": "2026-10-24T09:19:04.645Z",
+  "kind": "documentation-only",
+  "validator": "Ajv 6, draft-07 compatible keyword subset; $defs resolved by JSON pointer",
+  "applicationTestsRun": false,
+  "independentRebuildRun": false,
+  "passed": 325,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "18-table-count",
+      "passed": true
+    },
+    {
+      "name": "storage-and-data-definitions-identical",
+      "passed": true
+    },
+    {
+      "name": "document-table:credentials",
+      "passed": true
+    },
+    {
+      "name": "sample:credentials:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:appSettings",
+      "passed": true
+    },
+    {
+      "name": "sample:appSettings:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:books",
+      "passed": true
+    },
+    {
+      "name": "sample:books:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:chapters",
+      "passed": true
+    },
+    {
+      "name": "sample:chapters:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:chapterTexts",
+      "passed": true
+    },
+    {
+      "name": "sample:chapterTexts:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:nodes",
+      "passed": true
+    },
+    {
+      "name": "sample:nodes:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:eventLines",
+      "passed": true
+    },
+    {
+      "name": "sample:eventLines:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:characters",
+      "passed": true
+    },
+    {
+      "name": "sample:characters:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:locations",
+      "passed": true
+    },
+    {
+      "name": "sample:locations:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:compileProgress",
+      "passed": true
+    },
+    {
+      "name": "sample:compileProgress:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:storyEditorMemory",
+      "passed": true
+    },
+    {
+      "name": "sample:storyEditorMemory:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:storyEditorNotes",
+      "passed": true
+    },
+    {
+      "name": "sample:storyEditorNotes:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:storyEditorCheckpoints",
+      "passed": true
+    },
+    {
+      "name": "sample:storyEditorCheckpoints:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:storySessions",
+      "passed": true
+    },
+    {
+      "name": "sample:storySessions:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:storySessionEntries",
+      "passed": true
+    },
+    {
+      "name": "sample:storySessionEntries:0",
+      "passed": true
+    },
+    {
+      "name": "document-table:extractionReceipts",
+      "passed": true
+    },
+    {
+      "name": "sample:extractionReceipts:0",
+      "passed": true
+    },
+    {
+      "name": "sample:extractionReceipts:1",
+      "passed": true
+    },
+    {
+      "name": "document-table:assetLifecycle",
+      "passed": true
+    },
+    {
+      "name": "sample:assetLifecycle:0",
+      "passed": true
+    },
+    {
+      "name": "sample:assetLifecycle:1",
+      "passed": true
+    },
+    {
+      "name": "sample:assetLifecycle:2",
+      "passed": true
+    },
+    {
+      "name": "sample:assetLifecycle:3",
+      "passed": true
+    },
+    {
+      "name": "document-table:pipelineRuns",
+      "passed": true
+    },
+    {
+      "name": "sample:pipelineRuns:0",
+      "passed": true
+    },
+    {
+      "name": "sample:pipelineRuns:1",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:query_characters",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:query_locations",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:read_original",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:asset_editor:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:query_characters",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:query_characters",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:query_locations",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:query_locations",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "shared-declaration:read_original",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:read_original",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "profile-parameter-validation:story_editor:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "business-tool-count",
+      "passed": true
+    },
+    {
+      "name": "profile-counts",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "document-tool:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "document-tool:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:get_node_detail",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "document-tool:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:query_event_lines",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "document-tool:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:get_event_line_detail",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:query_characters",
+      "passed": true
+    },
+    {
+      "name": "document-tool:query_characters",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:query_characters",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:query_characters",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:query_characters",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "document-tool:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:get_character_detail",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:query_locations",
+      "passed": true
+    },
+    {
+      "name": "document-tool:query_locations",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:query_locations",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:query_locations",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:query_locations",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:read_original",
+      "passed": true
+    },
+    {
+      "name": "document-tool:read_original",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:read_original",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:read_original",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:read_original",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "document-tool:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:get_editor_memory",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "document-tool:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:query_editor_notes",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "document-tool:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:get_editor_note_detail",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "document-tool:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:list_editor_sessions",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "document-tool:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:query_editor_session_history",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "document-tool:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "document-tool:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "declaration-and-result-input:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "document-tool:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "output-schema-compile:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "error-schema-compile:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "target-result-validation:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "reject-character-P3-source",
+      "passed": true
+    },
+    {
+      "name": "reject-location-fact-without-text",
+      "passed": true
+    },
+    {
+      "name": "reject-lineStatus-misnaming",
+      "passed": true
+    },
+    {
+      "name": "reject-deleted-with-currentId",
+      "passed": true
+    },
+    {
+      "name": "accept-deleted-tombstone",
+      "passed": true
+    },
+    {
+      "name": "reject-model-bookId:query_nodes",
+      "passed": true
+    },
+    {
+      "name": "reject-model-bookId:query_locations",
+      "passed": true
+    },
+    {
+      "name": "reject-model-bookId:get_location_detail",
+      "passed": true
+    },
+    {
+      "name": "reject-empty-detail-ids",
+      "passed": true
+    },
+    {
+      "name": "write-ack:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "write-oversize-error:commit_asset_changes",
+      "passed": true
+    },
+    {
+      "name": "write-ack:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "write-oversize-error:commit_story_changes",
+      "passed": true
+    },
+    {
+      "name": "finalizer-ack",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/.gitignore",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/eslint.config.js",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/index.html",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/package.json",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/pnpm-lock.yaml",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/README.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tsconfig.app.json",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tsconfig.json",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tsconfig.node.json",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/vite.config.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/licenses/PI-MIT.txt",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/public/favicon.svg",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/public/icons.svg",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/scripts/check-page.mjs",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/scripts/e2e-check.mjs",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/scripts/live-pipeline.config.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/scripts/live-pipeline.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/scripts/render-prompt-schema.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/App.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/index.css",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/main.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/agent/profiles.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/agent/run.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/assets/edit.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/assets/library.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/config/settings.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/db/canon.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/db/repo.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/db/settings.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/db/stores.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/events/bus.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/events/types.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/export/export-book.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/export/import-book.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/export/local-file.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/export/manifest.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/graph/build-network.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/graph/chapter-timeline.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/graph/layout.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/llm/call.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/llm/credentials.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/llm/errors.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/llm/models.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/llm/normalize-result.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/llm/probe.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/llm/provider.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/memory/story-editor.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/asset-frequency.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/asset-merge-policy.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/character-merge-policy.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/compilation-lock.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/decode-text.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/import-book.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/merge-characters.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/p1.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/pool.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/publish.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/run-all.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/run-link.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/run-merge.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/run-p1.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/run-test-stage.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/split-chapters.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/pipeline/try-one.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/index.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/extraction/01-extract-world-assets.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/extraction/02-extract-narrative-assets.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/merge/03-merge-world-assets.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/merge/04-link-event-lines.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/merge/05-detect-alias-groups.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/merge/06-merge-locations.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/merge/08-optimize-characters.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/prompts/session/07-compact-story-session.md",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/book.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/character-snapshot.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/character.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/common.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/editor-memory.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/event-line.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/extraction.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/index.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/link.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/location-snapshot.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/merge.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/node.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/story-session.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/schema/validate.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/session/compaction.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/session/pi-context.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/session/store.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/shared/fuse-assets.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/tools/compile-tools.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/core/tools/types.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/app-shell/AppShell.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/assets/AssetDetail.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/assets/AssetFields.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/assets/AssetsPanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/assets/BookSidebar.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/assets/EditorMemoryPanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/assets/local-file-export.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/assets/SessionHistory.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/assets/TryOnePanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/compile/CompilePanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/compile/StageTestPanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/import/ImportPanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/network/NetworkPanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/play/PlayPanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/settings/SettingsPanel.tsx",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/store/compile-store.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/features/store/ui-store.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/src/queries/index.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/agent-run.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/asset-delete-references.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/asset-fields.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/asset-frequency.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/asset-library.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/assets-edit.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/backup.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/canon-migration.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/chapter-timeline.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/character-merge-policy.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/compile-regressions.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/compile-tools.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/credentials.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/db.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/graph-network.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/import-book.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/llm-call.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/llm-credential-wiring.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/llm-errors.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/llm-probe.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/llm-session-wiring.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/local-file-export.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/locations.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/merge-characters.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/normalize-result.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/p1.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/pool.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/prompt-schema-sync.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/publish.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/run-all.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/run-link.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/run-merge.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/run-p1.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/schema.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/setup.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/smoke.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/split-chapters.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/story-editor-memory.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/story-session.test.ts",
+      "passed": true
+    },
+    {
+      "name": "app-unchanged:app/tests/test-stages.test.ts",
+      "passed": true
+    },
+    {
+      "name": "no-field-placeholder",
+      "passed": true
+    }
+  ],
+  "limitations": [
+    "Native FileSystemDirectoryHandle requires browser validation",
+    "Pi original-message extension content follows locked SDK protocol, not arbitrary JSON business data",
+    "No target database migration, model call, browser concurrency or independent app execution"
+  ]
+}

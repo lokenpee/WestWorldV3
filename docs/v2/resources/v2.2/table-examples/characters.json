@@ -1,0 +1,20 @@
+[
+  {
+    "id": "C1-P001",
+    "bookId": "bk_acceptance",
+    "chapterIndex": "1",
+    "chapterName": "第一章 码头会面",
+    "name": "沈青",
+    "confidence": 1,
+    "identity": "人工验证样本人物",
+    "roleWeight": "NPC",
+    "aliases": [],
+    "revision": 1,
+    "createdBy": "P1",
+    "nameSource": "extracted",
+    "manualKeep": false,
+    "sourceChapters": [
+      "1"
+    ]
+  }
+]

@@ -1,0 +1,89 @@
+- banner:
+  - generic: WestWorld V2
+  - button "资产"
+  - button "游玩"
+  - button "设置"
+- main:
+  - complementary "资产书架":
+    - generic: 资产书架 2
+    - button "＋ 导入小说"
+    - list:
+      - button "进入 逆推验证样本（导入）":
+        - generic: 逆推验证样本（导入）
+        - generic: 已入库 · 3 章/块
+        - generic: 3 人物 · 2 地点 · 4 节点 · 2 线
+      - button "进入"
+      - button "导出 逆推验证样本（导入）": 导出
+      - button "删除 逆推验证样本（导入）": 删除
+      - button "进入 逆推验证样本":
+        - generic: 逆推验证样本
+        - generic: 已导入 · 3 章/块
+        - generic: 0 人物 · 0 地点 · 0 节点 · 0 线
+      - button "进入"
+      - button "导出 逆推验证样本": 导出
+      - button "删除 逆推验证样本": 删除
+    - generic: 导出目录：尚未选择
+    - generic "E:\\WestWorldV2\\exports": 建议选择项目下 exports 文件夹
+    - button "选择导出目录"
+    - paragraph: 删除整本资产会清理该书的浏览器数据，已导出的文件保留。
+  - generic: 全书合并与检查
+  - generic: 2 / 2 步骤 · 失败 0 · 费用估算 0.0000
+  - generic: 15:26:35
+  - text: 入库：3 人物 / 2 地点 / 4 节点 / 2 事件线
+  - generic: 15:26:35
+  - text: 入库完成：3 人物 / 2 地点
+  - paragraph: 分阶段测试（临时）
+  - paragraph: 按顺序运行，每步后都可查看和修改草稿。P1/P2 默认处理前 100 章（含长章全部切块）；P3 检查当前全部已提取资产，不提取剩余章节。检查通过后可手动修改并入库。
+  - button "P1 提取前 100 章资产"
+  - button "P2 合并世界资产"
+  - button "P2 串联事件线"
+  - button "P3 整体检查"
+  - button "人物3"
+  - button "地点2"
+  - button "事件节点4"
+  - button "事件线2"
+  - button "事件网络" [active]
+  - button "编辑记忆"
+  - generic "入库后生成固定资产，游戏只读这一份；再点一次入库会用当前草稿生成新的一份": 资产包：3 人物
+  - button "试跑一章"
+  - button "重新检查全部"
+  - button "入库"
+  - button "导入另一本"
+  - text: 已入库：3 人物 · 2 地点
+  - button "知道了"
+  - button "全部 4 节点"
+  - generic: 散落 1
+  - button "书信交付"
+  - button "来信线索"
+  - generic: 章节为原文出现顺序；虚线表示线内先后，不表示因果
+  - application:
+    - generic "码头会面 沈青在码头见到顾衡。":
+      - generic: C1-N001
+      - generic: 线内节点
+      - generic: 码头会面
+      - generic: 第 1 章 · 顺序 1
+    - generic "交付书信 顾衡将信交给沈青。":
+      - generic: C1-N002
+      - generic: 共有 · 2 条线
+      - generic: 交付书信
+      - generic: 第 1 章 · 顺序 2
+    - generic "携信离开 沈青携信离开码头。":
+      - generic: C2-N001
+      - generic: 线内节点
+      - generic: 携信离开
+      - generic: 第 2 章 · 顺序 1
+    - generic "书铺候客 阿宁在书铺等候来客。":
+      - generic: C3-N001
+      - generic: 散落节点
+      - generic: 书铺候客
+      - generic: 第 3 章 · 顺序 1
+    - generic "章节时间轴":
+      - generic: 第 1 章
+      - generic: 第 2 章
+      - generic: 第 3 章
+    - generic "Control Panel":
+      - button "Zoom In":
+      - button "Zoom Out":
+      - button "Fit View":
+    - button "查看全图"
+    - button "回到起点 · 1:1"

@@ -1,0 +1,1152 @@
+[
+  {
+    "id": "OP-01",
+    "label": "切换顶层标签",
+    "page": "外壳",
+    "event": "click 资产/游玩/设置",
+    "inputs": "目标view枚举",
+    "guard": "始终可点",
+    "reads": [],
+    "writes": [
+      "内存ui.activeView"
+    ],
+    "steps": "同步setActiveView；条件挂载对应面板；不调用模型",
+    "success": "URL不变，目标组件出现",
+    "error": "无专设错误态",
+    "repeat": "离开游玩销毁消息，离开设置丢未保存表单；编译核心异步仍运行",
+    "flow": null
+  },
+  {
+    "id": "OP-02",
+    "label": "选择书籍/进入",
+    "page": "书架",
+    "event": "click卡片或进入",
+    "inputs": "book.id",
+    "guard": "sidebar.blocked=false",
+    "reads": [
+      "T03.id/title",
+      "选中书各库列表"
+    ],
+    "writes": [
+      "内存ui.bookId/selectedAssetId",
+      "局部showImport=false"
+    ],
+    "steps": "setBookId清全局选择；key=bookId工作台重挂载并响应式查询",
+    "success": "列表/章/进度切换本书",
+    "error": "查询错误无全局ErrorBoundary",
+    "repeat": "切书清工作台局部详情；global compile-store不自动按书隔离",
+    "flow": null
+  },
+  {
+    "id": "OP-03",
+    "label": "打开导入页",
+    "page": "书架/工作台",
+    "event": "click＋导入小说/导入另一本",
+    "inputs": "无",
+    "guard": "书架blocked=false；工作台按钮依R/P/running禁用",
+    "reads": [],
+    "writes": [
+      "局部showImport=true"
+    ],
+    "steps": "仅改变右侧面板；当前bookId不清空",
+    "success": "导入面板出现",
+    "error": "无",
+    "repeat": "已有当前书仍在，可通过书架再次进入",
+    "flow": null
+  },
+  {
+    "id": "OP-04",
+    "label": "修改分章正则",
+    "page": "导入",
+    "event": "input change",
+    "inputs": "原样字符串chapterRegex",
+    "guard": "!busy",
+    "reads": [
+      "局部preview.chapterRegex"
+    ],
+    "writes": [
+      "局部chapterRegex/error=null"
+    ],
+    "steps": "仅设置输入；不分章、不发模型",
+    "success": "旧预览保留；值不同则显示过期提示并禁用导入",
+    "error": "无即时语法校验",
+    "repeat": "每次编辑都要求apply后才可用新预览",
+    "flow": null
+  },
+  {
+    "id": "OP-05",
+    "label": "应用/恢复默认正则",
+    "page": "导入",
+    "event": "click apply/default",
+    "inputs": "当前字符串；default使用默认正则.toString",
+    "guard": "!busy",
+    "reads": [
+      "局部preview.decode.text/bytes"
+    ],
+    "writes": [
+      "局部preview.chapters/chapterRegex,error"
+    ],
+    "steps": "parseChapterRegex；有preview则splitChapters，成功替换预览；default同时改输入",
+    "success": "新预览有效",
+    "error": "catch显示具体错误，旧preview不替换",
+    "repeat": "无持久写入，未选文件仍可检查正则",
+    "flow": null
+  },
+  {
+    "id": "OP-06",
+    "label": "选择或拖放TXT",
+    "page": "导入",
+    "event": "file change/drop",
+    "inputs": "首个File，arrayBuffer→decodeBytes；parse当前regex",
+    "guard": "file选择器accept=.txt；drop不复验后缀，无busy统一禁止",
+    "reads": [
+      "本地所选文件"
+    ],
+    "writes": [
+      "局部preview={fileName,bytes,decode,chapters,chapterRegex},error"
+    ],
+    "steps": "parse→await arrayBuffer→decode→split；顺序不调用模型",
+    "success": "UTF8/GBK、章名/长度/总数显示前200条",
+    "error": "catch error字符串显示，未清旧preview",
+    "repeat": "drop只读第一文件；不保存完整bytes到DB",
+    "flow": "DF-01"
+  },
+  {
+    "id": "OP-07",
+    "label": "按UTF8/GBK重读",
+    "page": "导入",
+    "event": "click编码按钮",
+    "inputs": "preview.bytes+所选encoding",
+    "guard": "preview存在；无busy额外禁用",
+    "reads": [
+      "原始文件bytes"
+    ],
+    "writes": [
+      "局部preview.decode/chapters/chapterRegex,error"
+    ],
+    "steps": "decodeWith→用当前regex分章→替换预览",
+    "success": "编码和预览刷新",
+    "error": "catch显示，原预览保留",
+    "repeat": "不修改原文件，不发模型",
+    "flow": null
+  },
+  {
+    "id": "OP-08",
+    "label": "换一个文件",
+    "page": "导入",
+    "event": "click",
+    "inputs": "无",
+    "guard": "没有额外busy禁用",
+    "reads": [],
+    "writes": [
+      "局部preview=null"
+    ],
+    "steps": "清预览，不清regex",
+    "success": "回到无预览",
+    "error": "无",
+    "repeat": "下次选择仍用当前regex",
+    "flow": null
+  },
+  {
+    "id": "OP-09",
+    "label": "仅导入",
+    "page": "导入",
+    "event": "click仅导入",
+    "inputs": "newUUID书ID、去扩展文件title、preview.decode.text、regex",
+    "guard": "!busy、预览匹配regex且章数>0",
+    "reads": [
+      "局部preview"
+    ],
+    "writes": [
+      "T03整条",
+      "T04/T05整章",
+      "T12.P1初始进度",
+      "内存bookId"
+    ],
+    "steps": "busy=true→检查预览→await importBook→setBookId→compileStore.reset→回调关导入选人物",
+    "success": "进入空草稿工作台；无模型请求",
+    "error": "catch导入错误，finally busy=false；跨库失败可留书架",
+    "repeat": "不去重同名书；每次新ID",
+    "flow": "DF-01"
+  },
+  {
+    "id": "OP-10",
+    "label": "导入并完整提取",
+    "page": "导入",
+    "event": "click完整提取",
+    "inputs": "同仅导入+signal=beginRun()",
+    "guard": "同仅导入",
+    "reads": [
+      "同上"
+    ],
+    "writes": [
+      "同上",
+      "后续T06–T09/T12–T17"
+    ],
+    "steps": "先await导入并选书，再不await地runAll；catch流水线失败写日志/failed；回调立刻进工作台",
+    "success": "立即显示处理界面；完成依事件更新",
+    "error": "导入catch回面板；任务catch全局日志，已导入保留",
+    "repeat": "切页不自动cancel；关闭页面中断",
+    "flow": "DF-02"
+  },
+  {
+    "id": "OP-11",
+    "label": "切换资产分类",
+    "page": "工作台",
+    "event": "click六标签",
+    "inputs": "assetTab=characters/locations/nodes/lines/network/memory",
+    "guard": "始终可用",
+    "reads": [
+      "当前书对应查询"
+    ],
+    "writes": [
+      "内存assetTab",
+      "局部selected=null"
+    ],
+    "steps": "同步选标签、清详情",
+    "success": "显示对应列表/图/记忆",
+    "error": "空态依类型",
+    "repeat": "任务中可切换，不中断任务",
+    "flow": null
+  },
+  {
+    "id": "OP-12",
+    "label": "筛选人物层级",
+    "page": "人物列表",
+    "event": "click全部/四层级",
+    "inputs": "roleFilter",
+    "guard": "无运行禁用",
+    "reads": [
+      "T06.roleWeight（缺省按NPC）"
+    ],
+    "writes": [
+      "局部roleFilter"
+    ],
+    "steps": "内存过滤已加载快照，不修改数据库",
+    "success": "符合层级的人物列表",
+    "error": "空结果仍人物空态",
+    "repeat": "筛选状态随工作台卸载重置",
+    "flow": null
+  },
+  {
+    "id": "OP-13",
+    "label": "打开资产详情",
+    "page": "四列表/图",
+    "event": "click行或图节点",
+    "inputs": "选中对象快照asset={kind,item}",
+    "guard": "有对象；不检查compile锁",
+    "reads": [
+      "T06/T07/T08/T09当前查询对象"
+    ],
+    "writes": [
+      "局部selected/toEditable表单"
+    ],
+    "steps": "设置局部选中；详情根据kind初始化值",
+    "success": "右384px详情栏",
+    "error": "无独立取详情加载API",
+    "repeat": "selected保存旧对象；列表更新不替换它，BUG-16",
+    "flow": null
+  },
+  {
+    "id": "OP-14",
+    "label": "编辑表单输入",
+    "page": "资产详情",
+    "event": "input/textarea change",
+    "inputs": "UI-05字段到values[key]原字符串",
+    "guard": "无统一任务/必填校验",
+    "reads": [
+      "局部values"
+    ],
+    "writes": [
+      "局部values"
+    ],
+    "steps": "仅修改对应表单键；普通输入不自动保存",
+    "success": "显示输入值",
+    "error": "无即时required错误",
+    "repeat": "切标签/关闭无未保存提示；尚未持久化",
+    "flow": null
+  },
+  {
+    "id": "OP-15",
+    "label": "保存人物",
+    "page": "人物详情",
+    "event": "click保存",
+    "inputs": "主名/别名/身份/profile.ageText/四文本/原话；CSV拆逗号trim，字符串仅trim判空",
+    "guard": "!saving",
+    "reads": [
+      "T06整条及mergeFacts/cache"
+    ],
+    "writes": [
+      "T06对应字段/updatedAt",
+      "四文本变化时mergeFacts/optimizedFactIds/optimizationFingerprint"
+    ],
+    "steps": "saving→fromEditable→await updateCharacterSnapshot事务→savedAt；onChanged无实际重读详情",
+    "success": "列表通过useLiveQuery刷新，页脚已保存；普通文本局部值保留",
+    "error": "finally恢复saving；无统一catch toast",
+    "repeat": "不统一Schema校验；空必填可undefined，P3不失效",
+    "flow": "DF-06"
+  },
+  {
+    "id": "OP-16",
+    "label": "保存地点",
+    "page": "地点详情",
+    "event": "click保存",
+    "inputs": "name/aliases/description同表单转换",
+    "guard": "!saving",
+    "reads": [
+      "T07被选行"
+    ],
+    "writes": [
+      "T07三字段/updatedAt"
+    ],
+    "steps": "await updateLocationSnapshot→savedAt；原详情只读区仍旧对象",
+    "success": "列表刷新，已保存",
+    "error": "无专设错误UI，finally解saving",
+    "repeat": "不即时同步T11",
+    "flow": "DF-06"
+  },
+  {
+    "id": "OP-17",
+    "label": "保存事件节点",
+    "page": "节点详情",
+    "event": "click保存",
+    "inputs": "name/summary/process/actors/time_text/time_hint/targets/world_delta/new_facts/started_actions",
+    "guard": "!saving",
+    "reads": [
+      "局部values，T08行按id更新"
+    ],
+    "writes": [
+      "T08提交patch（未自动更新actorIds/eventLineIds）"
+    ],
+    "steps": "fromEditable→await updateNode→已保存；运行时patch含UI字段，不被较窄TS别名过滤",
+    "success": "列表/图读新节点；详情只读区可旧",
+    "error": "无完整Schema/原文校验，无统一catch",
+    "repeat": "不自动重算T09派生或更新P3标记",
+    "flow": "DF-06"
+  },
+  {
+    "id": "OP-18",
+    "label": "保存事件线",
+    "page": "线详情",
+    "event": "click保存",
+    "inputs": "title/cause/process/result",
+    "guard": "!saving",
+    "reads": [
+      "局部values"
+    ],
+    "writes": [
+      "T09四文本，不统一updatedAt"
+    ],
+    "steps": "await updateEventLine→savedAt",
+    "success": "线列表/图标题可变",
+    "error": "无统一catch；finally解saving",
+    "repeat": "不修改nodeIds，不重算派生",
+    "flow": "DF-06"
+  },
+  {
+    "id": "OP-19",
+    "label": "即时改变人物层级",
+    "page": "人物详情",
+    "event": "select change",
+    "inputs": "roleWeight值，当前id/bookId",
+    "guard": "无saving/任务统一禁用",
+    "reads": [
+      "当前selected快照"
+    ],
+    "writes": [
+      "T06.roleWeight/roleWeightSource=manual/updatedAt",
+      "局部savedAt"
+    ],
+    "steps": "await setCharacterRoleWeight→setSavedAt→onChanged空回调",
+    "success": "列表新层级；旧详情Select可回显旧层级，关闭重开才读新",
+    "error": "无统一catch",
+    "repeat": "不待保存按钮；不得自动改为整表单提交",
+    "flow": "DF-06"
+  },
+  {
+    "id": "OP-20",
+    "label": "即时改变事件线状态",
+    "page": "线详情",
+    "event": "select change",
+    "inputs": "open/closed",
+    "guard": "无统一禁用",
+    "reads": [
+      "当前selected线"
+    ],
+    "writes": [
+      "T09.lineStatus",
+      "局部savedAt"
+    ],
+    "steps": "await updateEventLine→setSavedAt",
+    "success": "列表状态变化，旧详情Select回显规则同BUG-16",
+    "error": "无统一catch",
+    "repeat": "不自动写updatedAt或修改正文",
+    "flow": "DF-06"
+  },
+  {
+    "id": "OP-21",
+    "label": "选择并入目标/并入",
+    "page": "人物地点详情",
+    "event": "select change→click并入",
+    "inputs": "目标keepId、mergeIds=[当前id]",
+    "guard": "目标非空才启按钮；仅同类非自己",
+    "reads": [
+      "T06或T07目标及当前全记录"
+    ],
+    "writes": [
+      "同表目标融合put+其余delete"
+    ],
+    "steps": "await merge；缺目标抛错；成功清mergeTarget，onChanged，关闭详情",
+    "success": "目标保留，数量减少，资料融合",
+    "error": "无二次确认或全局catch",
+    "repeat": "不可撤销；不改已入库实体",
+    "flow": "DF-07"
+  },
+  {
+    "id": "OP-22",
+    "label": "关闭详情",
+    "page": "资产详情",
+    "event": "click关闭",
+    "inputs": "无",
+    "guard": "始终",
+    "reads": [],
+    "writes": [
+      "局部selected=null"
+    ],
+    "steps": "卸载详情，不保存",
+    "success": "右栏消失",
+    "error": "无",
+    "repeat": "未保存输入丢弃；持久即时变更保留",
+    "flow": null
+  },
+  {
+    "id": "OP-23",
+    "label": "删除人物/地点草稿",
+    "page": "人物地点列表",
+    "event": "click删除，stopPropagation",
+    "inputs": "当前bookId/id/kind",
+    "guard": "无运行统一禁用",
+    "reads": [
+      "当前对象id"
+    ],
+    "writes": [
+      "T06或T07 delete单行",
+      "局部selected=null"
+    ],
+    "steps": "void调用delete；同步清详情；不打开确认",
+    "success": "列表订阅数量变化",
+    "error": "未统一catch可能产生未处理错误",
+    "repeat": "不删实体/文本称呼/原节点",
+    "flow": "DF-07"
+  },
+  {
+    "id": "OP-24",
+    "label": "删除节点",
+    "page": "节点列表",
+    "event": "click删除",
+    "inputs": "bookId/node.id",
+    "guard": "无统一禁用",
+    "reads": [
+      "T08全部",
+      "T09全部"
+    ],
+    "writes": [
+      "T08删除并重算eventLineIds",
+      "T09有效成员/chapters/timeRange/characterIds，删空线"
+    ],
+    "steps": "事务内删节点→逐线过滤/派生/删空→重建节点归属；UI同步清selected",
+    "success": "节点/图/线数量和引用一致",
+    "error": "事务失败回滚，无统一toast",
+    "repeat": "不清人物/地点",
+    "flow": "DF-08"
+  },
+  {
+    "id": "OP-25",
+    "label": "删除事件线",
+    "page": "线列表",
+    "event": "click删除",
+    "inputs": "bookId/line.id",
+    "guard": "无统一禁用",
+    "reads": [
+      "T08.eventLineIds"
+    ],
+    "writes": [
+      "T09删除线",
+      "T08移除该归属"
+    ],
+    "steps": "节点+线事务；UI清selected",
+    "success": "节点仍在，散落状态可能增加",
+    "error": "事务失败回滚",
+    "repeat": "无二次确认，不删成员节点",
+    "flow": "DF-08"
+  },
+  {
+    "id": "OP-26",
+    "label": "展开只读字段/事实/经过",
+    "page": "详情/试跑/历史",
+    "event": "native details toggle",
+    "inputs": "对应details",
+    "guard": "内容存在",
+    "reads": [
+      "当前selected或result/entry；不是每次回读DB"
+    ],
+    "writes": [
+      "局部原生details开闭"
+    ],
+    "steps": "字段为Schema+record键并集；复杂值JSON2缩进；历史另分页",
+    "success": "展开指定只读内容",
+    "error": "undefined/null→未填写",
+    "repeat": "无业务写入；旧selected可旧显示",
+    "flow": null
+  },
+  {
+    "id": "OP-27",
+    "label": "开始完整流程/重新检查",
+    "page": "工作台",
+    "event": "click继续/重新检查",
+    "inputs": "bookId,signal=beginRun(),recheck=progress.completed&&!testScope",
+    "guard": "!rerunning且C≠running",
+    "reads": [
+      "T04/T12–T17及所有草稿/原文"
+    ],
+    "writes": [
+      "T06–T09/T12–T17",
+      "全局compileStore"
+    ],
+    "steps": "rerunning=true→await runAll；事件更新；catch日志/failed；finally false",
+    "success": "按钮恢复，日志和阶段结果；P1完成章仍跳过",
+    "error": "同书锁冲突/任务错写日志，不清已提交资产",
+    "repeat": "按计划/会话恢复，不是重提全书",
+    "flow": "DF-02"
+  },
+  {
+    "id": "OP-28",
+    "label": "执行分阶段按钮",
+    "page": "工作台",
+    "event": "click四阶段之一",
+    "inputs": "step=p1/p2-merge/p2-link/p3、bookId、beginRun.signal",
+    "guard": "!R/P/T、C≠running、无局部active",
+    "reads": [
+      "T04/T12及执行相关表"
+    ],
+    "writes": [
+      "相应草稿/进度/会话；先删除旧P3，p1另删P2"
+    ],
+    "steps": "先选人物或线并清详情，active=step→await runTestStage→catchfailed日志→finally active=null",
+    "success": "仅跑所选步，P3样本testScope可入库",
+    "error": "非P1样本P1不全则报错，无强制P2前序",
+    "repeat": "成功阶段写草稿，不是沙盒",
+    "flow": "DF-03"
+  },
+  {
+    "id": "OP-29",
+    "label": "取消编译",
+    "page": "进度条",
+    "event": "click取消",
+    "inputs": "当前AbortController",
+    "guard": "仅显示状态running",
+    "reads": [
+      "内存controller"
+    ],
+    "writes": [
+      "signal.aborted；任务后续T12 cancelled/批checkpoint"
+    ],
+    "steps": "同步abort；已提交不撤销；任务检查signal决定何时退出",
+    "success": "最终cancelled提示可继续",
+    "error": "退避sleep本身不中断，可能延后",
+    "repeat": "不强制先显示cancelling，不关标签代替取消",
+    "flow": "DF-02"
+  },
+  {
+    "id": "OP-30",
+    "label": "入库",
+    "page": "工作台",
+    "event": "click入库/入库测试草稿",
+    "inputs": "当前bookId",
+    "guard": "!publishing、C≠running、最近进度P3 completed",
+    "reads": [
+      "T06/T07/T08/T09当前草稿"
+    ],
+    "writes": [
+      "T10/T11清表重建",
+      "T08.actorIds",
+      "T09.characterIds"
+    ],
+    "steps": "publishing=true→await publishCanon四表事务→setPublishedNote→finallyfalse",
+    "success": "人物地点数量/未匹配数量提示；标识按固定人物>0",
+    "error": "无底层P3/待复核再次校验，无统一catch",
+    "repeat": "重复替换而不叠加；不保历史版本",
+    "flow": "DF-09"
+  },
+  {
+    "id": "OP-31",
+    "label": "关闭入库提示",
+    "page": "工作台",
+    "event": "click知道了",
+    "inputs": "无",
+    "guard": "提示存在",
+    "reads": [],
+    "writes": [
+      "局部publishedNote=null"
+    ],
+    "steps": "仅隐藏提示",
+    "success": "提示消失",
+    "error": "无",
+    "repeat": "不影响资产",
+    "flow": null
+  },
+  {
+    "id": "OP-32",
+    "label": "打开/关闭单章试跑",
+    "page": "工作台/试跑",
+    "event": "click试跑一章或关闭",
+    "inputs": "bookId",
+    "guard": "打开!R/P/running；关闭不禁running",
+    "reads": [
+      "当前书id"
+    ],
+    "writes": [
+      "局部trying=true/false"
+    ],
+    "steps": "打开只挂载；关闭销毁，不发abort",
+    "success": "试跑弹窗或返回工作台",
+    "error": "无",
+    "repeat": "关闭在途不停止请求，最终结果不写草稿",
+    "flow": null
+  },
+  {
+    "id": "OP-33",
+    "label": "开始/重跑单章",
+    "page": "试跑弹窗",
+    "event": "click开始试跑/重跑",
+    "inputs": "bookId，底层默认第一章",
+    "guard": "!running",
+    "reads": [
+      "T04首order章",
+      "T05正文"
+    ],
+    "writes": [
+      "仅局部result/running/error"
+    ],
+    "steps": "running=true→await tryOneChapter完整章两请求→result→finallyfalse",
+    "success": "原文前2000、资产、时长、费用、失败详情",
+    "error": "catch显示错误，结果包含子步骤失败",
+    "repeat": "重跑不写入DB，不缓存到书籍",
+    "flow": "DF-04"
+  },
+  {
+    "id": "OP-34",
+    "label": "图的高亮/全部",
+    "page": "事件网络",
+    "event": "click线名或全部节点",
+    "inputs": "line.id或null",
+    "guard": "有节点",
+    "reads": [
+      "T08/T09派生graph"
+    ],
+    "writes": [
+      "局部highlight"
+    ],
+    "steps": "同一线再次点清高亮；无此线时active=null",
+    "success": "其他节点/边淡化，不移除",
+    "error": "无",
+    "repeat": "不持久、不改线成员",
+    "flow": null
+  },
+  {
+    "id": "OP-35",
+    "label": "图缩放/平移/全图/起点",
+    "page": "事件网络",
+    "event": "ReactFlow controls/drag背景",
+    "inputs": "viewport或fit命令",
+    "guard": "图存在",
+    "reads": [
+      "graph尺寸/章刻度"
+    ],
+    "writes": [
+      "局部ReactFlow viewport"
+    ],
+    "steps": "min0.08 max2；全图padding.15；起点x20/y0/zoom1；250ms动画",
+    "success": "章轴同步，<.65简化卡片",
+    "error": "无专设错误",
+    "repeat": "不拖节点不手动连线；不存布局偏好",
+    "flow": null
+  },
+  {
+    "id": "OP-36",
+    "label": "选择故事会话",
+    "page": "编辑记忆",
+    "event": "select change",
+    "inputs": "空=当前或archived.id",
+    "guard": "报告已加载",
+    "reads": [
+      "T16",
+      "T13/T14/T15/T17按session"
+    ],
+    "writes": [
+      "局部selection/page=0"
+    ],
+    "steps": "刷新查询指定同书会话；旧会话提示不代表当前通过",
+    "success": "摘要/记录/历史按会话显示",
+    "error": "底层不存在会话抛错，UI无统一兜底",
+    "repeat": "不激活旧会话，不回滚资产",
+    "flow": null
+  },
+  {
+    "id": "OP-37",
+    "label": "切换工作/完整会话视图",
+    "page": "编辑记忆",
+    "event": "click视图按钮",
+    "inputs": "work/history",
+    "guard": "可见",
+    "reads": [
+      "记忆报告或T17"
+    ],
+    "writes": [
+      "局部view"
+    ],
+    "steps": "切视图挂载工作区或SessionHistory",
+    "success": "对应内容显示",
+    "error": "未加载为空数组/读取提示",
+    "repeat": "SessionHistory局部page随卸载重置",
+    "flow": null
+  },
+  {
+    "id": "OP-38",
+    "label": "筛选与翻页工作记录",
+    "page": "编辑记忆",
+    "event": "click all/decision/review/pending/stale、上一页下一页",
+    "inputs": "filter/page",
+    "guard": "页界禁用",
+    "reads": [
+      "T14查询视图validity/status/kind"
+    ],
+    "writes": [
+      "局部filter/page"
+    ],
+    "steps": "筛选后page0，按50分页，页数随数据夹限",
+    "success": "列表和计数；空分类提示",
+    "error": "无",
+    "repeat": "pending是review active；stale按validity，不是持久status",
+    "flow": null
+  },
+  {
+    "id": "OP-39",
+    "label": "历史翻页与长条目分段",
+    "page": "完整会话",
+    "event": "click上一页下一页/上一段下一段",
+    "inputs": "page/offset",
+    "guard": "页界/段界禁用",
+    "reads": [
+      "T17 ordinal序列及JSON"
+    ],
+    "writes": [
+      "局部page/offset"
+    ],
+    "steps": "30条/页；单条JSON每12000字符；details原生展开",
+    "success": "精确条目/字符范围",
+    "error": "无",
+    "repeat": "不改压缩边界或原始记录",
+    "flow": null
+  },
+  {
+    "id": "OP-40",
+    "label": "编辑模型配置",
+    "page": "设置",
+    "event": "input四字段change",
+    "inputs": "baseUrl/extraction/aggregation/window字符串",
+    "guard": "无全局任务禁用",
+    "reads": [
+      "局部表单"
+    ],
+    "writes": [
+      "局部对应字段"
+    ],
+    "steps": "不自动保存、不用于下一次探测直到save",
+    "success": "显示未保存值",
+    "error": "无即时完整校验",
+    "repeat": "离开设置丢草稿；保存Key的refresh也可能覆盖",
+    "flow": null
+  },
+  {
+    "id": "OP-41",
+    "label": "保存模型配置",
+    "page": "设置",
+    "event": "click保存配置",
+    "inputs": "trim地址/两模型，window空undefined否则Number",
+    "guard": "window若提供须整数≥8192",
+    "reads": [
+      "T02.llm.config原值"
+    ],
+    "writes": [
+      "T02.llm.config.value和updatedAt"
+    ],
+    "steps": "校验窗口→await setLlmConfig merge→success行及2200ms提示",
+    "success": "已保存；空地址读取时回官方",
+    "error": "非法窗口提示不写；其他异常无统一catch",
+    "repeat": "不把Key一起保存；无额外busy禁用",
+    "flow": "DF-12"
+  },
+  {
+    "id": "OP-42",
+    "label": "输入/保存Key",
+    "page": "设置",
+    "event": "password change→click保存",
+    "inputs": "apiKeyDraft.trim",
+    "guard": "保存按钮仅trim非空",
+    "reads": [
+      "T01当前provider"
+    ],
+    "writes": [
+      "T01.deepseek.credential",
+      "局部Key输入清空"
+    ],
+    "steps": "await saveApiKey→清输入→await refresh全配置/Keyhint/concurrency→flash",
+    "success": "只显示掩码尾4，短Key全掩码",
+    "error": "无统一catch",
+    "repeat": "不触网；不更改导出数据",
+    "flow": "DF-12"
+  },
+  {
+    "id": "OP-43",
+    "label": "清除Key",
+    "page": "设置",
+    "event": "click清除",
+    "inputs": "provider=deepseek",
+    "guard": "configured=true",
+    "reads": [
+      "T01"
+    ],
+    "writes": [
+      "T01 delete provider"
+    ],
+    "steps": "await remove→refresh→flash",
+    "success": "测试禁用，hint消失",
+    "error": "无统一catch",
+    "repeat": "不清资产/其他配置",
+    "flow": "DF-12"
+  },
+  {
+    "id": "OP-44",
+    "label": "拉取模型",
+    "page": "设置",
+    "event": "click拉取模型",
+    "inputs": "保存的URL+Key",
+    "guard": "无loading禁用；无Key服务会报错",
+    "reads": [
+      "T01/T02"
+    ],
+    "writes": [
+      "仅局部catalog/model输入/status"
+    ],
+    "steps": "loading→await GET /models→去重排序；当前输入不在目录则暂选第一",
+    "success": "数量成功行，尚需保存配置",
+    "error": "catch错误行；空目录单独提示",
+    "repeat": "不自动持久模型选项；可能重复触发",
+    "flow": "DF-13"
+  },
+  {
+    "id": "OP-45",
+    "label": "测试提取模型",
+    "page": "设置",
+    "event": "click测试提取",
+    "inputs": "保存URL/Key/extractionModel",
+    "guard": "按钮!configured禁用；handler loading时不执行",
+    "reads": [
+      "T01/T02"
+    ],
+    "writes": [
+      "局部status"
+    ],
+    "steps": "最小文本HTTP请求，显示elapsed与detail截取",
+    "success": "2xx可空回复也成功；不证明工具提取",
+    "error": "catch或非ok错误行",
+    "repeat": "不保存会话/资产",
+    "flow": "DF-13"
+  },
+  {
+    "id": "OP-46",
+    "label": "测试归并工具",
+    "page": "设置",
+    "event": "click测试归并",
+    "inputs": "保存归并模型，Schema{ok:true}",
+    "guard": "!configured或loading禁用",
+    "reads": [
+      "T01/T02；工具声明不查小说"
+    ],
+    "writes": [
+      "局部status"
+    ],
+    "steps": "runAgent最多2轮30s；工具execute固定PROBE_ONLY",
+    "success": "必须有效submit_result才成功",
+    "error": "错误原样部分截取显示",
+    "repeat": "不建持久故事会话、不写业务资产",
+    "flow": "DF-13"
+  },
+  {
+    "id": "OP-47",
+    "label": "修改/保存并发",
+    "page": "设置",
+    "event": "number change→click保存",
+    "inputs": "Number(input.value)；round+clamp",
+    "guard": "没有额外busy/NaN显式防护",
+    "reads": [
+      "T02现值"
+    ],
+    "writes": [
+      "T02.compile.concurrency和updatedAt"
+    ],
+    "steps": "await setConcurrency→refresh所有设置→flash",
+    "success": "显示保存后数值",
+    "error": "无统一catch",
+    "repeat": "未保存不影响任务；新任务读取保存配置",
+    "flow": "DF-12"
+  },
+  {
+    "id": "OP-48",
+    "label": "清空日志",
+    "page": "设置",
+    "event": "click清空日志窗口",
+    "inputs": "无",
+    "guard": "无",
+    "reads": [],
+    "writes": [
+      "仅compileStore.logs=[]"
+    ],
+    "steps": "同步clearLogs",
+    "success": "日志区空",
+    "error": "无",
+    "repeat": "不清数据库会话、进度或费用",
+    "flow": null
+  },
+  {
+    "id": "OP-49",
+    "label": "预览备份文件",
+    "page": "设置数据",
+    "event": "file change",
+    "inputs": "Uint8Array(await file.arrayBuffer())",
+    "guard": "file label未按全局busy禁用",
+    "reads": [
+      "本地ZIP"
+    ],
+    "writes": [
+      "局部importPreview.bytes/inspect"
+    ],
+    "steps": "await inspectBackup→设置preview；input.value立即清供重选",
+    "success": "显示标题/固定实体统计/确认取消或错误列表",
+    "error": "handlePickBackup无catch，畸形统计JSON可未处理拒绝",
+    "repeat": "不写库直到确认",
+    "flow": "DF-10"
+  },
+  {
+    "id": "OP-50",
+    "label": "确认/取消备份导入",
+    "page": "设置数据",
+    "event": "click确认/取消",
+    "inputs": "缓存preview.bytes",
+    "guard": "确认inspect.ok且!busy；取消无busy统一限制",
+    "reads": [
+      "ZIP内容"
+    ],
+    "writes": [
+      "T03新书",
+      "目标新书T04–T17",
+      "ui.bookId"
+    ],
+    "steps": "busy→await importBackup→setBookId→清preview→flash→finallyfalse；取消只清preview",
+    "success": "新书（导入），仍停留设置页",
+    "error": "confirm catch显示flash；跨库可留书架",
+    "repeat": "每次新建，不覆盖当前书",
+    "flow": "DF-10"
+  },
+  {
+    "id": "OP-51",
+    "label": "设置页下载备份",
+    "page": "设置数据",
+    "event": "click导出备份",
+    "inputs": "当前bookId",
+    "guard": "busy或无书禁用",
+    "reads": [
+      "T03及本书T04–T17"
+    ],
+    "writes": [
+      "文件下载",
+      "局部busy/flash"
+    ],
+    "steps": "await exportBook→Blob URL→a.click→立即revoke→flash→finally",
+    "success": "已导出filename",
+    "error": "catch flash",
+    "repeat": "不删除浏览器数据；与书架延迟revoke不同",
+    "flow": "DF-10"
+  },
+  {
+    "id": "OP-52",
+    "label": "打开导出/删除弹窗",
+    "page": "书架",
+    "event": "click对应书操作",
+    "inputs": "书籍对象",
+    "guard": "sidebar.blocked=false",
+    "reads": [
+      "T03当前卡"
+    ],
+    "writes": [
+      "局部exporting或deleting/message空"
+    ],
+    "steps": "仅打开；不写文件不删库",
+    "success": "dialog aria与说明出现",
+    "error": "无",
+    "repeat": "不因遮罩/Escape自动关闭",
+    "flow": null
+  },
+  {
+    "id": "OP-53",
+    "label": "选择导出目录",
+    "page": "书架",
+    "event": "click选择导出目录",
+    "inputs": "浏览器showDirectoryPicker结果handle",
+    "guard": "!blocked且API支持",
+    "reads": [
+      "T02目录旧句柄"
+    ],
+    "writes": [
+      "T02.assets.exportDirectory/updatedAt"
+    ],
+    "steps": "sidebar.busy→await picker→remember→directory.name→提示",
+    "success": "目录名显示，路径字符串只是建议",
+    "error": "AbortError不提示；其他错误message",
+    "repeat": "权限仍在实际写文件时再检查",
+    "flow": "DF-10"
+  },
+  {
+    "id": "OP-54",
+    "label": "保存到目录",
+    "page": "导出弹窗",
+    "event": "click保存到目录",
+    "inputs": "exporting.bookId，已存handle或重新picker",
+    "guard": "!blocked且API支持",
+    "reads": [
+      "T02句柄",
+      "T03和T04–T17"
+    ],
+    "writes": [
+      "新文件写入；必要时T02句柄"
+    ],
+    "steps": "授权检查→export→文件名随机后缀→createWritable/write/close→关弹窗",
+    "success": "已保存到目录+filename",
+    "error": "失败abort尝试，弹窗保留rolealert",
+    "repeat": "busy期间取消禁用；不覆盖同名历史备份",
+    "flow": "DF-10"
+  },
+  {
+    "id": "OP-55",
+    "label": "书架下载备份",
+    "page": "导出弹窗",
+    "event": "click下载备份",
+    "inputs": "exporting.bookId",
+    "guard": "!blocked",
+    "reads": [
+      "T03及本书表"
+    ],
+    "writes": [
+      "下载文件",
+      "sidebar.message"
+    ],
+    "steps": "await exportBook→DOM a添加点击移除→1000ms后revoke→关弹窗",
+    "success": "已请求下载filename",
+    "error": "catch保留弹窗显示",
+    "repeat": "浏览器下载提示不等于已验证磁盘文件",
+    "flow": "DF-10"
+  },
+  {
+    "id": "OP-56",
+    "label": "删除弹窗先导出",
+    "page": "删除弹窗",
+    "event": "click先导出",
+    "inputs": "同一本书",
+    "guard": "!blocked",
+    "reads": [],
+    "writes": [
+      "局部exporting=deleting",
+      "deleting=null"
+    ],
+    "steps": "切到导出弹窗",
+    "success": "等待用户选择导出",
+    "error": "无",
+    "repeat": "导出成功不继续自动删除",
+    "flow": null
+  },
+  {
+    "id": "OP-57",
+    "label": "确认删除整书",
+    "page": "删除弹窗",
+    "event": "click确认删除",
+    "inputs": "deleting.id",
+    "guard": "!blocked；底层同书编译锁再次检查",
+    "reads": [
+      "T03/目标库缓存实例"
+    ],
+    "writes": [
+      "删除本书DB(T04–T17)+T03记录"
+    ],
+    "steps": "withLock→close/cache移除→await Dexie.delete→await books.delete→切另一书/导入→关弹窗",
+    "success": "当前书消失，其他书/Key/导出文件保留",
+    "error": "catch弹窗保留；非跨库原子",
+    "repeat": "永久删除，无回收站；本轮UI不执行最终删除",
+    "flow": "DF-11"
+  },
+  {
+    "id": "OP-58",
+    "label": "取消导出/删除弹窗",
+    "page": "弹窗",
+    "event": "click取消",
+    "inputs": "无",
+    "guard": "只在busy禁用",
+    "reads": [],
+    "writes": [
+      "局部exporting/deleting=null"
+    ],
+    "steps": "关闭",
+    "success": "无副作用",
+    "error": "无",
+    "repeat": "遮罩和Escape没有实现处理",
+    "flow": null
+  },
+  {
+    "id": "OP-59",
+    "label": "输入与发送游玩消息",
+    "page": "游玩",
+    "event": "input change/Enter非Shift/click发送",
+    "inputs": "trim后非空text，当前bookId",
+    "guard": "无书禁输入；无书或trim空禁发送",
+    "reads": [
+      "内存bookId/input"
+    ],
+    "writes": [
+      "仅局部lines追加player+固定narrator，input清空"
+    ],
+    "steps": "不调用模型/DB，新增后自动滚底",
+    "success": "固定占位说明",
+    "error": "无",
+    "repeat": "切顶层卸载清消息；无多行或历史恢复",
+    "flow": "DF-14"
+  },
+  {
+    "id": "OP-60",
+    "label": "图节点打开详情",
+    "page": "事件网络",
+    "event": "click ReactFlow节点",
+    "inputs": "node.id找到nodes当前对象",
+    "guard": "有匹配node",
+    "reads": [
+      "T08当前查询nodes"
+    ],
+    "writes": [
+      "局部selected=node"
+    ],
+    "steps": "与列表详情同服务，图保持在左",
+    "success": "节点表单和原文出处",
+    "error": "找不到则no-op",
+    "repeat": "不生成新节点，不改状态",
+    "flow": null
+  }
+]

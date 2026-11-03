@@ -1,0 +1,114 @@
+[
+  {
+    "id": "AUTO-01",
+    "trigger": "AppShell挂载/卸载",
+    "guard": "无",
+    "steps": "events.on注册唯一applyEvent，卸载取消订阅",
+    "data": "读任务事件；写global compile-store，无DB写入",
+    "lifecycle": "重挂载不重播历史事件"
+  },
+  {
+    "id": "AUTO-02",
+    "trigger": "资产页书架首次解析",
+    "guard": "initialSelection=false且books!==undefined",
+    "steps": "置true；无bookId且有书则选最新books[0]",
+    "data": "T03 createdAt倒序→ui.bookId；不写书",
+    "lifecycle": "每次该组件挂载仅判一次"
+  },
+  {
+    "id": "AUTO-03",
+    "trigger": "useLiveQuery订阅",
+    "guard": "所用bookId/数据表变化",
+    "steps": "重查对应表、按规定排序/计数",
+    "data": "T03/T04/T06–T10/T12–T17→列表/报告",
+    "lifecycle": "写库后列表刷新；局部selected不自动替换"
+  },
+  {
+    "id": "AUTO-04",
+    "trigger": "工作台忙状态变化/卸载",
+    "guard": "R/P/T任一变化",
+    "steps": "onBusyChange(R||P||T)；卸载false",
+    "data": "仅父sidebar.disabled",
+    "lifecycle": "不等于底层全局编辑锁"
+  },
+  {
+    "id": "AUTO-05",
+    "trigger": "选择asset对象变化",
+    "guard": "asset prop引用变化",
+    "steps": "重置toEditable、savedAt=0、mergeTarget空",
+    "data": "读selected字段→局部表单",
+    "lifecycle": "useLiveQuery新数组不保证selected引用变化"
+  },
+  {
+    "id": "AUTO-06",
+    "trigger": "日志数量变化",
+    "guard": "logs.length变化",
+    "steps": "日志scroller.scrollTop=scrollHeight",
+    "data": "内存logs→DOM滚动",
+    "lifecycle": "无持久写入"
+  },
+  {
+    "id": "AUTO-07",
+    "trigger": "游玩消息数量变化",
+    "guard": "lines.length变化",
+    "steps": "消息区滚到底",
+    "data": "局部lines→DOM",
+    "lifecycle": "无世界状态结算"
+  },
+  {
+    "id": "AUTO-08",
+    "trigger": "设置页挂载",
+    "guard": "无",
+    "steps": "离线catalog；异步refresh配置+Keyhint+并发；storage.estimate显示MB",
+    "data": "T01/T02→局部；不读取真实Key到表单",
+    "lifecycle": "刷新未完成字段可短暂空；卸载草稿消失"
+  },
+  {
+    "id": "AUTO-09",
+    "trigger": "书架挂载",
+    "guard": "无",
+    "steps": "读exportDirectoryName，失败吞掉",
+    "data": "T02.handle.name→局部directory",
+    "lifecycle": "不会自动取得目录写权限"
+  },
+  {
+    "id": "AUTO-10",
+    "trigger": "flash触发",
+    "guard": "成功/异常提示文字",
+    "steps": "setSaved(text)，2200ms后null",
+    "data": "仅局部toast",
+    "lifecycle": "旧计时器未统一去重，连续flash可提前清除后来提示"
+  },
+  {
+    "id": "AUTO-11",
+    "trigger": "网络数据/viewport变化",
+    "guard": "nodes/lines/chapterIndices/zoom",
+    "steps": "计算chapter layout与卡片紧凑状态，轴跟随",
+    "data": "T08/T09/T04→图视图，无写库",
+    "lifecycle": "无自动因果推断"
+  },
+  {
+    "id": "AUTO-12",
+    "trigger": "会话请求准备",
+    "guard": "已取得故事会话租约",
+    "steps": "投影→必要压缩→重注当前任务→校验可用窗口",
+    "data": "T16/T17读写、归并摘要模型；原记录保留",
+    "lifecycle": "超预算失败，不发未容纳的请求"
+  },
+  {
+    "id": "AUTO-13",
+    "trigger": "每个模型message_end",
+    "guard": "story_editor持久session",
+    "steps": "JSON标准消息校验→appendSessionMessage",
+    "data": "T17追加、T16 nextOrdinal/leafId/租约",
+    "lifecycle": "仅响应成功不表示事件提交，commit才确认写入"
+  },
+  {
+    "id": "AUTO-14",
+    "trigger": "恢复/检查资料变更",
+    "guard": "下一批读取旧记忆和checkpoint",
+    "steps": "重新计算原文/资产/节点/线指纹，stale和跳批判定",
+    "data": "T05–T09/T13–T15读；结果为视图；新提交才写",
+    "lifecycle": "不是后台定时自动检查，需继续任务"
+  }
+]

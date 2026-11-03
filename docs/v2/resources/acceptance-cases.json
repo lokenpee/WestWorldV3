@@ -1,0 +1,314 @@
+[
+  {
+    "id": "AC-01",
+    "requirement": "FR-01",
+    "precondition": "空来源首次启动",
+    "action": "进入应用",
+    "expected": "资产空书架，导入页；顶层三标签；无Key/用户小说预置",
+    "spec": "UI-01/02"
+  },
+  {
+    "id": "AC-02",
+    "requirement": "FR-02",
+    "precondition": "人工三章TXT",
+    "action": "选择文件并仅导入，再刷新",
+    "expected": "UTF8/3章预览；书架3章、资产0、入库禁用；刷新书仍在",
+    "spec": "ALG-01/UI-03"
+  },
+  {
+    "id": "AC-03",
+    "requirement": "FR-02",
+    "precondition": "已有预览",
+    "action": "正则改为(并应用",
+    "expected": "报错，旧预览过期，两导入按钮禁用；恢复默认可继续",
+    "spec": "UI-03"
+  },
+  {
+    "id": "AC-04",
+    "requirement": "FR-02",
+    "precondition": "无标题4001字符；含10001字符长章",
+    "action": "执行分章",
+    "expected": "固定4000/10000边界、标识、章名、order与golden一致",
+    "spec": "ALG-01"
+  },
+  {
+    "id": "AC-05",
+    "requirement": "FR-02",
+    "precondition": "前导序言TXT",
+    "action": "默认导入再导出",
+    "expected": "首标题前文本不在章正文中（BUG-01）",
+    "spec": "ALG-01"
+  },
+  {
+    "id": "AC-06",
+    "requirement": "FR-03",
+    "precondition": "无Key/默认设置",
+    "action": "打开设置，尝试未保存模型输入再探测",
+    "expected": "默认模型/地址/并发正确；测试禁用；使用保存配置而非草稿",
+    "spec": "UI-09/AI-01"
+  },
+  {
+    "id": "AC-07",
+    "requirement": "FR-03",
+    "precondition": "隔离测试凭据和拦截HTTP",
+    "action": "拉模型、文本测试、工具测试",
+    "expected": "三种请求协议及返回分别匹配；2xx空文本可连接成功；工具须submit ok",
+    "spec": "AI-01"
+  },
+  {
+    "id": "AC-08",
+    "requirement": "FR-04",
+    "precondition": "mock世界成功叙事失败",
+    "action": "P1后恢复",
+    "expected": "世界保存，章节失败，partial记录叙事；只补叙事后完成",
+    "spec": "ALG-02"
+  },
+  {
+    "id": "AC-09",
+    "requirement": "FR-04",
+    "precondition": "两个章同名人物地点",
+    "action": "mock提取并写入",
+    "expected": "同章保首条去重，跨章ID不同；取消在途不保存",
+    "spec": "ALG-02"
+  },
+  {
+    "id": "AC-10",
+    "requirement": "FR-05",
+    "precondition": "超过100原章含第100章切块",
+    "action": "完整编排并取消后继续",
+    "expected": "100/20分窗、块不多算原章；从有效恢复点继续",
+    "spec": "ALG-03"
+  },
+  {
+    "id": "AC-11",
+    "requirement": "FR-05",
+    "precondition": "旧P3完成且再次重查",
+    "action": "点击重新检查全部",
+    "expected": "新故事复核会话；已完成P1不重提取；归并与检查重做",
+    "spec": "ALG-03/AI-08"
+  },
+  {
+    "id": "AC-12",
+    "requirement": "FR-06",
+    "precondition": "样本P1完成",
+    "action": "分别运行4阶段；样本P3后完整继续",
+    "expected": "各步只做本步，写草稿；P3有testScope，完整流程不跳过剩余章",
+    "spec": "ALG-03"
+  },
+  {
+    "id": "AC-13",
+    "requirement": "FR-06",
+    "precondition": "任意已导入书",
+    "action": "试跑一章、关闭重开",
+    "expected": "完整首章发模型；最多2000字符展示；草稿数不变，结果视图重置",
+    "spec": "UI-08"
+  },
+  {
+    "id": "AC-14",
+    "requirement": "FR-07",
+    "precondition": "相同/包含/别名相似/地点区域样本",
+    "action": "执行本地归并",
+    "expected": "人物包含可合并含单字BUG-10；地点不按包含合；严格>0.9边界",
+    "spec": "ALG-04"
+  },
+  {
+    "id": "AC-15",
+    "requirement": "FR-07",
+    "precondition": "人工层级及不同主名频次样本",
+    "action": "统计/整编后重算",
+    "expected": "只计主名/原章、分位与golden一致；manual不覆盖；AI调整主名后重计",
+    "spec": "ALG-05"
+  },
+  {
+    "id": "AC-16",
+    "requirement": "FR-07",
+    "precondition": "冲突/大档案/AI少报事实ID",
+    "action": "mock整编成功或失败",
+    "expected": "触发阈值、批量与预算正确；缺ID拒绝保底稿并degraded",
+    "spec": "ALG-04"
+  },
+  {
+    "id": "AC-17",
+    "requirement": "FR-07",
+    "precondition": "归并请求未结束",
+    "action": "同时人工改参与行后返回模型",
+    "expected": "提交冲突拒绝，保人工内容；不自动锁所有编辑",
+    "spec": "AR-06/ALG-04"
+  },
+  {
+    "id": "AC-18",
+    "requirement": "FR-08",
+    "precondition": "已有节点/线",
+    "action": "mock append/create/update/merge",
+    "expected": "成员语义、标题保留、编号、反向引用正确，重复全同成员新线跳过",
+    "spec": "ALG-06"
+  },
+  {
+    "id": "AC-19",
+    "requirement": "FR-08",
+    "precondition": "有原文和缺引用/错章引文",
+    "action": "提交补点和工作记忆",
+    "expected": "错引用或错原文拒绝；合法补点生成ID、confidence0.6、章序回插",
+    "spec": "ALG-06/AI-07"
+  },
+  {
+    "id": "AC-20",
+    "requirement": "FR-09",
+    "precondition": "恢复人工资产备份",
+    "action": "修改身份/ageText保存、刷新重开",
+    "expected": "修改持久，age/gender不被覆盖；普通与即时保存区分",
+    "spec": "UI-05"
+  },
+  {
+    "id": "AC-21",
+    "requirement": "FR-09",
+    "precondition": "人物/地点各两草稿",
+    "action": "指定目标手动并入；删除节点/线",
+    "expected": "keepId保留；别名资料融合；删节点清成员空线、删线清反向归属",
+    "spec": "ALG-07"
+  },
+  {
+    "id": "AC-22",
+    "requirement": "FR-09",
+    "precondition": "人物或事件线详情已开",
+    "action": "改变层级/状态后关闭重开",
+    "expected": "持久值更新；原详情旧asset显示行为保留；重开显示新值",
+    "spec": "BUG-16/UI-05"
+  },
+  {
+    "id": "AC-23",
+    "requirement": "FR-10",
+    "precondition": "人工样本P3 completed",
+    "action": "入库两次并导出",
+    "expected": "3人物2地点、无翻倍；actors保称呼，actorIds与线characterIds匹配",
+    "spec": "ALG-08"
+  },
+  {
+    "id": "AC-24",
+    "requirement": "FR-10",
+    "precondition": "两实体重复精确称呼、两个模糊候选",
+    "action": "分别解析",
+    "expected": "精确首项优先；无精确时模糊多候选拒绝；未映射提示",
+    "spec": "ALG-08"
+  },
+  {
+    "id": "AC-25",
+    "requirement": "FR-11",
+    "precondition": "graph-input.json",
+    "action": "生成图并点击共享节点/线高亮",
+    "expected": "golden坐标/边一致，4节点1孤点1共享，详情可达；不额外补因果边",
+    "spec": "ALG-09/UI-06"
+  },
+  {
+    "id": "AC-26",
+    "requirement": "FR-12",
+    "precondition": "当前/历史会话有notes",
+    "action": "筛选分页、改事实后继续",
+    "expected": "50条/页，stale/pending独立，范围恢复点失效，不误用历史通过",
+    "spec": "AI-07/UI-07"
+  },
+  {
+    "id": "AC-27",
+    "requirement": "FR-12",
+    "precondition": "长会话带工具结果",
+    "action": "触发压缩、失败和取消",
+    "expected": "阈值/切点正确；旧条目保留；失败无新压缩边界；当前任务ID仍精确",
+    "spec": "AI-08"
+  },
+  {
+    "id": "AC-28",
+    "requirement": "FR-12",
+    "precondition": "当前会话活租约或旧owner消失",
+    "action": "竞争执行/恢复",
+    "expected": "同owner保护、存活探测和租约恢复正确；不伪造成全局跨页编辑锁",
+    "spec": "AR-07/AI-08"
+  },
+  {
+    "id": "AC-29",
+    "requirement": "FR-13",
+    "precondition": "未入库人工备份与已入库实际UI导出",
+    "action": "预览、导入、再导出",
+    "expected": "前者固定人数0而恢复草稿3；新建书（导入），不覆盖原书；SHA一致",
+    "spec": "DATA-05"
+  },
+  {
+    "id": "AC-30",
+    "requirement": "FR-13",
+    "precondition": "损坏ZIP/缺manifest/过新format",
+    "action": "预检",
+    "expected": "明确常规错误；不写书；缺统计JSON的异常路径保留",
+    "spec": "DATA-05/BUG-07"
+  },
+  {
+    "id": "AC-31",
+    "requirement": "FR-13",
+    "precondition": "目录接口授权/拒绝/写入失败替身",
+    "action": "导出目录及下载",
+    "expected": "拒绝不写，失败abort，close成功才提示；下载实际取文件校验",
+    "spec": "ALG-10"
+  },
+  {
+    "id": "AC-32",
+    "requirement": "FR-13",
+    "precondition": "两本书/设置测试Key",
+    "action": "整书删除和占锁删除",
+    "expected": "只删单书/书架，其他书Key和导出不变；占锁拒绝；无回收站",
+    "spec": "ALG-10"
+  },
+  {
+    "id": "AC-33",
+    "requirement": "FR-14",
+    "precondition": "有书",
+    "action": "发送行动、切设置再回游玩",
+    "expected": "固定回复、无模型/持久状态写入；返回空对话",
+    "spec": "UI-10"
+  },
+  {
+    "id": "AC-34",
+    "requirement": "FR-05",
+    "precondition": "模拟错误/取消与刷新",
+    "action": "任务运行时取消，再重开",
+    "expected": "已提交保留；100%含失败；历史日志/费用不恢复；点击继续才处理",
+    "spec": "ALG-11"
+  },
+  {
+    "id": "AC-35",
+    "requirement": "FR-03",
+    "precondition": "mock限流、认证、无submit/错误submit",
+    "action": "发起调用",
+    "expected": "服务重试与一次结果修正独立；末轮只提交；无无限查询或修正",
+    "spec": "AI-03/04/05"
+  },
+  {
+    "id": "AC-36",
+    "requirement": "FR-01",
+    "precondition": "全局任务状态非idle，另一书可选",
+    "action": "任务结束后切书",
+    "expected": "全局runtime显示不被自动按书过滤；保留BUG-13",
+    "spec": "ALG-11"
+  },
+  {
+    "id": "AC-37",
+    "requirement": "FR-08",
+    "precondition": "2个节点、合法和非法参数",
+    "action": "query_nodes分页、非法limit、get_node_detail空集合",
+    "expected": "offset/total/truncated/nextOffset及INVALID_ARGS/空页正确",
+    "spec": "AI-06/TOOL-01/02"
+  },
+  {
+    "id": "AC-38",
+    "requirement": "FR-12",
+    "precondition": "tool-response-examples完整seed",
+    "action": "依次执行13工具正常和非法参数",
+    "expected": "成功JSON与固定输出完全一致，非法参数返回INVALID_ARGS",
+    "spec": "11-AI工具返回与回放契约"
+  },
+  {
+    "id": "AC-39",
+    "requirement": "FR-03",
+    "precondition": "交付contracts.d.ts与TypeScript6",
+    "action": "脱离原业务模块编译结构类型",
+    "expected": "类型编译通过；原始签名摘录不冒充SDK",
+    "spec": "resources/contracts.d.ts"
+  }
+]

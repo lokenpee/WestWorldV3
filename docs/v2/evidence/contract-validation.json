@@ -1,0 +1,9 @@
+{
+  "schemasMatched": 52,
+  "sampleRowsValidated": 39,
+  "goldenSplitCases": 4,
+  "goldenAliasCases": 2,
+  "graphGoldenMatched": true,
+  "externalRequests": false,
+  "independentApplicationRebuilt": false
+}

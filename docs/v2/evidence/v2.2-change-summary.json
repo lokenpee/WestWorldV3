@@ -1,0 +1,395 @@
+{
+  "documentVersion": "2.2",
+  "date": "2026-10-22 Asia/Shanghai",
+  "scope": "docs/reverse-prd/v2 only",
+  "primaryDocsUpdated": [
+    "00-阅读入口与术语.md",
+    "01-PRD.md",
+    "02-架构与技术规格.md",
+    "03-Spec-数据与存储.md",
+    "04-Spec-流程接口与算法.md",
+    "05-Spec-AI与会话.md",
+    "06-界面与交互规格.md",
+    "07-验收与兼容缺陷.md",
+    "08-追溯与验证记录.md",
+    "09-操作与自动触发契约.md",
+    "10-字段级数据流与状态转移.md",
+    "11-AI工具返回与回放契约.md",
+    "12-验收执行与覆盖矩阵.md",
+    "13-流程变更与冲突对照.md"
+  ],
+  "singleLayerClarification": true,
+  "changes": [
+    {
+      "path": "00-阅读入口与术语.md",
+      "change": "modified",
+      "beforeBytes": 10134,
+      "afterBytes": 11417,
+      "addedLines": 41,
+      "removedLines": 38
+    },
+    {
+      "path": "01-PRD.md",
+      "change": "modified",
+      "beforeBytes": 15131,
+      "afterBytes": 18108,
+      "addedLines": 73,
+      "removedLines": 61
+    },
+    {
+      "path": "02-架构与技术规格.md",
+      "change": "modified",
+      "beforeBytes": 10531,
+      "afterBytes": 12682,
+      "addedLines": 44,
+      "removedLines": 30
+    },
+    {
+      "path": "03-Spec-数据与存储.md",
+      "change": "modified",
+      "beforeBytes": 86020,
+      "afterBytes": 13911,
+      "addedLines": 93,
+      "removedLines": 550
+    },
+    {
+      "path": "04-Spec-流程接口与算法.md",
+      "change": "modified",
+      "beforeBytes": 20830,
+      "afterBytes": 27125,
+      "addedLines": 74,
+      "removedLines": 51
+    },
+    {
+      "path": "05-Spec-AI与会话.md",
+      "change": "modified",
+      "beforeBytes": 17232,
+      "afterBytes": 21203,
+      "addedLines": 43,
+      "removedLines": 24
+    },
+    {
+      "path": "06-界面与交互规格.md",
+      "change": "modified",
+      "beforeBytes": 20390,
+      "afterBytes": 22775,
+      "addedLines": 63,
+      "removedLines": 51
+    },
+    {
+      "path": "07-验收与兼容缺陷.md",
+      "change": "modified",
+      "beforeBytes": 15127,
+      "afterBytes": 10127,
+      "addedLines": 59,
+      "removedLines": 101
+    },
+    {
+      "path": "08-追溯与验证记录.md",
+      "change": "modified",
+      "beforeBytes": 26821,
+      "afterBytes": 28292,
+      "addedLines": 15,
+      "removedLines": 5
+    },
+    {
+      "path": "09-操作与自动触发契约.md",
+      "change": "modified",
+      "beforeBytes": 43797,
+      "afterBytes": 45406,
+      "addedLines": 479,
+      "removedLines": 444
+    },
+    {
+      "path": "10-字段级数据流与状态转移.md",
+      "change": "modified",
+      "beforeBytes": 29772,
+      "afterBytes": 17595,
+      "addedLines": 99,
+      "removedLines": 495
+    },
+    {
+      "path": "11-AI工具返回与回放契约.md",
+      "change": "modified",
+      "beforeBytes": 30755,
+      "afterBytes": 7068,
+      "addedLines": 45,
+      "removedLines": 1142
+    },
+    {
+      "path": "12-验收执行与覆盖矩阵.md",
+      "change": "modified",
+      "beforeBytes": 14216,
+      "afterBytes": 16418,
+      "addedLines": 26,
+      "removedLines": 4
+    },
+    {
+      "path": "13-流程变更与冲突对照.md",
+      "change": "added",
+      "bytes": 8613
+    },
+    {
+      "path": "acceptance/adapter-contract.md",
+      "change": "modified",
+      "beforeBytes": 5693,
+      "afterBytes": 5925,
+      "addedLines": 3,
+      "removedLines": 0
+    },
+    {
+      "path": "evidence/resource-manifest-2.1.json",
+      "change": "added",
+      "bytes": 15990
+    },
+    {
+      "path": "evidence/semantic-coverage-review.md",
+      "change": "modified",
+      "beforeBytes": 13232,
+      "afterBytes": 13464,
+      "addedLines": 3,
+      "removedLines": 0
+    },
+    {
+      "path": "evidence/spec-quality-review.md",
+      "change": "modified",
+      "beforeBytes": 431,
+      "afterBytes": 663,
+      "addedLines": 3,
+      "removedLines": 0
+    },
+    {
+      "path": "evidence/tool-contracts-2.1.md",
+      "change": "added",
+      "bytes": 30864
+    },
+    {
+      "path": "evidence/v2.2-document-validation.json",
+      "change": "added",
+      "bytes": 7128
+    },
+    {
+      "path": "resources/assets/favicon.svg",
+      "change": "added",
+      "bytes": 9522
+    },
+    {
+      "path": "resources/assets/icons.svg",
+      "change": "added",
+      "bytes": 5031
+    },
+    {
+      "path": "resources/assets/index.css",
+      "change": "added",
+      "bytes": 24
+    },
+    {
+      "path": "resources/assets/PI-MIT.txt",
+      "change": "added",
+      "bytes": 1070
+    },
+    {
+      "path": "resources/internal-contracts.md",
+      "change": "modified",
+      "beforeBytes": 39571,
+      "afterBytes": 41311,
+      "addedLines": 3,
+      "removedLines": 0
+    },
+    {
+      "path": "resources/legacy-table-dictionary-2.1.md",
+      "change": "added",
+      "bytes": 86879
+    },
+    {
+      "path": "resources/prompts/extraction/01-extract-world-assets.md",
+      "change": "added",
+      "bytes": 6169
+    },
+    {
+      "path": "resources/prompts/extraction/02-extract-narrative-assets.md",
+      "change": "added",
+      "bytes": 6448
+    },
+    {
+      "path": "resources/prompts/merge/04-link-event-lines.md",
+      "change": "added",
+      "bytes": 12529
+    },
+    {
+      "path": "resources/prompts/merge/05-detect-alias-groups.md",
+      "change": "added",
+      "bytes": 4586
+    },
+    {
+      "path": "resources/prompts/merge/06-merge-locations.md",
+      "change": "added",
+      "bytes": 1953
+    },
+    {
+      "path": "resources/prompts/merge/08-optimize-characters.md",
+      "change": "added",
+      "bytes": 2555
+    },
+    {
+      "path": "resources/prompts/session/07-compact-story-session.md",
+      "change": "added",
+      "bytes": 2171
+    },
+    {
+      "path": "resources/README.md",
+      "change": "added",
+      "bytes": 761
+    },
+    {
+      "path": "resources/resource-manifest.json",
+      "change": "modified",
+      "beforeBytes": 15990,
+      "afterBytes": 26321,
+      "addedLines": 288,
+      "removedLines": 94
+    },
+    {
+      "path": "resources/runtime/eslint.config.js",
+      "change": "added",
+      "bytes": 2370
+    },
+    {
+      "path": "resources/runtime/index.html",
+      "change": "added",
+      "bytes": 355
+    },
+    {
+      "path": "resources/runtime/package.json",
+      "change": "added",
+      "bytes": 1205
+    },
+    {
+      "path": "resources/runtime/pnpm-lock.yaml",
+      "change": "added",
+      "bytes": 111503
+    },
+    {
+      "path": "resources/runtime/tsconfig.app.json",
+      "change": "added",
+      "bytes": 722
+    },
+    {
+      "path": "resources/runtime/tsconfig.json",
+      "change": "added",
+      "bytes": 119
+    },
+    {
+      "path": "resources/runtime/tsconfig.node.json",
+      "change": "added",
+      "bytes": 558
+    },
+    {
+      "path": "resources/runtime/vite.config.ts",
+      "change": "added",
+      "bytes": 484
+    },
+    {
+      "path": "resources/schema-dictionary-v2.0.md",
+      "change": "modified",
+      "beforeBytes": 131741,
+      "afterBytes": 131973,
+      "addedLines": 3,
+      "removedLines": 0
+    },
+    {
+      "path": "resources/v2.2/acceptance-cases.json",
+      "change": "added",
+      "bytes": 11091
+    },
+    {
+      "path": "resources/v2.2/automatic-triggers.json",
+      "change": "added",
+      "bytes": 5232
+    },
+    {
+      "path": "resources/v2.2/data-contract.json",
+      "change": "added",
+      "bytes": 34208
+    },
+    {
+      "path": "resources/v2.2/data-flows.json",
+      "change": "added",
+      "bytes": 22671
+    },
+    {
+      "path": "resources/v2.2/examples.json",
+      "change": "added",
+      "bytes": 2116
+    },
+    {
+      "path": "resources/v2.2/model-output-contract.json",
+      "change": "added",
+      "bytes": 21163
+    },
+    {
+      "path": "resources/v2.2/operation-catalog.json",
+      "change": "added",
+      "bytes": 43143
+    },
+    {
+      "path": "resources/v2.2/pipeline-contract.json",
+      "change": "added",
+      "bytes": 6278
+    },
+    {
+      "path": "resources/v2.2/prompts/optimize-locations.md",
+      "change": "added",
+      "bytes": 671
+    },
+    {
+      "path": "resources/v2.2/prompts/p2-asset-editor.md",
+      "change": "added",
+      "bytes": 1501
+    },
+    {
+      "path": "resources/v2.2/prompts/p3-story-editor.md",
+      "change": "added",
+      "bytes": 2375
+    },
+    {
+      "path": "resources/v2.2/resource-authority.json",
+      "change": "added",
+      "bytes": 2419
+    },
+    {
+      "path": "resources/v2.2/state-transitions.json",
+      "change": "added",
+      "bytes": 4181
+    },
+    {
+      "path": "resources/v2.2/tool-contracts.json",
+      "change": "added",
+      "bytes": 44913
+    },
+    {
+      "path": "resources/v2.2/tool-results.schema.json",
+      "change": "added",
+      "bytes": 103679
+    },
+    {
+      "path": "resources/数据值-ID与备份格式.md",
+      "change": "modified",
+      "beforeBytes": 8143,
+      "afterBytes": 3027,
+      "addedLines": 22,
+      "removedLines": 75
+    },
+    {
+      "path": "scripts/README.md",
+      "change": "added",
+      "bytes": 432
+    },
+    {
+      "path": "scripts/validate-v2.2.py",
+      "change": "added",
+      "bytes": 8204
+    }
+  ],
+  "applicationSourceChangedByThisTask": false
+}

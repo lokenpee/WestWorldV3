@@ -1,0 +1,1752 @@
+[
+  {
+    "table": "T01",
+    "field": "providerId",
+    "section": "T01 · credentials",
+    "source": "保存Key写deepseek/api_key，实际Key trim；SDK CredentialStore可携带其他凭据",
+    "update": "modify在credentials事务内读改写；UI清除delete"
+  },
+  {
+    "table": "T01",
+    "field": "credential",
+    "section": "T01 · credentials",
+    "source": "保存Key写deepseek/api_key，实际Key trim；SDK CredentialStore可携带其他凭据",
+    "update": "modify在credentials事务内读改写；UI清除delete"
+  },
+  {
+    "table": "T01",
+    "field": "credential<分支1>.type",
+    "section": "T01 · credentials",
+    "source": "保存Key写deepseek/api_key，实际Key trim；SDK CredentialStore可携带其他凭据",
+    "update": "modify在credentials事务内读改写；UI清除delete"
+  },
+  {
+    "table": "T01",
+    "field": "credential<分支1>.key",
+    "section": "T01 · credentials",
+    "source": "保存Key写deepseek/api_key，实际Key trim；SDK CredentialStore可携带其他凭据",
+    "update": "modify在credentials事务内读改写；UI清除delete"
+  },
+  {
+    "table": "T02",
+    "field": "key",
+    "section": "T02 · appSettings",
+    "source": "由key判定具体value；配置键字典逐项定义",
+    "update": "setAppSetting put覆盖value/updatedAt；无全量设置校验"
+  },
+  {
+    "table": "T02",
+    "field": "value",
+    "section": "T02 · appSettings",
+    "source": "由key判定具体value；配置键字典逐项定义",
+    "update": "setAppSetting put覆盖value/updatedAt；无全量设置校验"
+  },
+  {
+    "table": "T02",
+    "field": "updatedAt",
+    "section": "T02 · appSettings",
+    "source": "由key判定具体value；配置键字典逐项定义",
+    "update": "setAppSetting put覆盖value/updatedAt；无全量设置校验"
+  },
+  {
+    "table": "T03",
+    "field": "id",
+    "section": "T03 · books",
+    "source": "小说bk_UUID；备份bk_时间36进制_随机4字符",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T03",
+    "field": "title",
+    "section": "T03 · books",
+    "source": "小说文件去最后扩展名；备份原title+（导入）",
+    "update": "没有UI改书名；同名可多条"
+  },
+  {
+    "table": "T03",
+    "field": "author",
+    "section": "T03 · books",
+    "source": "创建书籍参数或备份元数据对应字段",
+    "update": "创建时复制；author/sourceFileName未提供则省略，无UI改写"
+  },
+  {
+    "table": "T03",
+    "field": "sourceFileName",
+    "section": "T03 · books",
+    "source": "创建书籍参数或备份元数据对应字段",
+    "update": "创建时复制；author/sourceFileName未提供则省略，无UI改写"
+  },
+  {
+    "table": "T03",
+    "field": "createdAt",
+    "section": "T03 · books",
+    "source": "创建时new Date().toISOString()",
+    "update": "除恢复既有条目外不更新"
+  },
+  {
+    "table": "T04",
+    "field": "bookId",
+    "section": "T04 · chapters",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T04",
+    "field": "chapterIndex",
+    "section": "T04 · chapters",
+    "source": "分章序号/切块字符串；快照来自当前章",
+    "update": "节点和快照创建后不随并入重新编号"
+  },
+  {
+    "table": "T04",
+    "field": "chapterName",
+    "section": "T04 · chapters",
+    "source": "切章标题；P1复制当前章",
+    "update": "非自动从原文件名推断"
+  },
+  {
+    "table": "T04",
+    "field": "charCount",
+    "section": "T04 · chapters",
+    "source": "text.length，UTF-16单位",
+    "update": "分章时一次生成；无token换算"
+  },
+  {
+    "table": "T04",
+    "field": "order",
+    "section": "T04 · chapters",
+    "source": "Chapter全书序0起；Node章内序0起",
+    "update": "补点可按引文位置重排Node.order"
+  },
+  {
+    "table": "T05",
+    "field": "bookId",
+    "section": "T05 · chapterTexts",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T05",
+    "field": "chapterIndex",
+    "section": "T05 · chapterTexts",
+    "source": "分章序号/切块字符串；快照来自当前章",
+    "update": "节点和快照创建后不随并入重新编号"
+  },
+  {
+    "table": "T05",
+    "field": "text",
+    "section": "T05 · chapterTexts",
+    "source": "已解码章节片段",
+    "update": "不包含首标题前丢弃片段；不保存完整原始bytes"
+  },
+  {
+    "table": "T06",
+    "field": "name",
+    "section": "T06 · characterSnapshots",
+    "source": "P1主称呼/归并保留或人工输入",
+    "update": "草稿表单允许空写undefined，不自动强制Schema"
+  },
+  {
+    "table": "T06",
+    "field": "aliases_mentioned",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].aliases_mentioned；合并按字段融合保留",
+    "update": "合并更新aliases_mentioned；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "identity",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].identity；合并按字段融合保留",
+    "update": "合并更新identity；UI对应字段保存覆盖，profile仅ageText"
+  },
+  {
+    "table": "T06",
+    "field": "profile",
+    "section": "T06 · characterSnapshots",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T06",
+    "field": "profile.age",
+    "section": "T06 · characterSnapshots",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T06",
+    "field": "profile.ageText",
+    "section": "T06 · characterSnapshots",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T06",
+    "field": "profile.gender",
+    "section": "T06 · characterSnapshots",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T06",
+    "field": "appearance",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].appearance；合并按字段融合保留",
+    "update": "合并更新appearance；UI对应字段保存覆盖，profile仅ageText"
+  },
+  {
+    "table": "T06",
+    "field": "personality",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].personality；合并按字段融合保留",
+    "update": "合并更新personality；UI对应字段保存覆盖，profile仅ageText"
+  },
+  {
+    "table": "T06",
+    "field": "background",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].background；合并按字段融合保留",
+    "update": "合并更新background；UI对应字段保存覆盖，profile仅ageText"
+  },
+  {
+    "table": "T06",
+    "field": "speech_style_sample",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].speech_style_sample；合并按字段融合保留",
+    "update": "合并更新speech_style_sample；UI对应字段保存覆盖，profile仅ageText"
+  },
+  {
+    "table": "T06",
+    "field": "relations",
+    "section": "T06 · characterSnapshots",
+    "source": "原文人物关系；按target/type/direction融合",
+    "update": "target始终称呼；无自动全量实体ID转换"
+  },
+  {
+    "table": "T06",
+    "field": "relations[].target",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].relations[]；合并按字段融合保留",
+    "update": "合并更新relations[]；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "relations[].relation_type",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].relations[]；合并按字段融合保留",
+    "update": "合并更新relations[]；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "relations[].relation_label",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].relations[]；合并按字段融合保留",
+    "update": "合并更新relations[]；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "relations[].direction",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].relations[]；合并按字段融合保留",
+    "update": "合并更新relations[]；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "confidence",
+    "section": "T06 · characterSnapshots",
+    "source": "P1模型0–1；补点固定0.6；实体复制",
+    "update": "无confidence<0.6自动阻止入库"
+  },
+  {
+    "table": "T06",
+    "field": "frequency",
+    "section": "T06 · characterSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T06",
+    "field": "frequency.chapters",
+    "section": "T06 · characterSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T06",
+    "field": "frequency.mentions",
+    "section": "T06 · characterSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T06",
+    "field": "frequency.scopeChapters",
+    "section": "T06 · characterSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T06",
+    "field": "frequency.percentile",
+    "section": "T06 · characterSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T06",
+    "field": "sourceChapters",
+    "section": "T06 · characterSnapshots",
+    "source": "合并来源chapterIndex并集numeric排序",
+    "update": "范围选择同时检查它；不拿来源章冒充真实主名出场"
+  },
+  {
+    "table": "T06",
+    "field": "mergeNotes",
+    "section": "T06 · characterSnapshots",
+    "source": "本地冲突或AI merge_notes并集",
+    "update": "可在详情查看，无单独解决按钮"
+  },
+  {
+    "table": "T06",
+    "field": "mergeFacts",
+    "section": "T06 · characterSnapshots",
+    "source": "四文本拆分去重及稳定事实ID",
+    "update": "改四文本时替换对应事实、清退休优化ID"
+  },
+  {
+    "table": "T06",
+    "field": "mergeFacts[].id",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].mergeFacts[]；合并按字段融合保留",
+    "update": "合并更新mergeFacts[]；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "mergeFacts[].field",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].mergeFacts[]；合并按字段融合保留",
+    "update": "合并更新mergeFacts[]；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "mergeFacts[].text",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].mergeFacts[]；合并按字段融合保留",
+    "update": "合并更新mergeFacts[]；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "mergeFacts[].chapters",
+    "section": "T06 · characterSnapshots",
+    "source": "P1 world.characters[i].mergeFacts[]；合并按字段融合保留",
+    "update": "合并更新mergeFacts[]；无直接UI编辑入口；备份恢复可携带"
+  },
+  {
+    "table": "T06",
+    "field": "optimizedFactIds",
+    "section": "T06 · characterSnapshots",
+    "source": "人物整编成功后当前底稿事实ID全集",
+    "update": "人工改字段移除退休ID；非模型直接写长哈希"
+  },
+  {
+    "table": "T06",
+    "field": "optimizationFingerprint",
+    "section": "T06 · characterSnapshots",
+    "source": "names/facts/notes JSON签名",
+    "update": "资料变则失效；不是全库指纹"
+  },
+  {
+    "table": "T06",
+    "field": "roleWeightSource",
+    "section": "T06 · characterSnapshots",
+    "source": "自动frequency / 人工manual",
+    "update": "manual更新后自动归并不得覆盖层级"
+  },
+  {
+    "table": "T06",
+    "field": "id",
+    "section": "T06 · characterSnapshots",
+    "source": "C{chapterIndex}-P{去重后序号至少3位}",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T06",
+    "field": "bookId",
+    "section": "T06 · characterSnapshots",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T06",
+    "field": "chapterIndex",
+    "section": "T06 · characterSnapshots",
+    "source": "分章序号/切块字符串；快照来自当前章",
+    "update": "节点和快照创建后不随并入重新编号"
+  },
+  {
+    "table": "T06",
+    "field": "chapterName",
+    "section": "T06 · characterSnapshots",
+    "source": "切章标题；P1复制当前章",
+    "update": "非自动从原文件名推断"
+  },
+  {
+    "table": "T06",
+    "field": "aliases",
+    "section": "T06 · characterSnapshots",
+    "source": "合并所有称呼去主名，或CSV人工输入",
+    "update": "数组并集/人工替换；缺省不自动视为[]，实体构造有明确默认"
+  },
+  {
+    "table": "T06",
+    "field": "roleWeight",
+    "section": "T06 · characterSnapshots",
+    "source": "频次分位或人工Select；实体缺省NPC",
+    "update": "manual优先，非manual重算；不是模型因果重要性"
+  },
+  {
+    "table": "T06",
+    "field": "updatedAt",
+    "section": "T06 · characterSnapshots",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T07",
+    "field": "name",
+    "section": "T07 · locationSnapshots",
+    "source": "P1主称呼/归并保留或人工输入",
+    "update": "草稿表单允许空写undefined，不自动强制Schema"
+  },
+  {
+    "table": "T07",
+    "field": "description",
+    "section": "T07 · locationSnapshots",
+    "source": "P1 world.locations[i].description；合并按字段融合保留",
+    "update": "合并更新description；UI对应字段保存覆盖，profile仅ageText"
+  },
+  {
+    "table": "T07",
+    "field": "confidence",
+    "section": "T07 · locationSnapshots",
+    "source": "P1模型0–1；补点固定0.6；实体复制",
+    "update": "无confidence<0.6自动阻止入库"
+  },
+  {
+    "table": "T07",
+    "field": "frequency",
+    "section": "T07 · locationSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T07",
+    "field": "frequency.chapters",
+    "section": "T07 · locationSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T07",
+    "field": "frequency.mentions",
+    "section": "T07 · locationSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T07",
+    "field": "frequency.scopeChapters",
+    "section": "T07 · locationSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T07",
+    "field": "frequency.percentile",
+    "section": "T07 · locationSnapshots",
+    "source": "代码扫描最终主名正文命中",
+    "update": "合并末重算；chapters原章去重，mentions非重叠匹配"
+  },
+  {
+    "table": "T07",
+    "field": "sourceChapters",
+    "section": "T07 · locationSnapshots",
+    "source": "合并来源chapterIndex并集numeric排序",
+    "update": "范围选择同时检查它；不拿来源章冒充真实主名出场"
+  },
+  {
+    "table": "T07",
+    "field": "mergeNotes",
+    "section": "T07 · locationSnapshots",
+    "source": "本地冲突或AI merge_notes并集",
+    "update": "可在详情查看，无单独解决按钮"
+  },
+  {
+    "table": "T07",
+    "field": "aliases",
+    "section": "T07 · locationSnapshots",
+    "source": "合并所有称呼去主名，或CSV人工输入",
+    "update": "数组并集/人工替换；缺省不自动视为[]，实体构造有明确默认"
+  },
+  {
+    "table": "T07",
+    "field": "id",
+    "section": "T07 · locationSnapshots",
+    "source": "C{chapterIndex}-L{去重后序号至少3位}",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T07",
+    "field": "bookId",
+    "section": "T07 · locationSnapshots",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T07",
+    "field": "chapterIndex",
+    "section": "T07 · locationSnapshots",
+    "source": "分章序号/切块字符串；快照来自当前章",
+    "update": "节点和快照创建后不随并入重新编号"
+  },
+  {
+    "table": "T07",
+    "field": "chapterName",
+    "section": "T07 · locationSnapshots",
+    "source": "切章标题；P1复制当前章",
+    "update": "非自动从原文件名推断"
+  },
+  {
+    "table": "T07",
+    "field": "updatedAt",
+    "section": "T07 · locationSnapshots",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T08",
+    "field": "name",
+    "section": "T08 · nodes",
+    "source": "P1主称呼/归并保留或人工输入",
+    "update": "草稿表单允许空写undefined，不自动强制Schema"
+  },
+  {
+    "table": "T08",
+    "field": "summary",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].summary；检查new_nodes[i].summary",
+    "update": "普通编辑summary按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "process",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].process；检查new_nodes[i].process",
+    "update": "普通编辑process按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "actors",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].actors；检查new_nodes[i].actors",
+    "update": "普通编辑actors按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "targets",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].targets；检查new_nodes[i].targets",
+    "update": "普通编辑targets按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "world_delta",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].world_delta；检查new_nodes[i].world_delta",
+    "update": "普通编辑world_delta按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "new_facts",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].new_facts；检查new_nodes[i].new_facts",
+    "update": "普通编辑new_facts按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "started_actions",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].started_actions；检查new_nodes[i].started_actions",
+    "update": "普通编辑started_actions按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "time_text",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].time_text；检查new_nodes[i].time_text",
+    "update": "普通编辑time_text按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "time_hint",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].time_hint；检查new_nodes[i].time_hint",
+    "update": "普通编辑time_hint按表单patch替换；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "quote",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].quote；检查new_nodes[i].quote",
+    "update": "普通编辑quote无直接UI编辑；补点时从已验证提取结果复制；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "offset",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].offset；检查new_nodes[i].offset",
+    "update": "普通编辑offset无直接UI编辑；补点时从已验证提取结果复制；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "confidence",
+    "section": "T08 · nodes",
+    "source": "P1模型0–1；补点固定0.6；实体复制",
+    "update": "无confidence<0.6自动阻止入库"
+  },
+  {
+    "table": "T08",
+    "field": "id",
+    "section": "T08 · nodes",
+    "source": "C{chapterIndex}-N{序号至少3位}；补点取本章已有最大序号+1",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T08",
+    "field": "bookId",
+    "section": "T08 · nodes",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T08",
+    "field": "chapterIndex",
+    "section": "T08 · nodes",
+    "source": "分章序号/切块字符串；快照来自当前章",
+    "update": "节点和快照创建后不随并入重新编号"
+  },
+  {
+    "table": "T08",
+    "field": "chapterName",
+    "section": "T08 · nodes",
+    "source": "切章标题；P1复制当前章",
+    "update": "非自动从原文件名推断"
+  },
+  {
+    "table": "T08",
+    "field": "order",
+    "section": "T08 · nodes",
+    "source": "Chapter全书序0起；Node章内序0起",
+    "update": "补点可按引文位置重排Node.order"
+  },
+  {
+    "table": "T08",
+    "field": "createdBy",
+    "section": "T08 · nodes",
+    "source": "P1 narrative.nodes[i].createdBy；检查new_nodes[i].createdBy",
+    "update": "普通编辑createdBy无直接UI编辑；补点时从已验证提取结果复制；相关派生按DF-03/09执行"
+  },
+  {
+    "table": "T08",
+    "field": "eventLineIds",
+    "section": "T08 · nodes",
+    "source": "runLink/deleteNode/deleteEventLine根据线成员反算",
+    "update": "无归属明确[]；P1/导入可能省略"
+  },
+  {
+    "table": "T08",
+    "field": "actorIds",
+    "section": "T08 · nodes",
+    "source": "入库匹配actors+targets所得人物ID并集",
+    "update": "仅入库重算，不随普通actors编辑立即同步"
+  },
+  {
+    "table": "T08",
+    "field": "timeCoord",
+    "section": "T08 · nodes",
+    "source": "只保留导入/已有值；没有自动生成流程",
+    "update": "可参与时间范围和记忆指纹"
+  },
+  {
+    "table": "T08",
+    "field": "timePrecision",
+    "section": "T08 · nodes",
+    "source": "已有或导入值；不由本基线自动推断",
+    "update": "枚举存在不增加世界时钟"
+  },
+  {
+    "table": "T08",
+    "field": "canonicalId",
+    "section": "T08 · nodes",
+    "source": "兼容可携带字段",
+    "update": "无当前自动节点去重流程"
+  },
+  {
+    "table": "T09",
+    "field": "id",
+    "section": "T09 · eventLines",
+    "source": "L{现有L数字最大+1，至少2位}",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T09",
+    "field": "bookId",
+    "section": "T09 · eventLines",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T09",
+    "field": "title",
+    "section": "T09 · eventLines",
+    "source": "create.title（其他操作保留旧title）",
+    "update": "人工title表单/状态可覆盖；普通update不重算成员和更新时间"
+  },
+  {
+    "table": "T09",
+    "field": "nodeIds",
+    "section": "T09 · eventLines",
+    "source": "AI线操作的成员，临时补点ID映射后排序",
+    "update": "append并集/update替换/merge多线并集"
+  },
+  {
+    "table": "T09",
+    "field": "chapters",
+    "section": "T09 · eventLines",
+    "source": "线成员节点chapterIndex去重排序",
+    "update": "runLink和删点重算；不是章节表正文副本"
+  },
+  {
+    "table": "T09",
+    "field": "timeRange",
+    "section": "T09 · eventLines",
+    "source": "当前事件线操作对应字段",
+    "update": "人工timeRange表单/状态可覆盖；普通update不重算成员和更新时间"
+  },
+  {
+    "table": "T09",
+    "field": "cause",
+    "section": "T09 · eventLines",
+    "source": "op.cause",
+    "update": "人工cause表单/状态可覆盖；普通update不重算成员和更新时间"
+  },
+  {
+    "table": "T09",
+    "field": "process",
+    "section": "T09 · eventLines",
+    "source": "op.process",
+    "update": "人工process表单/状态可覆盖；普通update不重算成员和更新时间"
+  },
+  {
+    "table": "T09",
+    "field": "result",
+    "section": "T09 · eventLines",
+    "source": "op.result",
+    "update": "人工result表单/状态可覆盖；普通update不重算成员和更新时间"
+  },
+  {
+    "table": "T09",
+    "field": "lineStatus",
+    "section": "T09 · eventLines",
+    "source": "op.line_status",
+    "update": "人工lineStatus表单/状态可覆盖；普通update不重算成员和更新时间"
+  },
+  {
+    "table": "T09",
+    "field": "characterIds",
+    "section": "T09 · eventLines",
+    "source": "线成员节点actorIds有序并集",
+    "update": "runLink/删点/入库重算，普通线表单不重算"
+  },
+  {
+    "table": "T09",
+    "field": "updatedAt",
+    "section": "T09 · eventLines",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T10",
+    "field": "id",
+    "section": "T10 · characters",
+    "source": "每次入库按来源ID排序从P001重编",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T10",
+    "field": "bookId",
+    "section": "T10 · characters",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T10",
+    "field": "chapterIndex",
+    "section": "T10 · characters",
+    "source": "分章序号/切块字符串；快照来自当前章",
+    "update": "节点和快照创建后不随并入重新编号"
+  },
+  {
+    "table": "T10",
+    "field": "name",
+    "section": "T10 · characters",
+    "source": "P1主称呼/归并保留或人工输入",
+    "update": "草稿表单允许空写undefined，不自动强制Schema"
+  },
+  {
+    "table": "T10",
+    "field": "aliases",
+    "section": "T10 · characters",
+    "source": "合并所有称呼去主名，或CSV人工输入",
+    "update": "数组并集/人工替换；缺省不自动视为[]，实体构造有明确默认"
+  },
+  {
+    "table": "T10",
+    "field": "roleWeight",
+    "section": "T10 · characters",
+    "source": "频次分位或人工Select；实体缺省NPC",
+    "update": "manual优先，非manual重算；不是模型因果重要性"
+  },
+  {
+    "table": "T10",
+    "field": "identity",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.identity",
+    "update": "每次入库清表后重新复制identity；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "profile",
+    "section": "T10 · characters",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T10",
+    "field": "profile.age",
+    "section": "T10 · characters",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T10",
+    "field": "profile.ageText",
+    "section": "T10 · characters",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T10",
+    "field": "profile.gender",
+    "section": "T10 · characters",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T10",
+    "field": "appearance",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.appearance",
+    "update": "每次入库清表后重新复制appearance；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "personality",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.personality",
+    "update": "每次入库清表后重新复制personality；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "background",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.background",
+    "update": "每次入库清表后重新复制background；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "speechStyleSample",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.speech_style_sample",
+    "update": "每次入库清表后重新复制speechStyleSample；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "relations",
+    "section": "T10 · characters",
+    "source": "原文人物关系；按target/type/direction融合",
+    "update": "target始终称呼；无自动全量实体ID转换"
+  },
+  {
+    "table": "T10",
+    "field": "relations[].target",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.relations[]",
+    "update": "每次入库清表后重新复制relations[]；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "relations[].relation_type",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.relations[]",
+    "update": "每次入库清表后重新复制relations[]；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "relations[].relation_label",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.relations[]",
+    "update": "每次入库清表后重新复制relations[]；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "relations[].direction",
+    "section": "T10 · characters",
+    "source": "入库读取characterSnapshots.relations[]",
+    "update": "每次入库清表后重新复制relations[]；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T10",
+    "field": "confidence",
+    "section": "T10 · characters",
+    "source": "P1模型0–1；补点固定0.6；实体复制",
+    "update": "无confidence<0.6自动阻止入库"
+  },
+  {
+    "table": "T10",
+    "field": "updatedAt",
+    "section": "T10 · characters",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T11",
+    "field": "name",
+    "section": "T11 · locations",
+    "source": "P1主称呼/归并保留或人工输入",
+    "update": "草稿表单允许空写undefined，不自动强制Schema"
+  },
+  {
+    "table": "T11",
+    "field": "description",
+    "section": "T11 · locations",
+    "source": "入库读取locationSnapshots.description",
+    "update": "每次入库清表后重新复制description；草稿修改不即时同步；备份恢复可携带"
+  },
+  {
+    "table": "T11",
+    "field": "confidence",
+    "section": "T11 · locations",
+    "source": "P1模型0–1；补点固定0.6；实体复制",
+    "update": "无confidence<0.6自动阻止入库"
+  },
+  {
+    "table": "T11",
+    "field": "id",
+    "section": "T11 · locations",
+    "source": "每次入库按来源ID排序从L001重编",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T11",
+    "field": "aliases",
+    "section": "T11 · locations",
+    "source": "合并所有称呼去主名，或CSV人工输入",
+    "update": "数组并集/人工替换；缺省不自动视为[]，实体构造有明确默认"
+  },
+  {
+    "table": "T11",
+    "field": "bookId",
+    "section": "T11 · locations",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T11",
+    "field": "chapterIndex",
+    "section": "T11 · locations",
+    "source": "分章序号/切块字符串；快照来自当前章",
+    "update": "节点和快照创建后不随并入重新编号"
+  },
+  {
+    "table": "T11",
+    "field": "updatedAt",
+    "section": "T11 · locations",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T12",
+    "field": "bookId",
+    "section": "T12 · compileProgress",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T12",
+    "field": "stage",
+    "section": "T12 · compileProgress",
+    "source": "见本表创建源与对象语义；从提交/表单对应字段复制",
+    "update": "本表生命周期规定覆盖、合并或追加方式"
+  },
+  {
+    "table": "T12",
+    "field": "status",
+    "section": "T12 · compileProgress",
+    "source": "按对象/流程转移表赋值",
+    "update": "不能从同名status推断同一业务语义"
+  },
+  {
+    "table": "T12",
+    "field": "totalChapters",
+    "section": "T12 · compileProgress",
+    "source": "见本表创建源与对象语义；从提交/表单对应字段复制",
+    "update": "本表生命周期规定覆盖、合并或追加方式"
+  },
+  {
+    "table": "T12",
+    "field": "completedChapters",
+    "section": "T12 · compileProgress",
+    "source": "P1章块ID；P2窗口序号字符串；P3 assets/lines",
+    "update": "代码Set/数组更新，样本模式按当前步骤"
+  },
+  {
+    "table": "T12",
+    "field": "failedChapters",
+    "section": "T12 · compileProgress",
+    "source": "P1失败章块；P2失败窗口；P3失败步骤",
+    "update": "成功恢复清对应失败，P3另计上游失败"
+  },
+  {
+    "table": "T12",
+    "field": "lastWindowIndex",
+    "section": "T12 · compileProgress",
+    "source": "P2连续成功窗索引，初-1",
+    "update": "失败后不越过空洞"
+  },
+  {
+    "table": "T12",
+    "field": "planKey",
+    "section": "T12 · compileProgress",
+    "source": "完整JSON{version:4,windows,useAi}；样本JSON{mode,scope}",
+    "update": "不匹配重置窗口恢复"
+  },
+  {
+    "table": "T12",
+    "field": "editorSessionId",
+    "section": "T12 · compileProgress",
+    "source": "编排ensure得到的active session.id",
+    "update": "不匹配时恢复点失效"
+  },
+  {
+    "table": "T12",
+    "field": "testScope",
+    "section": "T12 · compileProgress",
+    "source": "阶段测试P1完成章/块集合",
+    "update": "完整流程不使用其完成标记跳过剩余章"
+  },
+  {
+    "table": "T12",
+    "field": "partialChapters",
+    "section": "T12 · compileProgress",
+    "source": "key为失败章块ID，value缺worldAssets/narrativeAssets",
+    "update": "恢复只请求缺子步骤；全部成功delete键"
+  },
+  {
+    "table": "T12",
+    "field": "partialChapters{key}",
+    "section": "T12 · compileProgress",
+    "source": "见本表创建源与对象语义；从提交/表单对应字段复制",
+    "update": "本表生命周期规定覆盖、合并或追加方式"
+  },
+  {
+    "table": "T12",
+    "field": "updatedAt",
+    "section": "T12 · compileProgress",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T13",
+    "field": "id",
+    "section": "T13 · storyEditorMemory",
+    "source": "当前sessionId，旧无会话id兼容story_editor",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T13",
+    "field": "bookId",
+    "section": "T13 · storyEditorMemory",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T13",
+    "field": "sessionId",
+    "section": "T13 · storyEditorMemory",
+    "source": "当前/历史故事会话ID；旧数据缺省空串",
+    "update": "会话归属过滤；不能查另一书"
+  },
+  {
+    "table": "T13",
+    "field": "revision",
+    "section": "T13 · storyEditorMemory",
+    "source": "记忆预期版本+1；note引用本次revision",
+    "update": "提交前校验memory.revision防冲突"
+  },
+  {
+    "table": "T13",
+    "field": "workingSummary",
+    "section": "T13 · storyEditorMemory",
+    "source": "memory_update.workingSummary（由代码补元数据）",
+    "update": "同批事件/记忆事务覆盖当前会话记录"
+  },
+  {
+    "table": "T13",
+    "field": "dataFingerprint",
+    "section": "T13 · storyEditorMemory",
+    "source": "全库选定事实与assetFingerprint SHA256",
+    "update": "读记忆时计算dataChanged；不保存派生显示布尔"
+  },
+  {
+    "table": "T13",
+    "field": "updatedAt",
+    "section": "T13 · storyEditorMemory",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T14",
+    "field": "key",
+    "section": "T14 · storyEditorNotes",
+    "source": "memory_update.notes[i].key；元数据来自当前work",
+    "update": "按sessionId+key更新；原kind不允许改变；stale为读取派生"
+  },
+  {
+    "table": "T14",
+    "field": "kind",
+    "section": "T14 · storyEditorNotes",
+    "source": "memory_update.notes[i].kind；元数据来自当前work",
+    "update": "按sessionId+key更新；原kind不允许改变；stale为读取派生"
+  },
+  {
+    "table": "T14",
+    "field": "status",
+    "section": "T14 · storyEditorNotes",
+    "source": "按对象/流程转移表赋值",
+    "update": "不能从同名status推断同一业务语义"
+  },
+  {
+    "table": "T14",
+    "field": "statement",
+    "section": "T14 · storyEditorNotes",
+    "source": "memory_update.notes[i].statement；元数据来自当前work",
+    "update": "按sessionId+key更新；原kind不允许改变；stale为读取派生"
+  },
+  {
+    "table": "T14",
+    "field": "nodeIds",
+    "section": "T14 · storyEditorNotes",
+    "source": "AI线操作的成员，临时补点ID映射后排序",
+    "update": "append并集/update替换/merge多线并集"
+  },
+  {
+    "table": "T14",
+    "field": "lineIds",
+    "section": "T14 · storyEditorNotes",
+    "source": "memory_update.notes[i].lineIds；元数据来自当前work",
+    "update": "按sessionId+key更新；原kind不允许改变；stale为读取派生"
+  },
+  {
+    "table": "T14",
+    "field": "evidence",
+    "section": "T14 · storyEditorNotes",
+    "source": "memory_update.notes[i].evidence；元数据来自当前work",
+    "update": "按sessionId+key更新；原kind不允许改变；stale为读取派生"
+  },
+  {
+    "table": "T14",
+    "field": "evidence[].chapterIndex",
+    "section": "T14 · storyEditorNotes",
+    "source": "memory_update.notes[i].evidence[]；元数据来自当前work",
+    "update": "按sessionId+key更新；原kind不允许改变；stale为读取派生"
+  },
+  {
+    "table": "T14",
+    "field": "evidence[].quote",
+    "section": "T14 · storyEditorNotes",
+    "source": "memory_update.notes[i].evidence[]；元数据来自当前work",
+    "update": "按sessionId+key更新；原kind不允许改变；stale为读取派生"
+  },
+  {
+    "table": "T14",
+    "field": "id",
+    "section": "T14 · storyEditorNotes",
+    "source": "同会话key沿用旧id；新增取本书SN数字最大+1，至少6位",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T14",
+    "field": "bookId",
+    "section": "T14 · storyEditorNotes",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T14",
+    "field": "revision",
+    "section": "T14 · storyEditorNotes",
+    "source": "记忆预期版本+1；note引用本次revision",
+    "update": "提交前校验memory.revision防冲突"
+  },
+  {
+    "table": "T14",
+    "field": "sessionId",
+    "section": "T14 · storyEditorNotes",
+    "source": "当前/历史故事会话ID；旧数据缺省空串",
+    "update": "会话归属过滤；不能查另一书"
+  },
+  {
+    "table": "T14",
+    "field": "stage",
+    "section": "T14 · storyEditorNotes",
+    "source": "memory_update.notes[i].stage；元数据来自当前work",
+    "update": "按sessionId+key更新；原kind不允许改变；stale为读取派生"
+  },
+  {
+    "table": "T14",
+    "field": "basisFingerprint",
+    "section": "T14 · storyEditorNotes",
+    "source": "本note引用事实/原文与资产指纹",
+    "update": "读取时比对得到current/stale，不改note.status"
+  },
+  {
+    "table": "T14",
+    "field": "createdAt",
+    "section": "T14 · storyEditorNotes",
+    "source": "创建时new Date().toISOString()",
+    "update": "除恢复既有条目外不更新"
+  },
+  {
+    "table": "T14",
+    "field": "updatedAt",
+    "section": "T14 · storyEditorNotes",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T15",
+    "field": "id",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "work含sessionId及排序去重scopeIds JSON的SHA256 hex",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T15",
+    "field": "bookId",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T15",
+    "field": "stage",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "当前work.stage或该批执行结果",
+    "update": "成功同批事务/失败取消单写；恢复时核指纹和成员"
+  },
+  {
+    "table": "T15",
+    "field": "sessionId",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "当前/历史故事会话ID；旧数据缺省空串",
+    "update": "会话归属过滤；不能查另一书"
+  },
+  {
+    "table": "T15",
+    "field": "phase",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "当前work.phase或该批执行结果",
+    "update": "成功同批事务/失败取消单写；恢复时核指纹和成员"
+  },
+  {
+    "table": "T15",
+    "field": "scopeIds",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "当前work.scopeIds或该批执行结果",
+    "update": "成功同批事务/失败取消单写；恢复时核指纹和成员"
+  },
+  {
+    "table": "T15",
+    "field": "sourceFingerprint",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "该批范围的原文/节点或线/资产指纹",
+    "update": "相同completed且归属未变才跳过"
+  },
+  {
+    "table": "T15",
+    "field": "status",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "按对象/流程转移表赋值",
+    "update": "不能从同名status推断同一业务语义"
+  },
+  {
+    "table": "T15",
+    "field": "memberships",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "该link批每节点的线ID快照",
+    "update": "恢复比较当前归属，review通常空映射"
+  },
+  {
+    "table": "T15",
+    "field": "memberships{key}",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "当前work.memberships{key}或该批执行结果",
+    "update": "成功同批事务/失败取消单写；恢复时核指纹和成员"
+  },
+  {
+    "table": "T15",
+    "field": "updatedAt",
+    "section": "T15 · storyEditorCheckpoints",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T16",
+    "field": "id",
+    "section": "T16 · storySessions",
+    "source": "crypto.randomUUID()",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T16",
+    "field": "bookId",
+    "section": "T16 · storySessions",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T16",
+    "field": "profile",
+    "section": "T16 · storySessions",
+    "source": "模型精确年龄/原文描述/性别；合并冲突保留说明",
+    "update": "ageText点路径更新；保留age/gender"
+  },
+  {
+    "table": "T16",
+    "field": "kind",
+    "section": "T16 · storySessions",
+    "source": "newReview?review:initial",
+    "update": "会话头服务按对应生命周期更新，UI不能直接编辑"
+  },
+  {
+    "table": "T16",
+    "field": "title",
+    "section": "T16 · storySessions",
+    "source": "初次故事编辑或全书复核n",
+    "update": "会话头服务按对应生命周期更新，UI不能直接编辑"
+  },
+  {
+    "table": "T16",
+    "field": "status",
+    "section": "T16 · storySessions",
+    "source": "按对象/流程转移表赋值",
+    "update": "不能从同名status推断同一业务语义"
+  },
+  {
+    "table": "T16",
+    "field": "parentSessionId",
+    "section": "T16 · storySessions",
+    "source": "归档旧active.id",
+    "update": "会话头服务按对应生命周期更新，UI不能直接编辑"
+  },
+  {
+    "table": "T16",
+    "field": "leafId",
+    "section": "T16 · storySessions",
+    "source": "最新追加条目ID",
+    "update": "投影从末端追父链；恢复校验所属会话"
+  },
+  {
+    "table": "T16",
+    "field": "nextOrdinal",
+    "section": "T16 · storySessions",
+    "source": "新会话0；每次append+1",
+    "update": "与条目新增和leafId同事务"
+  },
+  {
+    "table": "T16",
+    "field": "createdAt",
+    "section": "T16 · storySessions",
+    "source": "创建时new Date().toISOString()",
+    "update": "除恢复既有条目外不更新"
+  },
+  {
+    "table": "T16",
+    "field": "updatedAt",
+    "section": "T16 · storySessions",
+    "source": "相应写入当前ISO时间",
+    "update": "并非所有编辑都会更新：节点/事件线普通更新不统一加时间"
+  },
+  {
+    "table": "T16",
+    "field": "leaseOwner",
+    "section": "T16 · storySessions",
+    "source": "acquire生成UUID",
+    "update": "release清除；不导出恢复旧执行租约"
+  },
+  {
+    "table": "T16",
+    "field": "leaseUntil",
+    "section": "T16 · storySessions",
+    "source": "取得/持owner追加时Date.now()+300000",
+    "update": "毫秒值；失去owner探测后可恢复"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.id",
+    "section": "T17 · storySessionEntries",
+    "source": "crypto.randomUUID()",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.sessionId",
+    "section": "T17 · storySessionEntries",
+    "source": "当前/历史故事会话ID；旧数据缺省空串",
+    "update": "会话归属过滤；不能查另一书"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.bookId",
+    "section": "T17 · storySessionEntries",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.ordinal",
+    "section": "T17 · storySessionEntries",
+    "source": "append时session.nextOrdinal",
+    "update": "会话内唯一，从0递增"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.parentId",
+    "section": "T17 · storySessionEntries",
+    "source": "append时旧leafId，无旧条目null",
+    "update": "必须同session较小序号；原始链不因压缩重写"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.createdAt",
+    "section": "T17 · storySessionEntries",
+    "source": "创建时new Date().toISOString()",
+    "update": "除恢复既有条目外不更新"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.type",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.type（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.message",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.message（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.message.role",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.message（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.message.content",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.message（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支1>.message.timestamp",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.message（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.id",
+    "section": "T17 · storySessionEntries",
+    "source": "crypto.randomUUID()",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.sessionId",
+    "section": "T17 · storySessionEntries",
+    "source": "当前/历史故事会话ID；旧数据缺省空串",
+    "update": "会话归属过滤；不能查另一书"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.bookId",
+    "section": "T17 · storySessionEntries",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.ordinal",
+    "section": "T17 · storySessionEntries",
+    "source": "append时session.nextOrdinal",
+    "update": "会话内唯一，从0递增"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.parentId",
+    "section": "T17 · storySessionEntries",
+    "source": "append时旧leafId，无旧条目null",
+    "update": "必须同session较小序号；原始链不因压缩重写"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.createdAt",
+    "section": "T17 · storySessionEntries",
+    "source": "创建时new Date().toISOString()",
+    "update": "除恢复既有条目外不更新"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.type",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.type（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.summary",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.summary（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.firstKeptEntryId",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.firstKeptEntryId（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.tokensBefore",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.tokensBefore（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.tokensAfter",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.tokensAfter（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.systemMessage",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.systemMessage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.systemMessage.role",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.systemMessage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.systemMessage.content",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.systemMessage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.systemMessage.timestamp",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.systemMessage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.usage",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.usage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.usage.input",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.usage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.usage.output",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.usage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.usage.totalTokens",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.usage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支2>.usage.cost",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.usage（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.id",
+    "section": "T17 · storySessionEntries",
+    "source": "crypto.randomUUID()",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.sessionId",
+    "section": "T17 · storySessionEntries",
+    "source": "当前/历史故事会话ID；旧数据缺省空串",
+    "update": "会话归属过滤；不能查另一书"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.bookId",
+    "section": "T17 · storySessionEntries",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.ordinal",
+    "section": "T17 · storySessionEntries",
+    "source": "append时session.nextOrdinal",
+    "update": "会话内唯一，从0递增"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.parentId",
+    "section": "T17 · storySessionEntries",
+    "source": "append时旧leafId，无旧条目null",
+    "update": "必须同session较小序号；原始链不因压缩重写"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.createdAt",
+    "section": "T17 · storySessionEntries",
+    "source": "创建时new Date().toISOString()",
+    "update": "除恢复既有条目外不更新"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.type",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.type（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.omittedEntryIds",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.omittedEntryIds（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支3>.reason",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.reason（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支4>.id",
+    "section": "T17 · storySessionEntries",
+    "source": "crypto.randomUUID()",
+    "update": "创建后作为本表主键；覆盖/重编/恢复的例外按本表生命周期执行"
+  },
+  {
+    "table": "T17",
+    "field": "<分支4>.sessionId",
+    "section": "T17 · storySessionEntries",
+    "source": "当前/历史故事会话ID；旧数据缺省空串",
+    "update": "会话归属过滤；不能查另一书"
+  },
+  {
+    "table": "T17",
+    "field": "<分支4>.bookId",
+    "section": "T17 · storySessionEntries",
+    "source": "当前书ID；备份恢复换newBookId",
+    "update": "归属冗余字段；选库仍按bookId"
+  },
+  {
+    "table": "T17",
+    "field": "<分支4>.ordinal",
+    "section": "T17 · storySessionEntries",
+    "source": "append时session.nextOrdinal",
+    "update": "会话内唯一，从0递增"
+  },
+  {
+    "table": "T17",
+    "field": "<分支4>.parentId",
+    "section": "T17 · storySessionEntries",
+    "source": "append时旧leafId，无旧条目null",
+    "update": "必须同session较小序号；原始链不因压缩重写"
+  },
+  {
+    "table": "T17",
+    "field": "<分支4>.createdAt",
+    "section": "T17 · storySessionEntries",
+    "source": "创建时new Date().toISOString()",
+    "update": "除恢复既有条目外不更新"
+  },
+  {
+    "table": "T17",
+    "field": "<分支4>.type",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.type（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  },
+  {
+    "table": "T17",
+    "field": "<分支4>.summary",
+    "section": "T17 · storySessionEntries",
+    "source": "appendSessionEntry的data.summary（type决定字段）",
+    "update": "追加后不回写原条目；compaction/omit改变投影不删除消息"
+  }
+]

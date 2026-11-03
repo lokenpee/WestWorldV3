@@ -1,0 +1,42 @@
+[
+  {
+    "key": "character:C1-P001",
+    "bookId": "bk_acceptance",
+    "kind": "character",
+    "originId": "C1-P001",
+    "currentId": "C1-P001",
+    "state": "live",
+    "revision": 1,
+    "updatedAt": "2026-10-23T00:00:00.000Z"
+  },
+  {
+    "key": "location:C1-L001",
+    "bookId": "bk_acceptance",
+    "kind": "location",
+    "originId": "C1-L001",
+    "currentId": "C1-L001",
+    "state": "live",
+    "revision": 1,
+    "updatedAt": "2026-10-23T00:00:00.000Z"
+  },
+  {
+    "key": "node:C1-N001",
+    "bookId": "bk_acceptance",
+    "kind": "node",
+    "originId": "C1-N001",
+    "currentId": "C1-N001",
+    "state": "live",
+    "revision": 1,
+    "updatedAt": "2026-10-23T00:00:00.000Z"
+  },
+  {
+    "key": "eventLine:L01",
+    "bookId": "bk_acceptance",
+    "kind": "eventLine",
+    "originId": "L01",
+    "currentId": "L01",
+    "state": "live",
+    "revision": 1,
+    "updatedAt": "2026-10-23T00:00:00.000Z"
+  }
+]

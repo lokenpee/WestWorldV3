@@ -1,0 +1,651 @@
+{
+  "script": [
+    {
+      "tool": "query_nodes",
+      "args": {}
+    },
+    {
+      "tool": "submit_result",
+      "args": {
+        "answer": "confirmed"
+      }
+    }
+  ],
+  "requests": [
+    {
+      "url": "https://api.deepseek.com/chat/completions",
+      "body": {
+        "model": "deepseek-v4-pro",
+        "messages": [
+          {
+            "role": "system",
+            "content": "职责：人物／地点整理。整理本次人物或地点资料。只从当前输入和数据库查询事实，不读取故事编辑工作记忆。\n核对测试样本后提交answer字符串。\n最多 6 轮（其中最后一轮仅能提交）；提交结构或引用错误另保留最多 1 次修正，修正轮仅能重新提交。按工具错误修正上一份提交。拿不准的合并不要做，禁止编造原文。"
+          },
+          {
+            "role": "user",
+            "content": "核对当前节点。"
+          }
+        ],
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "max_tokens": 384000,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "query_nodes",
+              "description": "检索事件节点摘要。支持章节、人物、事件线过滤和 offset 分页；细节用 get_node_detail。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "chapter_range": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "恰好两个字符串：[起始章节, 结束章节]。",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actor": {
+                    "type": "string"
+                  },
+                  "event_line_id": {
+                    "type": "string"
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "get_node_detail",
+              "description": "按 ID 读取节点详情，包含原文摘录与完整事件字段。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "query_event_lines",
+              "description": "检索事件线摘要。确认跨窗口是否同一件事；详情用 get_event_line_detail。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "chapter_range": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "恰好两个字符串：[起始章节, 结束章节]。",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "character": {
+                    "type": "string"
+                  },
+                  "name_like": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "open",
+                        "type": "string"
+                      },
+                      {
+                        "const": "closed",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "get_event_line_detail",
+              "description": "按 ID 读取完整事件线，核对成员与连贯性。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "query_characters",
+              "description": "查询草稿人物主名、全部别名与身份；判定是否同人，不能仅凭同姓合并。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "name_like": {
+                    "type": "string"
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "get_character_detail",
+              "description": "读取人物草稿完整档案、关系与冲突信息。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "query_locations",
+              "description": "查询地点与别名，区分同一地点、内部区域和相邻地点。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "name_like": {
+                    "type": "string"
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "read_original",
+              "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapter_range"
+                ],
+                "properties": {
+                  "chapter_range": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "恰好两个字符串：[起始章节, 结束章节]。",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxChars": {
+                    "minimum": 1,
+                    "maximum": 200000,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "submit_result",
+              "description": "提交符合 Schema 的结果；不直接修改数据库。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "answer"
+                ],
+                "properties": {
+                  "answer": {
+                    "type": "string"
+                  }
+                }
+              },
+              "strict": false
+            }
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        }
+      }
+    },
+    {
+      "url": "https://api.deepseek.com/chat/completions",
+      "body": {
+        "model": "deepseek-v4-pro",
+        "messages": [
+          {
+            "role": "system",
+            "content": "职责：人物／地点整理。整理本次人物或地点资料。只从当前输入和数据库查询事实，不读取故事编辑工作记忆。\n核对测试样本后提交answer字符串。\n最多 6 轮（其中最后一轮仅能提交）；提交结构或引用错误另保留最多 1 次修正，修正轮仅能重新提交。按工具错误修正上一份提交。拿不准的合并不要做，禁止编造原文。"
+          },
+          {
+            "role": "user",
+            "content": "核对当前节点。"
+          },
+          {
+            "role": "assistant",
+            "content": null,
+            "reasoning_content": "核对测试样本。",
+            "tool_calls": [
+              {
+                "id": "replay_call_0",
+                "type": "function",
+                "function": {
+                  "name": "query_nodes",
+                  "arguments": "{}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "content": "{\"data\":[{\"id\":\"C1-N001\",\"name\":\"码头会面\",\"summary\":\"沈青在码头见到顾衡。\",\"actors\":[\"沈青\",\"顾衡\"],\"chapterIndex\":\"1\"},{\"id\":\"C1-N002\",\"name\":\"交付书信\",\"summary\":\"顾衡将信交给沈青。\",\"actors\":[\"顾衡\",\"沈青\"],\"chapterIndex\":\"1\"}],\"totalCount\":2,\"truncated\":false,\"nextOffset\":null}",
+            "tool_call_id": "replay_call_0"
+          }
+        ],
+        "stream": true,
+        "stream_options": {
+          "include_usage": true
+        },
+        "max_tokens": 384000,
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "query_nodes",
+              "description": "检索事件节点摘要。支持章节、人物、事件线过滤和 offset 分页；细节用 get_node_detail。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "chapter_range": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "恰好两个字符串：[起始章节, 结束章节]。",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actor": {
+                    "type": "string"
+                  },
+                  "event_line_id": {
+                    "type": "string"
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "get_node_detail",
+              "description": "按 ID 读取节点详情，包含原文摘录与完整事件字段。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "query_event_lines",
+              "description": "检索事件线摘要。确认跨窗口是否同一件事；详情用 get_event_line_detail。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "chapter_range": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "恰好两个字符串：[起始章节, 结束章节]。",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "character": {
+                    "type": "string"
+                  },
+                  "name_like": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "open",
+                        "type": "string"
+                      },
+                      {
+                        "const": "closed",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "get_event_line_detail",
+              "description": "按 ID 读取完整事件线，核对成员与连贯性。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "query_characters",
+              "description": "查询草稿人物主名、全部别名与身份；判定是否同人，不能仅凭同姓合并。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "name_like": {
+                    "type": "string"
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "get_character_detail",
+              "description": "读取人物草稿完整档案、关系与冲突信息。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "query_locations",
+              "description": "查询地点与别名，区分同一地点、内部区域和相邻地点。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "properties": {
+                  "name_like": {
+                    "type": "string"
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "limit": {
+                    "minimum": 1,
+                    "maximum": 200,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "read_original",
+              "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "chapter_range"
+                ],
+                "properties": {
+                  "chapter_range": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "恰好两个字符串：[起始章节, 结束章节]。",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "offset": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "maxChars": {
+                    "minimum": 1,
+                    "maximum": 200000,
+                    "type": "integer"
+                  }
+                }
+              },
+              "strict": false
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "submit_result",
+              "description": "提交符合 Schema 的结果；不直接修改数据库。",
+              "parameters": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "answer"
+                ],
+                "properties": {
+                  "answer": {
+                    "type": "string"
+                  }
+                }
+              },
+              "strict": false
+            }
+          }
+        ],
+        "thinking": {
+          "type": "disabled"
+        }
+      }
+    }
+  ],
+  "result": {
+    "ok": true,
+    "data": {
+      "answer": "confirmed"
+    },
+    "stopReason": "toolUse",
+    "attemptsUsage": [
+      {
+        "input": 100,
+        "output": 30,
+        "totalTokens": 130,
+        "cost": 0.0002508
+      },
+      {
+        "input": 100,
+        "output": 30,
+        "totalTokens": 130,
+        "cost": 0.0002508
+      }
+    ],
+    "attempts": 2,
+    "degraded": false
+  }
+}

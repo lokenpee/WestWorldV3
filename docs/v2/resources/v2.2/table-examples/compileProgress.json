@@ -1,0 +1,25 @@
+[
+  {
+    "bookId": "bk_acceptance",
+    "stage": "P1",
+    "status": "completed",
+    "totalChapters": 1,
+    "completedChapters": [
+      "1"
+    ],
+    "failedChapters": [],
+    "updatedAt": "2000-01-01T00:00:00.000Z",
+    "scope": "fullBook",
+    "planVersion": "2.2",
+    "runId": "run_example",
+    "phase": "narrativeAssets",
+    "unit": "chapter",
+    "validity": "current",
+    "coverage": {
+      "total": 2,
+      "checked": 2,
+      "pendingIds": []
+    },
+    "dependencyFingerprint": "example-not-a-valid-runtime-fingerprint"
+  }
+]

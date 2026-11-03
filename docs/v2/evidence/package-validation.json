@@ -1,0 +1,16 @@
+{
+  "formalDocuments": 13,
+  "schemas": 52,
+  "acceptanceCases": 39,
+  "compatibilityCases": 16,
+  "toolCounts": {
+    "asset_editor": 8,
+    "story_editor": 13
+  },
+  "fixtureBackupsChecked": 2,
+  "sourceFilesChecked": 143,
+  "brokenLinks": [],
+  "failures": [],
+  "checkLayer": "mechanical-structure-and-references-only",
+  "independentApplicationRebuilt": false
+}

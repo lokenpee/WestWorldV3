@@ -1,0 +1,822 @@
+[
+  {
+    "id": "DF-01",
+    "title": "小说预览与保存",
+    "trigger": "OP-06/09/10",
+    "steps": [
+      {
+        "input": "File首文件",
+        "read": "浏览器bytes",
+        "transform": "解码UTF8/GBK，按regex切章/10000切块",
+        "write": "局部preview.{decode,chapters,regex,bytes}",
+        "commit": "仅内存，无DB事务",
+        "failure": "错regex/解码显示错误，旧preview保留",
+        "consumer": "预览200行与导入守卫"
+      },
+      {
+        "input": "preview有效、用户确认",
+        "read": "preview.decode.text与regex",
+        "transform": "uuid生成书ID、filename去最后扩展名作为title",
+        "write": "T03.{id,title,sourceFileName,createdAt}",
+        "commit": "先await设置库单行put",
+        "failure": "后续失败没有跨库回滚",
+        "consumer": "书架新卡片"
+      },
+      {
+        "input": "ChapterDraft[]",
+        "read": "每章index/name/text/order/charCount",
+        "transform": "元数据与正文拆表，共享bookId/chapterIndex",
+        "write": "T04全记录；T05.{bookId,chapterIndex,text}",
+        "commit": "本书两表同事务bulkPut",
+        "failure": "事务失败两表不部分写；T03可能已存在",
+        "consumer": "窗口、P1、章数"
+      },
+      {
+        "input": "保存章节成功",
+        "read": "drafts.length",
+        "transform": "构造stage=P1/status=idle/完成失败[]",
+        "write": "T12.P1",
+        "commit": "独立put，不与建书/章节合为同事务",
+        "failure": "这里失败仍可能已有书/章节",
+        "consumer": "入库按钮禁用、可阶段处理"
+      },
+      {
+        "input": "仅导入或完整模式",
+        "read": "新bookId",
+        "transform": "仅导入reset任务；完整模式beginRun后不await runAll",
+        "write": "ui.bookId；showImport=false；assetTab人物",
+        "commit": "仅内存状态；完整后续另走DF-02",
+        "failure": "任务catch写failed日志，书不删除",
+        "consumer": "资产工作台"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P02",
+        "P03",
+        "P05"
+      ],
+      "before": {
+        "books": [],
+        "chapters": []
+      },
+      "input": {
+        "id": "bk_acceptance",
+        "title": "测试书",
+        "text": "第一章 会面\n甲见乙。"
+      },
+      "after": {
+        "books.count": 1,
+        "chapters": [
+          {
+            "chapterIndex": "1",
+            "order": 0,
+            "charCount": 11
+          }
+        ],
+        "chapterTexts.0.text": "第一章 会面\n甲见乙。",
+        "P1.status": "idle"
+      },
+      "note": "charCount应取具体字符串UTF16长度；可执行用例直接核正文/章数，完整精确记录由import结果。"
+    }
+  },
+  {
+    "id": "DF-02",
+    "title": "完整编排与取消恢复",
+    "trigger": "OP-10/27/29",
+    "steps": [
+      {
+        "input": "bookId/配置/signal",
+        "read": "T04按order、T12各阶段、T16 active",
+        "transform": "建100/20窗口、planKey，判断恢复点，ensure会话",
+        "write": "T12.P2 running；必要T16建/归档",
+        "commit": "分别事务；同JS同书锁包围整个编排",
+        "failure": "锁占用拒绝；不删除已有资产",
+        "consumer": "窗口调度"
+      },
+      {
+        "input": "当前窗口未完成章",
+        "read": "T05.text、T12.P1完成/partial",
+        "transform": "世界/叙事独立调用，分配ID；成功部分可用",
+        "write": "T06/T07/T08成功数组bulkPut",
+        "commit": "三个资产表同事务，随后独立写T12.P1",
+        "failure": "失败缺子步骤进入partial；signal取消则不提交在途",
+        "consumer": "进度、列表，恢复只补失败"
+      },
+      {
+        "input": "P1本窗处理结束",
+        "read": "T06/T07与来源/正文",
+        "transform": "DF-05归并；DF-03串联",
+        "write": "相应草稿与T13–17；T12.P2完成/失败窗",
+        "commit": "各阶段各批提交，非整窗全原子",
+        "failure": "degraded/失败窗不推进连续checkpoint，但可处理后窗",
+        "consumer": "可继续而不丢先前结果"
+      },
+      {
+        "input": "所有窗口处理后",
+        "read": "全书当前草稿",
+        "transform": "全局合并与runLink(review=true)",
+        "write": "T12.P3；T06–09/T13–17",
+        "commit": "本阶段分批保存，最后T12.P3状态",
+        "failure": "P1/P2/P3任失败则P3failed；取消不自动入库",
+        "consumer": "P3completed仅为当前范围门槛"
+      },
+      {
+        "input": "取消/刷新/继续",
+        "read": "T12与T15已有检查点",
+        "transform": "abort或重读恢复方案；刷新不后台跑",
+        "write": "已提交不撤销；后续T12cancelled/paused显示",
+        "commit": "无总回滚；继续才运行",
+        "failure": "sleep可延迟取消；旧runtime不代表后台存活",
+        "consumer": "CompilePanel、继续按钮"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P06",
+        "P07",
+        "P24"
+      ],
+      "note": "P06明确失败世界/叙事恢复请求次数和前后表；窗口P24明确第100章切块与181原章；完整真实模型全书效果另列验证范围。"
+    }
+  },
+  {
+    "id": "DF-03",
+    "title": "独立阶段与事件串联提交",
+    "trigger": "OP-28与AUTO-12/13",
+    "steps": [
+      {
+        "input": "step/sample",
+        "read": "T04、T12.P1",
+        "transform": "sample前100原章；非P1只核样本P1全完成",
+        "write": "删除T12.P3；p1另删T12.P2",
+        "commit": "前置成功后删除旧完成标记",
+        "failure": "P1未齐先报错，不擅加P2先后守卫",
+        "consumer": "入库放行撤销"
+      },
+      {
+        "input": "P2/P3故事检查",
+        "read": "T08当前范围、T09全书、T06/T07、T13–17",
+        "transform": "按400节点给ID/摘要，工具按需查询；核Schema/原文/引用",
+        "write": "工作内存nodeMap/lineMap，尚不生效",
+        "commit": "只有工具submit成功仍不等于DB提交",
+        "failure": "失败记录T15 failed/cancelled，保前一批",
+        "consumer": "准备提交"
+      },
+      {
+        "input": "有效新节点/操作/记忆",
+        "read": "T05引文与当前T08/T09/T13版本/资产signature",
+        "transform": "临时ID→正式ID；成员排序；重算chapters/characterIds/eventLineIds；准备指纹",
+        "write": "T08/T09/T13/T14/T15及T17 commit，T16末端",
+        "commit": "同批多表事务，事务内再核旧读值/版本/会话",
+        "failure": "冲突抛错，全批回滚；不能覆盖人工修改",
+        "consumer": "列表/图/记忆useLiveQuery"
+      },
+      {
+        "input": "阶段完成",
+        "read": "本次失败和旧assets失败",
+        "transform": "stage样本模式保存testScope；p3检查所有已提取，不补未提取",
+        "write": "T12.P2/P3状态/完成失败；runtime事件",
+        "commit": "进度独立事务",
+        "failure": "样本通过不表示全书通过；失败不放行",
+        "consumer": "测试草稿提示、入库测试草稿"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P17",
+        "P18",
+        "P19",
+        "P20"
+      ],
+      "before": {
+        "eventLines": [],
+        "storyEditorMemory": []
+      },
+      "input": {
+        "event_line_ops": [
+          {
+            "op": "create",
+            "title": "会面线",
+            "node_ids": [
+              "C1-N001"
+            ],
+            "cause": "会面",
+            "process": "见面",
+            "result": "",
+            "line_status": "open"
+          }
+        ],
+        "memory_update": {
+          "workingSummary": "已核对会面",
+          "notes": []
+        }
+      },
+      "after": {
+        "line": "L01",
+        "nodeIds": [
+          "C1-N001"
+        ],
+        "node.eventLineIds": [
+          "L01"
+        ],
+        "memory.revision": 1,
+        "memory.workingSummary": "已核对会面",
+        "checkpoint.status": "completed"
+      },
+      "failureAfter": {
+        "lineCount": 0,
+        "memoryCount": 0,
+        "checkpoint.status": "failed"
+      }
+    }
+  },
+  {
+    "id": "DF-04",
+    "title": "单章试跑不保存资产",
+    "trigger": "OP-32/33",
+    "steps": [
+      {
+        "input": "bookId",
+        "read": "T04首order章、T05完整正文",
+        "transform": "使用P1两次请求同完整章输入",
+        "write": "仅局部result，含三类资产与失败",
+        "commit": "不调用saveP1Result或putProgress",
+        "failure": "请求异常显示error；子步骤失败仍在result",
+        "consumer": "左右对照与人工判断"
+      },
+      {
+        "input": "结果显示",
+        "read": "sourceText、usages",
+        "transform": "sourceText.slice(0,2000)，cost求和，durationMs",
+        "write": "局部视图与文案",
+        "commit": "无业务保存",
+        "failure": "关闭不发abort，结果随卸载丢",
+        "consumer": "重跑按钮与费用说明"
+      }
+    ],
+    "example": {
+      "input": "任一已导入书首章",
+      "after": "T06/T07/T08/T12数量和值均不因试跑而改变",
+      "portable": [],
+      "verification": "静态路径，UI仅采集弹窗未真实调用模型；无虚构运行通过"
+    }
+  },
+  {
+    "id": "DF-05",
+    "title": "草稿合并、频次与缓存",
+    "trigger": "OP-27/28，ALG-04/05",
+    "steps": [
+      {
+        "input": "当前stage范围",
+        "read": "T06/T07选中与sourceChapters；T05全文；T12.P1范围",
+        "transform": "人物主名相等/包含、地点仅相等、别名集合>0.9；保最早ID，先本地融合",
+        "write": "仅workingCharacters/locations局部",
+        "commit": "提交前不替换旧表",
+        "failure": "未定义全局安全自动锁",
+        "consumer": "AI补充分组/频次"
+      },
+      {
+        "input": "本地组",
+        "read": "精简名称别名/identity、description前160",
+        "transform": "180条取批/160步；AI只能合本批>=2主名；再融合",
+        "write": "局部主名/aliases/sourceChapters/四文本/relations/conflicts",
+        "commit": "无单独工具直接写库",
+        "failure": "AI失败degraded，保本地底稿",
+        "consumer": "主名出场扫描"
+      },
+      {
+        "input": "最终主名",
+        "read": "T05处理范围、T06聚合资料",
+        "transform": "扫描主名非别名；原章去重/提及次数；分位→roleWeight，manual优先",
+        "write": "局部frequency/roleWeight/source",
+        "commit": "非单独持久写",
+        "failure": "未知/重复主名不重复归属",
+        "consumer": "按需人物整编"
+      },
+      {
+        "input": "需整编人物/多描述地点",
+        "read": "mergeFacts与缓存、Prompt/schema预算",
+        "transform": "短事实ID；固定人物键；覆盖/名称/非空校验；地点描述保底合入",
+        "write": "局部四文本/mergeNotes/optimizedFactIds/fingerprint",
+        "commit": "AI通过不等于提交；末尾重算主名频次",
+        "failure": "超预算/校验错保底，degraded使阶段不通过",
+        "consumer": "提交"
+      },
+      {
+        "input": "整轮未取消",
+        "read": "原参与快照bulkGet",
+        "transform": "JSON比对未变→删除参与旧ID→写保留融合记录",
+        "write": "T06/T07参与集合",
+        "commit": "两表同事务；范围外不删除",
+        "failure": "取消整轮不提交；冲突拒绝覆盖",
+        "consumer": "人物/地点列表、入库、记忆依据失效"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P10",
+        "P25",
+        "P26"
+      ],
+      "input": [
+        {
+          "id": "C1-P001",
+          "name": "甲",
+          "identity": "书生"
+        },
+        {
+          "id": "C2-P001",
+          "name": "甲乙",
+          "identity": "来客"
+        }
+      ],
+      "after": {
+        "keptId": "C1-P001",
+        "aliases": [
+          "甲乙"
+        ],
+        "identity": "书生；来客",
+        "sourceChapters": [
+          "1",
+          "2"
+        ]
+      },
+      "note": "包含聚组无单字守卫是兼容行为；手动指定keepId与自动规则分开。"
+    }
+  },
+  {
+    "id": "DF-06",
+    "title": "人工编辑与副本/指纹",
+    "trigger": "OP-15–20",
+    "steps": [
+      {
+        "input": "表单局部values",
+        "read": "UI字段→fromEditable",
+        "transform": "CSV中英文逗号分割trim去空；字符串只用trim判空，非空保原文本",
+        "write": "patch字段，尚未写库",
+        "commit": "无统一必填Schema",
+        "failure": "空必填可undefined，不补新校验",
+        "consumer": "核心update"
+      },
+      {
+        "input": "人物patch",
+        "read": "T06当前行/mergeFacts/cache",
+        "transform": "ageText点路径；四文本变则替换该字段事实、移除退休优化ID、清fingerprint",
+        "write": "T06 patch/updatedAt；层级另写manual",
+        "commit": "人物事务；地点单行更新；Node/Line普通update",
+        "failure": "未统一catch UI；无行通常no-op；不撤P3",
+        "consumer": "useLiveQuery列表"
+      },
+      {
+        "input": "DB提交",
+        "read": "本书查询订阅",
+        "transform": "重读新行，不自动setSelected新对象",
+        "write": "列表视图；旧详情仍持旧asset",
+        "commit": "无新事务",
+        "failure": "层级/线状态控件回显旧值BUG-16",
+        "consumer": "关闭重开后新详情"
+      },
+      {
+        "input": "后续继续/入库",
+        "read": "已变T06–09资料",
+        "transform": "记忆读取重算validity；入库才重建实体/人物引用",
+        "write": "本次编辑不自动写T10/T11/T08.actorIds/T09.characterIds",
+        "commit": "副本非持续同步",
+        "failure": "P3completed不自动失效，待处理不归零仍可能入库",
+        "consumer": "下轮检查/用户手动发布"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P08",
+        "P09"
+      ],
+      "input": {
+        "id": "C1-P001",
+        "patch": {
+          "identity": "修改身份",
+          "profile.ageText": "约二十岁"
+        }
+      },
+      "after": {
+        "characterSnapshots.C1-P001.identity": "修改身份",
+        "characterSnapshots.C1-P001.profile.ageText": "约二十岁",
+        "characters.count": 0
+      },
+      "UIVerification": "ui-role-change.txt：列表主要人物，详情仍NPC；关闭重开必须读取已保存值"
+    }
+  },
+  {
+    "id": "DF-07",
+    "title": "手动并入与快照删除",
+    "trigger": "OP-21/23",
+    "steps": [
+      {
+        "input": "keepId+mergeIds",
+        "read": "同表目标/其他有效记录",
+        "transform": "去掉keepId自身，保指定目标ID；资料/称呼/关系融合",
+        "write": "T06或T07目标put、其余delete",
+        "commit": "同表事务",
+        "failure": "keep不存在报错；无回收/拆分",
+        "consumer": "列表数量变化、详情关闭"
+      },
+      {
+        "input": "直接删快照",
+        "read": "当前id",
+        "transform": "仅按id delete",
+        "write": "T06或T07一行",
+        "commit": "单表删除",
+        "failure": "不改T10/T11和节点文本称呼；无二次确认",
+        "consumer": "下次入库重新计算实体"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P10"
+      ],
+      "before": {
+        "人物草稿": [
+          "C1-P001沈青",
+          "C1-P002顾衡",
+          "C1-P003阿宁"
+        ]
+      },
+      "input": {
+        "keepId": "C1-P001",
+        "mergeIds": [
+          "C1-P002"
+        ]
+      },
+      "after": {
+        "人数": 2,
+        "保留ID": "C1-P001",
+        "aliases包含": "顾衡"
+      }
+    }
+  },
+  {
+    "id": "DF-08",
+    "title": "节点/线删除传播",
+    "trigger": "OP-24/25",
+    "steps": [
+      {
+        "input": "删nodeId",
+        "read": "T08全部、T09全部",
+        "transform": "删节点→线成员过滤不存在ID→删空线；重算chapters/timeRange/characterIds",
+        "write": "T08删除+所有节点eventLineIds；T09成员和派生/空线",
+        "commit": "节点/线事务",
+        "failure": "事务错误全批回滚，无单独恢复UI",
+        "consumer": "列表、图、散落数"
+      },
+      {
+        "input": "删lineId",
+        "read": "T08.eventLineIds",
+        "transform": "删线→逐节点过滤该lineId",
+        "write": "T09删除；T08归属字段",
+        "commit": "节点/线事务",
+        "failure": "保留节点本体，不删人物地点",
+        "consumer": "节点可变散落点"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P13",
+        "P14"
+      ],
+      "before": {
+        "L01.nodeIds": [
+          "C1-N001",
+          "C1-N002"
+        ]
+      },
+      "input": "删除C1-N001，然后删除C1-N002",
+      "afterFirst": {
+        "L01.nodeIds": [
+          "C1-N002"
+        ]
+      },
+      "afterSecond": {
+        "nodes": [],
+        "eventLines": []
+      }
+    }
+  },
+  {
+    "id": "DF-09",
+    "title": "入库与引用重编",
+    "trigger": "OP-30",
+    "steps": [
+      {
+        "input": "入库点击",
+        "read": "UI最近progress、T06/T07/T08/T09",
+        "transform": "UI P3completed放行；底层不再核；按来源ID parseFloat章号+numeric ID排序",
+        "write": "局部entities/名称索引",
+        "commit": "读取在写事务外",
+        "failure": "与running/人工编辑无统一服务锁",
+        "consumer": "生成实体"
+      },
+      {
+        "input": "人物快照→实体",
+        "read": "name/aliases_mentioned/aliases/profile/relations等",
+        "transform": "P001起；speech_style_sample→speechStyleSample；roleWeight默认NPC；relations默认[]",
+        "write": "T10局部全数组；T11地点L001起",
+        "commit": "未提交",
+        "failure": "精确称呼先登记优先，模糊才唯一；重名BUG保留",
+        "consumer": "节点映射"
+      },
+      {
+        "input": "节点→人物引用",
+        "read": "actors+targets逐称呼、精确/模糊索引",
+        "transform": "唯一匹配ID有序去重；不改原称呼；未命中Set收集",
+        "write": "每节点actorIds；线按成员汇总characterIds",
+        "commit": "局部准备，不回写草稿",
+        "failure": "未映射只告警，不阻断入库",
+        "consumer": "最终事务"
+      },
+      {
+        "input": "准备完成",
+        "read": "实体数组和派生patch",
+        "transform": "clear T10/T11，bulkPut实体，update每节点/线引用",
+        "write": "T10/T11/T08.actorIds/T09.characterIds",
+        "commit": "四表单事务",
+        "failure": "失败回滚该四表；已有草稿保留",
+        "consumer": "资产包徽标、数量提示、备份"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P11",
+        "P12"
+      ],
+      "before": {
+        "characters": [],
+        "locations": [],
+        "node.actors": [
+          "沈青",
+          "顾衡"
+        ]
+      },
+      "after": {
+        "characters.ids": [
+          "P001",
+          "P002",
+          "P003"
+        ],
+        "locations.ids": [
+          "L001",
+          "L002"
+        ],
+        "node.actorIds": [
+          "P001",
+          "P002"
+        ],
+        "L01.characterIds": [
+          "P001",
+          "P002"
+        ]
+      },
+      "repeat": "第二次相同草稿仍3人物2地点；不新建资产包版本"
+    }
+  },
+  {
+    "id": "DF-10",
+    "title": "备份与恢复",
+    "trigger": "OP-49/50/51/53/54/55",
+    "steps": [
+      {
+        "input": "导出",
+        "read": "T03 book；单书T04–T17全表",
+        "transform": "单书只读事务快照→JSON/章节TXT→每文件SHA256→manifest→ZIP",
+        "write": "独立wwv2文件；不写单书",
+        "commit": "单书读事务；文件后写",
+        "failure": "排除T01/T02和lease；内存日志不导出",
+        "consumer": "目录/下载提示"
+      },
+      {
+        "input": "选择ZIP",
+        "read": "文件bytes",
+        "transform": "格式/manifest/过新版本/checksum→统计",
+        "write": "局部inspect结果",
+        "commit": "无业务写入",
+        "failure": "缺统计JSON可拒绝Promise无友好兜底",
+        "consumer": "用户确认"
+      },
+      {
+        "input": "确认恢复",
+        "read": "各data文件与章节文件",
+        "transform": "记忆/会话额外校验；新bookId；title后缀；bookId重写；清lease",
+        "write": "先T03新记录；后目标库T04–T17",
+        "commit": "目标书多表事务，非跨库原子",
+        "failure": "目标写失败可留书架；不回滚已有原书",
+        "consumer": "选中新书，页面仍设置"
+      },
+      {
+        "input": "恢复完成",
+        "read": "新库数据",
+        "transform": "useLiveQuery加载，P3可能来自备份",
+        "write": "UI当前书",
+        "commit": "无自动编译/发布",
+        "failure": "人工complete标记非真实模型证据",
+        "consumer": "可编辑/入库/再导出"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P21",
+        "P22"
+      ],
+      "before": {
+        "原书": "bk_acceptance"
+      },
+      "after": {
+        "newBookId": "不同于原书",
+        "newTitle": "逆推验证样本（导入）",
+        "原书仍存在": true,
+        "restored.nodes": 2,
+        "restored.characterSnapshots": 3
+      },
+      "preview": "固定实体0可以与草稿3同时成立"
+    }
+  },
+  {
+    "id": "DF-11",
+    "title": "整书删除边界",
+    "trigger": "OP-57",
+    "steps": [
+      {
+        "input": "弹窗确认",
+        "read": "目标bookId、同JS锁",
+        "transform": "锁检查→close缓存db→Dexie.delete资产库",
+        "write": "本书T04–T17所有表实例删除",
+        "commit": "整库删除",
+        "failure": "已有任务占锁则拒绝；不是全标签锁",
+        "consumer": "删除书架"
+      },
+      {
+        "input": "资产库删除成功",
+        "read": "T03对应书",
+        "transform": "books.delete(id)",
+        "write": "T03删除",
+        "commit": "设置库独立操作",
+        "failure": "失败不是跨库回滚；不清T01/T02或导出文件",
+        "consumer": "切其他书/空导入"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P23"
+      ],
+      "before": {
+        "bookExists": true,
+        "credentialExists": true
+      },
+      "after": {
+        "bookExists": false,
+        "credentialExists": true
+      },
+      "UI": "只看确认弹窗，未实际删除用户数据"
+    }
+  },
+  {
+    "id": "DF-12",
+    "title": "全局配置与凭据",
+    "trigger": "OP-41/42/43/47",
+    "steps": [
+      {
+        "input": "模型保存",
+        "read": "局部配置、T02旧llm.config",
+        "transform": "trim文本，窗口空undefined/整数≥8192，merge旧值",
+        "write": "T02.llm.config.value/updatedAt",
+        "commit": "单行put",
+        "failure": "错窗口不写；无自动网络探测",
+        "consumer": "后续调用配置"
+      },
+      {
+        "input": "Key保存/清除",
+        "read": "局部Key/T01 provider",
+        "transform": "trim→CredentialStore.modify；清除返回undefined触发delete",
+        "write": "T01凭据",
+        "commit": "credentials读改写事务",
+        "failure": "UI显示掩码，不将明文回填",
+        "consumer": "模型请求/配置状态"
+      },
+      {
+        "input": "并发保存/目录选择",
+        "read": "number/浏览器handle",
+        "transform": "round+clamp1–16；或保存真实目录句柄",
+        "write": "T02对应key/value/updatedAt",
+        "commit": "单行put",
+        "failure": "不新增NaN校验；目录仍需权限",
+        "consumer": "新任务池/目录导出"
+      }
+    ],
+    "example": {
+      "input": {
+        "key": "compile.concurrency",
+        "value": 99
+      },
+      "after": {
+        "key": "compile.concurrency",
+        "value": 16
+      },
+      "note": "该具体边界由源函数算式确定；独立用例主要覆盖Key保留，配置UI本轮只默认值运行观察"
+    }
+  },
+  {
+    "id": "DF-13",
+    "title": "模型探测和工具返回",
+    "trigger": "OP-44–46",
+    "steps": [
+      {
+        "input": "探测点击",
+        "read": "T01 Key、T02已保存URL/model",
+        "transform": "GET/models或文本POST或归并工具Agent，三种协议不同",
+        "write": "无小说资产写入；仅局部status/catalog",
+        "commit": "网络副作用，不是数据库事务",
+        "failure": "认证/空目录/工具无提交分别报错",
+        "consumer": "成功耗时/错误行"
+      },
+      {
+        "input": "Agent正常查询/修正",
+        "read": "toolSchema、DB查询、scripted SSE",
+        "transform": "只读查询→toolResult→submit校验→最多一次修正",
+        "write": "无session时不存T17；runLink调用方提交走DF-03",
+        "commit": "提交收集器只接data，非直接写库",
+        "failure": "两次无效停止；末轮只能提交",
+        "consumer": "结果回调用方"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P15",
+        "P16",
+        "P30",
+        "P31",
+        "P32"
+      ],
+      "replays": [
+        "resources/replays/agent-query-submit.json",
+        "resources/replays/agent-submit-repair.json",
+        "resources/replays/agent-submit-failure.json"
+      ],
+      "note": "回放为真实SDK/原边界拦截HTTP生成，非真实模型服务输出"
+    }
+  },
+  {
+    "id": "DF-14",
+    "title": "只读视图、记忆和游玩内存",
+    "trigger": "AUTO-03/12/13/14、OP-59",
+    "steps": [
+      {
+        "input": "持久消息追加",
+        "read": "T16当前header和owner",
+        "transform": "消息JSON校验，ordinal=nextOrdinal，parentId=leafId",
+        "write": "T17追加；T16.leafId/nextOrdinal/updatedAt/leaseUntil",
+        "commit": "两表同事务",
+        "failure": "租约冲突拒绝；消息保存不等于事件事务成功",
+        "consumer": "会话历史/模型上下文"
+      },
+      {
+        "input": "压缩请求",
+        "read": "T17原始链、有效usage、模型窗口",
+        "transform": "投影→预算→切点→分块摘要→核after预算",
+        "write": "成功追加compaction，不删除原始消息",
+        "commit": "最终append事务；失败不改投影边界",
+        "failure": "失败或取消原历史仍在",
+        "consumer": "后续模型读摘要+近期消息"
+      },
+      {
+        "input": "记忆列表读取",
+        "read": "T06–09、T05引文、T13–15",
+        "transform": "计算dataChanged/current或stale/pending，按会话过滤",
+        "write": "只读视图；不写note.status",
+        "commit": "无业务写入",
+        "failure": "无自动全书重查，需要用户继续",
+        "consumer": "记忆页面、下一批Prompt"
+      },
+      {
+        "input": "游玩发送",
+        "read": "当前bookId、trim(input)",
+        "transform": "追加player和固定占位narrator",
+        "write": "仅组件lines，input清空",
+        "commit": "无数据库/网络",
+        "failure": "切页卸载丢消息；不推进世界",
+        "consumer": "消息区滚底"
+      }
+    ],
+    "example": {
+      "portable": [
+        "P27",
+        "P28",
+        "P29"
+      ],
+      "compaction": {
+        "before": "3条长user消息",
+        "successAfter": "原message仍3、compaction新增1",
+        "failureAfter": "仍仅3条，无compaction"
+      },
+      "play": "UI运行确认占位且切页清空；不是可玩世界"
+    }
+  }
+]

@@ -1,0 +1,497 @@
+{
+  "App.tsx": [
+    "export default function App();"
+  ],
+  "core/agent/profiles.ts": [
+    "export type AgentProfileId = 'asset_editor' | 'story_editor';"
+  ],
+  "core/agent/run.ts": [
+    "export interface AgentLimits {\n    maxSteps?: number;\n    timeoutMs?: number;\n    contextWindow?: number;\n    compaction?: Partial<CompactionSettings>;\n}",
+    "export async function runAgent<T extends TSchema>(\n  opts: CallModelOptions<T> & { schema: T; tools: ReadTool[] },\n  limits: AgentLimits = {},\n  deps: { stream?: StreamFn; summarize?: SummaryCall } = {},\n): Promise<CallModelResult<Static<T>>>;"
+  ],
+  "core/assets/edit.ts": [
+    "export type CharacterSnapshotEdit = Partial<Pick<StoredCharacterSnapshot, 'name' | 'aliases' | 'roleWeight' | 'identity' | 'personality' | 'background' | 'appearance' | 'speech_style_sample'>> & {\n    'profile.ageText'?: string;\n};",
+    "export async function updateCharacterSnapshot(\r\n  bookId: string,\r\n  id: string,\r\n  patch: CharacterSnapshotEdit,\r\n): Promise<void>;",
+    "export async function deleteCharacterSnapshot(bookId: string, id: string): Promise<void>;",
+    "export async function mergeCharacterSnapshots(\r\n  bookId: string,\r\n  keepId: string,\r\n  mergeIds: string[],\r\n): Promise<void>;",
+    "export async function setCharacterRoleWeight(\r\n  bookId: string,\r\n  id: string,\r\n  roleWeight: RoleWeight,\r\n): Promise<void>;",
+    "export type LocationSnapshotEdit = Partial<Pick<StoredLocationSnapshot, 'name' | 'aliases' | 'description'>>;",
+    "export async function updateLocationSnapshot(\r\n  bookId: string,\r\n  id: string,\r\n  patch: LocationSnapshotEdit,\r\n): Promise<void>;",
+    "export async function deleteLocationSnapshot(bookId: string, id: string): Promise<void>;",
+    "export async function mergeLocationSnapshots(\r\n  bookId: string,\r\n  keepId: string,\r\n  mergeIds: string[],\r\n): Promise<void>;",
+    "export type NodeEdit = Partial<Pick<StoredNode, 'name' | 'summary' | 'process' | 'actors' | 'time_text'>>;",
+    "export async function updateNode(bookId: string, id: string, patch: NodeEdit): Promise<void>;",
+    "export async function deleteNode(bookId: string, id: string): Promise<void>;",
+    "export type EventLineEdit = Partial<Pick<EventLine, 'title' | 'cause' | 'process' | 'result' | 'lineStatus'>>;",
+    "export async function updateEventLine(bookId: string, id: string, patch: EventLineEdit): Promise<void>;",
+    "export async function deleteEventLine(bookId: string, id: string): Promise<void>;",
+    "export async function deleteCharacter(bookId: string, id: string): Promise<void>;",
+    "export async function deleteStoredLocation(bookId: string, id: string): Promise<void>;"
+  ],
+  "core/assets/library.ts": [
+    "export function deleteAssetBook(bookId: string): Promise<void>;"
+  ],
+  "core/config/settings.ts": [
+    "export async function isApiKeyConfigured(): Promise<boolean>;",
+    "export async function saveApiKey(key: string): Promise<void>;",
+    "export async function removeApiKey(): Promise<void>;",
+    "export async function getApiKeyHint(): Promise<string | null>;",
+    "export async function readApiKeyForProbe(): Promise<string | null>;",
+    "export async function getAppSetting<T>(key: string, fallback: T): Promise<T>;",
+    "export async function setAppSetting(key: string, value: unknown): Promise<void>;",
+    "export async function getLlmConfig(): Promise<LlmConfig>;",
+    "export async function setLlmConfig(patch: Partial<LlmConfig>): Promise<void>;",
+    "export async function getModelForRole(role: ModelRole): Promise<string>;",
+    "export async function getConcurrency(): Promise<number>;",
+    "export async function setConcurrency(n: number): Promise<void>;",
+    "export function getCatalogModels(): string[];",
+    "export async function probeFetchModels(signal?: AbortSignal): Promise<string[]>;",
+    "export async function probeQuickTest(\n  role: ModelRole = 'extraction',\n  signal?: AbortSignal,\n): Promise<QuickTestResult>;",
+    "export async function probeAggregationTools(signal?: AbortSignal): Promise<QuickTestResult>;"
+  ],
+  "core/db/canon.ts": [
+    "export function getCanonDb(bookId: string): CanonDatabase;",
+    "export async function deleteCanonDb(bookId: string): Promise<void>;",
+    "export async function resetCanonDbForTest(bookId?: string): Promise<void>;",
+    "export function listOpenCanonDbs(): string[];"
+  ],
+  "core/db/repo.ts": [
+    "export async function createBook(input: {\n  id: string\n  title: string\n  author?: string\n  sourceFileName?: string\n}): Promise<Book>;",
+    "export async function getBook(bookId: string): Promise<Book | undefined>;",
+    "export async function listBooks(): Promise<Book[]>;",
+    "export async function deleteBook(bookId: string): Promise<void>;",
+    "export async function saveChapters(\n  bookId: string,\n  drafts: Array<{ chapterIndex: string; chapterName: string; text: string; charCount: number; order: number }>,\n): Promise<void>;",
+    "export async function listChapters(bookId: string): Promise<Chapter[]>;",
+    "export async function getChapterText(bookId: string, chapterIndex: string): Promise<string | undefined>;",
+    "export interface P1PersistPayload {\n    characterSnapshots: StoredCharacterSnapshot[];\n    locationSnapshots: StoredLocationSnapshot[];\n    nodes: StoredNode[];\n}",
+    "export async function saveP1Result(bookId: string, payload: P1PersistPayload): Promise<void>;",
+    "export async function listCharacterSnapshots(bookId: string): Promise<StoredCharacterSnapshot[]>;",
+    "export async function listLocationSnapshots(bookId: string): Promise<StoredLocationSnapshot[]>;",
+    "export async function listNodes(bookId: string): Promise<StoredNode[]>;",
+    "export async function replaceCharacterSnapshots(\n  bookId: string,\n  snapshots: StoredCharacterSnapshot[],\n): Promise<void>;",
+    "export async function replaceLocationSnapshots(\n  bookId: string,\n  snapshots: StoredLocationSnapshot[],\n): Promise<void>;",
+    "export async function listCharacters(bookId: string): Promise<Character[]>;",
+    "export async function listLocations(bookId: string): Promise<StoredLocation[]>;",
+    "export async function listEventLines(bookId: string): Promise<EventLine[]>;",
+    "export async function getProgress(\n  bookId: string,\n  stage: CompileProgress['stage'],\n): Promise<CompileProgress | undefined>;",
+    "export async function putProgress(progress: CompileProgress): Promise<void>;"
+  ],
+  "core/db/settings.ts": [
+    "export interface StoredCredentialRow {\n    providerId: string;\n    credential: unknown;\n}",
+    "export interface AppSettingRow {\n    key: string;\n    value: unknown;\n    updatedAt: string;\n}",
+    "export function getSettingsDb(): SettingsDatabase;",
+    "export async function resetSettingsDbForTest(): Promise<void>;"
+  ],
+  "core/db/stores.ts": [
+    "export type CanonStoreName = keyof typeof CANON_STORES;"
+  ],
+  "core/events/bus.ts": [
+    "export interface EventBus {\n    emit(event: AppEvent): void;\n    on(handler: (event: AppEvent) => void): () => void;\n    onType<T extends AppEvent['type']>(type: T, handler: (event: Extract<AppEvent, {\n        type: T;\n    }>) => void): () => void;\n}",
+    "export function createEventBus(): EventBus;",
+    "export function getEventBus(): EventBus;"
+  ],
+  "core/events/types.ts": [
+    "export type AppEvent = {\n    type: 'task:start';\n    bookId: string;\n    stage: CompileStage;\n    total: number;\n    unit?: '章' | '步骤' | '批' | '窗口';\n} | {\n    type: 'task:progress';\n    bookId: string;\n    stage: CompileStage;\n    completed: number;\n    failed: number;\n    total: number;\n    cost: number;\n} | {\n    type: 'task:paused';\n    bookId: string;\n    stage: CompileStage;\n} | {\n    type: 'task:resumed';\n    bookId: string;\n    stage: CompileStage;\n} | {\n    type: 'task:cancelled';\n    bookId: string;\n    stage: CompileStage;\n} | {\n    type: 'task:done';\n    bookId: string;\n    stage: CompileStage;\n    completed: number;\n    failed: number;\n    pendingFailures?: number;\n} | {\n    type: 'chapter:start';\n    bookId: string;\n    chapterIndex: string;\n} | {\n    type: 'chapter:done';\n    bookId: string;\n    chapterIndex: string;\n    characters: number;\n    locations: number;\n    nodes: number;\n} | {\n    type: 'chapter:failed';\n    bookId: string;\n    chapterIndex: string;\n    message?: string;\n} | {\n    type: 'log';\n    level: 'info' | 'warn' | 'error';\n    message: string;\n    data?: unknown;\n};",
+    "export type AppEventType = AppEvent['type'];"
+  ],
+  "core/export/export-book.ts": [
+    "export interface ExportResult {\n    fileName: string;\n    bytes: Uint8Array;\n    manifest: BackupManifest;\n}",
+    "export async function exportBook(bookId: string): Promise<ExportResult>;"
+  ],
+  "core/export/import-book.ts": [
+    "export interface InspectResult {\n    ok: boolean;\n    manifest?: BackupManifest;\n    errors: string[];\n    stats?: {\n        chapters: number;\n        characters: number;\n        locations: number;\n        nodes: number;\n        eventLines: number;\n    };\n}",
+    "export function inspectBackup(bytes: Uint8Array): Promise<InspectResult>;",
+    "export interface ImportResult {\n    bookId: string;\n    chapterCount: number;\n}",
+    "export async function importBackup(bytes: Uint8Array): Promise<ImportResult>;"
+  ],
+  "core/export/local-file.ts": [
+    "export interface ExportDirectory {\n    name: string;\n    queryPermission(options: {\n        mode: 'readwrite';\n    }): Promise<PermissionState>;\n    requestPermission(options: {\n        mode: 'readwrite';\n    }): Promise<PermissionState>;\n    getFileHandle(name: string, options: {\n        create: true;\n    }): Promise<{\n        createWritable(): Promise<{\n            write(data: Blob): Promise<void>;\n            close(): Promise<void>;\n            abort(): Promise<void>;\n        }>;\n    }>;\n}",
+    "export async function exportDirectoryName(): Promise<string | null>;",
+    "export async function writeBackupToDirectory(backup: ExportResult, directory: ExportDirectory): Promise<string>;",
+    "export async function exportBookToDirectory(bookId: string, directory: ExportDirectory): Promise<{ fileName: string; directoryName: string }>;"
+  ],
+  "core/export/manifest.ts": [
+    "export interface BackupManifest {\n    format: typeof BACKUP_FORMAT;\n    formatVersion: number;\n    appVersion: string;\n    exportedAt: string;\n    book: {\n        id: string;\n        title: string;\n        author?: string;\n        chapterCount: number;\n    };\n    contents: string[];\n    excludes: string[];\n    checksums: Record<string, string>;\n}",
+    "export async function sha256Hex(bytes: Uint8Array): Promise<string>;",
+    "export async function checksumOf(bytes: Uint8Array): Promise<string>;",
+    "export function chapterFileName(chapterIndex: string): string;",
+    "export function parseChapterFileName(fileName: string): string | null;"
+  ],
+  "core/graph/build-network.ts": [
+    "export type EdgeKind = 'shares_node' | 'shares_character' | 'temporal_overlap' | 'contains';",
+    "export interface NetworkNode {\n    id: string;\n    kind: 'line' | 'node';\n    label: string;\n    sublabel?: string;\n    chapters: string[];\n    lineStatus?: EventLine['lineStatus'];\n    nodeCount?: number;\n}",
+    "export interface NetworkEdge {\n    id: string;\n    source: string;\n    target: string;\n    kind: EdgeKind;\n}",
+    "export interface NetworkGraph {\n    nodes: NetworkNode[];\n    edges: NetworkEdge[];\n}",
+    "export function compareChapterIndex(a: string, b: string): number;",
+    "export function buildLineLevelGraph(lines: EventLine[], nodes: StoredNode[]): NetworkGraph;",
+    "export function buildNodeLevelGraph(\n  line: EventLine,\n  nodes: StoredNode[],\n  allLines: EventLine[],\n): NetworkGraph;",
+    "export function topByDegree(graph: NetworkGraph, limit = 5): string[];"
+  ],
+  "core/graph/chapter-timeline.ts": [
+    "export interface TimelineLine {\n    id: string;\n    title: string;\n    color: string;\n    nodeCount: number;\n    lineStatus: EventLine['lineStatus'];\n}",
+    "export interface TimelineEvent {\n    node: StoredNode;\n    lineIds: string[];\n    x: number;\n    y: number;\n}",
+    "export interface ChapterTimeline {\n    events: TimelineEvent[];\n    lines: TimelineLine[];\n    chapters: Array<{\n        chapterIndex: string;\n        x: number;\n        width: number;\n    }>;\n    edges: Array<{\n        id: string;\n        source: string;\n        target: string;\n        lineId: string;\n        color: string;\n    }>;\n    width: number;\n    height: number;\n}",
+    "export function buildChapterTimeline(lines: EventLine[], nodes: StoredNode[], chapterIndices: string[] = []): ChapterTimeline;"
+  ],
+  "core/graph/layout.ts": [
+    "export interface PositionedNode {\n    id: string;\n    x: number;\n    y: number;\n}",
+    "export interface LayoutOptions {\n    direction?: 'LR' | 'TB';\n    nodeWidth?: number;\n    nodeHeight?: number;\n    rankSep?: number;\n    nodeSep?: number;\n}",
+    "export function layoutGraph(graph: NetworkGraph, options: LayoutOptions = {}): PositionedNode[];"
+  ],
+  "core/llm/call.ts": [
+    "export interface CallUsage {\n    input: number;\n    output: number;\n    totalTokens: number;\n    cost: number;\n}",
+    "export interface CallModelOptions<T extends TSchema> {\n    role: ModelRole;\n    system: string;\n    messages: Message[];\n    schema?: T;\n    submitToolDescription?: string;\n    temperature?: number;\n    signal?: AbortSignal;\n    tools?: ReadTool[];\n    agentProfile?: AgentProfileId;\n    session?: StorySessionRef;\n    forceCompaction?: boolean;\n    maxTokens?: number;\n    bus?: EventBus;\n    validateData?: (data: Static<T>) => Promise<string[]> | string[];\n}",
+    "export interface CallModelResult<T> {\n    ok: boolean;\n    data?: T;\n    stopReason: string;\n    errorKind?: ErrorKind;\n    errorMessage?: string;\n    usage?: CallUsage;\n    attemptsUsage: CallUsage[];\n    attempts: number;\n    degraded?: boolean;\n}",
+    "export async function callModel<T extends TSchema>(\n  opts: CallModelOptions<T>,\n): Promise<CallModelResult<Static<T>>>;"
+  ],
+  "core/llm/credentials.ts": [
+    "export async function hasCredential(providerId: string): Promise<boolean>;",
+    "export async function setApiKey(providerId: string, key: string): Promise<void>;",
+    "export async function clearApiKey(providerId: string): Promise<void>;"
+  ],
+  "core/llm/errors.ts": [
+    "export type ErrorKind = 'network' | 'rate_limit' | 'server' | 'auth' | 'content_policy' | 'context_length' | 'validation' | 'unknown';",
+    "export interface RetryPolicy {\n    retry: boolean;\n    maxAttempts: number;\n    baseDelayMs: number;\n}",
+    "export function classifyError(stopReason: string, errorMessage?: string): ErrorKind;",
+    "export function backoffDelay(attempt: number, baseDelayMs: number): number;",
+    "export function parseRetryAfter(errorMessage?: string): number | null;"
+  ],
+  "core/llm/models.ts": [
+    "export interface LlmConfig {\n    baseUrl: string;\n    extractionModel: string;\n    aggregationModel: string;\n    aggregationContextWindow?: number;\n}",
+    "export type ModelRole = 'extraction' | 'aggregation';",
+    "export function listCatalogModels(): string[];",
+    "export function resolveModel(role: ModelRole, cfg: LlmConfig);",
+    "export function getModelsForConfig(cfg: LlmConfig);",
+    "export function resetModelsForTest(): void;"
+  ],
+  "core/llm/normalize-result.ts": [
+    "export function normalizeModelResult(schema: TSchema, value: unknown): unknown;"
+  ],
+  "core/llm/probe.ts": [
+    "export interface ProbeTarget {\n    baseUrl: string;\n    apiKey: string;\n}",
+    "export async function fetchModelList(target: ProbeTarget, signal?: AbortSignal): Promise<string[]>;",
+    "export interface QuickTestResult {\n    ok: boolean;\n    elapsedMs: number;\n    detail: string;\n}",
+    "export async function quickTestModel(\n  target: ProbeTarget & { model: string },\n  signal?: AbortSignal,\n): Promise<QuickTestResult>;"
+  ],
+  "core/llm/provider.ts": [
+    "export interface ProviderConfig {\n    id?: string;\n    baseUrl?: string;\n    models: string[];\n}",
+    "export function buildProvider(cfg: ProviderConfig): Provider;"
+  ],
+  "core/memory/story-editor.ts": [
+    "export interface EditorContext {\n    nodes: Map<string, StoredNode>;\n    lines: Map<string, EventLine>;\n    assetFingerprint?: string;\n}",
+    "export type EditorWork = Pick<StoryEditorCheckpoint, 'stage' | 'phase' | 'scopeIds'> & {\n    sessionId?: string;\n};",
+    "export async function loadEditorContext(bookId: string): Promise<EditorContext>;",
+    "export async function editorAssetSignature(bookId: string);",
+    "export async function loadEditorAssets(bookId: string);",
+    "export async function editorDataFingerprint(context: EditorContext);",
+    "export async function validateEditorUpdate(bookId: string, value: unknown, context: EditorContext,\n  temporaryNodeIds: string[] = [], sessionId?: string): Promise<string[]>;",
+    "export async function readEditorNotes(bookId: string, context?: EditorContext, sessionId?: string): Promise<StoryEditorNoteView[]>;",
+    "export async function readEditorMemory(bookId: string, context?: EditorContext, sessionId?: string);",
+    "export async function checkpointId(work: EditorWork);",
+    "export async function completedEditorWork(bookId: string, work: EditorWork, context: EditorContext): Promise<boolean>;",
+    "export async function prepareEditorCommit(bookId: string, update: EditorMemoryUpdate, work: EditorWork,\n  context: EditorContext, expectedRevision: number);",
+    "export async function recordEditorFailure(bookId: string, work: EditorWork, context: EditorContext, status: 'failed' | 'cancelled');"
+  ],
+  "core/pipeline/asset-frequency.ts": [
+    "export interface AssetFrequency {\n    chapters: number;\n    mentions: number;\n    scopeChapters: number;\n    percentile: number;\n}",
+    "export function assignAssetFrequency<T extends FrequencyAsset>(entities: T[], texts: ChapterText[], processedIds?: string[]): void;"
+  ],
+  "core/pipeline/asset-merge-policy.ts": [
+    "export interface AssetGroupingConfig<T> {\n    name: (item: T) => string;\n    aliases: (item: T) => string[];\n    allowContainment?: boolean;\n}",
+    "export function assetNames<T>(records: T[], config: AssetGroupingConfig<T>): string[];",
+    "export function nameSimilarity(a: string, b: string): number;",
+    "export function aliasSimilarity(left: string[], right: string[]): number;",
+    "export function twoPassAssetGroups<T>(records: T[], config: AssetGroupingConfig<T>, threshold = ALIAS_SIMILARITY_THRESHOLD);"
+  ],
+  "core/pipeline/character-merge-policy.ts": [
+    "export function characterNames(records: StoredCharacterSnapshot[]): string[];",
+    "export function twoPassCharacterGroups(records: StoredCharacterSnapshot[], threshold = 0.9);",
+    "export function collectMergeFacts(group: StoredCharacterSnapshot[]): CharacterMergeFact[];",
+    "export function optimizationFingerprint(entity: StoredCharacterSnapshot): string;",
+    "export function optimizationReason(entity: StoredCharacterSnapshot): string | undefined;",
+    "export function assignFrequencyWeights(entities: StoredCharacterSnapshot[], texts: ChapterText[], processedIds?: string[]): void;"
+  ],
+  "core/pipeline/compilation-lock.ts": [
+    "export async function withCompilationLock<T>(bookId: string, run: () => Promise<T>): Promise<T>;"
+  ],
+  "core/pipeline/decode-text.ts": [
+    "export interface DecodeResult {\n    text: string;\n    encoding: 'utf-8' | 'gbk';\n    ok: boolean;\n}",
+    "export function decodeBytes(bytes: ArrayBuffer): DecodeResult;",
+    "export function decodeWith(bytes: ArrayBuffer, encoding: 'utf-8' | 'gbk'): string;"
+  ],
+  "core/pipeline/import-book.ts": [
+    "export interface ImportBookInput {\n    id: string;\n    title: string;\n    text: string;\n    sourceFileName?: string;\n    split?: SplitOptions;\n}",
+    "export interface ImportBookResult {\n    book: Book;\n    chapterCount: number;\n    chapters: Array<{\n        chapterIndex: string;\n        chapterName: string;\n        charCount: number;\n        order: number;\n    }>;\n}",
+    "export async function importBook(input: ImportBookInput): Promise<ImportBookResult>;"
+  ],
+  "core/pipeline/merge-characters.ts": [
+    "export function normalizeEntryName(name: string): string;",
+    "export function normalizeNameForComparison(name: string): string;",
+    "export function areNamesObviouslySame(a: string, b: string): boolean;",
+    "export function pickMainByQuality(snapshots: StoredCharacterSnapshot[]): StoredCharacterSnapshot;",
+    "export interface MergeGroup {\n    main: StoredCharacterSnapshot;\n    others: StoredCharacterSnapshot[];\n    aliases: string[];\n}",
+    "export function groupSnapshots(snapshots: StoredCharacterSnapshot[]): MergeGroup[];"
+  ],
+  "core/pipeline/p1.ts": [
+    "export interface P1Input {\n    bookId: string;\n    chapterIndex: string;\n    chapterName: string;\n    text: string;\n}",
+    "export interface P1Failure {\n    stage: 'worldAssets' | 'narrativeAssets';\n    errorKind?: string;\n    errorMessage?: string;\n    attempts: number;\n}",
+    "export interface P1Result {\n    characterSnapshots: StoredCharacterSnapshot[];\n    locationSnapshots: StoredLocationSnapshot[];\n    nodes: StoredNode[];\n    usages: CallUsage[];\n    failures: P1Failure[];\n}",
+    "export function buildChapterMessage(input: P1Input): string;",
+    "export function assignCharacterIds(\n  input: P1Input,\n  characters: CharacterSnapshot[],\n): StoredCharacterSnapshot[];",
+    "export function assignLocationIds(\n  input: P1Input,\n  locations: LocationSnapshot[],\n): StoredLocationSnapshot[];",
+    "export function assignNodeIds(input: P1Input, nodes: Node[]): StoredNode[];",
+    "export interface P1Deps {\n    call?: typeof callModel;\n    signal?: AbortSignal;\n    onlyStages?: Array<'worldAssets' | 'narrativeAssets'>;\n}",
+    "export async function extractChapter(input: P1Input, deps: P1Deps = {}): Promise<P1Result>;"
+  ],
+  "core/pipeline/pool.ts": [
+    "export async function runPool<T>(\n  items: readonly T[],\n  concurrency: number,\n  worker: (item: T, index: number) => Promise<void>,\n  signal?: AbortSignal,\n): Promise<void>;"
+  ],
+  "core/pipeline/publish.ts": [
+    "export interface PublishOptions {\n    bus?: EventBus;\n}",
+    "export interface PublishResult {\n    characters: number;\n    locations: number;\n    mappedNodes: number;\n    mappedLines: number;\n    unmappedNames: string[];\n}",
+    "export function createNameResolver(entries: Array<{ id: string; names: string[] }>): (name: string) => string | undefined;",
+    "export function toCharacterEntity(bookId: string, s: StoredCharacterSnapshot, id: string): Character;",
+    "export function toLocationEntity(bookId: string, s: StoredLocationSnapshot, id: string): StoredLocation;",
+    "export function deriveLineCharacterIds(nodeIds: string[], nodeById: Map<string, StoredNode>): string[];",
+    "export async function publishCanon(bookId: string, options: PublishOptions = {}): Promise<PublishResult>;",
+    "export function lineCharacterNames(line: EventLine, nodes: StoredNode[]): string[];"
+  ],
+  "core/pipeline/run-all.ts": [
+    "export interface RunAllOptions {\n    concurrency?: number;\n    signal?: AbortSignal;\n    bus?: EventBus;\n    useAi?: boolean;\n    deps?: RunP1Options['deps'];\n    windowSize?: number;\n    overlap?: number;\n    recheck?: boolean;\n}",
+    "export interface RunAllResult {\n    p1: {\n        status: CompileStatus;\n        completed: number;\n        failed: number;\n        cost: number;\n    };\n    merge: Pick<RunMergeResult, 'characters' | 'locations' | 'cost'> | null;\n    link: Pick<RunLinkResult, 'eventLineCount' | 'batches' | 'failedBatches' | 'cost'> | null;\n    totalCost: number;\n}",
+    "export function buildChapterWindows(chapters: Chapter[], size = 100, overlap = 20): string[][];",
+    "export async function runAll(bookId: string, options: RunAllOptions = {}): Promise<RunAllResult>;"
+  ],
+  "core/pipeline/run-link.ts": [
+    "export interface RunLinkOptions {\n    signal?: AbortSignal;\n    deps?: {\n        call?: typeof callModel;\n    };\n    bus?: EventBus;\n    batchSize?: number;\n    chapterIndices?: string[];\n    stage?: Extract<CompileStage, 'P2' | 'P3'>;\n    review?: boolean;\n    quiet?: boolean;\n    recheck?: boolean;\n    sessionId?: string;\n}",
+    "export interface RunLinkResult {\n    status: 'completed' | 'cancelled';\n    batches: number;\n    nodeCount: number;\n    eventLineCount: number;\n    cost: number;\n    failedBatches: number;\n    reviewBatches: number;\n    newNodes: number;\n    skippedBatches: number;\n}",
+    "export function splitIntoBatches<T>(items: readonly T[], batchSize: number): T[][];",
+    "export function buildExistingLinesDigest(lines: EventLine[]): string;",
+    "export function buildNodesDigest(nodes: StoredNode[]): string;",
+    "export function deriveLineFields(nodeIds: string[], nodeById: Map<string, StoredNode>): { chapters: string[]; timeRange?: string[] };",
+    "export async function validateLinkResult(bookId: string, result: Pick<LinkEventLinesResult, 'event_line_ops' | 'new_nodes'> & { memory_update?: EditorMemoryUpdate },\n  nodeMap: Map<string, StoredNode>, lineMap: Map<string, EventLine>, checkMemory = false, sessionId?: string): Promise<string[]>;",
+    "export async function runLink(bookId: string, options: RunLinkOptions = {}): Promise<RunLinkResult>;"
+  ],
+  "core/pipeline/run-merge.ts": [
+    "export interface RunMergeOptions {\n    signal?: AbortSignal;\n    deps?: {\n        call?: typeof callModel;\n    };\n    bus?: EventBus;\n    useAi?: boolean;\n    stage?: Extract<CompileStage, 'P2' | 'P3'>;\n    chapterIndices?: string[];\n    quiet?: boolean;\n}",
+    "export interface RunMergeResult {\n    status: 'completed' | 'cancelled';\n    characters: {\n        before: number;\n        after: number;\n    };\n    locations: {\n        before: number;\n        after: number;\n    };\n    cost: number;\n    degraded: boolean;\n}",
+    "export function earliestChapter(ids: string[]): number;",
+    "export function pickEarliest<T extends Named>(group: T[]): T;",
+    "export function groupByName<T extends Named>(items: T[], _aliasOf?: (item: T) => string[]): T[][];",
+    "export function describeCallFailure(res: CallModelResult<unknown>): string;",
+    "export async function runMerge(bookId: string, options: RunMergeOptions = {}): Promise<RunMergeResult>;"
+  ],
+  "core/pipeline/run-p1.ts": [
+    "export interface RunP1Options {\n    concurrency?: number;\n    signal?: AbortSignal;\n    deps?: P1Deps;\n    bus?: EventBus;\n    chapterIndices?: string[];\n}",
+    "export interface RunP1Result {\n    status: CompileStatus;\n    total: number;\n    completed: number;\n    failed: number;\n    cost: number;\n    failures: Array<{\n        chapterIndex: string;\n        message?: string;\n    }>;\n}",
+    "export async function runP1(bookId: string, options: RunP1Options = {}): Promise<RunP1Result>;"
+  ],
+  "core/pipeline/run-test-stage.ts": [
+    "export type TestStage = 'p1' | 'p2-merge' | 'p2-link' | 'p3';",
+    "export interface TestStageOptions {\n    signal?: AbortSignal;\n    bus?: EventBus;\n    concurrency?: number;\n    deps?: RunP1Options['deps'];\n}",
+    "export async function runTestStage(bookId: string, step: TestStage, options: TestStageOptions = {}): Promise<{ status: CompileStatus; cost: number }>;"
+  ],
+  "core/pipeline/split-chapters.ts": [
+    "export function parseChapterRegex(value: string): RegExp;",
+    "export interface SplitOptions {\n    regex?: RegExp;\n    maxChunkChars?: number;\n    fallbackWindowChars?: number;\n}",
+    "export interface ChapterDraft {\n    chapterIndex: string;\n    chapterName: string;\n    text: string;\n    charCount: number;\n    order: number;\n}",
+    "export function splitChapters(text: string, options: SplitOptions = {}): ChapterDraft[];"
+  ],
+  "core/pipeline/try-one.ts": [
+    "export interface TryOneResult {\n    chapterIndex: string;\n    chapterName: string;\n    sourceText: string;\n    sourceTruncated: boolean;\n    characters: StoredCharacterSnapshot[];\n    locations: StoredLocationSnapshot[];\n    nodes: StoredNode[];\n    failures: P1Failure[];\n    cost: number;\n    durationMs: number;\n}",
+    "export async function tryOneChapter(\n  bookId: string,\n  chapterIndex?: string,\n  options: { signal?: AbortSignal; deps?: Parameters<typeof extractChapter>[1] } = {},\n): Promise<TryOneResult>;"
+  ],
+  "core/prompts/index.ts": [
+    "export type PromptName = keyof typeof PROMPTS;"
+  ],
+  "core/schema/book.ts": [
+    "export type Book = Static<typeof BookSchema>;",
+    "export type Chapter = Static<typeof ChapterSchema>;",
+    "export type ChapterText = Static<typeof ChapterTextSchema>;",
+    "export type CompileStage = Static<typeof CompileStageSchema>;",
+    "export type CompileStatus = Static<typeof CompileStatusSchema>;",
+    "export type CompileProgress = Static<typeof CompileProgressSchema>;"
+  ],
+  "core/schema/character-snapshot.ts": [
+    "export type CharacterSnapshot = Static<typeof CharacterSnapshotSchema>;",
+    "export type StoredCharacterSnapshot = Static<typeof StoredCharacterSnapshotSchema>;"
+  ],
+  "core/schema/character.ts": [
+    "export type RoleWeight = Static<typeof RoleWeightSchema>;",
+    "export type Character = Static<typeof CharacterSchema>;"
+  ],
+  "core/schema/common.ts": [
+    "export type Confidence = Static<typeof ConfidenceSchema>;",
+    "export type RelationDirection = Static<typeof RelationDirectionSchema>;",
+    "export type Relation = Static<typeof RelationSchema>;",
+    "export type CharacterMergeFact = Static<typeof CharacterMergeFactSchema>;"
+  ],
+  "core/schema/editor-memory.ts": [
+    "export type EditorNoteDraft = Static<typeof EditorNoteDraftSchema>;",
+    "export type EditorMemoryUpdate = Static<typeof EditorMemoryUpdateSchema>;",
+    "export type StoryEditorMemory = Static<typeof StoryEditorMemorySchema>;",
+    "export type StoryEditorNote = Static<typeof StoryEditorNoteSchema>;",
+    "export type StoryEditorNoteView = Static<typeof StoryEditorNoteViewSchema>;",
+    "export type StoryEditorCheckpoint = Static<typeof StoryEditorCheckpointSchema>;"
+  ],
+  "core/schema/event-line.ts": [
+    "export type LineStatus = Static<typeof LineStatusSchema>;",
+    "export type EventLine = Static<typeof EventLineSchema>;"
+  ],
+  "core/schema/extraction.ts": [
+    "export type WorldAssetsExtraction = Static<typeof WorldAssetsExtractionSchema>;",
+    "export type NarrativeAssetsExtraction = Static<typeof NarrativeAssetsExtractionSchema>;"
+  ],
+  "core/schema/link.ts": [
+    "export type NewNodeDraft = Static<typeof NewNodeDraftSchema>;",
+    "export type LinkEventLinesResult = Static<typeof LinkEventLinesResultSchema>;",
+    "export type EventLineOp = Static<typeof EventLineOpSchema>;"
+  ],
+  "core/schema/location-snapshot.ts": [
+    "export type LocationSnapshot = Static<typeof LocationSnapshotSchema>;",
+    "export type StoredLocationSnapshot = Static<typeof StoredLocationSnapshotSchema>;",
+    "export type StoredLocation = Static<typeof StoredLocationSchema>;"
+  ],
+  "core/schema/merge.ts": [
+    "export type AliasGroups = Static<typeof AliasGroupsSchema>;",
+    "export type AliasGroup = Static<typeof AliasGroupSchema>;",
+    "export function aliasGroupsSchemaFor(names: string[]);",
+    "export type MergedEntity = Static<typeof MergedEntitySchema>;",
+    "export type OptimizedCharacter = Static<typeof OptimizedCharacterSchema>;",
+    "export type CharacterOptimizationBatch = Static<typeof CharacterOptimizationBatchSchema>;",
+    "export function characterOptimizationSchemaFor(items: Array<{ id: string; name: string; aliases: string[]; facts: Array<{ id: string }> }>);",
+    "export type MergedLocation = Static<typeof MergedLocationSchema>;"
+  ],
+  "core/schema/node.ts": [
+    "export type Node = Static<typeof NodeSchema>;",
+    "export type TimePrecision = Static<typeof TimePrecisionSchema>;",
+    "export type StoredNode = Static<typeof StoredNodeSchema>;"
+  ],
+  "core/schema/story-session.ts": [
+    "export type StorySession = Static<typeof StorySessionSchema>;",
+    "export type StorySessionEntry = Static<typeof StorySessionEntrySchema>;",
+    "export type StorySessionRef = {\n    bookId: string;\n    id: string;\n};"
+  ],
+  "core/schema/validate.ts": [
+    "export function compileSchema<T extends TSchema>(schema: T): AnyCheck;",
+    "export type ValidationResult<T> = {\n    ok: true;\n    value: T;\n} | {\n    ok: false;\n    errors: string[];\n};",
+    "export function validate<T extends TSchema>(\n  schema: T,\n  data: unknown,\n): ValidationResult<Static<T>>;"
+  ],
+  "core/session/compaction.ts": [
+    "export type SummaryCall = (input: {\n    previousSummary: string;\n    transcript: string;\n    signal?: AbortSignal;\n    maxTokens: number;\n}) => Promise<CallModelResult<{\n    summary: string;\n}>>;",
+    "export function settingsForWindow(window: number, configured: Partial<CompactionSettings> = {}): CompactionSettings;",
+    "export async function projectedStoryContext(ref: StorySessionRef);",
+    "export async function compactStoryContext(ref: StorySessionRef, owner: string, options: {\n  contextWindow: number; settings?: Partial<CompactionSettings>; force?: boolean; signal?: AbortSignal;\n  bus?: EventBus; summarize?: SummaryCall; onUsage?: (usage: CallUsage[]) => void;\n}): Promise<Message[]>;"
+  ],
+  "core/session/pi-context.ts": [
+    "export type CompactionSettings = typeof PI_DEFAULT_COMPACTION;",
+    "export function estimateTextTokens(text: string): number;",
+    "export function estimateMessageTokens(message: Message): number;",
+    "export function shouldCompact(tokens: number, window: number, settings: CompactionSettings): boolean;",
+    "export function sessionPath(entries: StorySessionEntry[], leafId?: string): StorySessionEntry[];",
+    "export function buildContextEntries(entries: StorySessionEntry[], leafId?: string): StorySessionEntry[];",
+    "export function entryMessages(entry: StorySessionEntry): Message[];",
+    "export function projectSession(entries: StorySessionEntry[], leafId?: string);",
+    "export function estimateContextTokens(entries: StorySessionEntry[], messages: Message[]): number;",
+    "export function findCutPoint(entries: StorySessionEntry[], keepRecentTokens: number): number;",
+    "export function repairToolPairs(messages: Message[]): Message[];"
+  ],
+  "core/session/store.ts": [
+    "export async function activeStorySession(bookId: string);",
+    "export async function requireStorySession(ref: StorySessionRef, requireActive = false): Promise<StorySession>;",
+    "export async function ensureStorySession(bookId: string, newReview = false): Promise<StorySessionRef>;",
+    "export async function acquireStorySession(ref: StorySessionRef): Promise<string>;",
+    "export async function releaseStorySession(ref: StorySessionRef, owner: string);",
+    "export async function sessionEntries(ref: StorySessionRef): Promise<StorySessionEntry[]>;",
+    "export async function appendSessionEntry(ref: StorySessionRef, data: EntryData, owner?: string): Promise<StorySessionEntry>;",
+    "export async function appendSessionMessage(ref: StorySessionRef, message: Message, owner: string);",
+    "export async function resolveEditorSessionId(bookId: string, supplied?: string);"
+  ],
+  "core/shared/fuse-assets.ts": [
+    "export function uniqueText(values: Array<string | undefined>): string | undefined;",
+    "export function mergeRelations(relations: Relation[]): Relation[];",
+    "export function sources(items: Sourced[]): string[];",
+    "export function fuseCharacters(keep: StoredCharacterSnapshot, group: StoredCharacterSnapshot[]): StoredCharacterSnapshot;",
+    "export function fuseLocations(keep: StoredLocationSnapshot, group: StoredLocationSnapshot[]): StoredLocationSnapshot;"
+  ],
+  "core/tools/compile-tools.ts": [
+    "export function boundedRows(rows: unknown[], offset = 0, limit = 100, maxResults = 200);",
+    "export async function createCompileTools(bookId: string, state: {\n  nodes?: () => StoredNode[]\n  lines?: () => EventLine[]\n  characters?: () => StoredCharacterSnapshot[]\n  locations?: () => StoredLocationSnapshot[]\n  profile?: AgentProfileId\n  sessionId?: string\n} = {}): Promise<ReadTool[]>;"
+  ],
+  "core/tools/types.ts": [
+    "export interface ReadTool {\n    tool: Tool;\n    kind: 'read';\n    maxResults: number;\n    maxBytes: number;\n    returns?: TSchema;\n    execute: (args: unknown, signal?: AbortSignal) => Promise<unknown>;\n}"
+  ],
+  "features/app-shell/AppShell.tsx": [
+    "export function AppShell();"
+  ],
+  "features/assets/AssetDetail.tsx": [
+    "export type AssetKind = 'character' | 'location' | 'node' | 'line';",
+    "export type AssetItem = {\n    kind: 'character';\n    item: StoredCharacterSnapshot;\n} | {\n    kind: 'location';\n    item: StoredLocationSnapshot;\n} | {\n    kind: 'node';\n    item: StoredNode;\n} | {\n    kind: 'line';\n    item: EventLine;\n};",
+    "export interface MergeCandidate {\n    id: string;\n    name: string;\n}",
+    "export function AssetDetail({\r\n  bookId,\r\n  asset,\r\n  mergeCandidates,\r\n  onClose,\r\n  onChanged,\r\n}: {\r\n  bookId: string\r\n  asset: AssetItem\r\n  mergeCandidates: MergeCandidate[]\r\n  onClose: () => void\r\n  onChanged: () => void\r\n});"
+  ],
+  "features/assets/AssetFields.tsx": [
+    "export function AssetFields({ asset }: { asset: AssetItem });"
+  ],
+  "features/assets/AssetsPanel.tsx": [
+    "export function AssetsPanel();"
+  ],
+  "features/assets/BookSidebar.tsx": [
+    "export function BookSidebar({ books, bookId, importing, disabled, onOpen, onImport, onDeleted }: Props);"
+  ],
+  "features/assets/EditorMemoryPanel.tsx": [
+    "export function EditorMemoryPanel({ bookId }: { bookId: string });"
+  ],
+  "features/assets/SessionHistory.tsx": [
+    "export function SessionHistory({ entries }: { entries: StorySessionEntry[] });"
+  ],
+  "features/assets/TryOnePanel.tsx": [
+    "export function TryOnePanel({ bookId, onClose }: { bookId: string; onClose: () => void });"
+  ],
+  "features/assets/local-file-export.ts": [
+    "export async function chooseExportDirectory(): Promise<ExportDirectory>;",
+    "export async function exportBookToDirectory(bookId: string);",
+    "export async function downloadBookBackup(bookId: string): Promise<string>;"
+  ],
+  "features/compile/CompilePanel.tsx": [
+    "export function CompilePanel({ onCancel }: { onCancel?: () => void });"
+  ],
+  "features/compile/StageTestPanel.tsx": [
+    "export function StageTestPanel({ bookId, onInspect, disabled = false }: { bookId: string; onInspect: (tab: 'characters' | 'lines') => void; disabled?: boolean });"
+  ],
+  "features/import/ImportPanel.tsx": [
+    "export function ImportPanel({ onImported }: { onImported?: () => void });"
+  ],
+  "features/network/NetworkPanel.tsx": [
+    "export interface NetworkPanelProps {\n    lines: EventLine[];\n    nodes: StoredNode[];\n    chapterIndices?: string[];\n    onSelectNode?: (node: StoredNode) => void;\n}",
+    "export function NetworkPanel(props: NetworkPanelProps);"
+  ],
+  "features/play/PlayPanel.tsx": [
+    "export function PlayPanel();"
+  ],
+  "features/settings/SettingsPanel.tsx": [
+    "export function SettingsPanel();"
+  ],
+  "features/store/compile-store.ts": [
+    "export interface LogLine {\n    id: number;\n    at: number;\n    level: 'info' | 'warn' | 'error';\n    text: string;\n}"
+  ],
+  "features/store/ui-store.ts": [
+    "export type ActiveView = 'assets' | 'play' | 'settings';"
+  ],
+  "queries/index.ts": [
+    "export function useBooks(): Book[] | undefined;",
+    "export function useBookSummary(bookId: string);",
+    "export function useChapterIndices(bookId: string | null): string[] | undefined;",
+    "export function useProgress(bookId: string | null): CompileProgress | undefined;",
+    "export function useCharacterSnapshots(bookId: string | null): StoredCharacterSnapshot[] | undefined;",
+    "export function useLocationSnapshots(bookId: string | null): StoredLocationSnapshot[] | undefined;",
+    "export function useNodes(bookId: string | null): StoredNode[] | undefined;",
+    "export function useEventLines(bookId: string | null): EventLine[] | undefined;",
+    "export function useCharacters(bookId: string | null): Character[] | undefined;",
+    "export function useLocations(bookId: string | null): StoredLocation[] | undefined;",
+    "export function useEditorMemory(bookId: string | null, sessionId?: string);",
+    "export function useEditorNotes(bookId: string | null, sessionId?: string);",
+    "export function useStorySessions(bookId: string);",
+    "export function useStorySessionEntries(bookId: string, sessionId?: string);"
+  ]
+}

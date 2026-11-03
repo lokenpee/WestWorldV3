@@ -1,0 +1,7 @@
+{
+  "command": "pnpm exec tsc --ignoreConfig --noEmit --strict --target es2023 --module nodenext --moduleResolution nodenext ../docs/reverse-prd/v2/resources/contracts.d.ts",
+  "exitCode": 0,
+  "businessModuleImports": false,
+  "runnerSyntaxChecked": true,
+  "independentApplicationRebuilt": false
+}

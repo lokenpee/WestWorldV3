@@ -1,0 +1,53 @@
+{
+  "04-Spec-流程接口与算法.md": {
+    "sha256": "0abe33ceddda289902d0073585bbb4c44ef2520722c8e50b3656a2bbe5a70de1",
+    "lines": [
+      [
+        22,
+        "| 2.2 | 2026-10-21 | 全书P1先行；P2世界资产整理与P3事件组织解耦；补实时编辑、批量合并和同书持续会话 | 目标设计变更；旧实现证据不作新验收结论 |"
+      ],
+      [
+        41,
+        "| runAll（兼容入口） | bookId、恢复/signal/deps | p1及本次费用，不产生merge/link结果 | 2.2停用自动连跑；兼容入口仅启动全书P1 |"
+      ],
+      [
+        83,
+        "startP1/startP2/startP3均接受bookId及独立signal/runId；P2/P3的服务前置再次核全书P1成功凭证覆盖全部章块。P2不检查P3，P3不检查P2。已有P1完成时“继续P1”跳过成功子步骤；旧runAll只能作为启动P1的兼容适配，不再自动连跑。"
+      ],
+      [
+        164,
+        "派生chapters去重按章节比较器，timeRange取已有timeCoord字符串最小最大；无坐标时不生成。线characterIds若重算仅取当前读取的actorIds，不根据P2结果同步写新实体映射；查询时统一派生。persist清理空线，重新计算节点eventLineIds，准备记忆与检查点；在事务内验证旧节点、全部线、记忆revision、本批实际读取的世界记录revision及active session；随后节点/线/记忆/notes/checkpoint及commit条目同批提交。冲突抛错，无部分事务提交。成功事务同时更新本次实际检查过的对象覆盖版本；同run写入的线摘要/成员派生不能通过旧指纹把自己所有前序窗口判过期，新增未核查证据才重新入队。"
+      ]
+    ]
+  },
+  "05-Spec-AI与会话.md": {
+    "sha256": "ba5ef513a51da62e293c336d657ba3597bdeab3cbe92662d4c44eebb410893d3",
+    "lines": [
+      [
+        22,
+        "| 2.2 | 2026-10-21 | 全书P1先行；P2世界资产整理与P3事件组织解耦；补实时编辑、批量合并和同书持续会话 | 目标设计变更；旧实现证据不作新验收结论 |"
+      ],
+      [
+        70,
+        "| 事件串联/复核 | [P3](resources/v2.2/prompts/p3-story-editor.md) | 本批ID、范围、已有线摘要、工作记忆；2.2 LinkEventLinesResultSchema（含confidence/reason/evidenceNodeIds） |"
+      ]
+    ]
+  },
+  "12-验收执行与覆盖矩阵.md": {
+    "sha256": "03695eef955e1aa73745fe27ae1b1cf212da4512c5ad567fad1918e805bf0088",
+    "lines": [
+      [
+        21,
+        "| 2.2 | 2026-10-21 | 全书P1先行；P2世界资产整理与P3事件组织解耦；补实时编辑、批量合并和同书持续会话 | 目标设计变更；旧实现证据不作新验收结论 |"
+      ],
+      [
+        39,
+        "当前[30项JSON](resources/v2.2/acceptance-cases.json)为可落地的声明式验收步骤，尚未接入自动runner。不能把运行旧suite或本轮文档校验计为新场景应用通过。新自动化应接对应新服务/工具并核界面与持久数据，特别覆盖并行调度、在途人工改动、跨标签租约和页覆盖。"
+      ],
+      [
+        41,
+        "本轮只执行`scripts/validate-v2.2.py`检查文档链接、JSON语法、机器/正文计数、阶段策略与样例结构；结果见[evidence/v2.2-document-validation.json](evidence/v2.2-document-validation.json)。"
+      ]
+    ]
+  }
+}

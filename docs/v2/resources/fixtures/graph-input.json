@@ -1,0 +1,125 @@
+{
+  "lines": [
+    {
+      "id": "L01",
+      "bookId": "bk_reverse_fixture",
+      "title": "书信交付",
+      "nodeIds": [
+        "C1-N001",
+        "C1-N002",
+        "C2-N001"
+      ],
+      "chapters": [
+        "1",
+        "2"
+      ],
+      "cause": "双方会面",
+      "process": "顾衡交信，沈青离开",
+      "result": "书信交付完成",
+      "lineStatus": "closed",
+      "characterIds": [],
+      "updatedAt": "2026-10-21T00:00:00.000Z"
+    },
+    {
+      "id": "L02",
+      "bookId": "bk_reverse_fixture",
+      "title": "来信线索",
+      "nodeIds": [
+        "C1-N002"
+      ],
+      "chapters": [
+        "1"
+      ],
+      "cause": "书信出现",
+      "process": "顾衡交付书信",
+      "result": "后续内容未知",
+      "lineStatus": "open",
+      "characterIds": [],
+      "updatedAt": "2026-10-21T00:00:00.000Z"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "C1-N001",
+      "bookId": "bk_reverse_fixture",
+      "chapterIndex": "1",
+      "chapterName": "第一章 码头会面",
+      "order": 0,
+      "name": "码头会面",
+      "summary": "沈青在码头见到顾衡。",
+      "process": "沈青在码头见到顾衡。",
+      "quote": "沈青在码头见到顾衡。",
+      "actors": [
+        "沈青",
+        "顾衡"
+      ],
+      "confidence": 1,
+      "createdBy": "P1",
+      "eventLineIds": [
+        "L01"
+      ]
+    },
+    {
+      "id": "C1-N002",
+      "bookId": "bk_reverse_fixture",
+      "chapterIndex": "1",
+      "chapterName": "第一章 码头会面",
+      "order": 1,
+      "name": "交付书信",
+      "summary": "顾衡将信交给沈青。",
+      "process": "顾衡将信交给沈青。",
+      "quote": "顾衡将信交给沈青。",
+      "actors": [
+        "顾衡",
+        "沈青"
+      ],
+      "confidence": 1,
+      "createdBy": "P1",
+      "eventLineIds": [
+        "L01",
+        "L02"
+      ]
+    },
+    {
+      "id": "C2-N001",
+      "bookId": "bk_reverse_fixture",
+      "chapterIndex": "2",
+      "chapterName": "第二章 携信离开",
+      "order": 0,
+      "name": "携信离开",
+      "summary": "沈青携信离开码头。",
+      "process": "沈青携信离开码头。",
+      "quote": "沈青携信离开码头。",
+      "actors": [
+        "沈青"
+      ],
+      "confidence": 1,
+      "createdBy": "P1",
+      "eventLineIds": [
+        "L01"
+      ]
+    },
+    {
+      "id": "C3-N001",
+      "bookId": "bk_reverse_fixture",
+      "chapterIndex": "3",
+      "chapterName": "第三章 书铺候客",
+      "order": 0,
+      "name": "书铺候客",
+      "summary": "阿宁在书铺等候来客。",
+      "process": "阿宁在书铺等候来客。",
+      "quote": "阿宁在书铺等候来客。",
+      "actors": [
+        "阿宁"
+      ],
+      "confidence": 1,
+      "createdBy": "P1",
+      "eventLineIds": []
+    }
+  ],
+  "chapters": [
+    "1",
+    "2",
+    "3"
+  ]
+}

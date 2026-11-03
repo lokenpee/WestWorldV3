@@ -1,0 +1,27 @@
+[
+  {
+    "key": "1:worldAssets",
+    "bookId": "bk_acceptance",
+    "chapterIndex": "1",
+    "substep": "worldAssets",
+    "inputFingerprint": "example-not-a-valid-runtime-fingerprint",
+    "originIds": [
+      "C1-P001",
+      "C1-L001"
+    ],
+    "committedAt": "2026-10-23T00:00:00.000Z",
+    "runId": "run_example"
+  },
+  {
+    "key": "1:narrativeAssets",
+    "bookId": "bk_acceptance",
+    "chapterIndex": "1",
+    "substep": "narrativeAssets",
+    "inputFingerprint": "example-not-a-valid-runtime-fingerprint",
+    "originIds": [
+      "C1-N001"
+    ],
+    "committedAt": "2026-10-23T00:00:00.000Z",
+    "runId": "run_example"
+  }
+]

@@ -1,0 +1,32 @@
+{
+  "id": "PROMPT-PROBE-DIRECT",
+  "kind": "synthetic-target-request-not-a-recording",
+  "inputSchema": "prompt-inputs.schema.json#/$defs/DirectProbeTask",
+  "input": {},
+  "mode": "direct",
+  "modelSnapshot": {
+    "providerId": "deepseek",
+    "api": "openai-completions",
+    "baseUrl": "https://api.deepseek.com",
+    "modelId": "deepseek-flash",
+    "modelRole": "extraction",
+    "contextWindow": 128000,
+    "capabilities": {
+      "tools": true,
+      "structuredOutput": true
+    },
+    "credentialRef": "deepseek"
+  },
+  "options": {
+    "maxTokens": 8
+  },
+  "context": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "回复一个字：好",
+        "timestamp": 1792800000000
+      }
+    ]
+  }
+}

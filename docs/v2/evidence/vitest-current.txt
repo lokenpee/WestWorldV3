@@ -1,0 +1,17 @@
+
+> westworld-v2@1.0.0 test E:\WestWorldV2\app
+> vitest run
+
+
+ RUN  v5.0.3 E:/WestWorldV2/app
+
+
+ Test Files  39 passed (39)
+      Tests  325 passed (325)
+   Start at  16:09:15
+   Duration  9.75s (import 64%, tests 19%, transform 9%, setup 8%, worker 1%)
+
+     Import  125 modules were evaluated 1198 times · 49.95s total, 64% of tracked time
+             ~1.69s faster with isolate: false — shared modules are evaluated once per worker instead of once per file
+             learn more: https://vitest.dev/guide/improving-performance#test-isolation
+

@@ -1,0 +1,602 @@
+{
+  "core/pipeline/p1.ts": [
+    {
+      "line": 62,
+      "template": "`章节标识：${input.chapterIndex}`"
+    },
+    {
+      "line": 63,
+      "template": "`章节名：${input.chapterName}`"
+    },
+    {
+      "line": 65,
+      "template": "'--- 正文开始 ---'"
+    },
+    {
+      "line": 67,
+      "template": "'--- 正文结束 ---'"
+    },
+    {
+      "line": 92,
+      "template": "`C${input.chapterIndex}-P${pad3(i + 1)}`"
+    },
+    {
+      "line": 111,
+      "template": "`C${input.chapterIndex}-L${pad3(i + 1)}`"
+    },
+    {
+      "line": 121,
+      "template": "`C${input.chapterIndex}-N${pad3(i + 1)}`"
+    },
+    {
+      "line": 156,
+      "template": "'提交本章的**世界资产**：人物快照（不判层级）与地点。'"
+    },
+    {
+      "line": 182,
+      "template": "'提交本章的**叙事资产**：事件节点（只记录，不解释）。'"
+    }
+  ],
+  "core/pipeline/run-merge.ts": [
+    {
+      "line": 53,
+      "template": "`${res.errorKind ?? res.stopReason}，共 ${res.attempts} 次模型请求：${res.errorMessage ?? '模型没有提交有效结果'}`"
+    },
+    {
+      "line": 53,
+      "template": "'模型没有提交有效结果'"
+    },
+    {
+      "line": 61,
+      "template": "'步骤'"
+    },
+    {
+      "line": 74,
+      "template": "`${stage} 代码合并：姓名相等/包含 ${chars.length} → ${passes.first.length}；姓名＋别名集合相似度 >${ALIAS_SIMILARITY_THRESHOLD * 100}% ${passes.first.length} → ${charGroups.length}`"
+    },
+    {
+      "line": 78,
+      "template": "'人物'"
+    },
+    {
+      "line": 78,
+      "template": "'地点'"
+    },
+    {
+      "line": 86,
+      "template": "`${stage} AI 补充合并${kind}：${dossiers.length} 份精简档案`"
+    },
+    {
+      "line": 94,
+      "template": "`groups[${i}].names 未知主名：${unknown.join('、')}。只填本批档案的 name，不填 aliases；单份档案已有别名无需提交。`"
+    },
+    {
+      "line": 95,
+      "template": "`groups[${i}] 至少需要两份不同档案的主名；单份档案请省略。`"
+    },
+    {
+      "line": 96,
+      "template": "`groups[${i}].canonicalName 必须选自该组 names。`"
+    },
+    {
+      "line": 100,
+      "template": "`实体类型：${kind}。${kind === '地点' ? '整体和内部区域不是同一地点。' : ''}仅补充代码遗漏的同一实体。groups[].names 只填下面至少两份档案的 name，canonicalName 选自该组 names；aliases 仅作证据，不重新提交一份档案的别名表。可查询全库核实，查询结果不扩展本批可合并主名。无确定的跨档案合并就提交 {\"groups\":[]}。\\n${JSON.stringify(batch)}`"
+    },
+    {
+      "line": 100,
+      "template": "'地点'"
+    },
+    {
+      "line": 100,
+      "template": "'整体和内部区域不是同一地点。'"
+    },
+    {
+      "line": 102,
+      "template": "`${kind}别名识别失败：${describeCallFailure(res)}；保留代码合并结果`"
+    },
+    {
+      "line": 109,
+      "template": "'人物'"
+    },
+    {
+      "line": 113,
+      "template": "`${stage} 出场权重已按主名实际出现章节＋提及次数分位数计算（不计别名）；人工层级保留。`"
+    },
+    {
+      "line": 115,
+      "template": "`${stage} AI 整编：${targets.length} 人；跳过 ${workingCharacters.length - targets.length} 人（单次/低冗余/低权重/资料未变）`"
+    },
+    {
+      "line": 129,
+      "template": "`F${index + 1}`"
+    },
+    {
+      "line": 135,
+      "template": "`人物 ${input.name} 档案超过模型预算，保留本地资料，未发起整编请求`"
+    },
+    {
+      "line": 144,
+      "template": "'人物整编数据与约束超过模型窗口，保留底稿，未发起请求'"
+    },
+    {
+      "line": 150,
+      "template": "`未知或重复人物 ID：${id}`"
+    },
+    {
+      "line": 154,
+      "template": "`人物 ${input.name} 事实编号不完整：缺少 ${missing.join(',') || '无'}；未知 ${unexpected.join(',') || '无'}`"
+    },
+    {
+      "line": 154,
+      "template": "'无'"
+    },
+    {
+      "line": 154,
+      "template": "'无'"
+    },
+    {
+      "line": 155,
+      "template": "`人物 ${input.name} 主名不在原始称呼中`"
+    },
+    {
+      "line": 156,
+      "template": "`人物 ${input.name} 新增了没有依据的别名`"
+    },
+    {
+      "line": 157,
+      "template": "`人物 ${input.name} 清空了已知 ${field} 信息`"
+    },
+    {
+      "line": 159,
+      "template": "'整编结果没有完整覆盖本批人物 ID'"
+    },
+    {
+      "line": 162,
+      "template": "`${stage} AI 批量整编 ${items.length} 人，约 ${estimateTextTokens(JSON.stringify(items))} 输入 tokens（不含固定提示词）`"
+    },
+    {
+      "line": 167,
+      "template": "`人物整编失败：${!res.ok ? describeCallFailure(res) : checked?.ok ? check(checked.value).join('；') : checked?.errors.join('；') ?? '结果无效'}；保留本地底稿`"
+    },
+    {
+      "line": 167,
+      "template": "'结果无效'"
+    },
+    {
+      "line": 177,
+      "template": "`${stage} 本批人物整编通过校验：${items.map((item) => item.name).join('、')}；等待本轮事务提交`"
+    },
+    {
+      "line": 183,
+      "template": "`${stage} 地点代码合并：主名相等 ${locs.length} → ${locationPasses.first.length}；名称＋别名集合相似度 >${ALIAS_SIMILARITY_THRESHOLD * 100}% → ${locGroups.length}`"
+    },
+    {
+      "line": 185,
+      "template": "'地点'"
+    },
+    {
+      "line": 199,
+      "template": "`地点 ${entity.name} 融合失败：${describeCallFailure(res)}；保留本地事实`"
+    },
+    {
+      "line": 209,
+      "template": "'草稿在合并期间被修改，已保留编辑并停止提交，请重新检查。'"
+    },
+    {
+      "line": 214,
+      "template": "`${stage} 合并：人物 ${chars.length} → ${cancelled ? chars.length : workingCharacters.length}；地点 ${locs.length} → ${cancelled ? locs.length : mergedLocs.length}`"
+    }
+  ],
+  "core/pipeline/run-link.ts": [
+    {
+      "line": 40,
+      "template": "'batchSize 必须是正整数'"
+    },
+    {
+      "line": 46,
+      "template": "`${l.id} | ${l.title} | 章节 ${l.chapters.join(',')} | ${l.lineStatus} | 起因 ${l.cause.slice(0, 100)} | 结果 ${l.result.slice(0, 100)}`"
+    },
+    {
+      "line": 46,
+      "template": "'（还没有任何事件线）'"
+    },
+    {
+      "line": 49,
+      "template": "`${n.id} | ${n.name} | ${n.actors.join('、')} | 第${n.chapterIndex}章 | ${n.summary.slice(0, 120)}`"
+    },
+    {
+      "line": 67,
+      "template": "`补充节点结构无效：${checked.errors.join(';')}`"
+    },
+    {
+      "line": 68,
+      "template": "`临时节点 ID 重复：${n.client_id}`"
+    },
+    {
+      "line": 71,
+      "template": "`补充节点 ${n.client_id} 没有第 ${n.chapterIndex} 章的真实原文依据`"
+    },
+    {
+      "line": 75,
+      "template": "`事件线操作引用了不存在或无效的节点：${op.node_ids.filter((id) => !ids.has(id)).join(',')}`"
+    },
+    {
+      "line": 76,
+      "template": "`引用了不存在的事件线 ${op.line_id}`"
+    },
+    {
+      "line": 77,
+      "template": "'事件线合并目标不存在或与保留项重复'"
+    },
+    {
+      "line": 116,
+      "template": "`与已有事件线 ${duplicate.id} 的节点完全一致，忽略重复新建`"
+    },
+    {
+      "line": 118,
+      "template": "`L${String(number).padStart(2, '0')}`"
+    },
+    {
+      "line": 119,
+      "template": "`L${String(number).padStart(2, '0')}`"
+    },
+    {
+      "line": 125,
+      "template": "`合并重复事件线：${op.merge_line_ids.join('、')} → ${id}`"
+    },
+    {
+      "line": 144,
+      "template": "`清除无有效成员的事件线 ${id}`"
+    },
+    {
+      "line": 158,
+      "template": "'事件草稿在检查期间被修改，已保留编辑并停止提交，请重新检查。'"
+    },
+    {
+      "line": 161,
+      "template": "'故事编辑记忆已被其他任务更新，停止提交以保留结果，请继续检查。'"
+    },
+    {
+      "line": 162,
+      "template": "'人物或地点资料在故事编辑期间被修改，停止提交，请继续检查。'"
+    },
+    {
+      "line": 170,
+      "template": "`${editor!.work.stage} ${editor!.work.phase} 本批已提交：${prepared.memory.workingSummary.slice(0, 1800)}；当前节点 ${nodeMap.size} 个、事件线 ${lineMap.size} 条。`"
+    },
+    {
+      "line": 180,
+      "template": "`${stage} 恢复：跳过已完成且资料未变化的${work.phase === 'link' ? '节点批次' : '事件线复核'}`"
+    },
+    {
+      "line": 180,
+      "template": "'节点批次'"
+    },
+    {
+      "line": 180,
+      "template": "'事件线复核'"
+    },
+    {
+      "line": 182,
+      "template": "`${message}\\n\\n【本书故事编辑工作记忆：仅作参考，过期记录需核实】\\n${JSON.stringify(prior)}`"
+    },
+    {
+      "line": 184,
+      "template": "'提交串联与检查操作（append/create/update/merge）及有原文依据的补充节点。'"
+    },
+    {
+      "line": 190,
+      "template": "`本批检查失败：${describeCallFailure(res)}；保留已有数据与上一批记忆`"
+    },
+    {
+      "line": 202,
+      "template": "`补充节点章节不存在：${draft.chapterIndex}`"
+    },
+    {
+      "line": 205,
+      "template": "`C${draft.chapterIndex}-N${String(number).padStart(3, '0')}`"
+    },
+    {
+      "line": 206,
+      "template": "`C${draft.chapterIndex}-N${String(number).padStart(3, '0')}`"
+    },
+    {
+      "line": 220,
+      "template": "`补充草稿节点 ${id}：${draft.name}（原文已校验）`"
+    },
+    {
+      "line": 241,
+      "template": "`${stage} 串联第 ${i + 1}/${batches.length} 批（${batch.length} 个节点）`"
+    },
+    {
+      "line": 243,
+      "template": "`阶段 ${stage}：串联并检查本批节点。\\n章节范围：${batch[0]!.chapterIndex}—${batch[batch.length - 1]!.chapterIndex}\\n本批节点 ID：${batch.map((n) => n.id).join(',')}\\n调用 query_nodes/get_node_detail 获取内容；可查询全部已有线，跨批续接。\\n已有事件线摘要（前 50 条，其余用工具分页）：\\n${buildExistingLinesDigest([...lineMap.values()].slice(0, 50))}`"
+    },
+    {
+      "line": 253,
+      "template": "`P3 全书事件线复核 ${reviewBatches}/${focus.length}：查重复、错误成员、断点与闭合状态`"
+    },
+    {
+      "line": 256,
+      "template": "`全书收尾检查，不能只串联新节点。逐条核对以下事件线，与全书其他线比较是否同一件事；查详情、节点和原文。重复线用 merge；错误归属用 update；补断点必须有原文。允许独立节点不归线。\\n${buildExistingLinesDigest(active)}`"
+    }
+  ],
+  "core/agent/run.ts": [
+    {
+      "line": 24,
+      "template": "`${summary}${lines.length > 6 ? `\\n…另有 ${lines.length - 6} 条校验信息` : ''}${args ? `\\nReceived arguments:\\n${args.slice(0, 600)}` : ''}`"
+    },
+    {
+      "line": 24,
+      "template": "`\\n…另有 ${lines.length - 6} 条校验信息`"
+    },
+    {
+      "line": 24,
+      "template": "`\\nReceived arguments:\\n${args.slice(0, 600)}`"
+    },
+    {
+      "line": 54,
+      "template": "'工具返回结构不符合接口，请收窄查询并报告检查失败。'"
+    },
+    {
+      "line": 57,
+      "template": "'查询结果超过工具字节上限，请分页或收窄范围。'"
+    },
+    {
+      "line": 64,
+      "template": "'提交检查结果'"
+    },
+    {
+      "line": 65,
+      "template": "'提交符合 Schema 的结果；不直接修改数据库。'"
+    },
+    {
+      "line": 73,
+      "template": "'已接收，交由代码执行。'"
+    },
+    {
+      "line": 76,
+      "template": "'只有故事编辑职责可以恢复故事会话'"
+    },
+    {
+      "line": 100,
+      "template": "'当前任务或工具说明超过模型可用窗口，请缩小本批范围或设置正确的模型上下文窗口。'"
+    },
+    {
+      "line": 105,
+      "template": "`本书故事会话 ${header.id}。${header.kind === 'review' ? `这是新一轮完整复核，旧会话 ${header.parentSessionId ?? '无'} 只能回查参考，不代表本轮已通过。` : ''}\\n只有代码提交确认才表示写入成功；历史工具结果可能已过期，当前数据库与原文优先。\\n`"
+    },
+    {
+      "line": 105,
+      "template": "`这是新一轮完整复核，旧会话 ${header.parentSessionId ?? '无'} 只能回查参考，不代表本轮已通过。`"
+    },
+    {
+      "line": 105,
+      "template": "'无'"
+    },
+    {
+      "line": 106,
+      "template": "`${scope}${profile ? `职责：${profile.label}。${profile.instruction}\\n` : ''}${opts.system}\\n最多 ${maxSteps} 轮（其中最后一轮仅能提交）；提交结构或引用错误另保留最多 ${MAX_RESULT_REPAIRS} 次修正，修正轮仅能重新提交。按工具错误修正上一份提交。拿不准的合并不要做，禁止编造原文。`"
+    },
+    {
+      "line": 106,
+      "template": "`职责：${profile.label}。${profile.instruction}\\n`"
+    },
+    {
+      "line": 115,
+      "template": "`${session.bookId}:story_editor:${session.id}`"
+    },
+    {
+      "line": 117,
+      "template": "`归并模型 ${m.id}：发起第 ${steps} 轮请求，上下文窗口 ${window} tokens`"
+    },
+    {
+      "line": 130,
+      "template": "'本轮仅能调用 submit_result；依据不足的分组请省略。'"
+    },
+    {
+      "line": 130,
+      "template": "'工具不在只读白名单内'"
+    },
+    {
+      "line": 146,
+      "template": "'查询阶段结束。本轮只能调用 submit_result，依据不足的合并省略；若上次提交报错，只修正报错项并重新提交。'"
+    },
+    {
+      "line": 152,
+      "template": "'没有确定的别名合并时提交 groups=[]；不要重列已有别名。'"
+    },
+    {
+      "line": 153,
+      "template": "'只提交符合本次 Schema 的检查结果；没有确定变更时，保留必要摘要，相关操作数组留空。'"
+    },
+    {
+      "line": 155,
+      "template": "`查询阶段已经结束。现在只调用 submit_result 提交本次检查结果，禁止再次查询；依据不足的合并省略。${validationError ? `上一份提交错误：${validationError}。只修正这些错误，保留其他正确结果。` : noChange}`"
+    },
+    {
+      "line": 155,
+      "template": "`上一份提交错误：${validationError}。只修正这些错误，保留其他正确结果。`"
+    },
+    {
+      "line": 167,
+      "template": "'检查上下文接近模型上限，停止本轮并保留已有草稿。'"
+    },
+    {
+      "line": 178,
+      "template": "`模型 ${model.id} 返回 ${event.message.stopReason}：输入 ${u.input + u.cacheRead + u.cacheWrite}、输出 ${u.output} tokens${event.message.errorMessage ? `；${event.message.errorMessage}` : ''}`"
+    },
+    {
+      "line": 178,
+      "template": "`；${event.message.errorMessage}`"
+    },
+    {
+      "line": 184,
+      "template": "`  检查工具：${event.toolName}`"
+    },
+    {
+      "line": 187,
+      "template": "'工具调用失败'"
+    },
+    {
+      "line": 188,
+      "template": "`${event.toolName}：${detail}`"
+    },
+    {
+      "line": 197,
+      "template": "`  工具 ${event.toolName} 校验失败${validationFailures > MAX_RESULT_REPAIRS ? '，已达到结果修正上限，停止本轮' : '，要求模型修正'}：${detail}`"
+    },
+    {
+      "line": 197,
+      "template": "'，已达到结果修正上限，停止本轮'"
+    },
+    {
+      "line": 197,
+      "template": "'，要求模型修正'"
+    },
+    {
+      "line": 202,
+      "template": "'失败响应不作为下一轮的有效结论；原始记录仍保留'"
+    },
+    {
+      "line": 204,
+      "template": "'用户取消'"
+    },
+    {
+      "line": 204,
+      "template": "`已达到 ${maxSteps} 轮上限，模型未提交有效结果${toolError ? `；最后工具错误：${toolError}` : ''}`"
+    },
+    {
+      "line": 204,
+      "template": "`；最后工具错误：${toolError}`"
+    },
+    {
+      "line": 204,
+      "template": "'检查没有提交有效结果'"
+    },
+    {
+      "line": 214,
+      "template": "`模型 ${model.id} 在请求准备/执行阶段失败：${message}`"
+    }
+  ],
+  "core/session/compaction.ts": [
+    {
+      "line": 11,
+      "template": "`【旧摘要】\\n${input.previousSummary || '无'}\\n【需要压缩的原始会话数据】\\n${input.transcript}`"
+    },
+    {
+      "line": 11,
+      "template": "'无'"
+    },
+    {
+      "line": 21,
+      "template": "`[原始条目 ${entry.id}，角色 ${message.role}]\\n${JSON.stringify(message)}`"
+    },
+    {
+      "line": 71,
+      "template": "'没有可压缩的旧会话，已保留完整历史'"
+    },
+    {
+      "line": 72,
+      "template": "`会话上下文约 ${before} tokens，开始压缩旧历史，保留近期消息。`"
+    },
+    {
+      "line": 77,
+      "template": "'会话压缩已取消，原始历史不变'"
+    },
+    {
+      "line": 82,
+      "template": "'会话压缩未产生有效摘要，原始历史已保留，请继续重试'"
+    },
+    {
+      "line": 85,
+      "template": "'会话压缩已取消，原始历史不变'"
+    },
+    {
+      "line": 87,
+      "template": "'压缩后仍不足以容纳下一轮，请缩小当前任务；完整历史已保留'"
+    },
+    {
+      "line": 91,
+      "template": "`会话压缩完成：约 ${before} → ${after} tokens；完整原始历史可回查。`"
+    }
+  ],
+  "core/session/pi-context.ts": [
+    {
+      "line": 31,
+      "template": "'会话存档存在循环引用'"
+    },
+    {
+      "line": 34,
+      "template": "'会话存档缺少父条目'"
+    },
+    {
+      "line": 64,
+      "template": "`[代码提交确认] ${entry.summary}`"
+    },
+    {
+      "line": 67,
+      "template": "`[历史会话压缩摘要：仅作历史参考，可按原始条目 ID 回查]\\n${entry.summary}`"
+    },
+    {
+      "line": 117,
+      "template": "'会话中断，工具结果未保存；请重新查询。此标记不是实际工具结果。'"
+    }
+  ],
+  "core/llm/call.ts": [
+    {
+      "line": 98,
+      "template": "'把提取结果作为结构化数据提交。**必须调用这个工具提交结果**，不要用普通文本回复。'"
+    },
+    {
+      "line": 158,
+      "template": "'本请求只接收 submit_result，其他工具未执行。'"
+    },
+    {
+      "line": 161,
+      "template": "`上一次提交不符合 schema 或引用要求：\\n${error}\\n请在上一份提交基础上修正这些问题，保留已有正确信息，只通过 submit_result 重新提交。这是唯一一次修正机会。`"
+    },
+    {
+      "line": 226,
+      "template": "'模型没有调用 submit_result 工具，无法接收结果。'"
+    }
+  ],
+  "core/config/settings.ts": [
+    {
+      "line": 41,
+      "template": "`••••••••${key.slice(-4)}`"
+    },
+    {
+      "line": 104,
+      "template": "'还没有配置 API Key'"
+    },
+    {
+      "line": 115,
+      "template": "'还没有配置 API Key'"
+    },
+    {
+      "line": 125,
+      "template": "'本测试仅验证工具声明，请直接提交结果。'"
+    },
+    {
+      "line": 126,
+      "template": "'这是一条最小工具调用探测。请调用 submit_result 提交 {ok:true}，不查询外部资料。'"
+    },
+    {
+      "line": 127,
+      "template": "'验证工具调用并提交。'"
+    },
+    {
+      "line": 129,
+      "template": "'归并模型已通过 PI 工具提交验证'"
+    },
+    {
+      "line": 129,
+      "template": "`${result.errorKind ?? result.stopReason}：${result.errorMessage ?? '没有有效提交'}`"
+    },
+    {
+      "line": 129,
+      "template": "'没有有效提交'"
+    }
+  ]
+}

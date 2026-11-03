@@ -1,0 +1,23 @@
+{
+  "contractRevision": "2026-10-24",
+  "kind": "synthetic-contract-fixtures",
+  "modelExecuted": false,
+  "examples": [
+    "PROMPT-P1-WORLD.json",
+    "PROMPT-P1-NARRATIVE.json",
+    "PROMPT-P2-IDENTITY.json",
+    "PROMPT-P2-CHARACTER.json",
+    "PROMPT-P2-LOCATION.json",
+    "PROMPT-P3-WINDOW.json",
+    "PROMPT-P3-GLOBAL.json",
+    "PROMPT-COMPACT.json",
+    "PROMPT-PROBE-DIRECT.json",
+    "PROMPT-PROBE-AGENT.json",
+    "PROMPT-PROBE-AGENT-STORY.json",
+    "VARIANT-P3-FINAL-ONLY.json",
+    "VARIANT-DIRECT-REPAIR.json",
+    "VARIANT-P3-RECOVERY.json",
+    "VARIANT-P3-WRITE-REPAIR.json",
+    "VARIANT-P3-FINAL-REPAIR.json"
+  ]
+}

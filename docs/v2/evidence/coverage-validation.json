@@ -1,0 +1,14 @@
+{
+  "checkLayer": "mechanical-coverage-reconciliation-only",
+  "tableDefinitions": 17,
+  "tableFieldRows": 250,
+  "uiOperationGroups": 60,
+  "automaticTriggers": 14,
+  "dataFlows": 14,
+  "stateTransitions": 20,
+  "portableScenarios": 51,
+  "baselinePasses": 51,
+  "errors": [],
+  "semanticReview": "See 12-验收执行与覆盖矩阵.md; not inferred by this script",
+  "independentApplicationRebuilt": false
+}

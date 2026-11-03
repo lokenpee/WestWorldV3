@@ -1,0 +1,842 @@
+[
+  {
+    "evidence": "E01",
+    "path": "app/src/App.tsx",
+    "line": 3,
+    "pattern": "export default function App"
+  },
+  {
+    "evidence": "E01",
+    "path": "app/src/features/app-shell/AppShell.tsx",
+    "line": 9,
+    "pattern": "const TABS"
+  },
+  {
+    "evidence": "E01",
+    "path": "app/src/features/store/ui-store.ts",
+    "line": 24,
+    "pattern": "export const useUiStore"
+  },
+  {
+    "evidence": "E02",
+    "path": "app/src/features/settings/SettingsPanel.tsx",
+    "line": 78,
+    "pattern": "export function SettingsPanel"
+  },
+  {
+    "evidence": "E02",
+    "path": "app/src/core/config/settings.ts",
+    "line": 19,
+    "pattern": "export const DEFAULT_CONCURRENCY"
+  },
+  {
+    "evidence": "E02",
+    "path": "app/src/core/config/settings.ts",
+    "line": 87,
+    "pattern": "export async function setConcurrency"
+  },
+  {
+    "evidence": "E02",
+    "path": "app/src/core/llm/models.ts",
+    "line": 22,
+    "pattern": "export const DEFAULT_LLM_CONFIG"
+  },
+  {
+    "evidence": "E02",
+    "path": "app/src/core/llm/provider.ts",
+    "line": 33,
+    "pattern": "export function buildProvider"
+  },
+  {
+    "evidence": "E02",
+    "path": "app/src/core/llm/credentials.ts",
+    "line": 15,
+    "pattern": "export class IndexedDbCredentialStore"
+  },
+  {
+    "evidence": "E03",
+    "path": "app/src/features/settings/SettingsPanel.tsx",
+    "line": 141,
+    "pattern": "async function handleFetchModels"
+  },
+  {
+    "evidence": "E03",
+    "path": "app/src/core/config/settings.ts",
+    "line": 101,
+    "pattern": "export async function probeFetchModels"
+  },
+  {
+    "evidence": "E03",
+    "path": "app/src/core/config/settings.ts",
+    "line": 121,
+    "pattern": "export async function probeAggregationTools"
+  },
+  {
+    "evidence": "E03",
+    "path": "app/src/core/llm/probe.ts",
+    "line": 57,
+    "pattern": "export async function quickTestModel"
+  },
+  {
+    "evidence": "E04",
+    "path": "app/src/features/import/ImportPanel.tsx",
+    "line": 22,
+    "pattern": "export function ImportPanel"
+  },
+  {
+    "evidence": "E04",
+    "path": "app/src/features/import/ImportPanel.tsx",
+    "line": 59,
+    "pattern": "async function start"
+  },
+  {
+    "evidence": "E04",
+    "path": "app/src/core/pipeline/decode-text.ts",
+    "line": 17,
+    "pattern": "export function decodeBytes"
+  },
+  {
+    "evidence": "E05",
+    "path": "app/src/core/pipeline/split-chapters.ts",
+    "line": 11,
+    "pattern": "export const DEFAULT_CHAPTER_REGEX"
+  },
+  {
+    "evidence": "E05",
+    "path": "app/src/core/pipeline/split-chapters.ts",
+    "line": 15,
+    "pattern": "export function parseChapterRegex"
+  },
+  {
+    "evidence": "E05",
+    "path": "app/src/core/pipeline/split-chapters.ts",
+    "line": 91,
+    "pattern": "function fallbackSplit"
+  },
+  {
+    "evidence": "E05",
+    "path": "app/src/core/pipeline/split-chapters.ts",
+    "line": 117,
+    "pattern": "export function splitChapters"
+  },
+  {
+    "evidence": "E06",
+    "path": "app/src/core/pipeline/import-book.ts",
+    "line": 24,
+    "pattern": "export async function importBook"
+  },
+  {
+    "evidence": "E06",
+    "path": "app/src/core/db/repo.ts",
+    "line": 24,
+    "pattern": "export async function createBook"
+  },
+  {
+    "evidence": "E06",
+    "path": "app/src/core/db/repo.ts",
+    "line": 60,
+    "pattern": "export async function saveChapters"
+  },
+  {
+    "evidence": "E06",
+    "path": "app/src/queries/index.ts",
+    "line": 31,
+    "pattern": "export function useBooks"
+  },
+  {
+    "evidence": "E07",
+    "path": "app/src/core/pipeline/run-all.ts",
+    "line": 29,
+    "pattern": "export function buildChapterWindows"
+  },
+  {
+    "evidence": "E07",
+    "path": "app/src/core/pipeline/run-all.ts",
+    "line": 49,
+    "pattern": "async function runCompilation"
+  },
+  {
+    "evidence": "E07",
+    "path": "app/src/core/pipeline/compilation-lock.ts",
+    "line": 3,
+    "pattern": "export async function withCompilationLock"
+  },
+  {
+    "evidence": "E08",
+    "path": "app/src/core/pipeline/p1.ts",
+    "line": 143,
+    "pattern": "export async function extractChapter"
+  },
+  {
+    "evidence": "E08",
+    "path": "app/src/core/pipeline/p1.ts",
+    "line": 86,
+    "pattern": "export function assignCharacterIds"
+  },
+  {
+    "evidence": "E08",
+    "path": "app/src/core/pipeline/run-p1.ts",
+    "line": 33,
+    "pattern": "export async function runP1"
+  },
+  {
+    "evidence": "E08",
+    "path": "app/src/core/db/repo.ts",
+    "line": 99,
+    "pattern": "export async function saveP1Result"
+  },
+  {
+    "evidence": "E09",
+    "path": "app/src/core/pipeline/run-merge.ts",
+    "line": 56,
+    "pattern": "export async function runMerge"
+  },
+  {
+    "evidence": "E09",
+    "path": "app/src/core/pipeline/asset-merge-policy.ts",
+    "line": 63,
+    "pattern": "export function twoPassAssetGroups"
+  },
+  {
+    "evidence": "E09",
+    "path": "app/src/core/shared/fuse-assets.ts",
+    "line": 25,
+    "pattern": "export function fuseCharacters"
+  },
+  {
+    "evidence": "E09",
+    "path": "app/src/core/shared/fuse-assets.ts",
+    "line": 58,
+    "pattern": "export function fuseLocations"
+  },
+  {
+    "evidence": "E10",
+    "path": "app/src/core/pipeline/asset-frequency.ts",
+    "line": 13,
+    "pattern": "export function assignAssetFrequency"
+  },
+  {
+    "evidence": "E10",
+    "path": "app/src/core/pipeline/character-merge-policy.ts",
+    "line": 56,
+    "pattern": "export function assignFrequencyWeights"
+  },
+  {
+    "evidence": "E11",
+    "path": "app/src/core/pipeline/character-merge-policy.ts",
+    "line": 44,
+    "pattern": "export function optimizationReason"
+  },
+  {
+    "evidence": "E11",
+    "path": "app/src/core/pipeline/run-merge.ts",
+    "line": 114,
+    "pattern": "const targets ="
+  },
+  {
+    "evidence": "E11",
+    "path": "app/src/core/pipeline/run-merge.ts",
+    "line": 146,
+    "pattern": "const check = (data: CharacterOptimizationBatch)"
+  },
+  {
+    "evidence": "E11",
+    "path": "app/src/core/pipeline/run-merge.ts",
+    "line": 181,
+    "pattern": "const locationPasses ="
+  },
+  {
+    "evidence": "E12",
+    "path": "app/src/core/pipeline/run-link.ts",
+    "line": 15,
+    "pattern": "export const DEFAULT_BATCH_SIZE"
+  },
+  {
+    "evidence": "E12",
+    "path": "app/src/core/pipeline/run-link.ts",
+    "line": 59,
+    "pattern": "export async function validateLinkResult"
+  },
+  {
+    "evidence": "E12",
+    "path": "app/src/core/pipeline/run-link.ts",
+    "line": 109,
+    "pattern": "function apply("
+  },
+  {
+    "evidence": "E12",
+    "path": "app/src/core/pipeline/run-link.ts",
+    "line": 247,
+    "pattern": "if (review &&"
+  },
+  {
+    "evidence": "E13",
+    "path": "app/src/core/pipeline/run-merge.ts",
+    "line": 207,
+    "pattern": "if (!cancelled) await db.transaction"
+  },
+  {
+    "evidence": "E13",
+    "path": "app/src/core/pipeline/run-link.ts",
+    "line": 140,
+    "pattern": "async function persist("
+  },
+  {
+    "evidence": "E13",
+    "path": "app/src/core/memory/story-editor.ts",
+    "line": 141,
+    "pattern": "export async function prepareEditorCommit"
+  },
+  {
+    "evidence": "E14",
+    "path": "app/src/features/compile/StageTestPanel.tsx",
+    "line": 5,
+    "pattern": "const STEPS"
+  },
+  {
+    "evidence": "E14",
+    "path": "app/src/core/pipeline/run-test-stage.ts",
+    "line": 23,
+    "pattern": "export async function runTestStage"
+  },
+  {
+    "evidence": "E14",
+    "path": "app/src/features/assets/AssetsPanel.tsx",
+    "line": 219,
+    "pattern": "progress?.stage !== 'P3'"
+  },
+  {
+    "evidence": "E15",
+    "path": "app/src/features/assets/TryOnePanel.tsx",
+    "line": 17,
+    "pattern": "export function TryOnePanel"
+  },
+  {
+    "evidence": "E15",
+    "path": "app/src/core/pipeline/try-one.ts",
+    "line": 30,
+    "pattern": "export async function tryOneChapter"
+  },
+  {
+    "evidence": "E16",
+    "path": "app/src/features/compile/CompilePanel.tsx",
+    "line": 12,
+    "pattern": "export function CompilePanel"
+  },
+  {
+    "evidence": "E16",
+    "path": "app/src/features/store/compile-store.ts",
+    "line": 31,
+    "pattern": "const MAX_LOGS"
+  },
+  {
+    "evidence": "E16",
+    "path": "app/src/features/store/compile-store.ts",
+    "line": 23,
+    "pattern": "beginRun:"
+  },
+  {
+    "evidence": "E16",
+    "path": "app/src/queries/index.ts",
+    "line": 53,
+    "pattern": "export function useProgress"
+  },
+  {
+    "evidence": "E17",
+    "path": "app/src/features/assets/BookSidebar.tsx",
+    "line": 8,
+    "pattern": "function BookEntry"
+  },
+  {
+    "evidence": "E17",
+    "path": "app/src/features/assets/AssetsPanel.tsx",
+    "line": 61,
+    "pattern": "export function AssetsPanel"
+  },
+  {
+    "evidence": "E17",
+    "path": "app/src/features/assets/AssetDetail.tsx",
+    "line": 38,
+    "pattern": "const FIELDS"
+  },
+  {
+    "evidence": "E17",
+    "path": "app/src/features/assets/AssetDetail.tsx",
+    "line": 185,
+    "pattern": "async function doMerge"
+  },
+  {
+    "evidence": "E17",
+    "path": "app/src/core/assets/edit.ts",
+    "line": 31,
+    "pattern": "export async function updateCharacterSnapshot"
+  },
+  {
+    "evidence": "E17",
+    "path": "app/src/core/assets/edit.ts",
+    "line": 139,
+    "pattern": "export async function updateNode"
+  },
+  {
+    "evidence": "E18",
+    "path": "app/src/core/assets/edit.ts",
+    "line": 53,
+    "pattern": "export async function deleteCharacterSnapshot"
+  },
+  {
+    "evidence": "E18",
+    "path": "app/src/core/assets/edit.ts",
+    "line": 143,
+    "pattern": "export async function deleteNode"
+  },
+  {
+    "evidence": "E18",
+    "path": "app/src/core/assets/edit.ts",
+    "line": 179,
+    "pattern": "export async function deleteEventLine"
+  },
+  {
+    "evidence": "E19",
+    "path": "app/src/core/pipeline/publish.ts",
+    "line": 80,
+    "pattern": "export function createNameResolver"
+  },
+  {
+    "evidence": "E19",
+    "path": "app/src/core/pipeline/publish.ts",
+    "line": 111,
+    "pattern": "export function toCharacterEntity"
+  },
+  {
+    "evidence": "E19",
+    "path": "app/src/core/pipeline/publish.ts",
+    "line": 160,
+    "pattern": "export async function publishCanon"
+  },
+  {
+    "evidence": "E19",
+    "path": "app/src/core/pipeline/publish.ts",
+    "line": 208,
+    "pattern": "await db.transaction('rw'"
+  },
+  {
+    "evidence": "E20",
+    "path": "app/src/features/network/NetworkPanel.tsx",
+    "line": 47,
+    "pattern": "function TimelineView"
+  },
+  {
+    "evidence": "E20",
+    "path": "app/src/core/graph/chapter-timeline.ts",
+    "line": 20,
+    "pattern": "export function buildChapterTimeline"
+  },
+  {
+    "evidence": "E20",
+    "path": "app/src/features/network/NetworkPanel.tsx",
+    "line": 68,
+    "pattern": "<ReactFlow nodes="
+  },
+  {
+    "evidence": "E21",
+    "path": "app/src/features/assets/EditorMemoryPanel.tsx",
+    "line": 5,
+    "pattern": "export function EditorMemoryPanel"
+  },
+  {
+    "evidence": "E21",
+    "path": "app/src/core/memory/story-editor.ts",
+    "line": 58,
+    "pattern": "export async function validateEditorUpdate"
+  },
+  {
+    "evidence": "E21",
+    "path": "app/src/core/memory/story-editor.ts",
+    "line": 99,
+    "pattern": "export async function readEditorMemory"
+  },
+  {
+    "evidence": "E21",
+    "path": "app/src/core/memory/story-editor.ts",
+    "line": 128,
+    "pattern": "export async function completedEditorWork"
+  },
+  {
+    "evidence": "E22",
+    "path": "app/src/core/session/store.ts",
+    "line": 33,
+    "pattern": "export async function ensureStorySession"
+  },
+  {
+    "evidence": "E22",
+    "path": "app/src/core/session/store.ts",
+    "line": 59,
+    "pattern": "export async function acquireStorySession"
+  },
+  {
+    "evidence": "E22",
+    "path": "app/src/core/agent/profiles.ts",
+    "line": 4,
+    "pattern": "export const AGENT_PROFILES"
+  },
+  {
+    "evidence": "E22",
+    "path": "app/src/features/assets/SessionHistory.tsx",
+    "line": 20,
+    "pattern": "export function SessionHistory"
+  },
+  {
+    "evidence": "E23",
+    "path": "app/src/core/session/compaction.ts",
+    "line": 14,
+    "pattern": "export function settingsForWindow"
+  },
+  {
+    "evidence": "E23",
+    "path": "app/src/core/session/compaction.ts",
+    "line": 42,
+    "pattern": "export async function compactStoryContext"
+  },
+  {
+    "evidence": "E23",
+    "path": "app/src/core/session/pi-context.ts",
+    "line": 112,
+    "pattern": "export function repairToolPairs"
+  },
+  {
+    "evidence": "E24",
+    "path": "app/src/core/tools/compile-tools.ts",
+    "line": 12,
+    "pattern": "const MAX_BYTES"
+  },
+  {
+    "evidence": "E24",
+    "path": "app/src/core/tools/compile-tools.ts",
+    "line": 22,
+    "pattern": "export function boundedRows"
+  },
+  {
+    "evidence": "E24",
+    "path": "app/src/core/tools/compile-tools.ts",
+    "line": 37,
+    "pattern": "export async function createCompileTools"
+  },
+  {
+    "evidence": "E24",
+    "path": "app/src/core/agent/run.ts",
+    "line": 47,
+    "pattern": "const allowed ="
+  },
+  {
+    "evidence": "E25",
+    "path": "app/src/core/llm/call.ts",
+    "line": 22,
+    "pattern": "export const MAX_RESULT_REPAIRS"
+  },
+  {
+    "evidence": "E25",
+    "path": "app/src/core/llm/call.ts",
+    "line": 114,
+    "pattern": "export async function callModel"
+  },
+  {
+    "evidence": "E25",
+    "path": "app/src/core/llm/errors.ts",
+    "line": 26,
+    "pattern": "export const RETRY_POLICY"
+  },
+  {
+    "evidence": "E25",
+    "path": "app/src/core/agent/run.ts",
+    "line": 35,
+    "pattern": "const maxSteps ="
+  },
+  {
+    "evidence": "E25",
+    "path": "app/src/core/agent/run.ts",
+    "line": 84,
+    "pattern": "const timer ="
+  },
+  {
+    "evidence": "E25",
+    "path": "app/src/core/llm/normalize-result.ts",
+    "line": 5,
+    "pattern": "export function normalizeModelResult"
+  },
+  {
+    "evidence": "E26",
+    "path": "app/src/core/export/export-book.ts",
+    "line": 25,
+    "pattern": "export async function exportBook"
+  },
+  {
+    "evidence": "E26",
+    "path": "app/src/core/export/manifest.ts",
+    "line": 10,
+    "pattern": "export const BACKUP_FORMAT_VERSION"
+  },
+  {
+    "evidence": "E26",
+    "path": "app/src/core/export/manifest.ts",
+    "line": 37,
+    "pattern": "export async function checksumOf"
+  },
+  {
+    "evidence": "E27",
+    "path": "app/src/core/export/import-book.ts",
+    "line": 54,
+    "pattern": "export function inspectBackup"
+  },
+  {
+    "evidence": "E27",
+    "path": "app/src/core/export/import-book.ts",
+    "line": 123,
+    "pattern": "export async function importBackup"
+  },
+  {
+    "evidence": "E27",
+    "path": "app/src/features/settings/SettingsPanel.tsx",
+    "line": 195,
+    "pattern": "async function confirmImport"
+  },
+  {
+    "evidence": "E28",
+    "path": "app/src/features/assets/local-file-export.ts",
+    "line": 7,
+    "pattern": "export async function chooseExportDirectory"
+  },
+  {
+    "evidence": "E28",
+    "path": "app/src/core/export/local-file.ts",
+    "line": 18,
+    "pattern": "export async function writeBackupToDirectory"
+  },
+  {
+    "evidence": "E28",
+    "path": "app/src/core/export/local-file.ts",
+    "line": 31,
+    "pattern": "export async function exportBookToDirectory"
+  },
+  {
+    "evidence": "E28",
+    "path": "app/src/features/assets/local-file-export.ts",
+    "line": 18,
+    "pattern": "export async function downloadBookBackup"
+  },
+  {
+    "evidence": "E29",
+    "path": "app/src/features/assets/BookSidebar.tsx",
+    "line": 62,
+    "pattern": "{deleting &&"
+  },
+  {
+    "evidence": "E29",
+    "path": "app/src/core/assets/library.ts",
+    "line": 5,
+    "pattern": "export function deleteAssetBook"
+  },
+  {
+    "evidence": "E29",
+    "path": "app/src/core/db/repo.ts",
+    "line": 53,
+    "pattern": "export async function deleteBook"
+  },
+  {
+    "evidence": "E29",
+    "path": "app/src/core/db/canon.ts",
+    "line": 82,
+    "pattern": "export async function deleteCanonDb"
+  },
+  {
+    "evidence": "E30",
+    "path": "app/src/core/db/settings.ts",
+    "line": 15,
+    "pattern": "export const SETTINGS_STORES"
+  },
+  {
+    "evidence": "E30",
+    "path": "app/src/core/db/stores.ts",
+    "line": 52,
+    "pattern": "export const CANON_STORES"
+  },
+  {
+    "evidence": "E30",
+    "path": "app/src/core/db/canon.ts",
+    "line": 42,
+    "pattern": "constructor(bookId:"
+  },
+  {
+    "evidence": "E30",
+    "path": "app/src/core/schema/book.ts",
+    "line": 71,
+    "pattern": "export const CompileProgressSchema"
+  },
+  {
+    "evidence": "E30",
+    "path": "app/src/core/schema/node.ts",
+    "line": 81,
+    "pattern": "export const StoredNodeSchema"
+  },
+  {
+    "evidence": "E30",
+    "path": "app/src/core/schema/event-line.ts",
+    "line": 14,
+    "pattern": "export const EventLineSchema"
+  },
+  {
+    "evidence": "E31",
+    "path": "app/src/features/play/PlayPanel.tsx",
+    "line": 15,
+    "pattern": "export function PlayPanel"
+  },
+  {
+    "evidence": "E31",
+    "path": "app/src/features/play/PlayPanel.tsx",
+    "line": 26,
+    "pattern": "function send()"
+  },
+  {
+    "evidence": "E31",
+    "path": "app/src/features/app-shell/AppShell.tsx",
+    "line": 54,
+    "pattern": "activeView === 'play'"
+  },
+  {
+    "evidence": "E32",
+    "path": "app/src/features/assets/AssetFields.tsx",
+    "line": 27,
+    "pattern": "export function AssetFields"
+  },
+  {
+    "evidence": "E32",
+    "path": "app/src/core/schema/common.ts",
+    "line": 12,
+    "pattern": "export const CharacterProfileSchema"
+  },
+  {
+    "evidence": "E32",
+    "path": "app/src/core/schema/character-snapshot.ts",
+    "line": 50,
+    "pattern": "export const StoredCharacterSnapshotSchema"
+  },
+  {
+    "evidence": "E32",
+    "path": "app/src/core/schema/node.ts",
+    "line": 13,
+    "pattern": "export const NodeSchema"
+  },
+  {
+    "evidence": "E32",
+    "path": "app/src/core/schema/location-snapshot.ts",
+    "line": 10,
+    "pattern": "export const LocationSnapshotSchema"
+  },
+  {
+    "evidence": "E33",
+    "path": "app/vite.config.ts",
+    "line": 13,
+    "pattern": "test:"
+  },
+  {
+    "evidence": "E33",
+    "path": "app/tests/setup.ts",
+    "line": 1,
+    "pattern": "import 'fake-indexeddb/auto'"
+  },
+  {
+    "evidence": "E33",
+    "path": "app/tests/llm-session-wiring.test.ts",
+    "line": 69,
+    "pattern": "vi.stubGlobal('fetch'"
+  },
+  {
+    "evidence": "E34",
+    "path": "app/src/core/schema/node.ts",
+    "line": 108,
+    "pattern": "timeCoord: Type.Optional"
+  },
+  {
+    "evidence": "E34",
+    "path": "app/src/core/db/stores.ts",
+    "line": 52,
+    "pattern": "export const CANON_STORES"
+  },
+  {
+    "evidence": "E34",
+    "path": "app/src/features/network/NetworkPanel.tsx",
+    "line": 49,
+    "pattern": "buildChapterTimeline(lines, nodes"
+  },
+  {
+    "evidence": "E34",
+    "path": "app/src/features/play/PlayPanel.tsx",
+    "line": 26,
+    "pattern": "function send()"
+  },
+  {
+    "evidence": "E35",
+    "path": "app/src/core/prompts/index.ts",
+    "line": 19,
+    "pattern": "export const PROMPTS"
+  },
+  {
+    "evidence": "E35",
+    "path": "app/src/core/prompts/extraction/01-extract-world-assets.md",
+    "line": 19,
+    "pattern": "## 铁律"
+  },
+  {
+    "evidence": "E35",
+    "path": "app/src/core/prompts/extraction/02-extract-narrative-assets.md",
+    "line": 23,
+    "pattern": "## 铁律"
+  },
+  {
+    "evidence": "E35",
+    "path": "app/src/core/pipeline/p1.ts",
+    "line": 155,
+    "pattern": "schema: WorldAssetsExtractionSchema"
+  },
+  {
+    "evidence": "E35",
+    "path": "app/src/core/pipeline/run-merge.ts",
+    "line": 112,
+    "pattern": "assignFrequencyWeights(workingCharacters"
+  },
+  {
+    "evidence": "E36",
+    "path": "app/src/features/assets/AssetsPanel.tsx",
+    "line": 441,
+    "pattern": "asset={selected}"
+  },
+  {
+    "evidence": "E36",
+    "path": "app/src/features/assets/AssetDetail.tsx",
+    "line": 251,
+    "pattern": "value={asset.item.roleWeight ?? 'NPC'}"
+  },
+  {
+    "evidence": "E36",
+    "path": "app/src/features/assets/AssetDetail.tsx",
+    "line": 273,
+    "pattern": "value={asset.item.lineStatus}"
+  },
+  {
+    "evidence": "E37",
+    "path": "app/src/core/pipeline/asset-merge-policy.ts",
+    "line": 66,
+    "pattern": "config.allowContainment !== false"
+  },
+  {
+    "evidence": "E38",
+    "path": "app/src/features/store/compile-store.ts",
+    "line": 69,
+    "pattern": "applyEvent: (e)"
+  },
+  {
+    "evidence": "E39",
+    "path": "app/src/core/llm/models.ts",
+    "line": 44,
+    "pattern": "cacheKey(cfg: LlmConfig)"
+  }
+]

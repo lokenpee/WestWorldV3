@@ -1,0 +1,29 @@
+[
+  {
+    "recordType": "run",
+    "id": "run_example",
+    "bookId": "bk_acceptance",
+    "stage": "P1",
+    "status": "completed",
+    "startedAt": "2026-10-23T00:00:00.000Z",
+    "finishedAt": "2026-10-23T00:00:00.000Z",
+    "planVersion": "2.2",
+    "appliedCommands": [],
+    "usage": {
+      "input": 0,
+      "output": 0,
+      "totalTokens": 0,
+      "cost": 0
+    },
+    "cost": 0
+  },
+  {
+    "recordType": "lease",
+    "id": "lease:world",
+    "bookId": "bk_acceptance",
+    "lockKey": "world",
+    "owner": "owner_example",
+    "runId": "run_world_example",
+    "expiresAt": 1792713900000
+  }
+]

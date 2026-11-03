@@ -1,0 +1,615 @@
+{
+  "tables": [
+    {
+      "table": "T01",
+      "name": "credentials",
+      "operations": [
+        "OP-42",
+        "OP-43",
+        "OP-44",
+        "OP-45",
+        "OP-46"
+      ],
+      "flows": [
+        "DF-10",
+        "DF-11",
+        "DF-12",
+        "DF-13"
+      ],
+      "fields": 4,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T02",
+      "name": "appSettings",
+      "operations": [
+        "OP-41",
+        "OP-44",
+        "OP-45",
+        "OP-46",
+        "OP-47",
+        "OP-53",
+        "OP-54"
+      ],
+      "flows": [
+        "DF-10",
+        "DF-11",
+        "DF-12",
+        "DF-13"
+      ],
+      "fields": 3,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T03",
+      "name": "books",
+      "operations": [
+        "OP-02",
+        "OP-09",
+        "OP-50",
+        "OP-51",
+        "OP-52",
+        "OP-54",
+        "OP-55",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-01",
+        "DF-10",
+        "DF-11"
+      ],
+      "fields": 5,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T04",
+      "name": "chapters",
+      "operations": [
+        "OP-09",
+        "OP-27",
+        "OP-28",
+        "OP-33",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-01",
+        "DF-02",
+        "DF-03",
+        "DF-04",
+        "DF-10",
+        "DF-11"
+      ],
+      "fields": 5,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T05",
+      "name": "chapterTexts",
+      "operations": [
+        "OP-09",
+        "OP-33",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-01",
+        "DF-02",
+        "DF-03",
+        "DF-04",
+        "DF-05",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 3,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T06",
+      "name": "characterSnapshots",
+      "operations": [
+        "OP-10",
+        "OP-12",
+        "OP-13",
+        "OP-15",
+        "OP-19",
+        "OP-21",
+        "OP-23",
+        "OP-27",
+        "OP-30",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-04",
+        "DF-05",
+        "DF-06",
+        "DF-07",
+        "DF-09",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 39,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T07",
+      "name": "locationSnapshots",
+      "operations": [
+        "OP-10",
+        "OP-13",
+        "OP-16",
+        "OP-21",
+        "OP-23",
+        "OP-27",
+        "OP-30",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-04",
+        "DF-05",
+        "DF-06",
+        "DF-07",
+        "DF-09",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 16,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T08",
+      "name": "nodes",
+      "operations": [
+        "OP-10",
+        "OP-13",
+        "OP-17",
+        "OP-24",
+        "OP-25",
+        "OP-27",
+        "OP-30",
+        "OP-34",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57",
+        "OP-60"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-04",
+        "DF-06",
+        "DF-08",
+        "DF-09",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 24,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T09",
+      "name": "eventLines",
+      "operations": [
+        "OP-10",
+        "OP-13",
+        "OP-18",
+        "OP-20",
+        "OP-24",
+        "OP-25",
+        "OP-27",
+        "OP-30",
+        "OP-34",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-06",
+        "DF-08",
+        "DF-09",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 12,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T10",
+      "name": "characters",
+      "operations": [
+        "OP-30",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-06",
+        "DF-07",
+        "DF-09",
+        "DF-10",
+        "DF-11"
+      ],
+      "fields": 22,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T11",
+      "name": "locations",
+      "operations": [
+        "OP-30",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-06",
+        "DF-07",
+        "DF-09",
+        "DF-10",
+        "DF-11"
+      ],
+      "fields": 8,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T12",
+      "name": "compileProgress",
+      "operations": [
+        "OP-09",
+        "OP-10",
+        "OP-27",
+        "OP-28",
+        "OP-29",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-01",
+        "DF-02",
+        "DF-03",
+        "DF-04",
+        "DF-05",
+        "DF-10",
+        "DF-11"
+      ],
+      "fields": 13,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T13",
+      "name": "storyEditorMemory",
+      "operations": [
+        "OP-10",
+        "OP-27",
+        "OP-36",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 7,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T14",
+      "name": "storyEditorNotes",
+      "operations": [
+        "OP-10",
+        "OP-27",
+        "OP-36",
+        "OP-38",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 17,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T15",
+      "name": "storyEditorCheckpoints",
+      "operations": [
+        "OP-10",
+        "OP-27",
+        "OP-36",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 11,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T16",
+      "name": "storySessions",
+      "operations": [
+        "OP-10",
+        "OP-27",
+        "OP-36",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-10",
+        "DF-11",
+        "DF-14"
+      ],
+      "fields": 13,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    },
+    {
+      "table": "T17",
+      "name": "storySessionEntries",
+      "operations": [
+        "OP-10",
+        "OP-27",
+        "OP-36",
+        "OP-37",
+        "OP-39",
+        "OP-50",
+        "OP-51",
+        "OP-54",
+        "OP-57"
+      ],
+      "flows": [
+        "DF-02",
+        "DF-03",
+        "DF-10",
+        "DF-11",
+        "DF-13",
+        "DF-14"
+      ],
+      "fields": 48,
+      "spec": "03-Spec-数据与存储.md",
+      "documentation": "逐表字段、生命周期和例子已说明",
+      "validation": "执行用例覆盖部分路径；其余源调用链审阅"
+    }
+  ],
+  "uiModules": {
+    "features/app-shell/AppShell.tsx": [
+      "OP-01",
+      "AUTO-01"
+    ],
+    "features/import/ImportPanel.tsx": [
+      "OP-04",
+      "OP-05",
+      "OP-06",
+      "OP-07",
+      "OP-08",
+      "OP-09",
+      "OP-10"
+    ],
+    "features/assets/BookSidebar.tsx": [
+      "OP-02",
+      "OP-03",
+      "OP-52",
+      "OP-53",
+      "OP-54",
+      "OP-55",
+      "OP-56",
+      "OP-57",
+      "OP-58",
+      "AUTO-09"
+    ],
+    "features/assets/AssetsPanel.tsx": [
+      "OP-02",
+      "OP-03",
+      "OP-11",
+      "OP-12",
+      "OP-13",
+      "OP-23",
+      "OP-24",
+      "OP-25",
+      "OP-27",
+      "OP-30",
+      "OP-31",
+      "OP-32",
+      "OP-60",
+      "AUTO-02",
+      "AUTO-04"
+    ],
+    "features/assets/AssetDetail.tsx": [
+      "OP-14",
+      "OP-15",
+      "OP-16",
+      "OP-17",
+      "OP-18",
+      "OP-19",
+      "OP-20",
+      "OP-21",
+      "OP-22",
+      "OP-26",
+      "AUTO-05"
+    ],
+    "features/assets/AssetFields.tsx": [
+      "OP-26"
+    ],
+    "features/compile/CompilePanel.tsx": [
+      "OP-29",
+      "AUTO-06"
+    ],
+    "features/compile/StageTestPanel.tsx": [
+      "OP-28"
+    ],
+    "features/assets/TryOnePanel.tsx": [
+      "OP-32",
+      "OP-33",
+      "OP-26"
+    ],
+    "features/network/NetworkPanel.tsx": [
+      "OP-34",
+      "OP-35",
+      "OP-60",
+      "AUTO-11"
+    ],
+    "features/assets/EditorMemoryPanel.tsx": [
+      "OP-36",
+      "OP-37",
+      "OP-38",
+      "AUTO-14"
+    ],
+    "features/assets/SessionHistory.tsx": [
+      "OP-26",
+      "OP-39"
+    ],
+    "features/settings/SettingsPanel.tsx": [
+      "OP-40",
+      "OP-41",
+      "OP-42",
+      "OP-43",
+      "OP-44",
+      "OP-45",
+      "OP-46",
+      "OP-47",
+      "OP-48",
+      "OP-49",
+      "OP-50",
+      "OP-51",
+      "AUTO-08",
+      "AUTO-10"
+    ],
+    "features/play/PlayPanel.tsx": [
+      "OP-01",
+      "OP-59",
+      "AUTO-07"
+    ]
+  },
+  "semantics": [
+    {
+      "area": "库表数量",
+      "status": "已明确",
+      "conclusion": "3全局+14每书=17表定义，N本书3+14N实例；配置/凭据不是遗漏的Schema外对象"
+    },
+    {
+      "area": "逐表字段与生命周期",
+      "status": "已说明",
+      "conclusion": "17表独立章节与例子；字段来源/更新按表分开，DTO另放附录；是否实际读写仍以调用映射核对"
+    },
+    {
+      "area": "UI与自动触发",
+      "status": "已说明",
+      "conclusion": "60组动作、14自动触发；原14个UI模块对账，不把class数组当执行逻辑"
+    },
+    {
+      "area": "字段级流转",
+      "status": "已说明",
+      "conclusion": "14流、20状态转移，独立列事务/失败残留和输入前后值；不承诺全流程原子"
+    },
+    {
+      "area": "工具入参与返回",
+      "status": "已补齐",
+      "conclusion": "13个成功形状/错误分支和真实样例；原运行仅3个返回校验保持"
+    },
+    {
+      "area": "AI回放",
+      "status": "部分运行验证",
+      "conclusion": "6完整HTTP回放（含真实P1/P2任务）+服务级部分失败/压缩样例；真实限流时序和所有动态Prompt组合未自动逐一回放"
+    },
+    {
+      "area": "UI画面",
+      "status": "部分运行验证",
+      "conclusion": "17张参考画面；本轮新增默认/预览/错误/地点/线/节点/空记忆/弹窗/试跑空态；真实模型加载/失败态仅源码规格"
+    },
+    {
+      "area": "独立验收入口",
+      "status": "已可执行",
+      "conclusion": "suite只读固定cases；所列场景接原边界全过，13工具预期为一次录制后冻结；原实现不在suite依赖中"
+    },
+    {
+      "area": "契约可编译",
+      "status": "已验证",
+      "conclusion": "新contracts.d.ts独立编译；旧internal-contracts只读材料，不能冒充SDK"
+    },
+    {
+      "area": "实际第二应用重建",
+      "status": "未执行",
+      "conclusion": "不声称任意AI已能100%复现；需重建自己的adapter再运行并对比UI"
+    }
+  ]
+}

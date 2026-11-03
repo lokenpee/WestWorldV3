@@ -1,0 +1,9 @@
+{
+  "id": "session_example",
+  "bookId": "bk_acceptance",
+  "sessionId": "session_example",
+  "revision": 1,
+  "workingSummary": "已核对第一章。",
+  "dataFingerprint": "example-fingerprint",
+  "updatedAt": "2000-01-01T00:00:00.000Z"
+}

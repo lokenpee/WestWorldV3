@@ -1,0 +1,87 @@
+{
+  "revision": "2026-10-24.stage0",
+  "kind": "declarative-target-scenarios-not-executable-suite",
+  "applicationExecuted": false,
+  "cases": [
+    {
+      "id": "LOCK-01",
+      "title": "P2锁定世界全部人工写",
+      "given": "P2运行且world租约有效",
+      "when": "在同标签及另一标签新增/保存/删除/合并人物地点、改变层级",
+      "then": "ASSET_DOMAIN_LOCKED，数据零写；叙事编辑仍可用",
+      "status": "pending-application"
+    },
+    {
+      "id": "LOCK-02",
+      "title": "P3锁定叙事全部人工写",
+      "given": "P3运行且narrative租约有效",
+      "when": "新增/保存/删除节点线、即时改线状态及从图保存",
+      "then": "ASSET_DOMAIN_LOCKED，数据零写；世界编辑仍可用",
+      "status": "pending-application"
+    },
+    {
+      "id": "LOCK-03",
+      "title": "取消不提前解锁",
+      "given": "P2正在提交，表单有未保存输入",
+      "when": "点取消后立即保存，再等待任务停稳释放锁",
+      "then": "第一次拒绝并保留输入；释放后核revision再保存",
+      "status": "pending-application"
+    },
+    {
+      "id": "LOCK-04",
+      "title": "按书与阶段独立释放",
+      "given": "A书P2/P3同时运行，B书空闲",
+      "when": "编辑B；取消A的P2后分别编辑A世界和叙事",
+      "then": "B可编辑；P2停稳后A世界可编辑，叙事仍拒绝",
+      "status": "pending-application"
+    },
+    {
+      "id": "LOCK-05",
+      "title": "开始与保存竞争",
+      "given": "一标签启动P2，另一标签提交人物修改",
+      "when": "并发提交两事务",
+      "then": "保存先完成则P2读新值；P2先得锁则保存拒绝，无半次写",
+      "status": "pending-application"
+    },
+    {
+      "id": "RETRY-01",
+      "title": "direct预算含修正",
+      "given": "依次返回network、validation、success",
+      "when": "执行P1单个子步骤",
+      "then": "恰3次实际请求成功；无章节额外重试",
+      "status": "pending-application"
+    },
+    {
+      "id": "RETRY-02",
+      "title": "额度耗尽不额外修正",
+      "given": "依次返回network、network、validation",
+      "when": "执行P1单个子步骤",
+      "then": "恰3次后失败，不发第4次，无成功凭证",
+      "status": "pending-application"
+    },
+    {
+      "id": "RETRY-03",
+      "title": "鉴权不自动重发",
+      "given": "Provider返回401",
+      "when": "执行direct或Agent",
+      "then": "只发1次并提示鉴权错误",
+      "status": "pending-application"
+    },
+    {
+      "id": "RETRY-04",
+      "title": "限流预算与可取消退避",
+      "given": "持续429且Retry-After=30",
+      "when": "先运行至上限；另一轮在等待中取消",
+      "then": "最多3次；取消结束等待且不再发请求",
+      "status": "pending-application"
+    },
+    {
+      "id": "RETRY-05",
+      "title": "Agent总预算不重置",
+      "given": "task已发5次且恢复后遇暂时错误",
+      "when": "恢复原task",
+      "then": "最多再发1次；不得免费开启3次网络重试",
+      "status": "pending-application"
+    }
+  ]
+}

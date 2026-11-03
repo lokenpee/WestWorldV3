@@ -1,0 +1,10 @@
+- banner:
+  - generic: WestWorld V2
+  - button "资产"
+  - button "游玩"
+  - button "设置"
+- main:
+  - generic: 我想去码头寻找顾衡。
+  - generic: （游玩逻辑尚未接入。Director / Editor / Narrator 属于下一阶段 —— 当前版本完成到「资产提取与编辑」。）
+  - textbox "我想做什么…"
+  - button "发送" [disabled]

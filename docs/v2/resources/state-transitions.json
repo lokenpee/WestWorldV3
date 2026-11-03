@@ -1,0 +1,202 @@
+[
+  {
+    "object": "编译P1",
+    "from": "idle/paused/failed/cancelled",
+    "event": "runP1",
+    "guard": "存在章节/获得入口锁",
+    "write": "T12.running",
+    "to": "running",
+    "feedback": "进度/日志开始",
+    "failure": "加载/读正文异常传播"
+  },
+  {
+    "object": "编译P1",
+    "from": "running",
+    "event": "章两子步骤全成功",
+    "guard": "signal未取消",
+    "write": "三资产表保存；completed加入、failed移除、partial删除",
+    "to": "running或completed",
+    "feedback": "章完成与数量",
+    "failure": "资产和进度不是一个事务"
+  },
+  {
+    "object": "编译P1",
+    "from": "running",
+    "event": "子步骤失败",
+    "guard": "有可保存成功部分",
+    "write": "保存成功部分；failed加入，partial缺口",
+    "to": "failed或paused",
+    "feedback": "失败章日志",
+    "failure": "继续只补缺口"
+  },
+  {
+    "object": "编译",
+    "from": "running",
+    "event": "用户取消",
+    "guard": "signal检查到",
+    "write": "不交当前在途；已有批保留，记录cancelled",
+    "to": "cancelled",
+    "feedback": "恢复说明",
+    "failure": "退避可能延迟"
+  },
+  {
+    "object": "显示进度",
+    "from": "DB running/runtime idle",
+    "event": "刷新挂载",
+    "guard": "旧任务进程已不存在",
+    "write": "不写DB",
+    "to": "显示paused",
+    "feedback": "继续按钮",
+    "failure": "须用户继续，不后台续跑"
+  },
+  {
+    "object": "P2窗口",
+    "from": "running",
+    "event": "一窗归并串联结束",
+    "guard": "无degraded/失败",
+    "write": "保存窗索引完成；此前无空洞才推进lastWindowIndex",
+    "to": "running/阶段完成",
+    "feedback": "窗口成功计数",
+    "failure": "失败窗保数据不推进checkpoint"
+  },
+  {
+    "object": "P3",
+    "from": "running",
+    "event": "两项结束",
+    "guard": "上下游均无失败",
+    "write": "T12.status completed",
+    "to": "completed",
+    "feedback": "入库UI可用",
+    "failure": "任上游失败仍failed"
+  },
+  {
+    "object": "P3样本",
+    "from": "running",
+    "event": "样本检查完成",
+    "guard": "当前已提取范围",
+    "write": "T12.completed+testScope",
+    "to": "completed（样本）",
+    "feedback": "入库测试草稿",
+    "failure": "不代表全书完成"
+  },
+  {
+    "object": "人工草稿",
+    "from": "任意",
+    "event": "普通保存",
+    "guard": "行存在，UI仅saving守卫",
+    "write": "patch字段，P3不自动删",
+    "to": "仍草稿",
+    "feedback": "已保存、列表变",
+    "failure": "可写空必填；缺少全局兜底"
+  },
+  {
+    "object": "入库实体",
+    "from": "空或已有",
+    "event": "publishCanon",
+    "guard": "UI P3门槛；服务无再核",
+    "write": "清表重建实体与引用",
+    "to": "当前实体替换",
+    "feedback": "数量徽标",
+    "failure": "无历史版本/永久稳定ID"
+  },
+  {
+    "object": "笔记",
+    "from": "无",
+    "event": "新active主题",
+    "guard": "有效引用/原文",
+    "write": "新增T14，revision>=1",
+    "to": "active",
+    "feedback": "判断/待复核",
+    "failure": "无依据拒绝"
+  },
+  {
+    "object": "笔记",
+    "from": "active/resolved",
+    "event": "同主题更新/解决",
+    "guard": "同kind；resolved须原主题存在",
+    "write": "覆盖同会话key条目与basisFingerprint",
+    "to": "active/resolved",
+    "feedback": "相应状态",
+    "failure": "不能凭空解决主题"
+  },
+  {
+    "object": "笔记视图",
+    "from": "current",
+    "event": "依据变化后读取",
+    "guard": "指纹不等",
+    "write": "无T14.status写入",
+    "to": "stale视图",
+    "feedback": "依据变化警告",
+    "failure": "直到继续重查，不后台自动修复"
+  },
+  {
+    "object": "会话",
+    "from": "无active",
+    "event": "ensure",
+    "guard": "无活竞争",
+    "write": "新session active/nextOrdinal0",
+    "to": "active",
+    "feedback": "当前会话",
+    "failure": "旧记录可迁移但不造聊天"
+  },
+  {
+    "object": "会话",
+    "from": "active",
+    "event": "新全书复核",
+    "guard": "旧owner不活/无竞争",
+    "write": "旧archived，新review指parent",
+    "to": "旧归档+新active",
+    "feedback": "历史可回查",
+    "failure": "活竞争拒绝"
+  },
+  {
+    "object": "会话租约",
+    "from": "未持有",
+    "event": "acquire",
+    "guard": "同owner存活探测允许",
+    "write": "leaseUUID、到期+300000",
+    "to": "持有",
+    "feedback": "仅任务内部",
+    "failure": "不保护全部编辑"
+  },
+  {
+    "object": "会话租约",
+    "from": "持有",
+    "event": "append/release",
+    "guard": "owner相同",
+    "write": "append续租；release清lease",
+    "to": "持有/释放",
+    "feedback": "消息可查看",
+    "failure": "错owner拒绝"
+  },
+  {
+    "object": "上下文",
+    "from": "未压缩",
+    "event": "预算超限",
+    "guard": "可切分且有效摘要",
+    "write": "追加compaction，不删旧",
+    "to": "摘要投影",
+    "feedback": "token前后日志",
+    "failure": "失败不追加compaction"
+  },
+  {
+    "object": "备份预览",
+    "from": "无",
+    "event": "选择合法包",
+    "guard": "常规检查通过",
+    "write": "仅局部preview",
+    "to": "待确认",
+    "feedback": "统计与确认按钮",
+    "failure": "非法包错误/畸形结构可抛错"
+  },
+  {
+    "object": "备份恢复",
+    "from": "待确认",
+    "event": "确认",
+    "guard": "inspect.ok",
+    "write": "先建书后单书事务",
+    "to": "新书可用",
+    "feedback": "已导入n章",
+    "failure": "跨库可留下孤立书架"
+  }
+]

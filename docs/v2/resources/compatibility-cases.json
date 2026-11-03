@@ -1,0 +1,130 @@
+[
+  {
+    "id": "BUG-01",
+    "title": "首标题前文本丢弃",
+    "trigger": "TXT为“序言内容\\n第一章 开始\\n甲。”，按默认分章",
+    "expected": "只保留第一章起的内容；不得自动建序言章",
+    "spec": "ALG-01 / FR-02",
+    "category": "兼容缺陷"
+  },
+  {
+    "id": "BUG-02",
+    "title": "拖放不二次校验扩展名",
+    "trigger": "拖放可读文本内容的非.txt文件",
+    "expected": "仍进入解码/预览；选择器的accept限制不等于拖放拒绝",
+    "spec": "UI-03 / FR-02",
+    "category": "兼容限制"
+  },
+  {
+    "id": "BUG-03",
+    "title": "入库状态和备份人数统计不代表草稿",
+    "trigger": "固定人物空但有3个人物草稿；或只有地点实体",
+    "expected": "书架不显示已入库；备份预览人物0，恢复后草稿仍为3",
+    "spec": "UI-02 / DATA-05",
+    "category": "兼容缺陷"
+  },
+  {
+    "id": "BUG-04",
+    "title": "精确重复称呼优先首项",
+    "trigger": "两个人物均有相同主名或alias，名称精确归一后相同",
+    "expected": "名称解析返回索引先加入者；不按模糊歧义规则拒绝",
+    "spec": "ALG-08 / FR-10",
+    "category": "兼容缺陷"
+  },
+  {
+    "id": "BUG-05",
+    "title": "无Key本地模型文案与行为不一致",
+    "trigger": "设置无Key，查看或触发模型探测",
+    "expected": "保留“本地模型可留空”文案，但测试禁用/探测报无Key；不得自动补anonymous Key",
+    "spec": "AI-01 / UI-09",
+    "category": "兼容缺陷"
+  },
+  {
+    "id": "BUG-06",
+    "title": "人工编辑弱校验与P3放行未绑定",
+    "trigger": "已有P3 completed，编辑必填名称为空或修改事实再入库",
+    "expected": "保存不统一拒绝空值，P3不自动失效；入库不核待处理数",
+    "spec": "UI-05 / ALG-08",
+    "category": "兼容缺陷"
+  },
+  {
+    "id": "BUG-07",
+    "title": "备份预检与恢复非完整原子校验",
+    "trigger": "合法manifest但缺统计JSON；或创建书架后单书写入失败",
+    "expected": "前者可Promise拒绝且不出现统一友好错误；后者可留下书架记录，无跨库补偿",
+    "spec": "DATA-05 / ALG-10",
+    "category": "兼容缺陷"
+  },
+  {
+    "id": "BUG-08",
+    "title": "同书任务锁不覆盖全部浏览器编辑",
+    "trigger": "另一JS上下文或手动编辑与任务交错",
+    "expected": "不自动得到全局锁；只在已有租约/提交冲突检查处拒绝",
+    "spec": "AR-07 / ALG-04",
+    "category": "兼容边界"
+  },
+  {
+    "id": "BUG-09",
+    "title": "P1语义主要依赖Prompt",
+    "trigger": "模拟结构有效但quote不在原文的P1事件提交",
+    "expected": "P1按结构接收；不能擅自新增逐字引文拒绝，补点仍须核引文",
+    "spec": "AI-03 / ALG-02",
+    "category": "兼容边界"
+  },
+  {
+    "id": "BUG-10",
+    "title": "自动人物包含聚组无单字守卫",
+    "trigger": "本地人物主名“甲”和“甲乙”，无别名",
+    "expected": "第一轮聚为同组；入库模糊匹配仍有较短≥2守卫，不统一两规则",
+    "spec": "ALG-04 / ALG-08",
+    "category": "兼容缺陷"
+  },
+  {
+    "id": "BUG-11",
+    "title": "阶段前置不完整强制",
+    "trigger": "前100章P1 completed但未跑P2合并，点P2串联或P3",
+    "expected": "入口主要校验P1；不得新增强制按四步完成的拦截",
+    "spec": "ALG-03 / UI-04",
+    "category": "兼容限制"
+  },
+  {
+    "id": "BUG-12",
+    "title": "游玩消息仅组件内存",
+    "trigger": "有书发送行动→切设置→切游玩",
+    "expected": "固定占位响应；返回空会话，不写库、不生成故事",
+    "spec": "UI-10 / FR-14",
+    "category": "占位兼容"
+  },
+  {
+    "id": "BUG-13",
+    "title": "任务显示使用全局未按书过滤的store",
+    "trigger": "某书任务后runtime非idle，切换另一书",
+    "expected": "当前CompilePanel可继续采用全局runtime；不得自动按bookId隔离费用和日志",
+    "spec": "ALG-11 / UI-04",
+    "category": "兼容缺陷"
+  },
+  {
+    "id": "BUG-14",
+    "title": "未知模型继承模板元数据与费用符号",
+    "trigger": "配置不在目录的模型名",
+    "expected": "继承目录首项窗口/价格，除归并窗口显式覆盖；货币符号不保证真实账单币种",
+    "spec": "AR-05 / AI-01",
+    "category": "兼容边界"
+  },
+  {
+    "id": "BUG-15",
+    "title": "窄视口固定宽度挤压",
+    "trigger": "将应用放入约400px宽侧栏，仍显示书架和工具区",
+    "expected": "固定240px书架、按钮换行与384px详情规则不改；不自动移动重排",
+    "spec": "UI-01 / UI-05",
+    "category": "兼容限制"
+  },
+  {
+    "id": "BUG-16",
+    "title": "详情对象不随列表数据自动刷新",
+    "trigger": "打开人物详情改变层级，或线详情改变状态；保存后观察原详情",
+    "expected": "持久更新立即执行，但受控选择/只读区仍可基于旧asset；关闭重开读取新值",
+    "spec": "UI-05 / ALG-07",
+    "category": "静态兼容缺陷"
+  }
+]

@@ -1,0 +1,43 @@
+{
+  "legacy": {
+    "chapters": "chapterIndex, order",
+    "chapterTexts": "chapterIndex",
+    "characterSnapshots": "id, chapterIndex, name",
+    "locationSnapshots": "id, chapterIndex, name",
+    "nodes": "id, chapterIndex, order",
+    "eventLines": "id",
+    "characters": "id, name",
+    "locations": "id, name",
+    "compileProgress": "stage"
+  },
+  "v3": {
+    "chapters": "chapterIndex, order",
+    "chapterTexts": "chapterIndex",
+    "characterSnapshots": "id, chapterIndex, name",
+    "locationSnapshots": "id, chapterIndex, name",
+    "nodes": "id, chapterIndex, order",
+    "eventLines": "id",
+    "characters": "id, name",
+    "locations": "id, name",
+    "compileProgress": "stage",
+    "storyEditorMemory": "id",
+    "storyEditorNotes": "id, &key, kind, status, updatedAt",
+    "storyEditorCheckpoints": "id, stage, phase, status, updatedAt"
+  },
+  "v4": {
+    "chapters": "chapterIndex, order",
+    "chapterTexts": "chapterIndex",
+    "characterSnapshots": "id, chapterIndex, name",
+    "locationSnapshots": "id, chapterIndex, name",
+    "nodes": "id, chapterIndex, order",
+    "eventLines": "id",
+    "characters": "id, name",
+    "locations": "id, name",
+    "compileProgress": "stage",
+    "storyEditorMemory": "id, sessionId",
+    "storyEditorNotes": "id, &[sessionId+key], sessionId, kind, status, updatedAt",
+    "storyEditorCheckpoints": "id, sessionId, stage, phase, status, updatedAt",
+    "storySessions": "id, status, createdAt, parentSessionId",
+    "storySessionEntries": "id, &[sessionId+ordinal], sessionId, parentId, type"
+  }
+}

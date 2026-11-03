@@ -1,0 +1,635 @@
+{
+  "documentVersion": "2.2",
+  "validatedAt": "2026-10-24T09:19:06.110771+00:00",
+  "kind": "documentation-only",
+  "applicationTestsRun": false,
+  "checks": [
+    {
+      "check": "json:resources\\v2.2\\acceptance\\bugfix-cases.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\acceptance\\recovery-cases.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\acceptance-cases.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\ai-runtime-contract.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\automatic-triggers.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\bugfix-contract.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\data-contract.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\data-flows.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\examples.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\execution-examples.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\execution.schema.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\model-output-contract.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\operation-catalog.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\pipeline-contract.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\prompt-call-manifest.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\prompt-inputs.schema.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\index.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-COMPACT.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-P1-NARRATIVE.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-P1-WORLD.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-P2-CHARACTER.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-P2-IDENTITY.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-P2-LOCATION.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-P3-GLOBAL.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-P3-WINDOW.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-PROBE-AGENT-STORY.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-PROBE-AGENT.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\PROMPT-PROBE-DIRECT.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\VARIANT-DIRECT-REPAIR.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\VARIANT-P3-FINAL-ONLY.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\VARIANT-P3-FINAL-REPAIR.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\VARIANT-P3-RECOVERY.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\request-examples\\VARIANT-P3-WRITE-REPAIR.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\resource-authority.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\state-transitions.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\storage.schema.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\appSettings.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\assetLifecycle.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\books.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\chapters.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\chapterTexts.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\characters.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\compileProgress.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\credentials.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\eventLines.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\extractionReceipts.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\locations.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\nodes.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\pipelineRuns.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\storyEditorCheckpoints.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\storyEditorMemory.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\storyEditorNotes.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\storySessionEntries.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\table-examples\\storySessions.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\tool-contracts.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\tool-results.schema.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "counts",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "tables",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "new-tables",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "P1-serial-and-no-auto-start",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "P2-P3-parallel",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "P3-same-session",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "P3-high-confidence",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "mechanical-boundary",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "direct-storage-no-publish",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "no-publish-operation",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "stable-current-entities",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "backup-v5",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "window-policy",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "window-examples",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "tool-profile-counts",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "tool-name-alignment",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "query_characters:summary-whitelist",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "query_characters:no-detail-leak",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "query_characters:stable-cursor",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "query_locations:summary-whitelist",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "query_locations:no-detail-leak",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "query_locations:stable-cursor",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Pi-shared-model-boundary",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Pi-mode-ownership",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Pi-read-write-count",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Pi-write-scope",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Pi-write-before-tool-result",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Pi-finalizer-no-repeat-write",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Pi-app-idempotency-ledger",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "commit_asset_changes:command-envelope",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "commit_story_changes:command-envelope",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "Pi-write-receipt-example",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "strict-link-metadata",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "receipt:required-properties",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "mergedOrigin:required-properties",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:00-阅读入口与术语.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:01-PRD.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:02-架构与技术规格.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:03-Spec-数据与存储.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:04-Spec-流程接口与算法.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:05-Spec-AI与会话.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:06-界面与交互规格.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:07-验收与兼容缺陷.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:08-追溯与验证记录.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:09-操作与自动触发契约.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:10-字段级数据流与状态转移.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:11-AI工具返回与回放契约.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:12-验收执行与覆盖矩阵.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:13-流程变更与冲突对照.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:README.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:character-optimize.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:compact.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:location-optimize.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:p1-narrative.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:p1-world.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:p2-identity.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:p3-story.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:README.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:optimize-locations.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:p2-asset-editor.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:p3-story-editor.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:数据值-ID与备份格式.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:README.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:README.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "local-links",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-tables",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "operation-doc-machine-alignment",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "target-verification-honest",
+      "passed": true,
+      "detail": ""
+    }
+  ],
+  "passed": 124,
+  "failed": 0,
+  "limitations": [
+    "No application workflow execution",
+    "Schema example checks cover required keys, not full JSON Schema semantics",
+    "No real model, browser concurrency, or UI rendering verification"
+  ]
+}

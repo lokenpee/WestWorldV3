@@ -1,0 +1,20 @@
+{
+  "id": "L01",
+  "bookId": "bk_acceptance",
+  "title": "书信交付",
+  "nodeIds": [
+    "C1-N001",
+    "C1-N002",
+    "C2-N001"
+  ],
+  "chapters": [
+    "1",
+    "2"
+  ],
+  "cause": "双方会面",
+  "process": "顾衡交信，沈青离开",
+  "result": "书信交付完成",
+  "lineStatus": "closed",
+  "characterIds": [],
+  "updatedAt": "2026-10-21T00:00:00.000Z"
+}

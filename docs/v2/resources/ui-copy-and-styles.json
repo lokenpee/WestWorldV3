@@ -1,0 +1,3090 @@
+{
+  "features/app-shell/AppShell.tsx": {
+    "copy": [
+      "资产",
+      "游玩",
+      "设置",
+      "WestWorld V2"
+    ],
+    "classNames": [
+      "\"flex h-screen flex-col bg-neutral-50 text-neutral-900\"",
+      "flex h-screen flex-col bg-neutral-50 text-neutral-900",
+      "\"flex items-center gap-1 border-b border-neutral-200 bg-white px-4 py-2\"",
+      "flex items-center gap-1 border-b border-neutral-200 bg-white px-4 py-2",
+      "\"mr-4 text-sm font-semibold tracking-wide\"",
+      "mr-4 text-sm font-semibold tracking-wide",
+      "{\n              'rounded px-3 py-1 text-sm transition ' +\n              (activeView === t.key\n                ? 'bg-neutral-900 text-white'\n                : 'text-neutral-600 hover:bg-neutral-100')\n            }",
+      "\"min-h-0 flex-1 overflow-hidden\"",
+      "min-h-0 flex-1 overflow-hidden"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 32,
+        "attributes": {
+          "className": "\"flex h-screen flex-col bg-neutral-50 text-neutral-900\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 36,
+        "attributes": {
+          "key": "{t.key}",
+          "type": "\"button\"",
+          "className": "{\n              'rounded px-3 py-1 text-sm transition ' +\n              (activeView === t.key\n                ? 'bg-neutral-900 text-white'\n                : 'text-neutral-600 hover:bg-neutral-100')\n            }"
+        },
+        "events": [
+          "onClick"
+        ]
+      }
+    ]
+  },
+  "features/assets/AssetDetail.tsx": {
+    "copy": [
+      "主要人物",
+      "重要配角",
+      "路人",
+      "主名",
+      "别名（逗号分隔）",
+      "身份",
+      "原文年龄描述",
+      "性格",
+      "背景",
+      "外貌",
+      "原话片段",
+      "名称",
+      "描述",
+      "事件名称",
+      "概述",
+      "事件经过",
+      "涉及人物（逗号分隔）",
+      "原文时间（可空）",
+      "相对时间",
+      "对象／承受者（逗号分隔）",
+      "世界状态变化（逗号分隔）",
+      "新增信息（逗号分隔）",
+      "开始的行动（逗号分隔）",
+      "事件线名称",
+      "起因",
+      "经过",
+      "结果",
+      "编辑",
+      "关闭",
+      "合并冲突与待复核信息",
+      "人工层级",
+      "自动出场权重",
+      "：出现在",
+      "/",
+      "章，主名提及",
+      "次。统计不含别名。",
+      "原始合并资料（",
+      "条）",
+      "：",
+      "（来源章",
+      "）",
+      "此事件由检查阶段补充，已核对原文，可继续编辑。",
+      "原文出处：",
+      "已提取的人物关系",
+      "层级",
+      "状态",
+      "进行中",
+      "已结束",
+      "手动合并",
+      "把这条并入…",
+      "并入",
+      "保留目标条目，汇总两边的资料、称呼和关系，再删除当前条目。此操作不可撤销。",
+      "保存中…",
+      "保存",
+      "已保存"
+    ],
+    "classNames": [
+      "\"block\"",
+      "block",
+      "\"mb-1 block text-xs text-neutral-500\"",
+      "mb-1 block text-xs text-neutral-500",
+      "\"w-full resize-y rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-500\"",
+      "w-full resize-y rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-500",
+      "\"w-full rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-500\"",
+      "w-full rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-500",
+      "\"flex w-96 shrink-0 flex-col border-l border-neutral-200 bg-white\"",
+      "flex w-96 shrink-0 flex-col border-l border-neutral-200 bg-white",
+      "\"flex items-center gap-2 border-b border-neutral-200 px-4 py-2\"",
+      "flex items-center gap-2 border-b border-neutral-200 px-4 py-2",
+      "\"font-mono text-xs text-neutral-400\"",
+      "font-mono text-xs text-neutral-400",
+      "\"text-sm font-medium\"",
+      "text-sm font-medium",
+      "\"ml-auto text-xs text-neutral-500 hover:text-neutral-800\"",
+      "ml-auto text-xs text-neutral-500 hover:text-neutral-800",
+      "\"min-h-0 flex-1 space-y-3 overflow-auto p-4\"",
+      "min-h-0 flex-1 space-y-3 overflow-auto p-4",
+      "\"rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900\"",
+      "rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900",
+      "\"font-medium\"",
+      "font-medium",
+      "\"mt-2 list-inside list-disc space-y-1\"",
+      "mt-2 list-inside list-disc space-y-1",
+      "\"rounded bg-neutral-50 p-2 text-xs text-neutral-600\"",
+      "rounded bg-neutral-50 p-2 text-xs text-neutral-600",
+      "\"cursor-pointer\"",
+      "cursor-pointer",
+      "\"mt-2 max-h-60 space-y-2 overflow-auto\"",
+      "mt-2 max-h-60 space-y-2 overflow-auto",
+      "\"text-neutral-400\"",
+      "text-neutral-400",
+      "\"rounded bg-amber-50 p-2 text-xs text-amber-900\"",
+      "rounded bg-amber-50 p-2 text-xs text-amber-900",
+      "\"rounded bg-neutral-50 p-3 text-xs text-neutral-600\"",
+      "rounded bg-neutral-50 p-3 text-xs text-neutral-600",
+      "\"mt-2 whitespace-pre-wrap\"",
+      "mt-2 whitespace-pre-wrap",
+      "\"mt-2 space-y-1\"",
+      "mt-2 space-y-1",
+      "\"w-full rounded border border-neutral-300 px-2 py-1 text-sm\"",
+      "w-full rounded border border-neutral-300 px-2 py-1 text-sm",
+      "\"rounded border border-neutral-200 p-3\"",
+      "rounded border border-neutral-200 p-3",
+      "\"mb-2 text-xs font-medium text-neutral-600\"",
+      "mb-2 text-xs font-medium text-neutral-600",
+      "\"flex gap-2\"",
+      "flex gap-2",
+      "\"flex-1 rounded border border-neutral-300 px-2 py-1 text-xs\"",
+      "flex-1 rounded border border-neutral-300 px-2 py-1 text-xs",
+      "\"rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-50 disabled:opacity-40\"",
+      "rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-50 disabled:opacity-40",
+      "\"mt-2 text-[10px] leading-4 text-neutral-400\"",
+      "mt-2 text-[10px] leading-4 text-neutral-400",
+      "\"flex items-center gap-2 border-t border-neutral-200 px-4 py-2\"",
+      "flex items-center gap-2 border-t border-neutral-200 px-4 py-2",
+      "\"rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\"",
+      "rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40",
+      "\"text-xs text-emerald-600\"",
+      "text-xs text-emerald-600"
+    ],
+    "controls": [
+      {
+        "tag": "label",
+        "line": 116,
+        "attributes": {
+          "className": "\"block\""
+        },
+        "events": []
+      },
+      {
+        "tag": "textarea",
+        "line": 119,
+        "attributes": {
+          "value": "{value}",
+          "rows": "{3}",
+          "className": "\"w-full resize-y rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-500\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "input",
+        "line": 126,
+        "attributes": {
+          "value": "{value}",
+          "className": "\"w-full rounded border border-neutral-300 px-2 py-1 text-sm outline-none focus:border-neutral-500\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "aside",
+        "line": 198,
+        "attributes": {
+          "className": "\"flex w-96 shrink-0 flex-col border-l border-neutral-200 bg-white\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 202,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"ml-auto text-xs text-neutral-500 hover:text-neutral-800\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 211,
+        "attributes": {
+          "className": "\"min-h-0 flex-1 space-y-3 overflow-auto p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 213,
+        "attributes": {
+          "className": "\"rounded border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 224,
+        "attributes": {
+          "className": "\"rounded bg-neutral-50 p-3 text-xs text-neutral-600\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 230,
+        "attributes": {
+          "className": "\"rounded bg-neutral-50 p-3 text-xs text-neutral-600\""
+        },
+        "events": []
+      },
+      {
+        "tag": "label",
+        "line": 248,
+        "attributes": {
+          "className": "\"block\""
+        },
+        "events": []
+      },
+      {
+        "tag": "select",
+        "line": 250,
+        "attributes": {
+          "value": "{asset.item.roleWeight ?? 'NPC'}",
+          "className": "\"w-full rounded border border-neutral-300 px-2 py-1 text-sm\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "label",
+        "line": 270,
+        "attributes": {
+          "className": "\"block\""
+        },
+        "events": []
+      },
+      {
+        "tag": "select",
+        "line": 272,
+        "attributes": {
+          "value": "{asset.item.lineStatus}",
+          "className": "\"w-full rounded border border-neutral-300 px-2 py-1 text-sm\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 289,
+        "attributes": {
+          "className": "\"rounded border border-neutral-200 p-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 290,
+        "attributes": {
+          "className": "\"mb-2 text-xs font-medium text-neutral-600\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 291,
+        "attributes": {
+          "className": "\"flex gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "select",
+        "line": 292,
+        "attributes": {
+          "value": "{mergeTarget}",
+          "className": "\"flex-1 rounded border border-neutral-300 px-2 py-1 text-xs\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 306,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{!mergeTarget}",
+          "className": "\"rounded border border-neutral-300 px-2 py-1 text-xs hover:bg-neutral-50 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 323,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{saving}",
+          "className": "\"rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      }
+    ]
+  },
+  "features/assets/AssetFields.tsx": {
+    "copy": [
+      "编号",
+      "书籍编号",
+      "章节标识",
+      "章节名称",
+      "名称",
+      "别名",
+      "本章其他称呼",
+      "身份",
+      "基础资料",
+      "外貌",
+      "性格",
+      "背景",
+      "原话片段",
+      "人物关系",
+      "置信度",
+      "人物层级",
+      "层级来源",
+      "主名出场统计",
+      "来源章节",
+      "合并复核信息",
+      "原始合并资料",
+      "已整编事实编号",
+      "整编缓存标记",
+      "更新时间",
+      "地点描述",
+      "事件概述",
+      "经过",
+      "行动者",
+      "对象／承受者",
+      "世界状态变化",
+      "新增信息",
+      "开始的行动",
+      "明确时间",
+      "相对时间",
+      "原文片段",
+      "原文字符位置",
+      "章内顺序",
+      "生成阶段",
+      "所属事件线编号",
+      "行动者编号",
+      "时间坐标",
+      "时间精度",
+      "去重主节点编号",
+      "事件线名称",
+      "成员节点编号",
+      "涉及章节",
+      "时间范围",
+      "起因",
+      "结果",
+      "事件线状态",
+      "人物编号",
+      "未填写",
+      "全部字段（只读，",
+      "项）",
+      "(",
+      ")"
+    ],
+    "classNames": [
+      "\"rounded border border-neutral-200 p-3 text-xs\"",
+      "rounded border border-neutral-200 p-3 text-xs",
+      "\"cursor-pointer font-medium\"",
+      "cursor-pointer font-medium",
+      "\"mt-3 space-y-3\"",
+      "mt-3 space-y-3",
+      "\"text-neutral-500\"",
+      "text-neutral-500",
+      "\"font-mono\"",
+      "font-mono",
+      "\"mt-1 whitespace-pre-wrap break-words text-neutral-800\"",
+      "mt-1 whitespace-pre-wrap break-words text-neutral-800"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 33,
+        "attributes": {
+          "key": "{key}"
+        },
+        "events": []
+      }
+    ]
+  },
+  "features/assets/AssetsPanel.tsx": {
+    "copy": [
+      "人物",
+      "地点",
+      "事件节点",
+      "事件线",
+      "事件网络",
+      "编辑记忆",
+      "全部",
+      "主要人物",
+      "重要配角",
+      "路人",
+      "删除",
+      "入库后生成固定资产，游戏只读这一份；再点一次入库会用当前草稿生成新的一份",
+      "未入库",
+      "试跑一章",
+      "处理中…",
+      "继续完整提取与检查",
+      "重新检查全部",
+      "继续提取与检查",
+      "用当前草稿生成资产包；测试流程只包含已提取章节",
+      "先完成 P3 检查",
+      "入库中…",
+      "入库测试草稿",
+      "入库",
+      "导入另一本",
+      "当前为测试草稿：已检查",
+      "个已提取章节或切块，未提取部分不会入库。可在下方修改资产；需要全书结果时点击“继续完整提取与检查”。",
+      "知道了",
+      "草稿层（快照）· 入库后冻结",
+      "还没有人物快照。提取+合并完成后会出现在这里。",
+      "别名",
+      "还没有地点快照。提取+合并完成后会出现在这里。",
+      "还没有事件节点。",
+      "第",
+      "章",
+      "还没有事件线。跑完串联后会出现在这里。",
+      "已结束",
+      "进行中",
+      "节点 · 第",
+      "起因：",
+      "经过：",
+      "结果："
+    ],
+    "classNames": [
+      "\"p-6 text-sm text-neutral-400\"",
+      "p-6 text-sm text-neutral-400",
+      "\"text-xs text-neutral-400 hover:text-red-600\"",
+      "text-xs text-neutral-400 hover:text-red-600",
+      "\"flex h-full\"",
+      "flex h-full",
+      "\"min-w-0 flex-1 overflow-hidden\"",
+      "min-w-0 flex-1 overflow-hidden",
+      "\"h-full overflow-auto\"",
+      "h-full overflow-auto",
+      "\"flex h-full flex-col\"",
+      "flex h-full flex-col",
+      "\"flex flex-wrap items-center gap-1 border-b border-neutral-200 bg-white px-4\"",
+      "flex flex-wrap items-center gap-1 border-b border-neutral-200 bg-white px-4",
+      "{\n              'border-b-2 px-3 py-2 text-sm transition ' +\n              (assetTab === t.key\n                ? 'border-neutral-900 font-medium text-neutral-900'\n                : 'border-transparent text-neutral-500 hover:text-neutral-800')\n            }",
+      "\"ml-1 text-xs text-neutral-400\"",
+      "ml-1 text-xs text-neutral-400",
+      "\"ml-auto flex items-center gap-2 py-1\"",
+      "ml-auto flex items-center gap-2 py-1",
+      "{\n              'rounded px-2 py-0.5 text-[10px] ' +\n              (published ? 'bg-emerald-50 text-emerald-700' : 'bg-neutral-100 text-neutral-500')\n            }",
+      "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50\"",
+      "rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50",
+      "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50 disabled:opacity-40\"",
+      "rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50 disabled:opacity-40",
+      "\"rounded bg-neutral-900 px-3 py-1 text-xs text-white hover:bg-neutral-700 disabled:opacity-40\"",
+      "rounded bg-neutral-900 px-3 py-1 text-xs text-white hover:bg-neutral-700 disabled:opacity-40",
+      "\"border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800\"",
+      "border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800",
+      "\"flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-4 py-1.5 text-xs text-emerald-800\"",
+      "flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-4 py-1.5 text-xs text-emerald-800",
+      "\"ml-auto text-emerald-600 hover:text-emerald-900\"",
+      "ml-auto text-emerald-600 hover:text-emerald-900",
+      "\"flex min-h-0 flex-1\"",
+      "flex min-h-0 flex-1",
+      "{`min-h-0 min-w-0 flex-1 ${assetTab === 'network' ? 'overflow-hidden' : 'overflow-auto'}`}",
+      "\"sticky top-0 z-10 flex items-center gap-1 border-b border-neutral-100 bg-neutral-50 px-4 py-1.5\"",
+      "sticky top-0 z-10 flex items-center gap-1 border-b border-neutral-100 bg-neutral-50 px-4 py-1.5",
+      "{\n                      'rounded px-2 py-0.5 text-[11px] ' +\n                      (roleFilter === r\n                        ? 'bg-neutral-900 text-white'\n                        : 'text-neutral-500 hover:bg-neutral-200')\n                    }",
+      "\"ml-auto text-[10px] text-neutral-400\"",
+      "ml-auto text-[10px] text-neutral-400",
+      "\"divide-y divide-neutral-100\"",
+      "divide-y divide-neutral-100",
+      "{\n                        'flex cursor-pointer items-baseline gap-3 px-4 py-2 hover:bg-white ' +\n                        (selected?.kind === 'character' && selected.item.id === c.id ? 'bg-white' : '')\n                      }",
+      "\"font-mono text-xs text-neutral-400\"",
+      "font-mono text-xs text-neutral-400",
+      "\"text-sm font-medium\"",
+      "text-sm font-medium",
+      "\"rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600\"",
+      "rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-600",
+      "\"text-xs text-neutral-400\"",
+      "text-xs text-neutral-400",
+      "\"text-xs text-neutral-500\"",
+      "text-xs text-neutral-500",
+      "{\n                      'flex cursor-pointer items-baseline gap-3 px-4 py-2 hover:bg-white ' +\n                      (selected?.kind === 'location' && selected.item.id === l.id ? 'bg-white' : '')\n                    }",
+      "{\n                      'cursor-pointer px-4 py-2 hover:bg-white ' +\n                      (selected?.kind === 'node' && selected.item.id === n.id ? 'bg-white' : '')\n                    }",
+      "\"flex items-baseline gap-3\"",
+      "flex items-baseline gap-3",
+      "\"rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700\"",
+      "rounded bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700",
+      "\"mt-0.5 text-xs text-neutral-500\"",
+      "mt-0.5 text-xs text-neutral-500",
+      "\"mt-1 border-l-2 border-neutral-200 pl-2 text-xs italic text-neutral-400\"",
+      "mt-1 border-l-2 border-neutral-200 pl-2 text-xs italic text-neutral-400",
+      "{\n                      'cursor-pointer px-4 py-3 hover:bg-white ' +\n                      (selected?.kind === 'line' && selected.item.id === l.id ? 'bg-white' : '')\n                    }",
+      "{\n                          'rounded px-1.5 py-0.5 text-[10px] ' +\n                          (l.lineStatus === 'closed'\n                            ? 'bg-neutral-100 text-neutral-600'\n                            : 'bg-emerald-50 text-emerald-700')\n                        }",
+      "\"text-[10px] text-neutral-400\"",
+      "text-[10px] text-neutral-400",
+      "\"mt-1 space-y-0.5 text-xs text-neutral-600\"",
+      "mt-1 space-y-0.5 text-xs text-neutral-600"
+    ],
+    "controls": [
+      {
+        "tag": "button",
+        "line": 49,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"text-xs text-neutral-400 hover:text-red-600\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 76,
+        "attributes": {
+          "className": "\"flex h-full\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 80,
+        "attributes": {
+          "className": "\"min-w-0 flex-1 overflow-hidden\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 81,
+        "attributes": {
+          "className": "\"h-full overflow-auto\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 153,
+        "attributes": {
+          "className": "\"flex h-full flex-col\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 157,
+        "attributes": {
+          "className": "\"flex flex-wrap items-center gap-1 border-b border-neutral-200 bg-white px-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 159,
+        "attributes": {
+          "key": "{t.key}",
+          "type": "\"button\"",
+          "className": "{\n              'border-b-2 px-3 py-2 text-sm transition ' +\n              (assetTab === t.key\n                ? 'border-neutral-900 font-medium text-neutral-900'\n                : 'border-transparent text-neutral-500 hover:text-neutral-800')\n            }"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 181,
+        "attributes": {
+          "className": "\"ml-auto flex items-center gap-2 py-1\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 191,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{rerunning || publishing || compileStatus === 'running'}",
+          "className": "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 199,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{rerunning || compileStatus === 'running'}",
+          "className": "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 217,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{publishing || compileStatus === 'running' || progress?.stage !== 'P3' || progress?.status !== 'completed'}",
+          "title": "{progress?.stage === 'P3' && progress.status === 'completed' ? '用当前草稿生成资产包；测试流程只包含已提取章节' : '先完成 P3 检查'}",
+          "className": "\"rounded bg-neutral-900 px-3 py-1 text-xs text-white hover:bg-neutral-700 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 226,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{rerunning || publishing || compileStatus === 'running'}",
+          "className": "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 242,
+        "attributes": {
+          "className": "\"flex items-center gap-2 border-b border-emerald-100 bg-emerald-50 px-4 py-1.5 text-xs text-emerald-800\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 244,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"ml-auto text-emerald-600 hover:text-emerald-900\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 254,
+        "attributes": {
+          "className": "\"flex min-h-0 flex-1\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 255,
+        "attributes": {
+          "className": "{`min-h-0 min-w-0 flex-1 ${assetTab === 'network' ? 'overflow-hidden' : 'overflow-auto'}`}"
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 258,
+        "attributes": {
+          "className": "\"sticky top-0 z-10 flex items-center gap-1 border-b border-neutral-100 bg-neutral-50 px-4 py-1.5\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 260,
+        "attributes": {
+          "key": "{r}",
+          "type": "\"button\"",
+          "className": "{\n                      'rounded px-2 py-0.5 text-[11px] ' +\n                      (roleFilter === r\n                        ? 'bg-neutral-900 text-white'\n                        : 'text-neutral-500 hover:bg-neutral-200')\n                    }"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 357,
+        "attributes": {
+          "className": "\"flex items-baseline gap-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 399,
+        "attributes": {
+          "className": "\"flex items-baseline gap-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 424,
+        "attributes": {
+          "className": "\"mt-1 space-y-0.5 text-xs text-neutral-600\""
+        },
+        "events": []
+      }
+    ]
+  },
+  "features/assets/BookSidebar.tsx": {
+    "copy": [
+      "已入库",
+      "草稿",
+      "已导入",
+      "·",
+      "章/块",
+      "人物 ·",
+      "地点 ·",
+      "节点 ·",
+      "线",
+      "进入",
+      "导出",
+      "删除",
+      "资产书架",
+      "＋ 导入小说",
+      "还没有资产。导入小说后会出现在这里。",
+      "导出目录：",
+      "尚未选择",
+      "建议选择项目下 exports 文件夹",
+      "选择导出目录",
+      "删除整本资产会清理该书的浏览器数据，已导出的文件保留。",
+      "导出资产",
+      "备份包含原文、草稿、入库资产和编辑进度，不包含 API Key。导出不会删除浏览器中的数据。",
+      "项目目录：",
+      "。首次使用“保存到目录”时，请在浏览器中选择这个文件夹。",
+      "处理中…",
+      "保存到目录",
+      "下载备份",
+      "取消",
+      "删除资产",
+      "？",
+      "将删除该书的原文、人物、地点、节点、事件线、进度和会话记录。其他书籍及本地导出文件不受影响。建议先导出备份。",
+      "先导出",
+      "已删除该书的浏览器数据。",
+      "确认删除"
+    ],
+    "classNames": [
+      "{`rounded-lg border p-3 ${active ? 'border-neutral-700 bg-white shadow-sm' : 'border-neutral-200 bg-white/60'}`}",
+      "\"w-full text-left disabled:opacity-50\"",
+      "w-full text-left disabled:opacity-50",
+      "\"break-words text-sm font-medium\"",
+      "break-words text-sm font-medium",
+      "\"mt-1 text-[11px] text-neutral-500\"",
+      "mt-1 text-[11px] text-neutral-500",
+      "\"mt-1 text-[10px] text-neutral-500\"",
+      "mt-1 text-[10px] text-neutral-500",
+      "\"mt-2 flex gap-3 text-xs\"",
+      "mt-2 flex gap-3 text-xs",
+      "\"text-neutral-700 hover:underline disabled:opacity-40\"",
+      "text-neutral-700 hover:underline disabled:opacity-40",
+      "\"ml-auto text-red-700 hover:underline disabled:opacity-40\"",
+      "ml-auto text-red-700 hover:underline disabled:opacity-40",
+      "\"flex h-full w-60 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100/70\"",
+      "flex h-full w-60 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100/70",
+      "\"border-b border-neutral-200 px-4 py-3\"",
+      "border-b border-neutral-200 px-4 py-3",
+      "\"text-sm font-semibold\"",
+      "text-sm font-semibold",
+      "\"font-normal text-neutral-400\"",
+      "font-normal text-neutral-400",
+      "{`mt-3 w-full rounded border px-3 py-2 text-xs disabled:opacity-40 ${importing ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white'}`}",
+      "\"min-h-0 flex-1 space-y-2 overflow-auto p-3\"",
+      "min-h-0 flex-1 space-y-2 overflow-auto p-3",
+      "\"px-1 py-3 text-xs text-neutral-500\"",
+      "px-1 py-3 text-xs text-neutral-500",
+      "\"space-y-2 border-t border-neutral-200 p-3 text-[11px] text-neutral-500\"",
+      "space-y-2 border-t border-neutral-200 p-3 text-[11px] text-neutral-500",
+      "\"break-all\"",
+      "break-all",
+      "\"rounded border border-neutral-300 bg-white px-2 py-1 disabled:opacity-40\"",
+      "rounded border border-neutral-300 bg-white px-2 py-1 disabled:opacity-40",
+      "\"break-words text-neutral-800\"",
+      "break-words text-neutral-800",
+      "\"fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4\"",
+      "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4",
+      "\"w-full max-w-md rounded-lg bg-white p-5 shadow-xl\"",
+      "w-full max-w-md rounded-lg bg-white p-5 shadow-xl",
+      "\"text-base font-semibold\"",
+      "text-base font-semibold",
+      "\"mt-3 text-sm text-neutral-600\"",
+      "mt-3 text-sm text-neutral-600",
+      "\"mt-2 break-all text-xs text-neutral-500\"",
+      "mt-2 break-all text-xs text-neutral-500",
+      "\"mt-4 flex flex-wrap gap-2\"",
+      "mt-4 flex flex-wrap gap-2",
+      "\"rounded bg-neutral-900 px-3 py-2 text-xs text-white disabled:opacity-40\"",
+      "rounded bg-neutral-900 px-3 py-2 text-xs text-white disabled:opacity-40",
+      "\"rounded border px-3 py-2 text-xs\"",
+      "rounded border px-3 py-2 text-xs",
+      "\"ml-auto px-3 py-2 text-xs text-neutral-500\"",
+      "ml-auto px-3 py-2 text-xs text-neutral-500",
+      "\"mt-3 text-xs text-red-700\"",
+      "mt-3 text-xs text-red-700",
+      "\"mt-4 flex gap-2\"",
+      "mt-4 flex gap-2",
+      "\"rounded bg-red-700 px-3 py-2 text-xs text-white disabled:opacity-40\"",
+      "rounded bg-red-700 px-3 py-2 text-xs text-white disabled:opacity-40"
+    ],
+    "controls": [
+      {
+        "tag": "button",
+        "line": 11,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{disabled}",
+          "aria-label": "{`进入 ${book.title}`}",
+          "aria-current": "{active ? 'page' : undefined}",
+          "className": "\"w-full text-left disabled:opacity-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 12,
+        "attributes": {
+          "className": "\"break-words text-sm font-medium\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 13,
+        "attributes": {
+          "className": "\"mt-1 text-[11px] text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 14,
+        "attributes": {
+          "className": "\"mt-1 text-[10px] text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 16,
+        "attributes": {
+          "className": "\"mt-2 flex gap-3 text-xs\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 17,
+        "attributes": {
+          "disabled": "{disabled}",
+          "className": "\"text-neutral-700 hover:underline disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 18,
+        "attributes": {
+          "disabled": "{disabled}",
+          "aria-label": "{`导出 ${book.title}`}",
+          "className": "\"text-neutral-700 hover:underline disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 19,
+        "attributes": {
+          "disabled": "{disabled}",
+          "aria-label": "{`删除 ${book.title}`}",
+          "className": "\"ml-auto text-red-700 hover:underline disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "aside",
+        "line": 38,
+        "attributes": {
+          "aria-label": "\"资产书架\"",
+          "className": "\"flex h-full w-60 shrink-0 flex-col border-r border-neutral-200 bg-neutral-100/70\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 39,
+        "attributes": {
+          "className": "\"border-b border-neutral-200 px-4 py-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 39,
+        "attributes": {
+          "className": "\"text-sm font-semibold\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 40,
+        "attributes": {
+          "disabled": "{blocked}",
+          "className": "{`mt-3 w-full rounded border px-3 py-2 text-xs disabled:opacity-40 ${importing ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white'}`}"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 46,
+        "attributes": {
+          "className": "\"space-y-2 border-t border-neutral-200 p-3 text-[11px] text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 47,
+        "attributes": {},
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 47,
+        "attributes": {
+          "className": "\"break-all\"",
+          "title": "{PROJECT_EXPORT_DIRECTORY}"
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 48,
+        "attributes": {
+          "disabled": "{blocked || !supportsDirectoryExport()}",
+          "className": "\"rounded border border-neutral-300 bg-white px-2 py-1 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 53,
+        "attributes": {
+          "className": "\"fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "section",
+        "line": 53,
+        "attributes": {
+          "role": "\"dialog\"",
+          "aria-modal": "\"true\"",
+          "aria-label": "\"导出资产\"",
+          "className": "\"w-full max-w-md rounded-lg bg-white p-5 shadow-xl\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 56,
+        "attributes": {
+          "className": "\"mt-4 flex flex-wrap gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 57,
+        "attributes": {
+          "disabled": "{blocked || !supportsDirectoryExport()}",
+          "className": "\"rounded bg-neutral-900 px-3 py-2 text-xs text-white disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 58,
+        "attributes": {
+          "disabled": "{blocked}",
+          "className": "\"rounded border px-3 py-2 text-xs\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 59,
+        "attributes": {
+          "disabled": "{busy}",
+          "className": "\"ml-auto px-3 py-2 text-xs text-neutral-500\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 62,
+        "attributes": {
+          "className": "\"fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "section",
+        "line": 62,
+        "attributes": {
+          "role": "\"dialog\"",
+          "aria-modal": "\"true\"",
+          "aria-label": "\"删除资产\"",
+          "className": "\"w-full max-w-md rounded-lg bg-white p-5 shadow-xl\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 64,
+        "attributes": {
+          "className": "\"mt-4 flex gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 64,
+        "attributes": {
+          "disabled": "{blocked}",
+          "className": "\"rounded border px-3 py-2 text-xs\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 65,
+        "attributes": {
+          "disabled": "{blocked}",
+          "className": "\"rounded bg-red-700 px-3 py-2 text-xs text-white disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 66,
+        "attributes": {
+          "disabled": "{busy}",
+          "className": "\"ml-auto px-3 py-2 text-xs text-neutral-500\""
+        },
+        "events": [
+          "onClick"
+        ]
+      }
+    ]
+  },
+  "features/assets/EditorMemoryPanel.tsx": {
+    "copy": [
+      "正在读取编辑记忆…",
+      "本书故事编辑记忆",
+      "用于窗口之间和全书复核时接续工作，保存摘要、判断依据与待复核事项。",
+      "故事会话",
+      "当前会话",
+      "（历史）",
+      "正在回查旧会话；其中的判断和进度不代表当前复核已经通过。",
+      "工作记录",
+      "完整会话与压缩记录",
+      "最新工作摘要 · 更新",
+      "次",
+      "完成第一批故事编辑后，工作记忆会出现在这里。",
+      "资料已有变化，",
+      "条记录需要重新核实。继续检查时会回查当前资料。",
+      "待复核",
+      "项 · 入库前可在这里检查尚未解决的事项。",
+      "全部记录",
+      "编辑判断",
+      "复核事项",
+      "待处理",
+      "依据变化",
+      "当前分类还没有工作记录。",
+      "已解决",
+      "已记录",
+      "依据已变化",
+      "引用：",
+      "第",
+      "章：",
+      "上一页",
+      "/",
+      "页，共",
+      "条",
+      "下一页",
+      "最近保存的检查批次",
+      "·",
+      "节点串联",
+      "事件线复核",
+      "个对象 ·",
+      "已提交",
+      "已取消",
+      "待重试"
+    ],
+    "classNames": [
+      "\"p-6 text-sm text-neutral-400\"",
+      "p-6 text-sm text-neutral-400",
+      "\"space-y-5 p-6\"",
+      "space-y-5 p-6",
+      "\"text-base font-medium\"",
+      "text-base font-medium",
+      "\"mt-1 text-xs text-neutral-500\"",
+      "mt-1 text-xs text-neutral-500",
+      "\"block text-xs text-neutral-600\"",
+      "block text-xs text-neutral-600",
+      "\"ml-3 rounded border border-neutral-300 bg-white px-2 py-1\"",
+      "ml-3 rounded border border-neutral-300 bg-white px-2 py-1",
+      "\"rounded bg-amber-50 p-3 text-xs text-amber-800\"",
+      "rounded bg-amber-50 p-3 text-xs text-amber-800",
+      "\"flex gap-2 text-xs\"",
+      "flex gap-2 text-xs",
+      "\"rounded border px-3 py-1\"",
+      "rounded border px-3 py-1",
+      "\"rounded border border-neutral-200 bg-white p-4\"",
+      "rounded border border-neutral-200 bg-white p-4",
+      "\"mb-2 text-xs text-neutral-500\"",
+      "mb-2 text-xs text-neutral-500",
+      "\"whitespace-pre-wrap text-sm\"",
+      "whitespace-pre-wrap text-sm",
+      "\"text-xs text-neutral-500\"",
+      "text-xs text-neutral-500",
+      "\"flex flex-wrap gap-2\"",
+      "flex flex-wrap gap-2",
+      "{'rounded border px-3 py-1 text-xs ' + (filter === key ? 'bg-neutral-900 text-white' : 'border-neutral-300 bg-white')}",
+      "\"text-sm text-neutral-400\"",
+      "text-sm text-neutral-400",
+      "\"space-y-2 rounded border border-neutral-200 bg-white p-4\"",
+      "space-y-2 rounded border border-neutral-200 bg-white p-4",
+      "\"flex flex-wrap gap-2 text-xs text-neutral-500\"",
+      "flex flex-wrap gap-2 text-xs text-neutral-500",
+      "\"text-amber-700\"",
+      "text-amber-700",
+      "\"border-l-2 border-neutral-200 pl-3 text-xs text-neutral-600\"",
+      "border-l-2 border-neutral-200 pl-3 text-xs text-neutral-600",
+      "\"flex items-center gap-3 text-xs text-neutral-500\"",
+      "flex items-center gap-3 text-xs text-neutral-500",
+      "\"rounded border px-3 py-1 disabled:opacity-40\"",
+      "rounded border px-3 py-1 disabled:opacity-40",
+      "\"rounded bg-neutral-100 p-4 text-xs text-neutral-600\"",
+      "rounded bg-neutral-100 p-4 text-xs text-neutral-600",
+      "\"mb-2 font-medium\"",
+      "mb-2 font-medium"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 20,
+        "attributes": {
+          "className": "\"space-y-5 p-6\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 21,
+        "attributes": {},
+        "events": []
+      },
+      {
+        "tag": "label",
+        "line": 25,
+        "attributes": {
+          "className": "\"block text-xs text-neutral-600\""
+        },
+        "events": []
+      },
+      {
+        "tag": "select",
+        "line": 26,
+        "attributes": {
+          "className": "\"ml-3 rounded border border-neutral-300 bg-white px-2 py-1\"",
+          "value": "{sessionId ?? ''}"
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 31,
+        "attributes": {
+          "className": "\"flex gap-2 text-xs\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 31,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded border px-3 py-1\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 31,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded border px-3 py-1\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 33,
+        "attributes": {
+          "className": "\"rounded border border-neutral-200 bg-white p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 39,
+        "attributes": {
+          "className": "\"flex flex-wrap gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 39,
+        "attributes": {
+          "key": "{key}",
+          "type": "\"button\"",
+          "className": "{'rounded border px-3 py-1 text-xs ' + (filter === key ? 'bg-neutral-900 text-white' : 'border-neutral-300 bg-white')}"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 42,
+        "attributes": {
+          "className": "\"flex flex-wrap gap-2 text-xs text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 47,
+        "attributes": {
+          "className": "\"flex items-center gap-3 text-xs text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 48,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{currentPage === 0}",
+          "className": "\"rounded border px-3 py-1 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 50,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{(currentPage + 1) * pageSize >= visible.length}",
+          "className": "\"rounded border px-3 py-1 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 52,
+        "attributes": {
+          "className": "\"rounded bg-neutral-100 p-4 text-xs text-neutral-600\""
+        },
+        "events": []
+      }
+    ]
+  },
+  "features/assets/SessionHistory.tsx": {
+    "copy": [
+      "系统与工具配置",
+      "任务输入",
+      "模型回复与工具调用",
+      "工具结果",
+      "历史压缩",
+      "代码提交确认",
+      "失败响应的上下文标记",
+      "#",
+      "·",
+      "约",
+      "→",
+      "tokens，原始历史仍保留。",
+      "查看完整记录",
+      "上一段",
+      "—",
+      "/",
+      "字符",
+      "下一段",
+      "完整原始会话共",
+      "条记录；压缩整理模型上下文，原始消息和工具结果仍可查看。",
+      "这条会话还没有原始消息。旧版工作记忆不会被伪造成聊天历史。",
+      "上一页",
+      "下一页"
+    ],
+    "classNames": [
+      "\"rounded border border-neutral-200 bg-white p-3 text-xs\"",
+      "rounded border border-neutral-200 bg-white p-3 text-xs",
+      "\"flex flex-wrap gap-2 text-neutral-500\"",
+      "flex flex-wrap gap-2 text-neutral-500",
+      "\"mt-2 whitespace-pre-wrap\"",
+      "mt-2 whitespace-pre-wrap",
+      "\"mb-1 text-amber-800\"",
+      "mb-1 text-amber-800",
+      "\"mt-2\"",
+      "mt-2",
+      "\"cursor-pointer text-neutral-700\"",
+      "cursor-pointer text-neutral-700",
+      "\"mt-2 whitespace-pre-wrap break-all rounded bg-neutral-50 p-3\"",
+      "mt-2 whitespace-pre-wrap break-all rounded bg-neutral-50 p-3",
+      "\"flex items-center gap-3\"",
+      "flex items-center gap-3",
+      "\"space-y-3\"",
+      "space-y-3",
+      "\"text-xs text-neutral-500\"",
+      "text-xs text-neutral-500",
+      "\"text-sm text-neutral-400\"",
+      "text-sm text-neutral-400",
+      "\"flex gap-3 text-xs\"",
+      "flex gap-3 text-xs"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 11,
+        "attributes": {
+          "className": "\"flex flex-wrap gap-2 text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 12,
+        "attributes": {
+          "className": "\"mt-2 whitespace-pre-wrap\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 16,
+        "attributes": {
+          "className": "\"flex items-center gap-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 16,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{offset === 0}"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 16,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{offset + size >= raw.length}"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 24,
+        "attributes": {
+          "className": "\"space-y-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 28,
+        "attributes": {
+          "className": "\"flex gap-3 text-xs\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 28,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{current === 0}"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 28,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{(current + 1) * size >= entries.length}"
+        },
+        "events": [
+          "onClick"
+        ]
+      }
+    ]
+  },
+  "features/assets/TryOnePanel.tsx": {
+    "copy": [
+      "世界资产",
+      "叙事资产",
+      "试跑一章",
+      "用真实模型跑一章，看看抽出来的东西对不对（",
+      "不写入数据库",
+      "）",
+      "关闭",
+      "正在跑第一章…",
+      "重跑",
+      "开始试跑",
+      "第",
+      "章 ·",
+      "ms · ¥",
+      "· 人物",
+      "· 地点",
+      "· 节点",
+      "调用失败（",
+      "结果校验",
+      "，尝试",
+      "次）",
+      "原文",
+      "（还没跑）",
+      "只显示前 2000 字",
+      "抽出来的东西",
+      "点「开始试跑」后，这里会显示提取结果。",
+      "人物（",
+      "别名",
+      "年龄：",
+      "性格：",
+      "（没抽到人物）",
+      "地点（",
+      "事件节点（",
+      "查看事件经过",
+      "涉及：",
+      "人工判断要点",
+      "：① 人物有没有漏抽 / 多抽 ② 节点是在「记录事实」还是在 「下结论」（后者不该出现） ③ 独立事件有没有遗漏，同一事件的小动作是否合在经过中 ④ 节点有没有带原文出处"
+    ],
+    "classNames": [
+      "\"fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6\"",
+      "fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6",
+      "\"flex h-full w-full max-w-6xl flex-col rounded-lg bg-white shadow-xl\"",
+      "flex h-full w-full max-w-6xl flex-col rounded-lg bg-white shadow-xl",
+      "\"flex items-center gap-3 border-b border-neutral-200 px-4 py-2\"",
+      "flex items-center gap-3 border-b border-neutral-200 px-4 py-2",
+      "\"text-sm font-medium\"",
+      "text-sm font-medium",
+      "\"text-xs text-neutral-500\"",
+      "text-xs text-neutral-500",
+      "\"ml-auto text-xs text-neutral-500 hover:text-neutral-800\"",
+      "ml-auto text-xs text-neutral-500 hover:text-neutral-800",
+      "\"rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\"",
+      "rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40",
+      "\"text-xs text-red-600\"",
+      "text-xs text-red-600",
+      "\"border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700\"",
+      "border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700",
+      "\"grid min-h-0 flex-1 grid-cols-2 divide-x divide-neutral-200\"",
+      "grid min-h-0 flex-1 grid-cols-2 divide-x divide-neutral-200",
+      "\"overflow-auto p-4\"",
+      "overflow-auto p-4",
+      "\"mb-2 text-xs font-medium text-neutral-500\"",
+      "mb-2 text-xs font-medium text-neutral-500",
+      "\"whitespace-pre-wrap text-xs leading-6 text-neutral-700\"",
+      "whitespace-pre-wrap text-xs leading-6 text-neutral-700",
+      "\"mt-2 text-[10px] text-neutral-400\"",
+      "mt-2 text-[10px] text-neutral-400",
+      "\"text-xs text-neutral-400\"",
+      "text-xs text-neutral-400",
+      "\"space-y-4\"",
+      "space-y-4",
+      "\"mb-1 text-xs font-medium\"",
+      "mb-1 text-xs font-medium",
+      "\"space-y-1\"",
+      "space-y-1",
+      "\"rounded border border-neutral-200 px-2 py-1.5\"",
+      "rounded border border-neutral-200 px-2 py-1.5",
+      "\"flex items-baseline gap-2\"",
+      "flex items-baseline gap-2",
+      "\"font-mono text-[10px] text-neutral-400\"",
+      "font-mono text-[10px] text-neutral-400",
+      "\"text-[10px] text-neutral-500\"",
+      "text-[10px] text-neutral-500",
+      "\"text-[11px] text-neutral-500\"",
+      "text-[11px] text-neutral-500",
+      "\"text-[11px] text-neutral-600\"",
+      "text-[11px] text-neutral-600",
+      "\"mt-0.5 border-l-2 border-neutral-200 pl-2 text-[11px] italic text-neutral-500\"",
+      "mt-0.5 border-l-2 border-neutral-200 pl-2 text-[11px] italic text-neutral-500",
+      "\"mt-1 text-[11px] text-neutral-600\"",
+      "mt-1 text-[11px] text-neutral-600",
+      "\"cursor-pointer text-neutral-500\"",
+      "cursor-pointer text-neutral-500",
+      "\"mt-1 whitespace-pre-wrap leading-5\"",
+      "mt-1 whitespace-pre-wrap leading-5",
+      "\"text-[10px] text-neutral-400\"",
+      "text-[10px] text-neutral-400",
+      "\"mt-0.5 border-l-2 border-neutral-200 pl-2 text-[10px] italic text-neutral-500\"",
+      "mt-0.5 border-l-2 border-neutral-200 pl-2 text-[10px] italic text-neutral-500",
+      "\"rounded bg-neutral-50 p-2 text-[10px] leading-4 text-neutral-500\"",
+      "rounded bg-neutral-50 p-2 text-[10px] leading-4 text-neutral-500"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 35,
+        "attributes": {
+          "className": "\"fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 36,
+        "attributes": {
+          "className": "\"flex h-full w-full max-w-6xl flex-col rounded-lg bg-white shadow-xl\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 42,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"ml-auto text-xs text-neutral-500 hover:text-neutral-800\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 51,
+        "attributes": {
+          "className": "\"flex items-center gap-3 border-b border-neutral-200 px-4 py-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 52,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{running}",
+          "className": "\"rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 70,
+        "attributes": {
+          "className": "\"border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 72,
+        "attributes": {
+          "key": "{f.stage}"
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 80,
+        "attributes": {
+          "className": "\"grid min-h-0 flex-1 grid-cols-2 divide-x divide-neutral-200\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 81,
+        "attributes": {
+          "className": "\"overflow-auto p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 91,
+        "attributes": {
+          "className": "\"overflow-auto p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 97,
+        "attributes": {
+          "className": "\"space-y-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "section",
+        "line": 98,
+        "attributes": {},
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 99,
+        "attributes": {
+          "className": "\"mb-1 text-xs font-medium\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 103,
+        "attributes": {
+          "className": "\"flex items-baseline gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 112,
+        "attributes": {
+          "className": "\"text-[11px] text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 113,
+        "attributes": {
+          "className": "\"text-[11px] text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 115,
+        "attributes": {
+          "className": "\"text-[11px] text-neutral-600\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 118,
+        "attributes": {
+          "className": "\"mt-0.5 border-l-2 border-neutral-200 pl-2 text-[11px] italic text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "section",
+        "line": 130,
+        "attributes": {},
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 131,
+        "attributes": {
+          "className": "\"mb-1 text-xs font-medium\""
+        },
+        "events": []
+      },
+      {
+        "tag": "section",
+        "line": 142,
+        "attributes": {},
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 143,
+        "attributes": {
+          "className": "\"mb-1 text-xs font-medium\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 147,
+        "attributes": {
+          "className": "\"flex items-baseline gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 151,
+        "attributes": {
+          "className": "\"text-[11px] text-neutral-600\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 159,
+        "attributes": {
+          "className": "\"text-[10px] text-neutral-400\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 162,
+        "attributes": {
+          "className": "\"mt-0.5 border-l-2 border-neutral-200 pl-2 text-[10px] italic text-neutral-500\""
+        },
+        "events": []
+      }
+    ]
+  },
+  "features/compile/CompilePanel.tsx": {
+    "copy": [
+      "逐章提取",
+      "窗口归并与串联",
+      "全书合并与检查",
+      "当前草稿整体检查",
+      "/",
+      "章",
+      "窗口",
+      "步骤",
+      "· 失败",
+      "· 费用估算",
+      "取消",
+      "任务尚未完整完成，已保存的结果仍在。点击“继续提取与检查”可恢复处理。",
+      "等待中…"
+    ],
+    "classNames": [
+      "\"border-b border-neutral-200 bg-white px-4 py-3\"",
+      "border-b border-neutral-200 bg-white px-4 py-3",
+      "\"flex items-center gap-4\"",
+      "flex items-center gap-4",
+      "\"text-sm font-medium\"",
+      "text-sm font-medium",
+      "\"h-2 flex-1 overflow-hidden rounded-full bg-neutral-100\"",
+      "h-2 flex-1 overflow-hidden rounded-full bg-neutral-100",
+      "\"h-full bg-neutral-800 transition-all\"",
+      "h-full bg-neutral-800 transition-all",
+      "\"w-40 text-right text-xs tabular-nums text-neutral-500\"",
+      "w-40 text-right text-xs tabular-nums text-neutral-500",
+      "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50\"",
+      "rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50",
+      "\"mt-2 text-xs text-amber-700\"",
+      "mt-2 text-xs text-amber-700",
+      "\"mt-3 h-40 overflow-auto rounded bg-neutral-950 p-2 font-mono text-[11px] leading-5 text-neutral-300\"",
+      "mt-3 h-40 overflow-auto rounded bg-neutral-950 p-2 font-mono text-[11px] leading-5 text-neutral-300",
+      "\"text-neutral-600\"",
+      "text-neutral-600",
+      "{\n              l.level === 'error'\n                ? 'text-red-400'\n                : l.level === 'warn'\n                  ? 'text-amber-300'\n                  : 'text-neutral-300'\n            }"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 42,
+        "attributes": {
+          "className": "\"border-b border-neutral-200 bg-white px-4 py-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 43,
+        "attributes": {
+          "className": "\"flex items-center gap-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 45,
+        "attributes": {
+          "className": "\"h-2 flex-1 overflow-hidden rounded-full bg-neutral-100\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 46,
+        "attributes": {
+          "className": "\"h-full bg-neutral-800 transition-all\"",
+          "style": "{{ width: `${pct}%` }}"
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 52,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 68,
+        "attributes": {
+          "ref": "{logRef}",
+          "className": "\"mt-3 h-40 overflow-auto rounded bg-neutral-950 p-2 font-mono text-[11px] leading-5 text-neutral-300\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 74,
+        "attributes": {
+          "key": "{l.id}",
+          "className": "{\n              l.level === 'error'\n                ? 'text-red-400'\n                : l.level === 'warn'\n                  ? 'text-amber-300'\n                  : 'text-neutral-300'\n            }"
+        },
+        "events": []
+      }
+    ]
+  },
+  "features/compile/StageTestPanel.tsx": {
+    "copy": [
+      "P1 提取前 100 章资产",
+      "P2 合并世界资产",
+      "P2 串联事件线",
+      "P3 整体检查",
+      "分阶段测试（临时）",
+      "按顺序运行，每步后都可查看和修改草稿。P1/P2 默认处理前 100 章（含长章全部切块）；P3 检查当前全部已提取资产，不提取剩余章节。检查通过后可手动修改并入库。"
+    ],
+    "classNames": [
+      "\"border-b border-neutral-200 bg-neutral-50 px-4 py-3\"",
+      "border-b border-neutral-200 bg-neutral-50 px-4 py-3",
+      "\"text-xs font-medium text-neutral-700\"",
+      "text-xs font-medium text-neutral-700",
+      "\"mt-1 text-xs text-neutral-500\"",
+      "mt-1 text-xs text-neutral-500",
+      "\"mt-2 flex flex-wrap gap-2\"",
+      "mt-2 flex flex-wrap gap-2",
+      "\"rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40\"",
+      "rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40"
+    ],
+    "controls": [
+      {
+        "tag": "section",
+        "line": 28,
+        "attributes": {
+          "className": "\"border-b border-neutral-200 bg-neutral-50 px-4 py-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 31,
+        "attributes": {
+          "className": "\"mt-2 flex flex-wrap gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 33,
+        "attributes": {
+          "key": "{step}",
+          "type": "\"button\"",
+          "disabled": "{disabled || running || active !== null}",
+          "className": "\"rounded border border-neutral-300 bg-white px-3 py-1.5 text-xs hover:bg-neutral-100 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      }
+    ]
+  },
+  "features/import/ImportPanel.tsx": {
+    "copy": [
+      "正则已修改，请先应用正则并重新预览。",
+      "导入小说",
+      "MVP 只支持",
+      ".txt",
+      "。中文 txt 常见 GBK 编码，会自动探测。",
+      "章节分隔正则",
+      "可填写正则正文或 /正则/标志，自动补齐 gm。第一个捕获组作为标题；没有捕获组时使用完整匹配。修改后重新预览，再确认导入。",
+      "应用正则并重新预览",
+      "恢复默认",
+      "正则已修改，下方仍是旧预览，请重新应用。",
+      "把 txt 拖到这里，或",
+      "选择文件",
+      "编码",
+      "· 切出",
+      "章",
+      "按 UTF-8 重读",
+      "按 GBK 重读",
+      "#",
+      "章节名",
+      "字数",
+      "只显示前 200 章（共",
+      "章）",
+      "正在导入…",
+      "仅导入，分阶段测试",
+      "导入并完整提取检查",
+      "换一个文件"
+    ],
+    "classNames": [
+      "\"mx-auto max-w-3xl p-8\"",
+      "mx-auto max-w-3xl p-8",
+      "\"text-lg font-semibold\"",
+      "text-lg font-semibold",
+      "\"mt-1 text-sm text-neutral-500\"",
+      "mt-1 text-sm text-neutral-500",
+      "\"rounded bg-neutral-100 px-1\"",
+      "rounded bg-neutral-100 px-1",
+      "\"mt-4 rounded-lg border border-neutral-200 bg-white p-4\"",
+      "mt-4 rounded-lg border border-neutral-200 bg-white p-4",
+      "\"text-sm font-medium\"",
+      "text-sm font-medium",
+      "\"mt-2 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs\"",
+      "mt-2 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs",
+      "\"mt-2 text-xs text-neutral-500\"",
+      "mt-2 text-xs text-neutral-500",
+      "\"mt-3 flex gap-3\"",
+      "mt-3 flex gap-3",
+      "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50\"",
+      "rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50",
+      "\"text-xs text-neutral-500 hover:text-neutral-800\"",
+      "text-xs text-neutral-500 hover:text-neutral-800",
+      "\"mt-2 text-xs text-amber-700\"",
+      "mt-2 text-xs text-amber-700",
+      "\"mt-6 rounded-lg border-2 border-dashed border-neutral-300 bg-white p-8 text-center\"",
+      "mt-6 rounded-lg border-2 border-dashed border-neutral-300 bg-white p-8 text-center",
+      "\"text-sm text-neutral-600\"",
+      "text-sm text-neutral-600",
+      "\"mt-3 rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700\"",
+      "mt-3 rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700",
+      "\"hidden\"",
+      "hidden",
+      "\"mt-4 rounded bg-red-50 p-3 text-sm text-red-700\"",
+      "mt-4 rounded bg-red-50 p-3 text-sm text-red-700",
+      "\"mt-6 rounded-lg border border-neutral-200 bg-white p-4\"",
+      "mt-6 rounded-lg border border-neutral-200 bg-white p-4",
+      "\"flex items-center justify-between\"",
+      "flex items-center justify-between",
+      "\"text-sm\"",
+      "text-sm",
+      "\"font-medium\"",
+      "font-medium",
+      "\"ml-2 text-neutral-500\"",
+      "ml-2 text-neutral-500",
+      "\"flex gap-2 text-xs\"",
+      "flex gap-2 text-xs",
+      "\"rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-50\"",
+      "rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-50",
+      "\"mt-3 max-h-64 overflow-auto rounded border border-neutral-100\"",
+      "mt-3 max-h-64 overflow-auto rounded border border-neutral-100",
+      "\"w-full text-left text-xs\"",
+      "w-full text-left text-xs",
+      "\"sticky top-0 bg-neutral-50 text-neutral-500\"",
+      "sticky top-0 bg-neutral-50 text-neutral-500",
+      "\"px-2 py-1 font-normal\"",
+      "px-2 py-1 font-normal",
+      "\"px-2 py-1 text-right font-normal\"",
+      "px-2 py-1 text-right font-normal",
+      "\"border-t border-neutral-100\"",
+      "border-t border-neutral-100",
+      "\"px-2 py-1 text-neutral-400\"",
+      "px-2 py-1 text-neutral-400",
+      "\"px-2 py-1\"",
+      "px-2 py-1",
+      "\"px-2 py-1 text-right text-neutral-500\"",
+      "px-2 py-1 text-right text-neutral-500",
+      "\"px-2 py-2 text-xs text-neutral-400\"",
+      "px-2 py-2 text-xs text-neutral-400",
+      "\"mt-4 flex items-center gap-3\"",
+      "mt-4 flex items-center gap-3",
+      "\"rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:opacity-50\"",
+      "rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:opacity-50",
+      "\"rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50\"",
+      "rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50",
+      "\"text-sm text-neutral-500 hover:text-neutral-800\"",
+      "text-sm text-neutral-500 hover:text-neutral-800"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 95,
+        "attributes": {
+          "className": "\"mx-auto max-w-3xl p-8\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 101,
+        "attributes": {
+          "className": "\"mt-4 rounded-lg border border-neutral-200 bg-white p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "label",
+        "line": 102,
+        "attributes": {
+          "htmlFor": "\"chapter-regex\"",
+          "className": "\"text-sm font-medium\""
+        },
+        "events": []
+      },
+      {
+        "tag": "input",
+        "line": 103,
+        "attributes": {
+          "id": "\"chapter-regex\"",
+          "type": "\"text\"",
+          "value": "{chapterRegex}",
+          "disabled": "{busy}",
+          "spellCheck": "{false}",
+          "className": "\"mt-2 w-full rounded border border-neutral-300 px-3 py-2 font-mono text-xs\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 107,
+        "attributes": {
+          "className": "\"mt-3 flex gap-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 108,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{busy}",
+          "className": "\"rounded border border-neutral-300 px-3 py-1 text-xs hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 109,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{busy}",
+          "className": "\"text-xs text-neutral-500 hover:text-neutral-800\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 114,
+        "attributes": {
+          "className": "\"mt-6 rounded-lg border-2 border-dashed border-neutral-300 bg-white p-8 text-center\""
+        },
+        "events": [
+          "onDragOver",
+          "onDrop"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 124,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"mt-3 rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "input",
+        "line": 131,
+        "attributes": {
+          "ref": "{fileRef}",
+          "type": "\"file\"",
+          "accept": "\".txt,text/plain\"",
+          "className": "\"hidden\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 146,
+        "attributes": {
+          "className": "\"mt-6 rounded-lg border border-neutral-200 bg-white p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 147,
+        "attributes": {
+          "className": "\"flex items-center justify-between\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 148,
+        "attributes": {
+          "className": "\"text-sm\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 154,
+        "attributes": {
+          "className": "\"flex gap-2 text-xs\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 155,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 162,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded border border-neutral-300 px-2 py-1 hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 172,
+        "attributes": {
+          "className": "\"mt-3 max-h-64 overflow-auto rounded border border-neutral-100\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 198,
+        "attributes": {
+          "className": "\"mt-4 flex items-center gap-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 199,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{busy || preview.chapterRegex !== chapterRegex || preview.chapters.length === 0}",
+          "className": "\"rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:opacity-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 207,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{busy || preview.chapterRegex !== chapterRegex || preview.chapters.length === 0}",
+          "className": "\"rounded border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 211,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"text-sm text-neutral-500 hover:text-neutral-800\""
+        },
+        "events": [
+          "onClick"
+        ]
+      }
+    ]
+  },
+  "features/network/NetworkPanel.tsx": {
+    "copy": [
+      "线内节点",
+      "散落节点",
+      "第",
+      "章 · 顺序",
+      "章节时间轴",
+      "章",
+      "查看全图",
+      "回到起点 · 1:1",
+      "还没有事件节点。完成章节提取后即可查看，未归线的节点也会显示。",
+      "全部",
+      "节点",
+      "散落",
+      "已结束",
+      "进行中",
+      "章节为原文出现顺序；虚线表示线内先后，不表示因果"
+    ],
+    "classNames": [
+      "\"h-full rounded border-2 px-3 py-2 shadow-sm transition-opacity\"",
+      "h-full rounded border-2 px-3 py-2 shadow-sm transition-opacity",
+      "\"flex items-center justify-between gap-1 text-[10px] text-neutral-500\"",
+      "flex items-center justify-between gap-1 text-[10px] text-neutral-500",
+      "{`mt-1 font-medium ${compact ? 'line-clamp-2' : 'line-clamp-3 text-xs leading-5'}`}",
+      "\"mt-1 text-[10px] text-neutral-500\"",
+      "mt-1 text-[10px] text-neutral-500",
+      "\"pointer-events-none absolute inset-x-0 top-0 z-10 h-14 overflow-hidden border-b border-neutral-200 bg-white/95\"",
+      "pointer-events-none absolute inset-x-0 top-0 z-10 h-14 overflow-hidden border-b border-neutral-200 bg-white/95",
+      "\"absolute inset-x-0 top-4 border-t border-neutral-800\"",
+      "absolute inset-x-0 top-4 border-t border-neutral-800",
+      "\"absolute top-4 border-l border-neutral-600 pt-2 text-[11px] text-neutral-700\"",
+      "absolute top-4 border-l border-neutral-600 pt-2 text-[11px] text-neutral-700",
+      "\"relative -left-5 whitespace-nowrap\"",
+      "relative -left-5 whitespace-nowrap",
+      "\"absolute bottom-3 right-3 z-10 flex gap-1 rounded border border-neutral-200 bg-white p-1 text-xs shadow-sm\"",
+      "absolute bottom-3 right-3 z-10 flex gap-1 rounded border border-neutral-200 bg-white p-1 text-xs shadow-sm",
+      "\"rounded px-2 py-1 hover:bg-neutral-100\"",
+      "rounded px-2 py-1 hover:bg-neutral-100",
+      "\"p-8 text-sm text-neutral-400\"",
+      "p-8 text-sm text-neutral-400",
+      "\"flex h-full min-h-[440px] flex-col bg-white\"",
+      "flex h-full min-h-[440px] flex-col bg-white",
+      "\"flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 text-xs\"",
+      "flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 text-xs",
+      "{`rounded px-2 py-1 ${!active ? 'bg-neutral-900 text-white' : 'bg-neutral-100'}`}",
+      "\"rounded bg-blue-50 px-2 py-1 text-blue-700\"",
+      "rounded bg-blue-50 px-2 py-1 text-blue-700",
+      "\"rounded border px-2 py-1\"",
+      "rounded border px-2 py-1",
+      "\"ml-auto text-[11px] text-neutral-500\"",
+      "ml-auto text-[11px] text-neutral-500",
+      "\"relative min-h-0 flex-1\"",
+      "relative min-h-0 flex-1"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 13,
+        "attributes": {
+          "className": "\"h-full rounded border-2 px-3 py-2 shadow-sm transition-opacity\"",
+          "title": "{`${data.event.name}\\n${data.event.summary}`}",
+          "style": "{{ borderColor: shared ? '#4266a9' : color, background: shared ? '#fff' : `${color}16`, opacity: data.dimmed ? 0.3 : 1 }}"
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 19,
+        "attributes": {
+          "className": "\"flex items-center justify-between gap-1 text-[10px] text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 20,
+        "attributes": {
+          "className": "{`mt-1 font-medium ${compact ? 'line-clamp-2' : 'line-clamp-3 text-xs leading-5'}`}",
+          "style": "{compact ? { fontSize: Math.min(34, 11 / zoom), lineHeight: 1.18 } : undefined}"
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 21,
+        "attributes": {
+          "className": "\"mt-1 text-[10px] text-neutral-500\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 29,
+        "attributes": {
+          "className": "\"pointer-events-none absolute inset-x-0 top-0 z-10 h-14 overflow-hidden border-b border-neutral-200 bg-white/95\"",
+          "aria-label": "\"章节时间轴\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 30,
+        "attributes": {
+          "className": "\"absolute inset-x-0 top-4 border-t border-neutral-800\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 31,
+        "attributes": {
+          "key": "{chapter.chapterIndex}",
+          "className": "\"absolute top-4 border-l border-neutral-600 pt-2 text-[11px] text-neutral-700\"",
+          "style": "{{ left: x + (chapter.x + TIMELINE_NODE_WIDTH / 2) * zoom }}"
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 38,
+        "attributes": {
+          "className": "\"absolute bottom-3 right-3 z-10 flex gap-1 rounded border border-neutral-200 bg-white p-1 text-xs shadow-sm\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 39,
+        "attributes": {
+          "className": "\"rounded px-2 py-1 hover:bg-neutral-100\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 40,
+        "attributes": {
+          "className": "\"rounded px-2 py-1 hover:bg-neutral-100\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 58,
+        "attributes": {
+          "className": "\"p-8 text-sm text-neutral-400\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 59,
+        "attributes": {
+          "className": "\"flex h-full min-h-[440px] flex-col bg-white\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 60,
+        "attributes": {
+          "className": "\"flex flex-wrap items-center gap-2 border-b border-neutral-200 px-3 py-2 text-xs\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 61,
+        "attributes": {
+          "className": "{`rounded px-2 py-1 ${!active ? 'bg-neutral-900 text-white' : 'bg-neutral-100'}`}"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 63,
+        "attributes": {
+          "key": "{line.id}",
+          "title": "{`${line.id} · ${line.nodeCount} 个成员 · ${line.lineStatus === 'closed' ? '已结束' : '进行中'}`}",
+          "className": "\"rounded border px-2 py-1\"",
+          "style": "{{ color: line.color, borderColor: line.color, background: active === line.id ? `${line.color}18` : 'white' }}"
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 67,
+        "attributes": {
+          "className": "\"relative min-h-0 flex-1\""
+        },
+        "events": []
+      },
+      {
+        "tag": "ReactFlow",
+        "line": 68,
+        "attributes": {
+          "nodes": "{flowNodes}",
+          "edges": "{edges}",
+          "nodeTypes": "{NODE_TYPES}",
+          "nodesDraggable": "{false}",
+          "nodesConnectable": "{false}",
+          "minZoom": "{0.08}",
+          "maxZoom": "{2}",
+          "defaultViewport": "{{ x: 20, y: 0, zoom: 0.85 }}",
+          "proOptions": "{{ hideAttribution: true }}"
+        },
+        "events": [
+          "onNodeClick",
+          "onlyRenderVisibleElements"
+        ]
+      },
+      {
+        "tag": "Controls",
+        "line": 71,
+        "attributes": {
+          "showInteractive": "{false}"
+        },
+        "events": []
+      }
+    ]
+  },
+  "features/play/PlayPanel.tsx": {
+    "copy": [
+      "（游玩逻辑尚未接入。Director / Editor / Narrator 属于下一阶段 —— 当前版本完成到「资产提取与编辑」。）",
+      "还没有开始游玩。这里将来是对话窗口。",
+      "我想做什么…",
+      "先导入一本书",
+      "发送"
+    ],
+    "classNames": [
+      "\"flex h-full flex-col\"",
+      "flex h-full flex-col",
+      "\"min-h-0 flex-1 space-y-4 overflow-auto p-6\"",
+      "min-h-0 flex-1 space-y-4 overflow-auto p-6",
+      "\"text-sm text-neutral-400\"",
+      "text-sm text-neutral-400",
+      "{l.role === 'player' ? 'text-right' : ''}",
+      "{\n                'inline-block max-w-[70%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ' +\n                (l.role === 'player'\n                  ? 'bg-neutral-900 text-white'\n                  : 'bg-white text-neutral-800 ring-1 ring-neutral-200')\n              }",
+      "\"border-t border-neutral-200 bg-white p-3\"",
+      "border-t border-neutral-200 bg-white p-3",
+      "\"flex gap-2\"",
+      "flex gap-2",
+      "\"flex-1 rounded border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 disabled:bg-neutral-50\"",
+      "flex-1 rounded border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 disabled:bg-neutral-50",
+      "\"rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\"",
+      "rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:opacity-40"
+    ],
+    "controls": [
+      {
+        "tag": "div",
+        "line": 41,
+        "attributes": {
+          "className": "\"flex h-full flex-col\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 42,
+        "attributes": {
+          "ref": "{scroller}",
+          "className": "\"min-h-0 flex-1 space-y-4 overflow-auto p-6\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 47,
+        "attributes": {
+          "key": "{i}",
+          "className": "{l.role === 'player' ? 'text-right' : ''}"
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 48,
+        "attributes": {
+          "className": "{\n                'inline-block max-w-[70%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ' +\n                (l.role === 'player'\n                  ? 'bg-neutral-900 text-white'\n                  : 'bg-white text-neutral-800 ring-1 ring-neutral-200')\n              }"
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 62,
+        "attributes": {
+          "className": "\"border-t border-neutral-200 bg-white p-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 63,
+        "attributes": {
+          "className": "\"flex gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "input",
+        "line": 64,
+        "attributes": {
+          "value": "{input}",
+          "placeholder": "{bookId ? '我想做什么…' : '先导入一本书'}",
+          "disabled": "{!bookId}",
+          "className": "\"flex-1 rounded border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 disabled:bg-neutral-50\""
+        },
+        "events": [
+          "onChange",
+          "onKeyDown"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 77,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{!bookId || input.trim() === ''}",
+          "className": "\"rounded bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      }
+    ]
+  },
+  "features/settings/SettingsPanel.tsx": {
+    "copy": [
+      "上下文容量须为不小于 8192 的整数，或留空使用默认值",
+      "已保存模型配置",
+      "已保存",
+      "⏳ 正在拉取模型列表…",
+      "❌ 没拉到模型（Key 可能没权限，或服务端不提供 /models）",
+      "⏳ 正在测试连接…",
+      "先导入一本书",
+      "设置",
+      "模型与 API",
+      "服务地址",
+      "留空使用 DeepSeek 官方地址",
+      "本地模型可留空",
+      "已配置",
+      "粘贴 DeepSeek API Key",
+      "已保存 Key",
+      "保存",
+      "已清除 Key",
+      "清除",
+      "提取用模型",
+      "P1 逐章提取 —— 调用量最大，选便宜快的",
+      "归并用模型",
+      "P2/P3 合并人物与串联事件线 —— 选强的",
+      "归并模型上下文容量（tokens）",
+      "自定义模型可填真实容量；留空按模型目录。会话自动压缩依据此容量预留余量。",
+      "自动",
+      "保存配置",
+      "🔄 拉取模型",
+      "⚡ 测试提取模型",
+      "测试归并模型工具",
+      "⚠️ Key",
+      "以明文保存在本机浏览器存储里",
+      "（IndexedDB）。它不会被导出到备份文件、也不会写进日志， 但本机的其他脚本可以读到 —— 只建议在这台个人电脑上使用。",
+      "调用模型时，会把当前章节的正文发送给你配置的模型服务商。本机存储的数据不经过任何中间服务器。",
+      "编译",
+      "并发数",
+      "越高越快，但更容易触发服务商限流",
+      "清空日志窗口",
+      "数据",
+      "导出备份（.wwv2）",
+      "导入备份",
+      "备份包含：原文、人物、地点、事件节点、事件线。",
+      "不包含 API Key，也不包含事件日志。",
+      "导入会",
+      "新建一本书",
+      "，不会覆盖你现有的数据。",
+      "浏览器存储：",
+      "备份有效：",
+      "章 ·",
+      "人物 ·",
+      "地点 ·",
+      "节点 ·",
+      "事件线",
+      "确认导入",
+      "取消",
+      "这个文件不能导入：",
+      "关闭",
+      "关于",
+      "WestWorld V2 · v1.0 —— 导入小说 → 提取世界资产与叙事资产 → 编辑 → 事件网络可视化。",
+      "游玩逻辑（Director / Editor / Narrator）属于下一阶段。"
+    ],
+    "classNames": [
+      "\"rounded-lg border border-neutral-200 bg-white p-4\"",
+      "rounded-lg border border-neutral-200 bg-white p-4",
+      "\"mb-3 text-sm font-semibold\"",
+      "mb-3 text-sm font-semibold",
+      "\"space-y-3\"",
+      "space-y-3",
+      "\"block\"",
+      "block",
+      "\"mb-1 block text-xs text-neutral-600\"",
+      "mb-1 block text-xs text-neutral-600",
+      "\"ml-1 text-neutral-400\"",
+      "ml-1 text-neutral-400",
+      "{`text-xs ${cls}`}",
+      "\"mx-auto max-w-3xl space-y-4 overflow-auto p-6\"",
+      "mx-auto max-w-3xl space-y-4 overflow-auto p-6",
+      "\"text-lg font-semibold\"",
+      "text-lg font-semibold",
+      "\"w-full rounded border border-neutral-300 px-2 py-1.5 font-mono text-sm outline-none focus:border-neutral-500\"",
+      "w-full rounded border border-neutral-300 px-2 py-1.5 font-mono text-sm outline-none focus:border-neutral-500",
+      "\"flex gap-2\"",
+      "flex gap-2",
+      "\"flex-1 rounded border border-neutral-300 px-2 py-1.5 font-mono text-sm outline-none focus:border-neutral-500\"",
+      "flex-1 rounded border border-neutral-300 px-2 py-1.5 font-mono text-sm outline-none focus:border-neutral-500",
+      "\"rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\"",
+      "rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40",
+      "\"rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-40\"",
+      "rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-40",
+      "{modelInputCls}",
+      "\"flex flex-wrap items-center gap-2 pt-1\"",
+      "flex flex-wrap items-center gap-2 pt-1",
+      "\"rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700\"",
+      "rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700",
+      "\"rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50\"",
+      "rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50",
+      "\"rounded bg-amber-50 p-2 text-xs text-amber-800\"",
+      "rounded bg-amber-50 p-2 text-xs text-amber-800",
+      "\"text-xs text-neutral-500\"",
+      "text-xs text-neutral-500",
+      "\"flex items-center gap-3 text-sm\"",
+      "flex items-center gap-3 text-sm",
+      "\"w-24 text-neutral-500\"",
+      "w-24 text-neutral-500",
+      "\"w-24 rounded border border-neutral-300 px-2 py-1 text-sm\"",
+      "w-24 rounded border border-neutral-300 px-2 py-1 text-sm",
+      "\"rounded border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-50\"",
+      "rounded border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-50",
+      "\"text-xs text-neutral-400\"",
+      "text-xs text-neutral-400",
+      "\"flex flex-wrap items-center gap-2\"",
+      "flex flex-wrap items-center gap-2",
+      "\"cursor-pointer rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50\"",
+      "cursor-pointer rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50",
+      "\"hidden\"",
+      "hidden",
+      "\"rounded border border-neutral-200 p-3\"",
+      "rounded border border-neutral-200 p-3",
+      "\"text-sm\"",
+      "text-sm",
+      "\"mt-1 text-xs text-neutral-500\"",
+      "mt-1 text-xs text-neutral-500",
+      "\"mt-2 flex gap-2\"",
+      "mt-2 flex gap-2",
+      "\"rounded bg-neutral-900 px-3 py-1 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\"",
+      "rounded bg-neutral-900 px-3 py-1 text-sm text-white hover:bg-neutral-700 disabled:opacity-40",
+      "\"text-sm text-neutral-500 hover:text-neutral-800\"",
+      "text-sm text-neutral-500 hover:text-neutral-800",
+      "\"text-sm text-red-600\"",
+      "text-sm text-red-600",
+      "\"mt-1 list-inside list-disc text-xs text-red-600\"",
+      "mt-1 list-inside list-disc text-xs text-red-600",
+      "\"mt-2 text-sm text-neutral-500 hover:text-neutral-800\"",
+      "mt-2 text-sm text-neutral-500 hover:text-neutral-800",
+      "\"text-sm text-neutral-600\"",
+      "text-sm text-neutral-600",
+      "\"fixed bottom-4 right-4 rounded bg-neutral-900 px-3 py-2 text-sm text-white\"",
+      "fixed bottom-4 right-4 rounded bg-neutral-900 px-3 py-2 text-sm text-white"
+    ],
+    "controls": [
+      {
+        "tag": "section",
+        "line": 30,
+        "attributes": {
+          "className": "\"rounded-lg border border-neutral-200 bg-white p-4\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 32,
+        "attributes": {
+          "className": "\"space-y-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "label",
+        "line": 47,
+        "attributes": {
+          "className": "\"block\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 215,
+        "attributes": {
+          "className": "\"mx-auto max-w-3xl space-y-4 overflow-auto p-6\""
+        },
+        "events": []
+      },
+      {
+        "tag": "input",
+        "line": 220,
+        "attributes": {
+          "value": "{baseUrl}",
+          "placeholder": "\"https://api.deepseek.com\"",
+          "className": "\"w-full rounded border border-neutral-300 px-2 py-1.5 font-mono text-sm outline-none focus:border-neutral-500\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 229,
+        "attributes": {
+          "className": "\"flex gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "input",
+        "line": 230,
+        "attributes": {
+          "type": "\"password\"",
+          "value": "{apiKeyDraft}",
+          "placeholder": "{configured ? (hint ?? '已配置') : '粘贴 DeepSeek API Key'}",
+          "className": "\"flex-1 rounded border border-neutral-300 px-2 py-1.5 font-mono text-sm outline-none focus:border-neutral-500\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 237,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{apiKeyDraft.trim() === ''}",
+          "className": "\"rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 250,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{!configured}",
+          "className": "\"rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "input",
+        "line": 266,
+        "attributes": {
+          "list": "{datalistId}",
+          "value": "{extractionModel}",
+          "className": "{modelInputCls}"
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "input",
+        "line": 275,
+        "attributes": {
+          "list": "{datalistId}",
+          "value": "{aggregationModel}",
+          "className": "{modelInputCls}"
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "input",
+        "line": 288,
+        "attributes": {
+          "type": "\"number\"",
+          "min": "{8192}",
+          "step": "{1024}",
+          "value": "{aggregationWindow}",
+          "className": "{modelInputCls}",
+          "placeholder": "\"自动\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 291,
+        "attributes": {
+          "className": "\"flex flex-wrap items-center gap-2 pt-1\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 292,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 299,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 306,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{!configured}",
+          "className": "\"rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 314,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{!configured || status.tone === 'loading'}",
+          "className": "\"rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "label",
+        "line": 328,
+        "attributes": {
+          "className": "\"flex items-center gap-3 text-sm\""
+        },
+        "events": []
+      },
+      {
+        "tag": "input",
+        "line": 330,
+        "attributes": {
+          "type": "\"number\"",
+          "min": "{1}",
+          "max": "{16}",
+          "value": "{concurrency}",
+          "className": "\"w-24 rounded border border-neutral-300 px-2 py-1 text-sm\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 338,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 352,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"rounded border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-50\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 362,
+        "attributes": {
+          "className": "\"flex flex-wrap items-center gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 363,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{busy || !bookId}",
+          "className": "\"rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "label",
+        "line": 371,
+        "attributes": {
+          "className": "\"cursor-pointer rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50\""
+        },
+        "events": []
+      },
+      {
+        "tag": "input",
+        "line": 373,
+        "attributes": {
+          "type": "\"file\"",
+          "accept": "\".wwv2,application/zip\"",
+          "className": "\"hidden\""
+        },
+        "events": [
+          "onChange"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 394,
+        "attributes": {
+          "className": "\"rounded border border-neutral-200 p-3\""
+        },
+        "events": []
+      },
+      {
+        "tag": "div",
+        "line": 405,
+        "attributes": {
+          "className": "\"mt-2 flex gap-2\""
+        },
+        "events": []
+      },
+      {
+        "tag": "button",
+        "line": 406,
+        "attributes": {
+          "type": "\"button\"",
+          "disabled": "{busy}",
+          "className": "\"rounded bg-neutral-900 px-3 py-1 text-sm text-white hover:bg-neutral-700 disabled:opacity-40\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 414,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"text-sm text-neutral-500 hover:text-neutral-800\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "button",
+        "line": 431,
+        "attributes": {
+          "type": "\"button\"",
+          "className": "\"mt-2 text-sm text-neutral-500 hover:text-neutral-800\""
+        },
+        "events": [
+          "onClick"
+        ]
+      },
+      {
+        "tag": "div",
+        "line": 454,
+        "attributes": {
+          "className": "\"fixed bottom-4 right-4 rounded bg-neutral-900 px-3 py-2 text-sm text-white\""
+        },
+        "events": []
+      }
+    ]
+  }
+}

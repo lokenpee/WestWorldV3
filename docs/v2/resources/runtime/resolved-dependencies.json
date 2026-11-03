@@ -1,0 +1,110 @@
+{
+  "dependencies": {
+    "@dagrejs/dagre": {
+      "version": "3.1.1",
+      "resolved": "https://registry.npmmirror.com/@dagrejs/dagre/-/dagre-3.1.1.tgz"
+    },
+    "@earendil-works/pi-agent-core": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmmirror.com/@earendil-works/pi-agent-core/-/pi-agent-core-1.0.2.tgz"
+    },
+    "@earendil-works/pi-ai": {
+      "version": "1.0.2",
+      "resolved": "https://registry.npmmirror.com/@earendil-works/pi-ai/-/pi-ai-1.0.2.tgz"
+    },
+    "@sinclair/typebox": {
+      "version": "0.34.52",
+      "resolved": "https://registry.npmmirror.com/@sinclair/typebox/-/typebox-0.34.52.tgz"
+    },
+    "@xyflow/react": {
+      "version": "12.12.0",
+      "resolved": "https://registry.npmmirror.com/@xyflow/react/-/react-12.12.0.tgz"
+    },
+    "dexie": {
+      "version": "4.4.6",
+      "resolved": "https://registry.npmmirror.com/dexie/-/dexie-4.4.6.tgz"
+    },
+    "dexie-react-hooks": {
+      "version": "4.4.0",
+      "resolved": "https://registry.npmmirror.com/dexie-react-hooks/-/dexie-react-hooks-4.4.0.tgz"
+    },
+    "fflate": {
+      "version": "0.8.3",
+      "resolved": "https://registry.npmmirror.com/fflate/-/fflate-0.8.3.tgz"
+    },
+    "react": {
+      "version": "19.3.0",
+      "resolved": "https://registry.npmmirror.com/react/-/react-19.3.0.tgz"
+    },
+    "react-dom": {
+      "version": "19.3.0",
+      "resolved": "https://registry.npmmirror.com/react-dom/-/react-dom-19.3.0.tgz"
+    },
+    "zustand": {
+      "version": "5.0.15",
+      "resolved": "https://registry.npmmirror.com/zustand/-/zustand-5.0.15.tgz"
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": {
+      "version": "9.39.5",
+      "resolved": "https://registry.npmmirror.com/@eslint/js/-/js-9.39.5.tgz"
+    },
+    "@tailwindcss/vite": {
+      "version": "4.3.3",
+      "resolved": "https://registry.npmmirror.com/@tailwindcss/vite/-/vite-4.3.3.tgz"
+    },
+    "@types/node": {
+      "version": "24.19.1",
+      "resolved": "https://registry.npmmirror.com/@types/node/-/node-24.19.1.tgz"
+    },
+    "@types/react": {
+      "version": "19.3.0",
+      "resolved": "https://registry.npmmirror.com/@types/react/-/react-19.3.0.tgz"
+    },
+    "@types/react-dom": {
+      "version": "19.3.0",
+      "resolved": "https://registry.npmmirror.com/@types/react-dom/-/react-dom-19.3.0.tgz"
+    },
+    "@vitejs/plugin-react": {
+      "version": "6.1.1",
+      "resolved": "https://registry.npmmirror.com/@vitejs/plugin-react/-/plugin-react-6.1.1.tgz"
+    },
+    "eslint": {
+      "version": "9.39.5",
+      "resolved": "https://registry.npmmirror.com/eslint/-/eslint-9.39.5.tgz"
+    },
+    "fake-indexeddb": {
+      "version": "6.2.5",
+      "resolved": "https://registry.npmmirror.com/fake-indexeddb/-/fake-indexeddb-6.2.5.tgz"
+    },
+    "globals": {
+      "version": "17.13.0",
+      "resolved": "https://registry.npmmirror.com/globals/-/globals-17.13.0.tgz"
+    },
+    "tailwindcss": {
+      "version": "4.3.3",
+      "resolved": "https://registry.npmmirror.com/tailwindcss/-/tailwindcss-4.3.3.tgz"
+    },
+    "tsx": {
+      "version": "4.23.15",
+      "resolved": "https://registry.npmmirror.com/tsx/-/tsx-4.23.15.tgz"
+    },
+    "typescript": {
+      "version": "6.0.3",
+      "resolved": "https://registry.npmmirror.com/typescript/-/typescript-6.0.3.tgz"
+    },
+    "typescript-eslint": {
+      "version": "8.71.0",
+      "resolved": "https://registry.npmmirror.com/typescript-eslint/-/typescript-eslint-8.71.0.tgz"
+    },
+    "vite": {
+      "version": "8.3.2",
+      "resolved": "https://registry.npmmirror.com/vite/-/vite-8.3.2.tgz"
+    },
+    "vitest": {
+      "version": "5.0.3",
+      "resolved": "https://registry.npmmirror.com/vitest/-/vitest-5.0.3.tgz"
+    }
+  }
+}

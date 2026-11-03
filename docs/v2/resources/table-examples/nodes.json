@@ -1,0 +1,20 @@
+{
+  "id": "C1-N001",
+  "bookId": "bk_acceptance",
+  "chapterIndex": "1",
+  "chapterName": "第一章 码头会面",
+  "order": 0,
+  "name": "码头会面",
+  "summary": "沈青在码头见到顾衡。",
+  "process": "沈青在码头见到顾衡。",
+  "quote": "沈青在码头见到顾衡。",
+  "actors": [
+    "沈青",
+    "顾衡"
+  ],
+  "confidence": 1,
+  "createdBy": "P1",
+  "eventLineIds": [
+    "L01"
+  ]
+}

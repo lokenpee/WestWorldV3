@@ -1,0 +1,99 @@
+- banner:
+  - generic: WestWorld V2
+  - button "资产"
+  - button "游玩"
+  - button "设置"
+- main:
+  - complementary "资产书架":
+    - generic: 资产书架 1
+    - button "＋ 导入小说"
+    - list:
+      - button "进入 逆推验证样本（导入）":
+        - generic: 逆推验证样本（导入）
+        - generic: 草稿 · 3 章/块
+        - generic: 3 人物 · 2 地点 · 4 节点 · 2 线
+      - button "进入"
+      - button "导出 逆推验证样本（导入）": 导出
+      - button "删除 逆推验证样本（导入）": 删除
+    - generic: 导出目录：尚未选择
+    - generic "E:\\WestWorldV2\\exports": 建议选择项目下 exports 文件夹
+    - button "选择导出目录"
+    - paragraph: 删除整本资产会清理该书的浏览器数据，已导出的文件保留。
+  - generic: 全书合并与检查
+  - generic: 2 / 2 步骤 · 失败 0 · 费用估算 0.0000
+  - generic: 等待中…
+  - paragraph: 分阶段测试（临时）
+  - paragraph: 按顺序运行，每步后都可查看和修改草稿。P1/P2 默认处理前 100 章（含长章全部切块）；P3 检查当前全部已提取资产，不提取剩余章节。检查通过后可手动修改并入库。
+  - button "P1 提取前 100 章资产"
+  - button "P2 合并世界资产"
+  - button "P2 串联事件线"
+  - button "P3 整体检查"
+  - button "人物3"
+  - button "地点2"
+  - button "事件节点4"
+  - button "事件线2"
+  - button "事件网络"
+  - button "编辑记忆"
+  - generic "入库后生成固定资产，游戏只读这一份；再点一次入库会用当前草稿生成新的一份": 未入库
+  - button "试跑一章"
+  - button "重新检查全部"
+  - button "入库"
+  - button "导入另一本"
+  - button "全部"
+  - button "主要人物"
+  - button "重要配角"
+  - button "NPC"
+  - button "路人"
+  - generic: 草稿层（快照）· 入库后冻结
+  - list:
+    - generic: C1-P001
+    - generic: 沈青
+    - generic: 主要人物
+    - generic: 人工验证样本人物
+    - button "删除"
+    - generic: C1-P002
+    - generic: 顾衡
+    - generic: NPC
+    - generic: 人工验证样本人物
+    - button "删除"
+    - generic: C1-P003
+    - generic: 阿宁
+    - generic: NPC
+    - generic: 人工验证样本人物
+    - button "删除"
+  - complementary:
+    - generic: C1-P001
+    - generic: 编辑
+    - button "关闭"
+    - generic: 主名
+    - textbox "主名": 沈青
+    - generic: 别名（逗号分隔）
+    - textbox "别名（逗号分隔）"
+    - generic: 身份
+    - textbox "身份": 人工验证样本人物
+    - generic: 原文年龄描述
+    - textbox "原文年龄描述"
+    - generic: 性格
+    - textbox "性格"
+    - generic: 背景
+    - textbox "背景"
+    - generic: 外貌
+    - textbox "外貌"
+    - generic: 原话片段
+    - textbox "原话片段"
+    - generic "全部字段（只读，24 项）"
+    - generic: 层级
+    - combobox "层级":
+      - option "主要人物"
+      - option "重要配角"
+      - option "NPC" [selected]
+      - option "路人"
+    - generic: 手动合并
+    - combobox:
+      - option "把这条并入…" [selected]
+      - option "C1-P002 顾衡"
+      - option "C1-P003 阿宁"
+    - button "并入" [disabled]
+    - paragraph: 保留目标条目，汇总两边的资料、称呼和关系，再删除当前条目。此操作不可撤销。
+    - button "保存"
+    - generic: 已保存
