@@ -24,7 +24,7 @@ export async function encodeBackup(input: BookData): Promise<ExportResult> {
   const files: Record<string, Uint8Array> = { 'data/book.json': strToU8(JSON.stringify(data.book)) }
   for (const name of tableNames.filter(name => name !== 'chapterTexts')) files[`data/${name}.json`] = strToU8(JSON.stringify(data.tables[name]))
   for (const row of data.tables.chapterTexts) files[chapterFileName(row.chapterIndex as string)] = strToU8(row.text as string)
-  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: 8, appVersion: '0.4.0', exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
+  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: 8, appVersion: '0.4.1', exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
   files['manifest.json'] = strToU8(JSON.stringify(manifest))
   const bytes = await new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) => zip(files as Zippable, { level: 6 }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
   const title = Array.from(data.book.title.replace(/[<>:"/\\|?*]/g, '_')).map(character => character.charCodeAt(0) < 32 ? '_' : character).join('').slice(0, 80)

@@ -41,3 +41,6 @@
   .chapter-card { padding: 16px; }
   .page-heading h1 { font-size: 24px; }
 }
+.chapter-step-group { display: inline-flex; align-items: center; gap: 2px; }
+.chapter-recycle { width: 22px; height: 22px; padding: 0; font-size: 12px; line-height: 1; border: 1px solid var(--border); border-radius: 4px; background: white; color: #356331; cursor: pointer; }
+.chapter-recycle:disabled { opacity: 0.4; cursor: default; }

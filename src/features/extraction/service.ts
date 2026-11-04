@@ -10,7 +10,8 @@ import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebuildFacts, updateFrequencies } from '../assets/derive'
 import type { Character, CharacterRelation, EventNode, Lifecycle, LocationAsset } from '../assets/types'
 import { stepLabels, substeps, type ExtractionData, type ExtractedRow, type Substep } from './types'
-import { checkReceiptSources, coverage, withExtractionLock, type Lease, type Progress, type Receipt, type Run, type SavedUsage, type StoredTask } from './recovery'
+import { checkReceiptSources, coverage, withExtractionLock, type Lease, type Progress, type Receipt, type ReExtractScope, type Run, type SavedUsage, type StoredTask } from './recovery'
+import { clearReExtractData, previewReExtractData } from './reextract'
 
 type Workspace = ReturnType<typeof createWorkspace>
 export interface StepResult { chapterIndex: string; step: Substep; ok: boolean; message: string; attempts: number; tokens: number; cost?: number; elapsedMs: number }
@@ -20,13 +21,22 @@ const distinct = (rows: ExtractedRow[]) => [...new Map(rows.map(row => [canonica
 class ExecutionLost extends Error {}
 export type ExtractionStepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'interrupted'
 type Selection = { chapterIndex: string; step: Substep }
+export type ReExtractRequest =
+  | { scope: 'all'; step: Substep }
+  | { scope: 'chapter'; chapterIndex: string; step: Substep }
+export interface ReExtractPreview { counts: Awaited<ReturnType<typeof previewReExtractData>>; blockers: string[] }
+const scopeComplete = (receipts: Receipt[], chapters: Chapter[], scope: ReExtractScope) => {
+  const keys = new Set(receipts.filter(row => row.substep === scope.step).map(row => row.chapterIndex))
+  return scope.scope === 'chapter' ? keys.has(scope.chapterIndex ?? '') : chapters.length > 0 && chapters.every(chapter => keys.has(chapter.chapterIndex))
+}
+const activeLease = (row: Lease) => row.recordType === 'lease' && (row.expiresAt === undefined || Number(row.expiresAt) > Date.now())
 
 export function createExtractionService(workspace: Workspace, models: Pick<ModelService, 'generate' | 'settings'>) {
   const states = new Map<string, ExtractionState>()
   const controllers = new Map<string, AbortController>()
   const listeners = new Set<() => void>()
   const set = (bookId: string, change: Partial<ExtractionState>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, results: [] }), ...change }); listeners.forEach(listener => listener()) }
-  async function execute(bookId: string, selection?: Selection) {
+  async function execute(bookId: string, selection?: Selection, options: { reExtract?: ReExtractScope; clear?: boolean } = {}) {
     if (controllers.has(bookId)) return
     const controller = new AbortController(); controllers.set(bookId, controller)
     const db = workspace.openBook(bookId)
@@ -35,6 +45,9 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
     let heartbeat: ReturnType<typeof setInterval> | undefined
     let heartbeatError: unknown
     let chapters: Chapter[] = []
+    const initialProgress = await db.table<Progress>('compileProgress').get('P1')
+    const activeScope = options.reExtract ?? (selection ? undefined : initialProgress?.reExtract)
+    const domainLease = activeScope ? (activeScope.step === 'worldAssets' ? 'world' : 'narrative') : undefined
     const usage: SavedUsage = { input: 0, output: 0, totalTokens: 0, cost: 0, costStatus: 'estimated' }
     const checkLease = async () => {
       controller.signal.throwIfAborted()
@@ -42,9 +55,14 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       if (lease?.owner !== owner || lease.runId !== runId) throw new ExecutionLost('提取任务已由其他执行者接管，当前任务已停止写入。')
       const progress = await db.table<Progress>('compileProgress').get('P1')
       if (progress?.runId !== runId) throw new ExecutionLost('当前书籍已有其他提取任务。')
+      if (domainLease) {
+        const domain = await db.table<Lease>('pipelineRuns').get(`lease:${domainLease}`)
+        if (domain?.owner !== owner || domain.runId !== runId || Number(domain.expiresAt ?? 0) <= Date.now()) throw new ExecutionLost('重提目标范围的执行权已失效。')
+      }
       const others = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
-      if (others.some(row => row.recordType === 'lease' && row.id !== lease.id && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new ExecutionLost('本书已有其他处理任务，当前提取已暂停。')
+      if (others.some(row => row.recordType === 'lease' && row.id !== lease.id && !(row.owner === owner && row.runId === runId) && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new ExecutionLost('本书已有其他处理任务，当前提取已暂停。')
       await db.table('pipelineRuns').update(lease.id, { expiresAt: Date.now() + 30000 })
+      if (domainLease) await db.table('pipelineRuns').update(`lease:${domainLease}`, { expiresAt: Date.now() + 30000 })
     }
     async function saveProgress(status: string) {
       const receipts = await db.table<Receipt>('extractionReceipts').toArray()
@@ -53,7 +71,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       const latest = new Map((run?.tasks ?? []).map(task => [`${task.input.chapterIndex}:${task.phase}`, task]))
       const failed = latest.size ? [...latest.values()].filter(task => task.status === 'failed' && !receipts.some(row => row.key === `${task.input.chapterIndex}:${task.phase}`)).map(task => task.input.chapterIndex) : previous?.failedChapters ?? []
       const { completedChapters, failedChapters, partialChapters } = coverage(chapters, receipts, failed)
-      await db.table('compileProgress').put({ bookId, stage: 'P1', status, totalChapters: chapters.length, completedChapters, failedChapters, partialChapters, updatedAt: new Date().toISOString(), runId, scope: 'fullBook', planVersion: '2.2', unit: 'chapter', validity: 'current' })
+      await db.table('compileProgress').put({ bookId, stage: 'P1', status, totalChapters: chapters.length, completedChapters, failedChapters, partialChapters, updatedAt: new Date().toISOString(), runId, scope: 'fullBook', planVersion: '2.2', unit: 'chapter', validity: 'current', ...(previous?.reExtract ? { reExtract: previous.reExtract } : {}) })
       return completedChapters.length === chapters.length
     }
     set(bookId, { running: true, results: [], error: undefined, progress: undefined })
@@ -79,16 +97,32 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
           await db.table('pipelineRuns').put({ ...resumed, status: 'running', tasks: (existing.tasks ?? []).map(task => task.status === 'running' ? { ...task, status: 'partial' } : task) })
         } else await db.table('pipelineRuns').put({ id: runId, recordType: 'run', bookId, stage: 'P1', status: 'running', startedAt: new Date().toISOString(), planVersion: '2.2', aiMode: 'direct', tasks: [] })
         await db.table('pipelineRuns').update('lease:extraction', { runId })
+        if (domainLease) await db.table('pipelineRuns').put({ id: `lease:${domainLease}`, recordType: 'lease', bookId, lockKey: domainLease, owner, runId, expiresAt: Date.now() + 30000 })
         await db.table('compileProgress').update('P1', { runId })
       }); acquired = true
       heartbeat = setInterval(() => { void db.transaction('rw', db.table('pipelineRuns'), async () => {
         const lease = await db.table<Lease>('pipelineRuns').get('lease:extraction')
         if (lease?.owner !== owner || lease.runId !== runId) throw new ExecutionLost('提取任务已由其他执行者接管。')
         await db.table('pipelineRuns').update(lease.id, { expiresAt: Date.now() + 30000 })
+        if (domainLease) {
+          const domain = await db.table<Lease>('pipelineRuns').get(`lease:${domainLease}`)
+          if (domain?.owner !== owner || domain.runId !== runId) throw new ExecutionLost('重提目标范围的执行权已失效。')
+          await db.table('pipelineRuns').update(`lease:${domainLease}`, { expiresAt: Date.now() + 30000 })
+        }
       }).catch(error => { if (error instanceof ExecutionLost) { heartbeatError = error; controller.abort() } }) }, 8000)
+      if (options.clear && activeScope) {
+        await db.transaction('rw', db.tables, async () => {
+          await checkLease()
+          await clearReExtractData(db, activeScope, chapters, new Date().toISOString())
+          const previous = await db.table<Progress>('compileProgress').get('P1')
+          if (previous) await db.table('compileProgress').put({ ...previous, reExtract: activeScope, status: 'running', updatedAt: new Date().toISOString() })
+          await saveProgress('running')
+        })
+      }
       await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), () => saveProgress('running'))
       for (const chapter of chapters) for (const step of substeps) {
         if (selection && (chapter.chapterIndex !== selection.chapterIndex || step !== selection.step)) continue
+        if (!selection && activeScope && (step !== activeScope.step || activeScope.scope === 'chapter' && chapter.chapterIndex !== activeScope.chapterIndex)) continue
         controller.signal.throwIfAborted()
         await db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), checkLease)
         const key = `${chapter.chapterIndex}:${step}`
@@ -222,7 +256,13 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
         const complete = await saveProgress('running')
         const current = await db.table<Progress>('compileProgress').get('P1')
         const status = complete ? 'completed' : current?.failedChapters.length ? 'failed' : 'paused'
-        await db.table('compileProgress').update('P1', { status })
+        const receipts = await db.table<Receipt>('extractionReceipts').toArray()
+        const scopeDone = activeScope ? scopeComplete(receipts, chapters, activeScope) : false
+        if (current) {
+          const next: Progress = { ...current, status }
+          if (activeScope && scopeDone) delete next.reExtract
+          await db.table('compileProgress').put(next)
+        } else await db.table('compileProgress').update('P1', { status })
         await db.table('pipelineRuns').update(runId, { status, usage, cost: usage.cost, finishedAt: new Date().toISOString() })
       })
     } catch (error) {
@@ -240,12 +280,48 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       }).catch(() => set(bookId, { error: `${message}；进度保存失败，请检查本地存储。` }))
     } finally {
       clearInterval(heartbeat)
-      if (acquired) await db.transaction('rw', db.table('pipelineRuns'), async () => { if ((await db.table<Lease>('pipelineRuns').get('lease:extraction'))?.owner === owner) await db.table('pipelineRuns').delete('lease:extraction') }).catch(() => set(bookId, { error: '任务已结束，执行锁等待到期释放。' }))
+      if (acquired) await db.transaction('rw', db.table('pipelineRuns'), async () => {
+        if ((await db.table<Lease>('pipelineRuns').get('lease:extraction'))?.owner === owner) await db.table('pipelineRuns').delete('lease:extraction')
+        if (domainLease && (await db.table<Lease>('pipelineRuns').get(`lease:${domainLease}`))?.owner === owner) await db.table('pipelineRuns').delete(`lease:${domainLease}`)
+      }).catch(() => set(bookId, { error: '任务已结束，执行锁等待到期释放。' }))
       controllers.delete(bookId); set(bookId, { running: false, progress: undefined })
     }
   }
   async function start(bookId: string, selection?: Selection) {
     await withExtractionLock(workspace.scope.settingsName, bookId, () => execute(bookId, selection), () => { set(bookId, { error: '本书已有处理任务，请等待其结束。' }) })
+  }
+  async function reExtractPreview(bookId: string, request: ReExtractRequest): Promise<ReExtractPreview> {
+    if (!await workspace.settings.books.get(bookId)) throw new Error('书籍已删除。')
+    const db = workspace.openBook(bookId)
+    const chapters = await db.chapters.orderBy('order').toArray()
+    const blockers: string[] = []
+    if (!chapters.length) blockers.push('本书没有章节，请先导入章节。')
+    if (request.scope === 'chapter' && !chapters.some(chapter => chapter.chapterIndex === request.chapterIndex)) blockers.push('目标章节不存在。')
+    const receipts = await db.table<Receipt>('extractionReceipts').toArray()
+    if (!receipts.some(row => row.substep === request.step && (request.scope === 'all' || row.chapterIndex === request.chapterIndex))) blockers.push('该范围还没有成功凭证，请使用普通提取。')
+    const progress = await db.table<Progress>('compileProgress').get('P1')
+    if (progress?.reExtract) blockers.push('已有待继续的重提任务，请先继续完成。')
+    const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
+    if (leases.some(activeLease)) blockers.push('本书已有处理任务，请等待其结束。')
+    const configured = await models.settings.read()
+    if (!configured.configured || !configured.config.extractionModel) blockers.push('请先在设置中保存提取模型和密钥。')
+    const scope: ReExtractScope = { ...request, startedAt: new Date().toISOString() }
+    const counts = request.scope === 'chapter' && !chapters.some(chapter => chapter.chapterIndex === request.chapterIndex)
+      ? { characters: 0, locations: 0, relations: 0, nodes: 0, eventLines: 0 }
+      : await db.transaction('r', db.tables, () => previewReExtractData(db, scope, chapters))
+    return { counts, blockers }
+  }
+  async function reExtract(bookId: string, request: ReExtractRequest) {
+    const preview = await reExtractPreview(bookId, request)
+    if (preview.blockers.length) throw new Error(preview.blockers.join('；'))
+    const scope: ReExtractScope = { ...request, startedAt: new Date().toISOString() }
+    await withExtractionLock(workspace.scope.settingsName, bookId, () => execute(bookId, undefined, { reExtract: scope, clear: true }), () => { set(bookId, { error: '本书已有处理任务，请等待其结束。' }) })
+  }
+  async function continueReExtract(bookId: string) {
+    const db = workspace.openBook(bookId)
+    const progress = await db.table<Progress>('compileProgress').get('P1')
+    if (!progress?.reExtract) throw new Error('没有待继续的重提任务。')
+    await withExtractionLock(workspace.scope.settingsName, bookId, () => execute(bookId, undefined, { reExtract: progress.reExtract }), () => { set(bookId, { error: '本书已有处理任务，请等待其结束。' }) })
   }
   async function recover(bookId: string) {
     if (controllers.has(bookId)) return
@@ -279,7 +355,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       })
     }, () => undefined)
   }
-  return { start, retry: (bookId: string, chapterIndex: string, step: Substep) => start(bookId, { chapterIndex, step }), recover, cancel: (bookId: string) => controllers.get(bookId)?.abort(), state: (bookId: string) => states.get(bookId),
+  return { start, retry: (bookId: string, chapterIndex: string, step: Substep) => start(bookId, { chapterIndex, step }), reExtractPreview, reExtract, continueReExtract, recover, cancel: (bookId: string) => controllers.get(bookId)?.abort(), state: (bookId: string) => states.get(bookId),
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
     async progress(bookId: string) {
       const db = workspace.openBook(bookId)

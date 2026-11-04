@@ -8,3 +8,9 @@
 .extraction-success strong { color: #047857; }
 .extraction-failure { color: #b91c1c; }
 @media(max-width: 767px) { .extraction-results { grid-template-columns: 1fr; } }
+.extraction-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.extraction-dialog-backdrop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.35); padding: 16px; }
+.extraction-dialog { width: min(560px, 100%); max-height: min(80dvh, 640px); overflow: auto; background: white; border-radius: 8px; padding: 18px; }
+.extraction-dialog h3 { margin-top: 0; }
+.extraction-dialog .editor-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.extraction-dialog .field-error { color: #b91c1c; }

@@ -30,6 +30,80 @@ async function setup(fetcher: typeof fetch, count = 1) {
 }
 afterEach(async () => { for (const workspace of workspaces.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
 
+it('整书重提世界资产先清空再提取，保留叙事节点并清除P2', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db, workspace } = await setup(fetcher, 2)
+  await service.start('a')
+  const before = { characters: await db.table('characters').count(), locations: await db.table('locations').count(), nodes: await db.table('nodes').count() }
+  await workspace.openBook('a').table('pipelineRuns').put({ id: 'p2-old', bookId: 'a', recordType: 'run', stage: 'P2', status: 'completed', startedAt: new Date().toISOString(), planVersion: '2.2', report: { status: 'completed' } })
+  fetcher.mockClear()
+  await service.reExtract('a', { scope: 'all', step: 'worldAssets' })
+  expect(fetcher).toHaveBeenCalledTimes(2)
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(await db.table('characters').count()).toBe(before.characters)
+  expect(await db.table('locations').count()).toBe(before.locations)
+  expect(await db.table('nodes').count()).toBe(before.nodes)
+  expect(await db.table('extractionReceipts').where('substep').equals('narrativeAssets').count()).toBe(2)
+  expect(await db.table('pipelineRuns').get('p2-old')).toBeUndefined()
+  expect((await service.progress('a'))?.reExtract).toBeUndefined()
+}, 30000)
+
+it('整书重提叙事资产删除事件线和P3结果，保留人物地点', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db, workspace } = await setup(fetcher, 1)
+  await service.start('a')
+  const assets = createAssetService(workspace)
+  const node = (await db.table('nodes').toArray())[0]
+  await assets.create('a', 'eventLine', { title: '送信线', nodeIds: [node.id] })
+  const before = { characters: await db.table('characters').count(), locations: await db.table('locations').count(), nodes: await db.table('nodes').count() }
+  await workspace.openBook('a').table('pipelineRuns').put({ id: 'p3-old', bookId: 'a', recordType: 'run', stage: 'P3', status: 'completed', startedAt: new Date().toISOString(), planVersion: '2.2' })
+  fetcher.mockClear()
+  await service.reExtract('a', { scope: 'all', step: 'narrativeAssets' })
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(await db.table('eventLines').count()).toBe(0)
+  expect(await db.table('nodes').count()).toBe(before.nodes)
+  expect(await db.table('characters').count()).toBe(before.characters)
+  expect(await db.table('locations').count()).toBe(before.locations)
+  expect(await db.table('pipelineRuns').get('p3-old')).toBeUndefined()
+}, 30000)
+
+it('单章重提合并编号后其他章节凭证仍有效，首章失败可继续且立即备份可校验', async () => {
+  let failing = false
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const schema = JSON.parse(init?.body as string).tools[0].function.parameters
+    if (failing && schema.properties.characters) return stream({ characters: [{ name: '', confidence: 1 }], locations: [] })
+    return stream(schema.properties.characters ? world : narrative)
+  })
+  const { service, db, workspace, book } = await setup(fetcher, 2)
+  await service.start('a')
+  const assets = createAssetService(workspace)
+  const preview = await assets.previewMerge('a', 'character', { memberIds: ['C1-P001', 'C2-P001'], keepId: 'C2-P001', canonicalName: '沈青' })
+  await assets.confirmMerge('a', 'character', preview.request)
+  const now = new Date().toISOString()
+  await db.table('characterRelations').put({ id: 'R-CROSS', bookId: 'a', originCharacterId: 'C1-P002', sourceName: '沈青', targetName: '沈青', relationType: 'friend', forwardLabel: '朋友', reverseLabel: '朋友', direction: 'bidirectional', evidence: [], sourceId: 'C1-P002', targetIds: ['C2-P002'], revision: 1, createdAt: now, updatedAt: now })
+  const chapter2Location = (await db.table('locations').toArray()).find(row => row.chapterIndex === '2')!
+  await db.table('pipelineRuns').put({ id: 'p2-coverage', bookId: 'a', recordType: 'run', stage: 'P2', status: 'paused', startedAt: now, planVersion: '2.2', coverageItems: [{ workItemId: `p2:${chapter2Location.id}`, phase: 'asset_review', kind: 'location', id: chapter2Location.id, status: 'checked', inputRevision: 1, inputFingerprint: 'fixture', coveredRevision: 1, coveredFingerprint: 'fixture', dependencies: { records: [], queries: [] }, taskId: null, outcome: 'no_change', reason: 'fixture', invalidations: 0, updatedAt: now }] })
+  await db.table('compileProgress').put({ bookId: 'a', stage: 'P2', status: 'paused', totalChapters: 2, completedChapters: [], failedChapters: [], updatedAt: now, validity: 'current' })
+  failing = true
+  await service.reExtract('a', { scope: 'chapter', chapterIndex: '2', step: 'worldAssets' })
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(await db.table('characters').get('C2-P001')).toBeUndefined()
+  expect((await db.table('characterRelations').get('R-CROSS'))?.targetIds).not.toContain('C2-P002')
+  expect((await db.table('pipelineRuns').get('p2-coverage'))?.coverageItems[0]).toMatchObject({ status: 'stale', invalidations: 1 })
+  expect(await db.table('compileProgress').get('P2')).toMatchObject({ validity: 'stale' })
+  const progress = await service.progress('a')
+  expect(progress?.reExtract).toMatchObject({ step: 'worldAssets', scope: 'chapter', chapterIndex: '2' })
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+  failing = false
+  await service.continueReExtract('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect((await service.progress('a'))?.reExtract).toBeUndefined()
+  expect(await db.table('extractionReceipts').get('2:worldAssets')).toBeTruthy()
+  expect(await db.table('characters').count()).toBeGreaterThan(0)
+}, 30000)
+
 it('续期延迟超过有效期时，同一执行者保存回复并继续所有章节', async () => {
   const fetcher = vi.fn<typeof fetch>()
   const { service, db } = await setup(fetcher, 2)

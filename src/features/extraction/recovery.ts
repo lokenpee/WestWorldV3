@@ -4,7 +4,8 @@ import { substeps, type Substep } from './types'
 export type ExtractionDatabase = ReturnType<ReturnType<typeof createWorkspace>['openBook']>
 export interface Receipt { key: string; bookId: string; chapterIndex: string; substep: Substep; originIds: string[]; inputFingerprint: string }
 export interface Lease { id: string; recordType: string; owner?: string; runId?: string; expiresAt?: number }
-export interface Progress { bookId: string; stage: string; status: string; totalChapters: number; completedChapters: string[]; failedChapters: string[]; partialChapters?: Record<string, Substep[]>; updatedAt: string; runId?: string }
+export interface ReExtractScope { step: Substep; scope: 'all' | 'chapter'; chapterIndex?: string; startedAt: string }
+export interface Progress { bookId: string; stage: string; status: string; totalChapters: number; completedChapters: string[]; failedChapters: string[]; partialChapters?: Record<string, Substep[]>; updatedAt: string; runId?: string; reExtract?: ReExtractScope }
 export interface SavedUsage { input: number; output: number; totalTokens: number; cost: number; costStatus: 'estimated' | 'unknown' }
 export interface StoredTask {
   taskId: string; ordinal: number; callId: string; phase: Substep; status: string; workItemIds: string[]

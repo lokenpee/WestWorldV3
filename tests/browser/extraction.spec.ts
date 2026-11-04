@@ -242,3 +242,28 @@ test('同书第二标签不能接管仍运行的任务，即使租约过期也�
   await expect(other.getByRole('region', { name: '逐章提取', exact: true })).toContainText('提取完成 · 成功 4/4', { timeout: 20000 })
   expect(calls).toBe(9)
 })
+
+test('P1整书与单章重新提取按钮可用，确认后清空并重新提取', async ({ page }) => {
+  test.setTimeout(90000)
+  await page.route('**/extraction-fixture/v1/chat/completions', async route => {
+    const world = !!route.request().postDataJSON().tools[0].function.parameters.properties.characters
+    await route.fulfill({ contentType: 'text/event-stream', body: response(world ? extractedWorld : extractedNarrative) })
+  })
+  await prepare(page)
+  const panel = page.getByRole('region', { name: '逐章提取', exact: true })
+  await page.getByRole('button', { name: '开始提取', exact: true }).click()
+  await expect(panel).toContainText('提取完成', { timeout: 20000 })
+  await page.getByRole('button', { name: '重新提取世界资产', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '确认重新提取', exact: true })
+  await expect(dialog).toContainText('将先清空全书对应旧资产')
+  await page.getByRole('button', { name: '清空并重新提取', exact: true }).click()
+  await expect(panel).toContainText('提取完成', { timeout: 20000 })
+  await page.getByRole('button', { name: '重新提取叙事资产', exact: true }).click()
+  await page.getByRole('button', { name: '清空并重新提取', exact: true }).click()
+  await expect(panel).toContainText('提取完成', { timeout: 20000 })
+  const recycle = page.getByRole('button', { name: '重新提取第1章 世界资产', exact: true })
+  await expect(recycle).toBeEnabled()
+  await recycle.click()
+  await expect(panel).toContainText('提取完成', { timeout: 20000 })
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+})

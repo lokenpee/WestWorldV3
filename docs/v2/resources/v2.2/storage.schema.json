@@ -2172,6 +2172,35 @@
         "runId": {
           "type": "string"
         },
+        "reExtract": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "step",
+            "scope",
+            "startedAt"
+          ],
+          "properties": {
+            "step": {
+              "enum": [
+                "worldAssets",
+                "narrativeAssets"
+              ]
+            },
+            "scope": {
+              "enum": [
+                "all",
+                "chapter"
+              ]
+            },
+            "chapterIndex": {
+              "type": "string"
+            },
+            "startedAt": {
+              "type": "string"
+            }
+          }
+        },
         "phase": {
           "type": "string"
         },

@@ -33,6 +33,12 @@
     "punctuationReplacement": "",
     "legacyQualityHeuristicExcluded": "/[\\u4e00-\\u9fa5a-zA-Z0-9]{2,}/"
   },
+  "candidateMatching": {
+    "overlapThreshold": 0.8,
+    "minimumSharedNames": 2,
+    "distinctiveNameMinLength": 3,
+    "rareNameMaxRecords": 2
+  },
   "defaultChapterRegex": "/(?:^|[。！？!?：:；;])([\\s\\u3000\\uFEFF]*第\\s*(?:[零一二三四五六七八九十百千万0-9]\\s*)+[章回卷节部篇][^\\n\\r]{0,80})/gm",
   "numericDefaults": {
     "chunkChars": 10000,

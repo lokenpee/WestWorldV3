@@ -47,8 +47,14 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     const candidates = [...findCandidates('character', snapshot.characters), ...findCandidates('location', snapshot.locations)]
     if (!saveReport) return candidates
     const id = crypto.randomUUID(), now = new Date().toISOString(); const report = emptyReport({ characters: snapshot.characters.length, locations: snapshot.locations.length })
-    report.status = 'completed'; report.skipped = candidates.map(row => `${row.kind === 'character' ? '人物' : '地点'}候选：${row.memberIds.join('、')}`)
+    report.status = 'completed'
+    const names = (kind: 'character' | 'location') => new Map((kind === 'character' ? snapshot.characters : snapshot.locations).map(row => [row.id, row.name]))
+    report.skipped = candidates.map(row => {
+      const nameOf = names(row.kind)
+      return `${row.kind === 'character' ? '人物' : '地点'}候选：${row.memberIds.map(id => `${nameOf.get(id) ?? id}（${id}）`).join('、')}；${row.reason}`
+    })
     await workspace.openBook(bookId).table('pipelineRuns').put({ id, recordType: 'run', bookId, stage: 'P2', phase: 'mechanical', status: 'completed', startedAt: now, finishedAt: now, planVersion: '2.2', report })
+    set(bookId, { reportId: id, reportType: 'code', error: undefined })
     return candidates
   }
   async function confirm<K extends WorldKind>(bookId: string, kind: K, request: MergeRequest) {
@@ -60,7 +66,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
   async function organize(bookId: string) {
     await assertReady(bookId)
     const automatic = await mechanical.mergeExactNames(bookId)
-    return { ...automatic, candidates: await scan(bookId, automatic.merged === 0 && automatic.failed === 0) }
+    return { ...automatic, candidates: await scan(bookId, true) }
   }
   async function start(bookId: string, startOptions: { reviewScope?: ReviewScope; reviewMode?: ReviewMode } = {}) {
     if (controllers.has(bookId) || mechanical.isRunning(bookId)) return

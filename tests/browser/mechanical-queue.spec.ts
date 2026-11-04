@@ -25,6 +25,12 @@ async function prepare(page: Page, sameNames = false) {
   await expect(page.getByRole('button', { name: '代码整理', exact: true })).toBeEnabled()
 }
 
+async function openCodeReport(page: Page) {
+  await page.getByRole('button', { name: '查看整理报告', exact: true }).click()
+  const report = page.getByRole('dialog', { name: '世界资产整理报告', exact: true })
+  await report.getByRole('tab', { name: '代码整理', exact: true }).click()
+  return report
+}
 const candidate = (page: Page, name: string, kind = '人物') => page.getByRole('region', { name: '代码整理候选', exact: true }).getByRole('button', { name: new RegExp(`^${kind} · ${name}(?:、.*?)? · 2 条$`) })
 async function add(page: Page, name: string, kind = '人物') {
   await candidate(page, name, kind).click()
@@ -51,10 +57,14 @@ test('逐组确认后统一顺序合并，草稿与预览选择保留，刷新�
   await page.getByRole('button', { name: '完成预览', exact: true }).click()
   await page.getByRole('button', { name: '加入待合并', exact: true }).click()
   await add(page, '顾衡'); await add(page, '客栈', '地点')
-  const queue = page.getByRole('region', { name: '待合并队列', exact: true })
+  await expect(world).not.toContainText('待处理 3 组')
+  await expect(page.getByRole('region', { name: '待合并队列', exact: true })).toHaveCount(0)
+  const queue = await openCodeReport(page)
+  await expect(page.getByRole('tab', { name: 'AI整理', exact: true })).toBeVisible()
   await expect(queue).toContainText('待处理 3 组')
   await queue.locator('li').filter({ hasText: '人物 · 顾衡' }).getByRole('button', { name: '移除待办', exact: true }).click()
   await expect(queue).toContainText('待处理 2 组')
+  await page.getByRole('button', { name: '关闭报告', exact: true }).click()
   await add(page, '顾衡')
   await expect(page.getByRole('button', { name: /^人物 6$/ })).toBeVisible()
   await page.reload()
@@ -67,9 +77,8 @@ test('逐组确认后统一顺序合并，草稿与预览选择保留，刷新�
   await expect(page.getByRole('button', { name: /^地点 1$/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /^编辑 陆川/ })).toHaveCount(2)
   await expect(page.getByRole('button', { name: '编辑 沈青', exact: true })).toContainText('A2')
-  await page.getByRole('button', { name: '查看整理报告', exact: true }).click()
-  const report = page.getByRole('dialog', { name: '世界资产整理报告', exact: true })
-  await expect(report).toContainText('代码整理无模型调用')
+  const report = await openCodeReport(page)
+  await expect(report).toContainText('代码整理不调用模型')
   await expect(report).toContainText('合并 3 组 · 减少 3 条')
   await page.getByRole('button', { name: '关闭报告', exact: true }).click()
   await page.setViewportSize({ width: 375, height: 812 })
@@ -89,7 +98,7 @@ test('成员变化的一组留待重核，其他组继续，重新确认后仅�
   await page.getByRole('button', { name: '一键机械合并（2组）', exact: true }).click()
   const world = page.getByRole('region', { name: '世界资产整理', exact: true })
   await expect(world).toContainText('成功 1 组，失败 1 组，待处理 0 组', { timeout: 20000 })
-  const queue = page.getByRole('region', { name: '待合并队列', exact: true })
+  const queue = await openCodeReport(page)
   await expect(queue).toContainText('成员内容已变化或删除')
   await queue.getByRole('button', { name: '重新核对', exact: true }).click()
   await expect(world.locator('.world-selection')).toContainText('人工补充的新身份')
@@ -123,7 +132,8 @@ test('待合并队列可从Edge备份到Firefox，恢复副本执行且原书保
     await expect(other.getByRole('button', { name: /^人物 4$/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^人物 6$/ })).toBeVisible()
     await other.reload()
-    await expect(other.getByRole('region', { name: '待合并队列', exact: true })).toContainText('已合并 2 组')
+    const report = await openCodeReport(other)
+    await expect(report).toContainText('已合并 2 组')
   } finally { await browser.close() }
 })
 
@@ -172,7 +182,9 @@ test('42组同名自动合并结束后恢复所有操作入口并能立即保存
   await page.reload()
   await page.getByRole('button', { name: '代码整理', exact: true }).click()
   await expect(page.getByRole('region', { name: '世界资产整理', exact: true })).toContainText('同名自动合并 42 组', { timeout: 30000 })
-  await expect(page.getByRole('region', { name: '待合并队列', exact: true })).toContainText('待处理 0 组 · 已合并 42 组 · 失败 0 组')
+  const report = await openCodeReport(page)
+  await expect(report).toContainText('待处理 0 组 · 已合并 42 组 · 失败 0 组')
+  await page.getByRole('button', { name: '关闭报告', exact: true }).click()
   await expect(page.getByRole('button', { name: '代码整理', exact: true })).toBeEnabled()
   await expect(page.getByRole('button', { name: 'AI整理', exact: true })).toBeEnabled()
   await expect(page.getByRole('button', { name: '新增人物', exact: true })).toBeEnabled()

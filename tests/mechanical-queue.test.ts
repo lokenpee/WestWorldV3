@@ -264,6 +264,19 @@ it('恢复副本保留已经失效的人工确认，不把旧确认套用到变�
   } finally { importer.close() }
 })
 
+it('代码整理每次保存候选摘要报告并更新报告编号', async () => {
+  const { service, db } = await setup()
+  await db.table('characters').bulkPut([{ id: 'D1', bookId: 'a', name: '张三', identity: '', revision: 1, confidence: 1, createdBy: 'P1' }, { id: 'D2', bookId: 'a', name: '张三丰', identity: '', revision: 1, confidence: 1, createdBy: 'P1' }])
+  await service.organize('a')
+  const scans = (await service.reports('a')).filter(run => run.phase === 'mechanical')
+  expect(scans).toHaveLength(1)
+  expect(scans[0].report.skipped.join('\n')).toContain('人物候选：张三（D1）、张三丰（D2）')
+  expect(scans[0].report.skipped.join('\n')).toContain('主名包含')
+  expect(service.state('a')?.reportId).toBe(scans[0].id)
+  await service.organize('a')
+  expect((await service.reports('a')).filter(run => run.phase === 'mechanical')).toHaveLength(2)
+})
+
 it('代码整理自动处理所有完整同名组，名称不同仍留候选，自动规则有记录且不调用模型', async () => {
   const { service, db, validate, agent, generate } = await setup()
   await db.table('characters').bulkPut([{ id: 'D1', bookId: 'a', name: '张三', identity: '', revision: 1, confidence: 1, createdBy: 'P1' }, { id: 'D2', bookId: 'a', name: '张三丰', identity: '', revision: 1, confidence: 1, createdBy: 'P1' }])
@@ -351,8 +364,9 @@ it('完整主名自动组不采用包含、别名或去后缀规则，别名剪�
   for (let index = 0; index < 40; index++) {
     const left = person('a', `person-${index}-aaaaaaaaaa`, Array.from({ length: index % 7 }, (_, i) => `alias-${index}-${i}`))
     const right = person('b', `person-${index}-${index % 2 ? 'zzzzzzzzzz' : 'aaaaaaaaba'}`, Array.from({ length: index % 5 }, (_, i) => `alias-${index}-${i}`))
-    expect(findCandidates('character', [left, right]).length > 0).toBe(aliasScore(characterMatchNames(left), characterMatchNames(right)) > 0.9)
+    if (aliasScore(characterMatchNames(left), characterMatchNames(right)) > 0.9) expect(findCandidates('character', [left, right]).length > 0).toBe(true)
   }
+  expect(findCandidates('character', [person('x', '完全无关甲', ['别名一']), person('y', '另外一个乙', ['别名二'])]).length).toBe(0)
 })
 
 it('候选扫描仅读取人物地点，不读取节点或整张任务历史', async () => {

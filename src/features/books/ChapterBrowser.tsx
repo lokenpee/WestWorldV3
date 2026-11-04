@@ -20,9 +20,17 @@ export function ChapterBrowser({ bookId, repository, extraction }: { bookId: str
   const progress = useLiveResult(progressQuery)
   const saved = progress.status === 'ready' ? progress.value : undefined
   const busy = extraction?.state(bookId)?.running || saved?.busy
+  const pending = saved?.reExtract
   const labels: Record<ExtractionStepStatus, string> = { pending: '待提取', running: '提取中', completed: '成功', failed: '失败 ↻', interrupted: '中断 ↻' }
   const [selected, setSelected] = useState<Chapter>()
   const [attempt, setAttempt] = useState(0)
+  const [actionError, setActionError] = useState('')
+  async function reExtractStep(chapterIndex: string, step: (typeof substeps)[number]) {
+    if (!extraction) return
+    setActionError('')
+    try { await extraction.reExtract(bookId, { scope: 'chapter', chapterIndex, step }) }
+    catch (error) { setActionError(error instanceof Error ? error.message : '重新提取失败。') }
+  }
   const query = useCallback(() => repository.listChapters(bookId), [repository, bookId])
   const chapters = useLiveResult(query, attempt)
   if (chapters.status === 'loading') return <p role="status" className="muted">正在读取章节列表…</p>
@@ -34,10 +42,14 @@ export function ChapterBrowser({ bookId, repository, extraction }: { bookId: str
         const state = result?.status ?? 'pending'
         const label = step === 'worldAssets' ? '世界资产' : '叙事资产'
         const retryable = state === 'failed' || state === 'interrupted'
-        return <button key={step} type="button" className={`chapter-step ${state}`} disabled={!!busy || !retryable || progress.status !== 'ready'} aria-label={`第${chapter.chapterIndex}章 ${label}：${labels[state]}${retryable ? '，点击重试' : ''}`} title={result?.message ? `${result.message}${retryable ? '；点击重新提取此项' : ''}` : `${label}：${labels[state]}`} onClick={() => void extraction.retry(bookId, chapter.chapterIndex, step)}>{label}<span>{labels[state]}</span></button>
+        return <span key={step} className="chapter-step-group">
+          <button type="button" className={`chapter-step ${state}`} disabled={!!busy || !!pending || !retryable || progress.status !== 'ready'} aria-label={`第${chapter.chapterIndex}章 ${label}：${labels[state]}${retryable ? '，点击重试' : ''}`} title={result?.message ? `${result.message}${retryable ? '；点击重新提取此项' : ''}` : `${label}：${labels[state]}`} onClick={() => void extraction.retry(bookId, chapter.chapterIndex, step)}>{label}<span>{labels[state]}</span></button>
+          {state === 'completed' && <button type="button" className="chapter-recycle" disabled={!!busy || !!pending || progress.status !== 'ready'} aria-label={`重新提取第${chapter.chapterIndex}章 ${label}`} title="清空本章该类资产并重新提取，不弹确认" onClick={() => void reExtractStep(chapter.chapterIndex, step)}>♻</button>}
+        </span>
       })}</div>}
       <span className="chapter-number">{chapter.chapterIndex}</span><button className="chapter-open" aria-label={`查看原文 ${chapter.chapterName}`} onClick={() => setSelected(chapter)}>{chapter.chapterName}</button><small>{chapter.charCount.toLocaleString('zh-CN')} 字符</small></li>)}</ol>}
     {extraction && progress.status === 'error' && <p role="alert">提取状态读取失败：{progress.message}</p>}
+    {actionError && <p role="alert">{actionError}</p>}
     <p className="muted chapter-help">点击章节名称查看完整原文。</p>
     {selected && <StoredText key={selected.chapterIndex} bookId={bookId} chapter={selected} repository={repository} onClose={() => setSelected(undefined)} />}
   </>

@@ -18,3 +18,5 @@
 .mechanical-queue li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); }
 .mechanical-queue li > div { flex: 1; min-width: 160px; overflow-wrap: anywhere; }
 .mechanical-queue strong, .mechanical-queue span, .mechanical-queue small { display: block; margin-bottom: 4px; }
+
+.report-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
