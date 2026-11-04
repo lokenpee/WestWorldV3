@@ -125,6 +125,9 @@ it.each([6, 7])('格式 %i 备份恢复与导出使用相同修复，保留编�
   files['data/pipelineRuns.json'] = strToU8('[]')
   manifest.formatVersion = version
   if (version === 6) { delete files['data/characterRelationEdits.json']; delete manifest.checksums['data/characterRelationEdits.json']; manifest.contents = manifest.contents.filter((name: string) => name !== 'characterRelationEdits') }
+  delete files['data/legacyRelationRecords.json']
+  delete manifest.checksums['data/legacyRelationRecords.json']
+  manifest.contents = manifest.contents.filter((name: string) => name !== 'legacyRelationRecords')
   for (const name of ['data/characterRelations.json', 'data/pipelineRuns.json']) manifest.checksums[name] = await checksumOf(files[name])
   files['manifest.json'] = strToU8(JSON.stringify(manifest))
   const inspected = await inspectBackup(zipSync(files))

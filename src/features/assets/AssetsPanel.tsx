@@ -8,6 +8,7 @@ import { setLeaveGuard } from './leaveGuard'
 import './AssetsPanel.css'
 import { MergeDialog } from './MergeDialog'
 import { MergeHistory } from './MergeHistory'
+import { LegacyRelationReport } from './LegacyRelationReport'
 import { EventNetwork } from '../network/EventNetwork'
 import { CharacterNetwork } from '../character-network/CharacterNetwork'
 import { searchAssets, searchCharacters } from './search'
@@ -89,6 +90,7 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange }:
       {worldKind && !mergeMode && characterView !== 'network' && <button className="secondary-button" disabled={locked} onClick={() => navigate(() => { setMergeMode(true); setMergeIds([]); setSelection(undefined); setMergeMessage('') })}>手动合并</button>}
       {mergeMode && <><span>已选 {mergeIds.length} 项{hidden ? `（含隐藏 ${hidden} 项）` : ''}</span><button className="primary-button" disabled={locked || mergeIds.length < 2} onClick={() => setPreviewOpen(true)}>确定合并</button><button className="secondary-button" onClick={() => { setMergeMode(false); setMergeIds([]); setPreviewOpen(false) }}>退出合并</button>{missingIds.length > 0 && <button className="text-button" onClick={() => setMergeIds(ids => ids.filter(id => !missingIds.includes(id)))}>清除失效选择（{missingIds.length}）</button>}</>}
       {data.value.manualMerges.length > 0 && <button className="text-button" onClick={() => setHistoryOpen(true)}>合并记录（{data.value.manualMerges.length}）</button>}
+      <LegacyRelationReport bookId={bookId} service={service} />
     </div>
     {mergeMessage && <p className="merge-success" role="status">{mergeMessage}</p>}
     {locked && <p className="asset-warning" role="status">这类资产正在处理，任务结束后可新增或修改。</p>}

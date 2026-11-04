@@ -27,7 +27,7 @@ describe('人物工作台查询', () => {
 
   it('人物对按对方姓名和编号稳定分页，总数与并集一致', () => {
     const people = [person('A', '张三', '主要人物'), ...Array.from({ length: 100 }, (_, index) => person(`B${index}`, `张${index}`, 'NPC'))]
-    const pairs: CharacterPairResult[] = people.slice(1).map((row, index) => ({ pairKey: JSON.stringify(['A', row.id].sort()), fromId: 'A', toId: row.id, forwardLabels: ['朋友'], reverseLabels: ['朋友'], state: 'active', editRevision: 0, fingerprint: `F${index}`, evidence: [], sourceRelationIds: [], directionUnclear: false, endpointRevisions: {} }))
+    const pairs: CharacterPairResult[] = people.slice(1).map((row, index) => ({ pairKey: JSON.stringify(['A', row.id].sort()), fromId: 'A', toId: row.id, forwardLabels: ['朋友'], reverseLabels: ['朋友'], state: 'active', editRevision: 0, fingerprint: `F${index}`, evidence: [], sourceRelationIds: [], legacyRecordIds: [], directionUnclear: false, endpointRevisions: {} }))
     const collected: string[] = []
     let offset: number | null = 0
     while (offset !== null) { const page = paginateCharacterPairs(pairs, people, 'A', offset, 50); collected.push(...page.items.map(row => row.toId)); offset = page.nextOffset }

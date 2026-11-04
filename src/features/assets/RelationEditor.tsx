@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import type { AssetService, RelationPairInput } from './service'
 import { searchCharacters } from './search'
 import { pairFromPerspective } from './relations'
-import type { AssetSnapshot, Character, CharacterPairResult, RelationEvidence } from './types'
+import type { AssetSnapshot, Character, CharacterPairResult, LegacyRelationRecord, RelationEvidence } from './types'
 
 interface LabelEditorProps { labels: string[]; onChange: (labels: string[]) => void; placeholder: string }
 function LabelEditor({ labels, onChange, placeholder }: LabelEditorProps) {
@@ -21,6 +21,7 @@ export const RelationEditor = forwardRef<RelationEditorHandle, {
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const generation = useRef(0)
   const [deletePair, setDeletePair] = useState<CharacterPairResult>()
+  const [legacyView, setLegacyView] = useState<{ pair: CharacterPairResult; items: LegacyRelationRecord[]; total: number; offset: number; nextOffset: number | null }>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const pageSize = 50
@@ -84,6 +85,14 @@ export const RelationEditor = forwardRef<RelationEditorHandle, {
     finally { setBusy(false) }
   }
 
+  async function showLegacy(pair: CharacterPairResult, offset = 0) {
+    if (!pair.legacyRecordIds.length) return
+    try {
+      const page = await service.readLegacyRelations(bookId, { ids: pair.legacyRecordIds, offset, limit: 50 })
+      setLegacyView({ pair, ...page })
+    } catch (error) { setMessage(error instanceof Error ? error.message : '读取旧关系依据失败。') }
+  }
+
   return <section className="relation-manager" aria-label="人物关系">
     <div className="relation-manager-head"><h4>人物关系</h4><button type="button" className="secondary-button" disabled={locked || busy} onClick={() => void begin()}>添加关系</button></div>
     {message && <p role="status" className="field-help">{message}</p>}
@@ -93,8 +102,8 @@ export const RelationEditor = forwardRef<RelationEditorHandle, {
         const person = other(pair.toId)
         return <li key={pair.pairKey} className="relation-pair">
           <div className="relation-pair-title"><strong>{person?.name ?? pair.toId}</strong><small>{person?.identity ? `${person.identity} · ` : ''}{pair.toId}</small></div>
-          <div className="relation-pair-labels"><span>→ 对方：{pair.forwardLabels.join('、') || '（空）'}</span><span>← 对方：{pair.reverseLabels.join('、') || '（空）'}</span>{pair.directionUnclear && <span>方向未明确</span>}</div>
-          <div className="relation-pair-actions"><button type="button" className="text-button" disabled={locked || busy} onClick={() => void begin(pair.toId)}>编辑</button><button type="button" className="text-button" disabled={locked || busy} onClick={() => setDeletePair(pair)}>删除</button></div>
+          <div className="relation-pair-labels"><span>→ 对方：{pair.forwardLabels.join('、') || '（空）'}</span><span>← 对方：{pair.reverseLabels.join('、') || '（空）'}</span>{pair.directionUnclear && <span>方向待核对</span>}{pair.legacyRecordIds.length > 0 && <span>由旧资料迁移 · {pair.legacyRecordIds.length} 条依据</span>}</div>
+          <div className="relation-pair-actions"><button type="button" className="text-button" disabled={locked || busy} onClick={() => void begin(pair.toId)}>编辑</button>{pair.legacyRecordIds.length > 0 && <button type="button" className="text-button" onClick={() => void showLegacy(pair)}>旧关系依据（{pair.legacyRecordIds.length}）</button>}<button type="button" className="text-button" disabled={locked || busy} onClick={() => setDeletePair(pair)}>删除</button></div>
         </li>
       })}
     </ul>
@@ -135,6 +144,14 @@ export const RelationEditor = forwardRef<RelationEditorHandle, {
     </section></div>}
 
     {confirmDiscard && <div className="relation-dialog-backdrop"><section role="alertdialog" aria-modal="true" aria-label="放弃关系修改" className="relation-dialog"><h4>放弃未保存的关系修改？</h4><div className="editor-actions"><button type="button" className="danger-button" onClick={discard}>放弃修改</button><button type="button" className="secondary-button" onClick={() => setConfirmDiscard(false)}>继续编辑</button></div></section></div>}
+
+    {legacyView && <div className="relation-dialog-backdrop"><section role="dialog" aria-modal="true" aria-label="旧关系依据" className="relation-dialog">
+      <h4>旧关系依据</h4>
+      <p className="field-help">迁移时完整保留的原始记录，只读；当前关系以人物对结果为准。共 {legacyView.total} 条。</p>
+      <ul className="relation-pair-list">{legacyView.items.map(record => <li key={record.id} className="relation-pair"><div className="relation-pair-title"><strong>{record.id}</strong><small>{record.disposition === 'converted' ? '已投影' : record.disposition === 'excluded' ? '已排除' : '待核对'} · 原确认来源：{String((record.original as { verification?: unknown }).verification ?? '未知')}</small></div><p className="field-help">原标签：{String((record.original as { label?: unknown }).label ?? '（空）')}{record.issues.length ? ` · ${record.issues.join('、')}` : ''}</p><details><summary>原始记录</summary><pre>{JSON.stringify(record.original, null, 2)}</pre></details></li>)}</ul>
+      {(legacyView.nextOffset !== null || legacyView.offset > 0) && <div className="editor-actions">{legacyView.offset > 0 && <button type="button" className="secondary-button" onClick={() => void showLegacy(legacyView.pair, Math.max(0, legacyView.offset - 50))}>上一页</button>}{legacyView.nextOffset !== null && <button type="button" className="secondary-button" onClick={() => void showLegacy(legacyView.pair, legacyView.nextOffset!)}>下一页</button>}</div>}
+      <div className="editor-actions"><button type="button" className="secondary-button" onClick={() => setLegacyView(undefined)}>关闭</button></div>
+    </section></div>}
 
     {deletePair && <div className="relation-dialog-backdrop"><section role="alertdialog" aria-modal="true" aria-label="删除人物关系" className="relation-dialog">
       <h4>删除整组关系？</h4>

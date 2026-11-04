@@ -83,7 +83,7 @@ describe('阶段 1：真实数据仓储契约', () => {
     const fresh = workspace.openBook('a')
     opened.push(fresh)
     await fresh.open()
-    expect(fresh.tables).toHaveLength(17)
+    expect(fresh.tables).toHaveLength(18)
     const legacy = new Dexie(`${workspace.scope.bookPrefix}b`)
     legacy.version(4).stores({ characters: 'id', characterSnapshots: 'id' })
     await legacy.table('characterSnapshots').put({ id: 'keep-me', name: '旧资料' })

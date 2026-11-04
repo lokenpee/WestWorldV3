@@ -25,7 +25,7 @@ it('生成2000人物10000人物对的可导入验收包，数据完整且分页�
   }
   expect(connected.size).toBe(1899)
   const exported = await encodeBackup(data)
-  expect(exported.manifest.formatVersion).toBe(7)
+  expect(exported.manifest.formatVersion).toBe(8)
   const folder = join(tmpdir(), 'westworld-acceptance')
   mkdirSync(folder, { recursive: true })
   const path = join(folder, exported.fileName)

@@ -72,7 +72,8 @@ export interface CharacterRelationEdit {
   directionUnclear: boolean
   evidence: RelationEvidence[]
   sourceRelationIds: string[]
-  revision: number; updatedAt: string; updatedBy: 'manual' | 'agent'; commitId: string
+  legacyRecordIds?: string[]
+  revision: number; updatedAt: string; updatedBy: 'manual' | 'agent' | 'migration'; commitId: string
 }
 /** 人物对的当前有效结果，由原始事实叠加编辑结果生成。 */
 export interface CharacterPairResult {
@@ -80,9 +81,20 @@ export interface CharacterPairResult {
   forwardLabels: string[]; reverseLabels: string[]
   state: 'active' | 'deleted' | 'absent'
   editRevision: number; fingerprint: string
-  evidence: RelationEvidence[]; sourceRelationIds: string[]
+  evidence: RelationEvidence[]; sourceRelationIds: string[]; legacyRecordIds: string[]
   directionUnclear: boolean
   endpointRevisions: Record<string, number>
+}
+export type LegacyRelationDisposition = 'converted' | 'unresolved' | 'excluded'
+/** 迁移时完整保留的历史 left/right 关系行，只读追溯，不参与业务编辑。 */
+export interface LegacyRelationRecord {
+  id: string; bookId: string; schema: 'legacy-left-right-v1'
+  original: Record<string, unknown>
+  disposition: LegacyRelationDisposition
+  pairKeys: string[]
+  issues: string[]
+  migrationVersion: 1
+  migratedAt: string
 }
 export interface AssetFieldChange { field: string; before: unknown; after: unknown }
 export interface AssetEditRecord {

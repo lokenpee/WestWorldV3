@@ -7,9 +7,10 @@ import { storyContent } from '../story/coverage'
 import { searchStoryContext } from '../story/retrieval'
 import type { Character, CharacterRelation, CharacterRelationEdit, Lifecycle } from '../assets/types'
 
-export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[] }
+export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations' }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
+const canonicalCursor = (value: unknown) => JSON.stringify(Array.isArray(value) ? value.map(String) : [])
 const within = (index: string, range: string[]) => !range.length || index.localeCompare(range[0], undefined, { numeric: true }) >= 0 && index.localeCompare(range[1], undefined, { numeric: true }) <= 0
 export async function noteFingerprint(store: AgentStore, note: Row) {
   const nodes = await Promise.all(strings(note.nodeIds).map(id => store.get('nodes', id)))
@@ -172,11 +173,66 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     const pairs = effectivePairs(syncRelations(relations, normalized, lifecycle).relations, edits, normalized)
     return { data: pairFromPerspective(pairs, fromId, toId, normalized) }
   }
+  if (name === 'get_legacy_relation_records') {
+    const ids = strings(args.ids)
+    if (!ids.length || ids.length > 50 || new Set(ids).size !== ids.length) throw new Error('INVALID_ARGS:旧关系编号须为1–50个不重复编号。')
+    const all = await scopedRows(store, scope, 'legacyRelationRecords')
+    const selected = ids.map(id => all.find(row => row.id === id))
+    if (selected.some(row => !row)) throw new Error(`NOT_FOUND:旧关系记录不存在：${ids.filter((_, index) => !selected[index]).join('、')}`)
+    const rows = selected as Row[]
+    const fingerprint = await store.wait(hash(rows))
+    const limit = Math.min(Math.max(Number(args.limit ?? 20), 1), 50)
+    let index = 0, offset = 0
+    if (args.cursor !== undefined && args.cursor !== null) {
+      if (typeof args.cursor !== 'string') throw new Error('INVALID_ARGS:续读游标格式不正确。')
+      let cursor: { ids?: unknown; index?: unknown; offset?: unknown; fingerprint?: unknown }
+      try { cursor = JSON.parse(args.cursor) } catch { throw new Error('INVALID_ARGS:续读游标无法解析。') }
+      if (canonicalCursor(cursor.ids) !== canonicalCursor(ids) || cursor.fingerprint !== fingerprint) throw new Error('CONFLICT:续读需求或旧关系记录已变化，请重新读取。')
+      if (!Number.isSafeInteger(cursor.index) || !Number.isSafeInteger(cursor.offset) || Number(cursor.index) < 0 || Number(cursor.offset) < 0) throw new Error('INVALID_ARGS:续读游标位置无效。')
+      index = Number(cursor.index); offset = Number(cursor.offset)
+      if (index >= rows.length) throw new Error('INVALID_ARGS:续读游标已超出记录范围。')
+    }
+    const data: Row[] = []
+    let next: { ids: string[]; index: number; offset: number; fingerprint: string } | null = null
+    const stable = (value: unknown): string => Array.isArray(value) ? `[${value.map(stable).join(',')}]` : value && typeof value === 'object'
+      ? `{${Object.entries(value).sort(([a], [b]) => compare(a, b)).map(([key, item]) => `${JSON.stringify(key)}:${stable(item)}`).join(',')}}`
+      : JSON.stringify(value)
+    while (index < rows.length) {
+      const row = rows[index]
+      const meta = { id: text(row.id), disposition: text(row.disposition), pairKeys: strings(row.pairKeys), issues: strings(row.issues) }
+      if (offset === 0) {
+        const whole = { ...meta, original: row.original, fragment: null }
+        if (bytes(whole) <= 24000 && bytes({ data: [...data, whole] }) <= 60000) {
+          data.push(whole); index++
+          if (data.length >= limit && index < rows.length) { next = { ids, index, offset: 0, fingerprint }; break }
+          continue
+        }
+      }
+      const serialized = stable(row.original)
+      if (offset >= serialized.length) { index++; offset = 0; continue }
+      let size = Math.min(16000, serialized.length - offset)
+      let textPart = serialized.slice(offset, offset + size)
+      while (textPart.length > 1 && /[\uD800-\uDBFF]$/.test(textPart)) textPart = textPart.slice(0, -1)
+      while (true) {
+        const item = { ...meta, original: null, fragment: { offset, text: textPart, totalLength: serialized.length } }
+        if (bytes({ data: [...data, item] }) <= 60000 || !data.length) { data.push(item); break }
+        if (textPart.length <= 1) { next = { ids, index, offset, fingerprint }; break }
+        textPart = textPart.slice(0, Math.max(1, Math.floor(textPart.length * 0.8)))
+        while (textPart.length > 1 && /[\uD800-\uDBFF]$/.test(textPart)) textPart = textPart.slice(0, -1)
+      }
+      if (next) break
+      const end = offset + textPart.length
+      if (end < serialized.length) { next = { ids, index, offset: end, fingerprint }; break }
+      index++; offset = 0
+      if (data.length >= limit && index < rows.length) { next = { ids, index, offset: 0, fingerprint }; break }
+    }
+    return { data, nextCursor: next ? JSON.stringify(next) : null, fingerprint }
+  }
   const table = name.includes('character') ? 'characters' : name.includes('location') ? 'locations' : name.includes('event_line') ? 'eventLines' : 'nodes'
   const detail = name.startsWith('get_')
   if (detail && args.include_facts && (scope.profile !== 'asset_editor' || scope.phase !== 'optimize')) throw new Error('INVALID_ARGS:事实底稿仅供世界资产整编读取。')
   if (detail) {
-    let characterRelations: { people: Character[]; rows: CharacterRelation[]; view: ReturnType<typeof pairView>; unresolved: ReturnType<typeof relationView>['unresolved'] } | undefined
+    let characterRelations: { people: Character[]; rows: CharacterRelation[]; view: ReturnType<typeof pairView>; unresolved: ReturnType<typeof relationView>['unresolved']; pairs: ReturnType<typeof effectivePairs> } | undefined
     if (table === 'characters') {
       const people = (await scopedRows(store, scope, 'characters')) as unknown as Character[]
       const lifecycle = (await scopedRows(store, scope, 'assetLifecycle')) as unknown as Lifecycle[]
@@ -188,7 +244,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
       const types = new Map(synced.map(relation => [relation.id, relation.relationType]))
       const view = pairView(pairs, normalized)
       view.edges = view.edges.map(edge => ({ ...edge, types: [...new Set(edge.relationIds.flatMap(id => types.get(id) ?? []))] }))
-      characterRelations = { people: normalized, rows: synced, view, unresolved: relationView(synced, normalized).unresolved }
+      characterRelations = { people: normalized, rows: synced, view, unresolved: relationView(synced, normalized).unresolved, pairs }
     }
     const rows: Row[] = []; const missing: string[] = []
     for (const id of strings(args.ids)) {
@@ -201,6 +257,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
         row.relations = projection.relations
         row.relationEdges = edgesFor(characterRelations.view.edges, text(row.id))
         row.unresolvedRelations = projection.unresolvedRelations
+        row.legacyRelationIds = [...new Set(characterRelations.pairs.filter(pair => pair.fromId === row.id || pair.toId === row.id).flatMap(pair => pair.legacyRecordIds))]
       }
       if (table === 'nodes') row.characterReferences = await references(store, scope, [...strings(row.actors), ...strings(row.targets)], [...strings(row.actorIds), ...strings(row.targetCharacterIds)])
       if (table === 'eventLines') {

@@ -4365,7 +4365,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "e3eaa5de09ad01d9f99abca52fcd803b4ddbe4766da736dca3c042ebae742a27"
+      "sha256": "afaccb6645370280174a3c330b967f3e510936eff7cb1479a9381c90f5ffa332"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4373,7 +4373,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "8d2acec791ebd3da3b2356c4afea08f2a83e9fd13c01045db4c680870c9bc4bf"
+      "sha256": "3e694a0629c7d2ac3dad6e7c093c3c0ba2470fc9a2db97799e6f92fae9d654d8"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4381,7 +4381,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "cc50b6546785cd8418d4c4aad926616d316d64ae620f20eef3bcf0ef15bbe467"
+      "sha256": "b780fa4b4244fd6e73e1cd3436cbd4a1e321a326796a776cef02f5e9d7b186f0"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",
@@ -4390,6 +4390,14 @@
         "src/features/world/assetReview.ts"
       ],
       "sha256": "bca397526e9b9a204ba9ce485e19a6e16ca1743d0e44bd4685276e0e1fb9e7dc"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-relation-review.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/assetReview.ts"
+      ],
+      "sha256": "fff0b1f0e1850ea0db7d7bdef4e4683ffc67e1df8e8b850938c9f62b273b464e"
     }
   ],
   "decisions": [

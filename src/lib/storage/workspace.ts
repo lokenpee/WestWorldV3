@@ -1,8 +1,10 @@
 import Dexie, { type Table } from 'dexie'
 import { migrateCharacterRelations, migrateNodeBindings } from '../../features/assets/migrate'
-import type { Character, EventNode, Lifecycle } from '../../features/assets/types'
+import type { Character, CharacterRelationEdit, EventNode, LegacyRelationRecord, Lifecycle } from '../../features/assets/types'
 import { dexieMergeStore } from '../../features/assets/mergeCore'
 import { repairRelationBindings } from '../../features/assets/repair'
+import { convertLegacyRelations } from '../../features/assets/legacyRelations'
+import { invalidateAssetProgress } from '../../features/assets/invalidate'
 
 export interface Book {
   id: string
@@ -99,6 +101,62 @@ class BookDatabase extends Dexie {
     })
     this.version(7).stores({
       characterRelationEdits: 'pairKey, aId, bId, state',
+    })
+    this.version(8).stores({
+      chapters: 'chapterIndex, order',
+      chapterTexts: 'chapterIndex',
+      characters: 'id, chapterIndex, name',
+      locations: 'id, chapterIndex, name',
+      nodes: 'id, chapterIndex, order',
+      eventLines: 'id, lineStatus',
+      compileProgress: 'stage',
+      storyEditorMemory: 'id, sessionId',
+      storyEditorNotes: 'id, &[sessionId+key], sessionId, kind, status, updatedAt',
+      storyEditorCheckpoints: 'id, sessionId, stage, phase, status, updatedAt',
+      storySessions: 'id, status, createdAt, parentSessionId',
+      storySessionEntries: 'id, &[sessionId+ordinal], sessionId, parentId, type',
+      extractionReceipts: 'key, chapterIndex, substep',
+      assetLifecycle: 'key, kind, originId, currentId, state',
+      pipelineRuns: 'id, recordType, stage, status, startedAt, &lockKey',
+      characterRelations: 'id, bookId, originCharacterId, sourceId, targetName, *targetIds',
+      characterRelationEdits: 'pairKey, aId, bId, state',
+      legacyRelationRecords: 'id, bookId, disposition',
+    }).upgrade(async transaction => {
+      const runs = await transaction.table('pipelineRuns').toArray()
+      const active = runs.find(row => row.recordType === 'lease' && (row.expiresAt === undefined || Number(row.expiresAt) > Date.now()))
+      if (active) throw new Error(`本书任务正在运行（${active.lockKey === 'narrative' ? '叙事整理' : active.lockKey === 'extraction' ? '逐章提取' : '世界资产整理'}），请先暂停任务再打开书籍。`)
+      const characters = await transaction.table('characters').toArray() as unknown as Character[]
+      const lifecycle = await transaction.table('assetLifecycle').toArray() as unknown as Lifecycle[]
+      const relations = await transaction.table('characterRelations').toArray()
+      const edits = await transaction.table('characterRelationEdits').toArray() as unknown as CharacterRelationEdit[]
+      const chapterTexts = await transaction.table('chapterTexts').toArray() as unknown as { chapterIndex: string; text: string }[]
+      const nodes = await transaction.table('nodes').toArray() as unknown as EventNode[]
+      const timestamp = new Date().toISOString()
+      const migrationId = `legacy-migration:${crypto.randomUUID()}`
+      const converted = convertLegacyRelations({ bookId, relations, characters, lifecycle, edits, chapterTexts, timestamp, migrationId })
+      if (converted.report) {
+        await transaction.table('characterRelations').clear()
+        if (converted.relations.length) await transaction.table('characterRelations').bulkPut(converted.relations as unknown as Record<string, unknown>[])
+        await transaction.table('legacyRelationRecords').bulkPut(converted.legacyRecords as unknown as LegacyRelationRecord[])
+        await transaction.table('characterRelationEdits').bulkPut(converted.edits as unknown as Record<string, unknown>[])
+        await transaction.table('pipelineRuns').put({
+          id: migrationId, bookId, recordType: 'asset_edit', stage: 'asset_edit', status: 'completed',
+          startedAt: timestamp, finishedAt: timestamp, planVersion: '2.2', result: converted.report,
+        })
+        await invalidateAssetProgress({
+          rows: async table => table === 'pipelineRuns' ? await transaction.table('pipelineRuns').toArray() : await transaction.table(table).toArray(),
+          get: async (table, id) => transaction.table(table).get(id),
+          put: async (table, row) => { await transaction.table(table).put(row) },
+          remove: async (table, id) => { await transaction.table(table).delete(id) },
+        }, converted.report.affectedIds.map(id => ({ kind: 'character' as const, id })), timestamp, runs)
+      }
+      // 历史节点若还没有绑定来源，先补齐再交给 ready 修复。
+      for (const [index, node] of nodes.entries()) {
+        if (node.actorBindings !== undefined) continue
+        const next = migrateNodeBindings([node], characters)[0]
+        if (JSON.stringify(next) === JSON.stringify(nodes[index])) continue
+        await transaction.table('nodes').put({ ...next, revision: Number(node.revision ?? 1) + 1 })
+      }
     })
     this.on('ready', () => this.transaction('rw', this.tables, async () => {
       await repairRelationBindings(dexieMergeStore(this), bookId)

@@ -5096,7 +5096,8 @@
               "pairKey",
               "state",
               "editRevision",
-              "fingerprint"
+              "fingerprint",
+              "legacyRecordIds"
             ],
             "properties": {
               "pairKey": {
@@ -5115,6 +5116,12 @@
               },
               "fingerprint": {
                 "type": "string"
+              },
+              "legacyRecordIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -5190,7 +5197,8 @@
               "pairKey",
               "state",
               "editRevision",
-              "fingerprint"
+              "fingerprint",
+              "legacyRecordIds"
             ],
             "properties": {
               "pairKey": {
@@ -5209,6 +5217,12 @@
               },
               "fingerprint": {
                 "type": "string"
+              },
+              "legacyRecordIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -5284,7 +5298,8 @@
               "pairKey",
               "state",
               "editRevision",
-              "fingerprint"
+              "fingerprint",
+              "legacyRecordIds"
             ],
             "properties": {
               "pairKey": {
@@ -5303,6 +5318,12 @@
               },
               "fingerprint": {
                 "type": "string"
+              },
+              "legacyRecordIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -5378,7 +5399,8 @@
               "pairKey",
               "state",
               "editRevision",
-              "fingerprint"
+              "fingerprint",
+              "legacyRecordIds"
             ],
             "properties": {
               "pairKey": {
@@ -5397,6 +5419,12 @@
               },
               "fingerprint": {
                 "type": "string"
+              },
+              "legacyRecordIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -5472,7 +5500,8 @@
               "pairKey",
               "state",
               "editRevision",
-              "fingerprint"
+              "fingerprint",
+              "legacyRecordIds"
             ],
             "properties": {
               "pairKey": {
@@ -5491,6 +5520,12 @@
               },
               "fingerprint": {
                 "type": "string"
+              },
+              "legacyRecordIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -5566,7 +5601,8 @@
               "pairKey",
               "state",
               "editRevision",
-              "fingerprint"
+              "fingerprint",
+              "legacyRecordIds"
             ],
             "properties": {
               "pairKey": {
@@ -5585,6 +5621,12 @@
               },
               "fingerprint": {
                 "type": "string"
+              },
+              "legacyRecordIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -5615,6 +5657,7 @@
               "fingerprint",
               "evidence",
               "sourceRelationIds",
+              "legacyRecordIds",
               "endpointRevisions"
             ],
             "properties": {
@@ -5658,7 +5701,6 @@
               },
               "evidence": {
                 "type": "array",
-                "minItems": 1,
                 "items": {
                   "additionalProperties": false,
                   "type": "object",
@@ -5684,6 +5726,12 @@
                   "type": "string"
                 }
               },
+              "legacyRecordIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "endpointRevisions": {
                 "type": "object",
                 "additionalProperties": {
@@ -5692,6 +5740,69 @@
               }
             }
           }
+        }
+      }
+    },
+    {
+      "name": "get_legacy_relation_records",
+      "success": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "data",
+          "nextCursor",
+          "fingerprint"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "disposition",
+                "pairKeys",
+                "issues",
+                "original",
+                "fragment"
+              ],
+              "properties": {
+                "id": { "type": "string" },
+                "disposition": { "enum": ["converted", "unresolved", "excluded"] },
+                "pairKeys": { "type": "array", "items": { "type": "string" } },
+                "issues": { "type": "array", "items": { "type": "string" } },
+                "original": {
+                  "anyOf": [
+                    { "type": "object" },
+                    { "type": "null" }
+                  ]
+                },
+                "fragment": {
+                  "anyOf": [
+                    { "type": "null" },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": ["offset", "text", "totalLength"],
+                      "properties": {
+                        "offset": { "type": "integer", "minimum": 0 },
+                        "text": { "type": "string" },
+                        "totalLength": { "type": "integer", "minimum": 0 }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "null" }
+            ]
+          },
+          "fingerprint": { "type": "string" }
         }
       }
     }

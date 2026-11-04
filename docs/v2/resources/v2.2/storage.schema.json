@@ -823,6 +823,28 @@
         "result": {
           "type": "object"
         },
+        "relationCoverage": {
+          "description": "历史版本关系覆盖记录；读取旧备份时原样保留。",
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "reviewScope": {
+          "enum": [
+            "all_assets",
+            "relations"
+          ]
+        },
+        "reviewMode": {
+          "enum": [
+            "sample",
+            "full"
+          ]
+        },
+        "relationReviewVersion": {
+          "const": 1
+        },
         "assetReview": {
           "type": "object",
           "additionalProperties": false,
@@ -5517,6 +5539,13 @@
             "type": "string"
           }
         },
+        "legacyRecordIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "revision": {
           "type": "integer",
           "minimum": 1
@@ -5527,12 +5556,70 @@
         "updatedBy": {
           "enum": [
             "manual",
-            "agent"
+            "agent",
+            "migration"
           ]
         },
         "commitId": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "LegacyRelationRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "bookId",
+        "schema",
+        "original",
+        "disposition",
+        "pairKeys",
+        "issues",
+        "migrationVersion",
+        "migratedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schema": {
+          "const": "legacy-left-right-v1"
+        },
+        "original": {
+          "type": "object"
+        },
+        "disposition": {
+          "enum": [
+            "converted",
+            "unresolved",
+            "excluded"
+          ]
+        },
+        "pairKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "migrationVersion": {
+          "const": 1
+        },
+        "migratedAt": {
+          "type": "string"
         }
       }
     },
@@ -5678,7 +5765,9 @@
                   "location",
                   "node",
                   "eventLine",
-                  "relation"
+                  "relation",
+                  "legacy_relation",
+                  "character_relation_scan"
                 ]
               },
               "id": {
@@ -5715,7 +5804,21 @@
           ]
         },
         "pageLimit": {
-          "const": 50
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "reviewScope": {
+          "enum": [
+            "all_assets",
+            "relations"
+          ]
+        },
+        "reviewMode": {
+          "enum": [
+            "sample",
+            "full"
+          ]
         }
       }
     },
@@ -5753,6 +5856,27 @@
         },
         "factFingerprint": {
           "type": "string"
+        },
+        "sourceFingerprint": {
+          "type": "string"
+        },
+        "evidenceReads": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "commitIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resolvedPairs": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
         },
         "status": {
           "enum": [

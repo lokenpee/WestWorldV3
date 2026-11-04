@@ -4,7 +4,7 @@ import type { AssetService } from '../assets/service'
 import type { Character, LocationAsset } from '../assets/types'
 import type { MergeRequest, WorldKind } from '../assets/merge'
 import { findCandidates, type Candidate } from './candidates'
-import { emptyReport, type WorldReport, type WorldRun } from './types'
+import { emptyReport, type WorldReport, type WorldRun, type ReviewMode, type ReviewScope } from './types'
 import { coverage, type Receipt } from '../extraction/recovery'
 import { createBookAgentRepository, type Row } from '../agents/repository'
 import { records, text } from '../agents/contracts'
@@ -62,11 +62,13 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     const automatic = await mechanical.mergeExactNames(bookId)
     return { ...automatic, candidates: await scan(bookId, automatic.merged === 0 && automatic.failed === 0) }
   }
-  async function start(bookId: string) {
+  async function start(bookId: string, startOptions: { reviewScope?: ReviewScope; reviewMode?: ReviewMode } = {}) {
     if (controllers.has(bookId) || mechanical.isRunning(bookId)) return
     const controller = new AbortController(); controllers.set(bookId, controller)
     const db = workspace.openBook(bookId); let runId: string = crypto.randomUUID(); const owner = crypto.randomUUID()
     let paused = false; let initialAgentUsage: Row | undefined
+    let reviewScope: ReviewScope = startOptions.reviewScope ?? 'all_assets'
+    let reviewMode: ReviewMode = startOptions.reviewMode ?? (reviewScope === 'relations' ? 'sample' : 'full')
     let acquired = false; let timer: ReturnType<typeof setInterval> | undefined
     set(bookId, { running: true, phase: '准备', processed: 0, total: 0, error: undefined, reportId: undefined, mode: 'ai' })
     const check = async () => {
@@ -90,18 +92,36 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         const now = new Date().toISOString()
         const previous = await db.table('compileProgress').get('P2')
         const existing = previous?.runId ? await db.table('pipelineRuns').get(previous.runId) : undefined
-        if (existing?.stage === 'P2' && ['ai', 'ai_identity', 'optimize', 'asset_review'].includes(existing.phase) && existing.status !== 'completed' && existing.report) {
+        const canResume = existing?.stage === 'P2' && ['ai', 'ai_identity', 'optimize', 'asset_review'].includes(existing.phase) && existing.status !== 'completed' && existing.report
+          && (!startOptions.reviewScope || (existing.reviewScope ?? 'all_assets') === startOptions.reviewScope)
+        if (canResume && existing) {
           runId = String(existing.id); initialAgentUsage = existing.usage
+          reviewScope = (existing.reviewScope as ReviewScope | undefined) ?? 'all_assets'
+          reviewMode = startOptions.reviewMode ?? (existing.reviewMode as ReviewMode | undefined) ?? (reviewScope === 'relations' ? 'sample' : 'full')
           const { finishedAt: _finishedAt, ...restored } = existing
-          await db.table('pipelineRuns').put({ ...restored, phase: 'ai_identity', status: 'running', report: { ...existing.report, status: 'running', failed: [] }, tasks: records(existing.tasks).map(task => task.status === 'running' ? { ...task, status: 'partial' } : task) })
-        } else await db.table('pipelineRuns').put({ id: runId, recordType: 'run', bookId, stage: 'P2', phase: 'ai_identity', status: 'running', startedAt: now, planVersion: '2.2', scope: 'fullBook', report: emptyReport(await counts(bookId)), tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent' })
+          await db.table('pipelineRuns').put({ ...restored, phase: reviewScope === 'relations' ? 'asset_review' : 'ai_identity', status: 'running', reviewScope, reviewMode, ...(reviewScope === 'relations' ? { relationReviewVersion: 1 } : {}), report: { ...existing.report, status: 'running', failed: [] }, tasks: records(existing.tasks).map(task => task.status === 'running' ? { ...task, status: 'partial' } : task) })
+        } else await db.table('pipelineRuns').put({ id: runId, recordType: 'run', bookId, stage: 'P2', phase: reviewScope === 'relations' ? 'asset_review' : 'ai_identity', status: 'running', startedAt: now, planVersion: '2.2', scope: 'fullBook', reviewScope, reviewMode, ...(reviewScope === 'relations' ? { relationReviewVersion: 1 } : {}), report: emptyReport(await counts(bookId)), tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent' })
         await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId, expiresAt: Date.now() + 30000 })
         await db.table('compileProgress').put({ bookId, stage: 'P2', status: 'running', runId, totalChapters: (await db.chapters.count()), completedChapters: [], failedChapters: [], updatedAt: now, scope: 'fullBook', planVersion: '2.2', unit: 'item', validity: 'current' })
       }); acquired = true
       timer = setInterval(() => { void db.transaction('rw', db.table('pipelineRuns'), async () => { const lease = await db.table('pipelineRuns').get('lease:world'); if (lease?.owner !== owner) throw new Error('执行权已变化'); await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 }) }).catch(() => controller.abort()) }, 8000)
+      const repo = createBookAgentRepository(workspace, bookId); const runtime = createAgentRuntime(models.agent)
+      if (reviewScope === 'relations') {
+        set(bookId, { phase: reviewMode === 'sample' ? '按原文核对人物关系（先10项）' : '按原文核对人物关系（全书）', processed: 0, total: 0 })
+        const review = await runAssetReview(repo, runId, {
+          owner, signal: controller.signal, models,
+          reviewScope, reviewMode,
+          onPhase: phase => set(bookId, { phase }),
+          onProgress: (processed, total) => set(bookId, { processed, total }),
+        })
+        if (review.deferred) {
+          paused = true
+          await addMessage('skipped', reviewMode === 'sample' ? `人物关系小批核对完成 ${review.checked}/${review.total} 项，等待用户确认后继续全书。` : `人物关系核对已完成 ${review.checked}/${review.total} 项，剩余项待继续。`)
+        }
+        return
+      }
       set(bookId, { phase: '核对自动合并与人工保留来源' })
       await repairAutomaticProtection(workspace, bookId, runId, owner)
-      const repo = createBookAgentRepository(workspace, bookId); const runtime = createAgentRuntime(models.agent)
       const initialQueue = await saveIdentityQueue(repo, runId, { owner, signal: controller.signal })
       const remaining = initialQueue.pending.map(row => text(row.workItemId))
       let scheduled: string[] = []
@@ -153,6 +173,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         set(bookId, { phase: '核对全部资产与人物关系', processed: 0, total: 0 })
         const review = await runAssetReview(repo, runId, {
           owner, signal: controller.signal, models,
+          reviewScope: 'all_assets', reviewMode: 'full',
           onPhase: phase => set(bookId, { phase }),
           onProgress: (processed, total) => set(bookId, { processed, total }),
         })
@@ -224,7 +245,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
       controllers.delete(bookId); set(bookId, { running: false })
     }
   }
-  return { scan, organize, confirm, start, mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
+  return { scan, organize, confirm, start, continueRelations: (bookId: string) => start(bookId, { reviewScope: 'relations', reviewMode: 'full' }), mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
 }
 export type WorldService = ReturnType<typeof createWorldService>
 export type { Candidate }

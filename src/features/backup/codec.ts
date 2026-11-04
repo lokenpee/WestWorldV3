@@ -1,6 +1,9 @@
 import { strFromU8, strToU8, unzipSync, zip, type Zippable } from 'fflate'
 import type { Book } from '../../lib/storage/workspace'
 import { chapterFileName, emptyTables, migrateLegacy, migrateRelationsData, pauseBookData, repairValidatedBookData, tableNames, type BackupError, type BookData, type Row, type TableName } from './data'
+import { convertLegacyRelations, hasCurrentRelationRows, isLegacyRelationRow } from '../assets/legacyRelations'
+import { migrateNodeBindings } from '../assets/migrate'
+import type { Character, CharacterRelationEdit, EventNode, Lifecycle } from '../assets/types'
 
 export interface BackupManifest {
   format: 'westworld-v2'; formatVersion: number; appVersion: string; exportedAt: string
@@ -21,7 +24,7 @@ export async function encodeBackup(input: BookData): Promise<ExportResult> {
   const files: Record<string, Uint8Array> = { 'data/book.json': strToU8(JSON.stringify(data.book)) }
   for (const name of tableNames.filter(name => name !== 'chapterTexts')) files[`data/${name}.json`] = strToU8(JSON.stringify(data.tables[name]))
   for (const row of data.tables.chapterTexts) files[chapterFileName(row.chapterIndex as string)] = strToU8(row.text as string)
-  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: 7, appVersion: '0.3.0', exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
+  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: 8, appVersion: '0.4.0', exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
   files['manifest.json'] = strToU8(JSON.stringify(manifest))
   const bytes = await new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) => zip(files as Zippable, { level: 6 }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
   const title = Array.from(data.book.title.replace(/[<>:"/\\|?*]/g, '_')).map(character => character.charCodeAt(0) < 32 ? '_' : character).join('').slice(0, 80)
@@ -41,7 +44,7 @@ export async function inspectBackup(bytes: Uint8Array): Promise<BackupInspection
     const parse = (name: string): unknown => { path = name; if (!files[name]) throw new Error('备份中缺少文件。'); return JSON.parse(strFromU8(files[name])) }
     const value = parse(path)
     if (!object(value) || value.format !== 'westworld-v2' || !Number.isInteger(value.formatVersion) || typeof value.appVersion !== 'string' || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)) || !object(value.book) || typeof value.book.id !== 'string' || typeof value.book.title !== 'string' || !Number.isInteger(value.book.chapterCount) || !Array.isArray(value.contents) || !value.contents.every(item => typeof item === 'string') || !Array.isArray(value.excludes) || !value.excludes.every(item => typeof item === 'string') || !object(value.checksums)) return fail('MANIFEST', path, '备份清单结构不完整。')
-    if (![4, 5, 6, 7].includes(value.formatVersion as number)) return fail('VERSION', path, Number(value.formatVersion) > 7 ? '备份版本较新，请使用支持该版本的应用。' : '备份版本不受支持。')
+    if (![4, 5, 6, 7, 8].includes(value.formatVersion as number)) return fail('VERSION', path, Number(value.formatVersion) > 8 ? '备份版本较新，请使用支持该版本的应用。' : '备份版本不受支持。')
     const manifest = value as unknown as BackupManifest
     for (const name of Object.keys(files)) if (name !== 'manifest.json' && !Object.hasOwn(manifest.checksums, name)) return fail('CHECKSUM', name, '文件缺少校验和。')
     for (const [name, checksum] of Object.entries(manifest.checksums)) {
@@ -55,18 +58,14 @@ export async function inspectBackup(bytes: Uint8Array): Promise<BackupInspection
     book.sourceFileName ??= ''
     const tables = emptyTables()
     const legacy: Record<string, unknown> = {}
-    const expected = ['book', ...tableNames.filter(name => name !== 'chapterTexts' && (
-      manifest.formatVersion < 5 ? !['extractionReceipts', 'assetLifecycle', 'pipelineRuns', 'characterRelations', 'characterRelationEdits'].includes(name)
-        : manifest.formatVersion === 5 ? !['characterRelations', 'characterRelationEdits'].includes(name)
-          : manifest.formatVersion === 6 ? name !== 'characterRelationEdits'
-            : true))]
-    if (expected.some(name => !manifest.contents.includes(name)) || new Set(manifest.contents).size !== manifest.contents.length) return fail('CONTENTS', 'manifest.json', '备份内容清单缺少必要数据或含重复项。')
     for (const name of manifest.contents) {
       if (name === 'book') continue
       const value = parse(`data/${name}.json`)
       if (!Array.isArray(value)) return fail('SCHEMA', path, '数据文件须为列表。')
-      if (tableNames.includes(name as TableName) && name !== 'chapterTexts') tables[name as TableName] = value as Row[]
-      else if (manifest.formatVersion === 4 && ['characterSnapshots', 'locationSnapshots'].includes(name)) legacy[name] = value
+      if (tableNames.includes(name as TableName) && name !== 'chapterTexts') {
+        if (name === 'legacyRelationRecords' && manifest.formatVersion < 8) return fail('CONTENTS', path, `格式${manifest.formatVersion}不应包含旧关系归档表。`)
+        tables[name as TableName] = value as Row[]
+      } else if (manifest.formatVersion === 4 && ['characterSnapshots', 'locationSnapshots'].includes(name)) legacy[name] = value
       else return fail('CONTENTS', path, '备份包含无法识别的数据表。')
     }
     const decoder = new TextDecoder('utf-8', { fatal: true })
@@ -76,11 +75,41 @@ export async function inspectBackup(bytes: Uint8Array): Promise<BackupInspection
       if (!files[path] || !manifest.checksums[path]) return fail('MISSING_FILE', path, '章节原文缺失。')
       tables.chapterTexts.push({ bookId: book.id, chapterIndex: chapter.chapterIndex, text: decoder.decode(files[path]) })
     }
+    // 历史版本7可能没有当前编辑表；只有空关系或全部是已知历史行时才按历史清单放行。
+    const historicalWithoutEdits = manifest.formatVersion === 7 && !manifest.contents.includes('characterRelationEdits')
+    if (historicalWithoutEdits && hasCurrentRelationRows(tables.characterRelations)) return fail('CONTENTS', 'manifest.json', '当前结构的关系资料缺少关系编辑表。')
+    if (historicalWithoutEdits && tables.characterRelations.some(row => !isLegacyRelationRow(row))) return fail('SCHEMA', 'data/characterRelations.json', '关系行既不是当前事实，也不是已知历史结构。')
+    const expected = ['book', ...tableNames.filter(name => name !== 'chapterTexts' && (
+      manifest.formatVersion < 5 ? !['extractionReceipts', 'assetLifecycle', 'pipelineRuns', 'characterRelations', 'characterRelationEdits', 'legacyRelationRecords'].includes(name)
+        : manifest.formatVersion === 5 ? !['characterRelations', 'characterRelationEdits', 'legacyRelationRecords'].includes(name)
+          : manifest.formatVersion === 6 ? !['characterRelationEdits', 'legacyRelationRecords'].includes(name)
+            : manifest.formatVersion === 7 ? name !== 'legacyRelationRecords' && (name !== 'characterRelationEdits' || !historicalWithoutEdits)
+              : true))]
+    if (expected.some(name => !manifest.contents.includes(name)) || new Set(manifest.contents).size !== manifest.contents.length) return fail('CONTENTS', 'manifest.json', '备份内容清单缺少必要数据或含重复项。')
     const expectedFiles = new Set(['manifest.json', ...manifest.contents.map(name => `data/${name}.json`), ...tables.chapters.map(row => chapterFileName(row.chapterIndex as string))])
     for (const name of Object.keys(files)) if (!expectedFiles.has(name)) return fail('CONTENTS', name, '文件未登记在数据表或章节清单中。')
     let data: BookData = { book, tables }
     if (manifest.formatVersion === 4) data = migrateLegacy(data, legacy)
     if (manifest.formatVersion < 6) data = migrateRelationsData(data)
+    if (manifest.formatVersion >= 6 && data.tables.characterRelations.some(row => isLegacyRelationRow(row))) {
+      const timestamp = new Date().toISOString(), migrationId = `legacy-migration:${crypto.randomUUID()}`
+      const converted = convertLegacyRelations({
+        bookId: data.book.id,
+        relations: data.tables.characterRelations,
+        characters: data.tables.characters as unknown as Character[],
+        lifecycle: data.tables.assetLifecycle as unknown as Lifecycle[],
+        edits: data.tables.characterRelationEdits as unknown as CharacterRelationEdit[],
+        chapterTexts: data.tables.chapterTexts as unknown as { chapterIndex: string; text: string }[],
+        timestamp, migrationId,
+      })
+      data.tables.characterRelations = converted.relations as unknown as Row[]
+      data.tables.characterRelationEdits = converted.edits as unknown as Row[]
+      data.tables.legacyRelationRecords = converted.legacyRecords as unknown as Row[]
+      const beforeNodes = data.tables.nodes
+      data.tables.nodes = migrateNodeBindings(beforeNodes as unknown as EventNode[], data.tables.characters as unknown as Character[])
+        .map((node, index) => JSON.stringify(node) === JSON.stringify(beforeNodes[index]) ? beforeNodes[index] : { ...node, revision: Number(beforeNodes[index].revision ?? 1) + 1 })
+      if (converted.report) data.tables.pipelineRuns.push({ id: migrationId, bookId: data.book.id, recordType: 'asset_edit', stage: 'asset_edit', status: 'completed', startedAt: timestamp, finishedAt: timestamp, planVersion: '2.2', result: converted.report })
+    }
     const errors = await repairValidatedBookData(data)
     if (manifest.book.chapterCount !== tables.chapters.length) errors.push({ code: 'COUNT', path: 'manifest.json', message: '清单章数与实际章节数量不符。' })
     if (errors.length) return { ok: false, errors, manifest }

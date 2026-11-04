@@ -197,7 +197,7 @@ export const pairEndpointIds = (pairKey: string) => JSON.parse(pairKey) as [stri
 
 export interface PairAccumulator {
   aId: string; bId: string; aToBLabels: string[]; bToALabels: string[]
-  evidence: RelationEvidence[]; sourceRelationIds: string[]; directionUnclear: boolean
+  evidence: RelationEvidence[]; sourceRelationIds: string[]; legacyRecordIds: string[]; directionUnclear: boolean
 }
 
 function addEvidence(target: RelationEvidence[], items: RelationEvidence[]) {
@@ -214,7 +214,7 @@ export function basePairs(relations: CharacterRelation[], characters: Character[
       if (!known.has(targetId) || targetId === relation.sourceId) continue
       const [aId, bId] = [relation.sourceId, targetId].sort()
       const pairKey = pairKeyOf(aId, bId)
-      if (!pairs.has(pairKey)) pairs.set(pairKey, { aId, bId, aToBLabels: [], bToALabels: [], evidence: [], sourceRelationIds: [], directionUnclear: false })
+      if (!pairs.has(pairKey)) pairs.set(pairKey, { aId, bId, aToBLabels: [], bToALabels: [], evidence: [], sourceRelationIds: [], legacyRecordIds: [], directionUnclear: false })
       const pair = pairs.get(pairKey)!
       const [forward, reverse] = aId === relation.sourceId ? [relation.forwardLabel, relation.reverseLabel] : [relation.reverseLabel, relation.forwardLabel]
       pair.aToBLabels = uniqueStrings([...pair.aToBLabels, forward])
@@ -227,7 +227,7 @@ export function basePairs(relations: CharacterRelation[], characters: Character[
   return pairs
 }
 
-const pairCanonical = (pair: CharacterPairResult) => JSON.stringify([pair.pairKey, pair.state, pair.fromId, pair.toId, pair.forwardLabels, pair.reverseLabels, pair.directionUnclear, pair.evidence.map(item => [item.chapterIndex, item.quote]), pair.sourceRelationIds, pair.endpointRevisions])
+const pairCanonical = (pair: CharacterPairResult) => JSON.stringify([pair.pairKey, pair.state, pair.fromId, pair.toId, pair.forwardLabels, pair.reverseLabels, pair.directionUnclear, pair.evidence.map(item => [item.chapterIndex, item.quote]), pair.sourceRelationIds, pair.legacyRecordIds, pair.endpointRevisions])
 
 /** 人物对指纹包含当前结果与两端修订号；读取、保存和 AI 提交共用。 */
 export function pairFingerprint(pair: Omit<CharacterPairResult, 'fingerprint'>) {
@@ -242,19 +242,20 @@ export function effectivePairs(relations: CharacterRelation[], edits: CharacterR
   const pairs = new Map<string, CharacterPairResult>()
   for (const [pairKey, base] of basePairs(relations, characters)) pairs.set(pairKey, {
     pairKey, fromId: base.aId, toId: base.bId, forwardLabels: base.aToBLabels, reverseLabels: base.bToALabels,
-    state: 'active', editRevision: 0, fingerprint: '', evidence: base.evidence, sourceRelationIds: base.sourceRelationIds,
+    state: 'active', editRevision: 0, fingerprint: '', evidence: base.evidence, sourceRelationIds: base.sourceRelationIds, legacyRecordIds: base.legacyRecordIds,
     directionUnclear: base.directionUnclear, endpointRevisions: {},
   })
   for (const edit of edits) {
     const pairKey = edit.pairKey
     const [aId, bId] = pairEndpointIds(pairKey)
     if (!known.has(aId) || !known.has(bId) || aId === bId) continue
+    const base = pairs.get(pairKey)
     pairs.set(pairKey, {
       pairKey, fromId: aId, toId: bId,
       forwardLabels: edit.state === 'active' ? uniqueStrings(edit.aToBLabels) : [],
       reverseLabels: edit.state === 'active' ? uniqueStrings(edit.bToALabels) : [],
       state: edit.state, editRevision: edit.revision, fingerprint: '', evidence: edit.evidence,
-      sourceRelationIds: edit.sourceRelationIds, directionUnclear: edit.directionUnclear, endpointRevisions: {},
+      sourceRelationIds: edit.sourceRelationIds, legacyRecordIds: uniqueStrings([...(base?.legacyRecordIds ?? []), ...(edit.legacyRecordIds ?? [])]), directionUnclear: edit.directionUnclear, endpointRevisions: {},
     })
   }
   const result = [...pairs.values()].map(pair => {
@@ -270,7 +271,7 @@ export function pairFromPerspective(pairs: CharacterPairResult[], fromId: string
   const pair = pairs.find(row => row.pairKey === pairKey)
   if (!pair) {
     const revisions = new Map(characters.map(person => [person.id, Number(person.revision ?? 0)]))
-    const absent: Omit<CharacterPairResult, 'fingerprint'> = { pairKey, fromId, toId, forwardLabels: [], reverseLabels: [], state: 'absent', editRevision: 0, evidence: [], sourceRelationIds: [], directionUnclear: false, endpointRevisions: { [fromId]: revisions.get(fromId) ?? 0, [toId]: revisions.get(toId) ?? 0 } }
+    const absent: Omit<CharacterPairResult, 'fingerprint'> = { pairKey, fromId, toId, forwardLabels: [], reverseLabels: [], state: 'absent', editRevision: 0, evidence: [], sourceRelationIds: [], legacyRecordIds: [], directionUnclear: false, endpointRevisions: { [fromId]: revisions.get(fromId) ?? 0, [toId]: revisions.get(toId) ?? 0 } }
     return { ...absent, fingerprint: pairFingerprint(absent) }
   }
   if (pair.fromId === fromId) return { ...pair, fromId, toId }

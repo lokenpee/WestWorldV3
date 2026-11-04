@@ -5,6 +5,7 @@ import { detailTokens } from '../assets/merge'
 import { mergeWorldAssets } from '../assets/mergeCore'
 import { applyAssetPatch } from '../assets/assetPatch'
 import { deleteCharacterPair, saveCharacterPair } from '../assets/relationEdits'
+import { pairKeyOf } from '../assets/relations'
 import { bindNodeCharacters } from '../assets/characterLinks'
 import type { Character, EventNode, RelationEvidence } from '../assets/types'
 import { acceptIdentityMerge } from '../world/queue'
@@ -261,6 +262,28 @@ async function assertNarrativeWritable(store: AgentStore, scope: Scope, kind: st
   const lease = await store.get('pipelineRuns', 'lease:narrative')
   if (lease && lease.bookId === scope.bookId && (lease.expiresAt === undefined || Number(lease.expiresAt) > Date.now()) && lease.owner !== scope.owner) throw new Error('ASSET_DOMAIN_LOCKED:叙事任务正在运行，本项待稍后继续。')
 }
+async function assertRelationReviewItem(store: AgentStore, scope: Scope, args: Row, fromId: string, toId: string, readSet: ReadSet) {
+  const reviewItemId = text(args.reviewItemId)
+  if (!reviewItemId) throw new Error('INVALID_ARGS:人物关系专项提交须提供本任务工作项reviewItemId。')
+  const { task } = await taskOf(store, scope)
+  const work = records((task.input as Row | undefined)?.workItems).find(item => text(item.workItemId) === reviewItemId)
+  if (!work) throw new Error('INVALID_ARGS:reviewItemId不属于本任务。')
+  const kind = text(work.kind), id = text(work.id), pairKey = pairKeyOf(fromId, toId)
+  if (kind === 'relation' && id !== pairKey) throw new Error('INVALID_ARGS:关系项提交的人物对与工作项不一致。')
+  if (kind === 'character_relation_scan' && ![fromId, toId].includes(id)) throw new Error('INVALID_ARGS:人物扫描新增关系须包含被扫描人物。')
+  if (kind === 'legacy_relation') {
+    const legacy = await store.get('legacyRelationRecords', id)
+    if (!legacy) throw new Error('NOT_FOUND:旧关系工作项对应的归档不存在。')
+    if (!readSet.queries.some(query => query.tool === 'get_legacy_relation_records' && strings((query.args as Row).ids).includes(id))) throw new Error('INVALID_ARGS:处理旧关系项前须读取该旧记录原值。')
+    const known = new Set((await store.rows('characters')).map(row => text(row.id)))
+    const live = strings(legacy.pairKeys).filter(key => {
+      try { const [a, b] = JSON.parse(key) as string[]; return known.has(a) && known.has(b) } catch { return false }
+    })
+    if (live.length && !live.includes(pairKey)) throw new Error('INVALID_ARGS:旧关系项的明确端点已存在，不能用其他同名编号代替。')
+  }
+  if (!['relation', 'character_relation_scan', 'legacy_relation'].includes(kind)) throw new Error('INVALID_ARGS:该工作项不是人物关系专项范围。')
+}
+
 async function applyAgentAssetTool(store: AgentStore, scope: Scope, name: string, args: Row, readSet: ReadSet, commitId: string, timestamp: string) {
   const evidence = records(args.evidence)
   await assertToolEvidence(store, scope, evidence, readSet)
@@ -269,6 +292,7 @@ async function applyAgentAssetTool(store: AgentStore, scope: Scope, name: string
     requireRecordRead(readSet, 'characters', fromId, 'get_character_detail')
     requireRecordRead(readSet, 'characters', toId, 'get_character_detail')
     if (!readSet.queries.some(query => query.tool === 'get_character_relation' && text((query.args as Row).fromId) === fromId && text((query.args as Row).toId) === toId)) throw new Error('INVALID_ARGS:修改人物对前须调用get_character_relation读取当前结果和指纹。')
+    if (scope.reviewScope === 'relations') await assertRelationReviewItem(store, scope, args, fromId, toId, readSet)
     const write = {
       bookId: scope.bookId, fromId, toId, forwardLabels: strings(args.forwardLabels), reverseLabels: strings(args.reverseLabels),
       directionUnclear: args.directionUnclear === true, evidence: evidence as unknown as RelationEvidence[], reason: text(args.reason), expectedFingerprint: text(args.expectedFingerprint),
@@ -299,10 +323,11 @@ async function applyAgentAssetTool(store: AgentStore, scope: Scope, name: string
 }
 export async function commitCommand(repo: AgentRepository, scope: Scope, name: string, toolCallId: string, args: Row, readSet: ReadSet, signal?: AbortSignal): Promise<CommitAck> {
   assertScope(scope, repo.bookId)
+  const relationOnly = scope.profile === 'asset_editor' && scope.phase === 'asset_review' && scope.reviewScope === 'relations'
   const allowed = scope.profile === 'asset_editor'
-    ? (scope.phase === 'asset_review' ? [...assetReviewTools] : ['commit_asset_changes'])
+    ? (scope.phase === 'asset_review' ? [...(relationOnly ? relationTools : assetReviewTools)] : ['commit_asset_changes'])
     : ['commit_story_changes']
-  if (!allowed.includes(name)) throw new Error('SCOPE:当前职责或阶段不能执行此写工具。')
+  if (!allowed.includes(name)) throw new Error(relationOnly ? 'WRITE_SCOPE_DENIED:人物关系专项只允许保存或删除人物对关系。' : 'SCOPE:当前职责或阶段不能执行此写工具。')
   validate(toolContracts[scope.profile].find(tool => tool.name === name)!.parameters, args)
   const operationKey = text(args.operationKey); const payload = name === 'commit_asset_changes' || name === 'commit_story_changes' ? args.payload as Row : args
   const payloadFingerprint = await hash({ tool: name, payload }); const timestamp = new Date().toISOString()
@@ -360,7 +385,9 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
         if (existing < 0) changed.push(proof); else changed[existing] = proof
       }
       if (toolResult?.pair) {
-        const work = workItems.find(item => text(item.kind) === 'relation' && text(item.id) === toolResult.pair!.pairKey)
+        const reviewWorkId = text(args.reviewItemId)
+        const reviewWork = reviewWorkId ? workItems.find(item => text(item.workItemId) === reviewWorkId) : undefined
+        const work = reviewWork ?? workItems.find(item => text(item.kind) === 'relation' && text(item.id) === toolResult.pair!.pairKey)
         if (work) {
           const existing = changed.findIndex(row => row.workItemId === work.workItemId)
           const proof = { workItemId: work.workItemId, outcome: 'changed', reason: '本任务已提交该人物对的修改。' }
@@ -368,7 +395,32 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
         }
       }
       const updatedTask = { ...task, appliedCommitIds: [...strings(task.appliedCommitIds), commitId], reviewedItems: changed }
-      await store.put('pipelineRuns', { ...latest, appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { changed: toolResult.changed, affected: toolResult.affected, ...(toolResult.pair ? { pair: toolResult.pair } : {}) } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
+      let assetReview = (latest as Row).assetReview as Row | undefined
+      if (toolResult?.pair) {
+        const reviewWorkId = text(args.reviewItemId)
+        const reviewItems = records(assetReview?.items)
+        const pairKey = toolResult.pair.pairKey, fingerprint = toolResult.pair.fingerprint
+        const reviewWork = reviewWorkId ? workItems.find(item => text(item.workItemId) === reviewWorkId) : undefined
+        const upsertPair = (row: Row) => {
+          const resolved = records(row.resolvedPairs).filter(item => text(item.pairKey) !== pairKey)
+          return { ...row, commitIds: [...new Set([...strings(row.commitIds), commitId])], resolvedPairs: [...resolved, { pairKey, fingerprint }] }
+        }
+        const at = reviewItems.findIndex(row => text(row.workItemId) === reviewWorkId)
+        if (at >= 0) reviewItems[at] = upsertPair(reviewItems[at])
+        if (reviewWork && text(reviewWork.kind) === 'character_relation_scan' && toolResult.changed) {
+          const relationWorkId = `asset_review:relations:relation:${encodeURIComponent(pairKey)}`
+          if (!reviewItems.some(row => text(row.workItemId) === relationWorkId)) {
+            const [aId, bId] = JSON.parse(pairKey) as [string, string]
+            reviewItems.push({
+              workItemId: relationWorkId, kind: 'relation', id: pairKey, fromId: aId, toId: bId, revision: 0, factFingerprint: fingerprint,
+              status: 'checked', outcome: 'changed', reason: '人物扫描发现并提交的新关系。', taskId: scope.taskId, updatedAt: timestamp,
+              commitIds: [commitId], resolvedPairs: [{ pairKey, fingerprint }],
+            })
+          }
+        }
+        assetReview = { ...(assetReview ?? { version: 1 }), items: reviewItems, updatedAt: timestamp }
+      }
+      await store.put('pipelineRuns', { ...latest, ...(assetReview ? { assetReview } : {}), appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { changed: toolResult.changed, affected: toolResult.affected, ...(toolResult.pair ? { pair: toolResult.pair } : {}) } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
       await appendEntry(store, scope, { type: 'commit', summary: `${commitId}：${summary}` })
       updatedReads = structuredClone(readSet)
       await rebaseReadSet(store, scope, updatedReads)

@@ -15,6 +15,7 @@ export function WorldPanel({ bookId, service, assets }: { bookId: string; servic
   const [prepared, setPrepared] = useState<MergeRequest>(); const [merging, setMerging] = useState(false); const [message, setMessage] = useState('')
   const [chosenName, setChosenName] = useState('')
   const [queueSaving, setQueueSaving] = useState(false)
+  const [reviewScope, setReviewScope] = useState<'all_assets' | 'relations'>('all_assets')
   const drafts = useRef(new Map<string, { memberIds: string[]; prepared?: MergeRequest; chosenName: string }>())
   const submitting = useRef(false)
   const [leaseAttempt, retryLease] = useState(0)
@@ -53,6 +54,8 @@ export function WorldPanel({ bookId, service, assets }: { bookId: string; servic
   const queueItems = queueData?.items ?? []
   const queueRunning = !!queueData?.running || !!state?.running && state.mode === 'mechanical'
   const aiRunning = !!state?.running && state.mode !== 'mechanical'
+  const relationRun = reports.status === 'ready' ? reports.value.find(row => row.reviewScope === 'relations') : undefined
+  const relationRemaining = !!relationRun?.assetReview?.items.some(item => item.status === 'pending' || item.status === 'deferred')
   const busy = !!state?.running || merging || queueRunning || queueSaving
   const queuedIds = new Set(queueItems.filter(item => item.status === 'pending' || item.status === 'running').flatMap(item => item.request.memberIds.map(id => `${item.kind}:${id}`)))
   const selectedRows = selected && snapshot.status === 'ready' ? (selected.kind === 'character' ? snapshot.value.characters : snapshot.value.locations).filter(row => selected.memberIds.includes(row.id)) : []
@@ -131,14 +134,17 @@ export function WorldPanel({ bookId, service, assets }: { bookId: string; servic
     finally { submitting.current = false; setMerging(false) }
   }
   return <section className="world-panel" aria-label="世界资产整理"><div className="world-heading"><h2>P2 世界资产整理</h2><div>
+      <label>整理范围 <select aria-label="整理范围" value={reviewScope} disabled={busy} onChange={event => setReviewScope(event.target.value as 'all_assets' | 'relations')}><option value="all_assets">全部资产</option><option value="relations">人物关系</option></select></label>
       <button className="secondary-button" disabled={!ready || scanning || busy} onClick={() => void scan()}>{scanning ? '正在查找候选…' : '代码整理'}</button>
       <button className="secondary-button" disabled={!ready || scanning || busy || queue.status !== 'ready' || !queueData?.pending && !queueData?.statisticsPending} onClick={() => void runQueue()}>{queueRunning ? queueData?.pending === 0 && queueData.statisticsPending ? '更新统计中…' : '机械合并中…' : queueData?.statisticsPending && !queueData.pending ? '完成合并收尾' : `一键机械合并（${queueData?.pending ?? 0}组）`}</button>
-      <button className="primary-button" disabled={!ready || scanning || busy} onClick={() => { setError(''); void service.start(bookId) }}>{aiRunning ? 'AI整理中…' : eligibility.status === 'ready' && eligibility.value.resumable ? '继续AI整理' : 'AI整理'}</button>
+      {reviewScope === 'relations'
+        ? <button className="primary-button" disabled={!ready || scanning || busy} onClick={() => { setError(''); setMessage(''); void (relationRemaining ? service.continueRelations(bookId) : service.start(bookId, { reviewScope: 'relations', reviewMode: 'sample' })) }}>{aiRunning ? '人物关系核对中…' : relationRemaining ? '继续全书核对' : '人物关系核对（先10项）'}</button>
+        : <button className="primary-button" disabled={!ready || scanning || busy} onClick={() => { setError(''); void service.start(bookId) }}>{aiRunning ? 'AI整理中…' : eligibility.status === 'ready' && eligibility.value.resumable ? '继续AI整理' : 'AI整理'}</button>}
       {aiRunning && <button className="text-button" onClick={() => service.cancel(bookId)}>取消AI整理</button>}
       {queueRunning && <button className="text-button" onClick={() => { void service.mechanical.stop(bookId).catch(failure => setError(failure instanceof Error ? failure.message : '停止请求失败。')) }}>停止机械合并</button>}
       {reports.status === 'ready' && reports.value.length > 0 && <button className="text-button" onClick={() => setReportOpen(true)}>查看整理报告</button>}
     </div></div>
-    <p>代码整理：先自动合并完整同名项，其余候选核对后合并，可按需预览。AI整理：核对原文后合并，按需整编详细资料。</p>
+    <p>代码整理：先自动合并完整同名项，其余候选核对后合并，可按需预览。AI整理：核对原文后合并，按需整编详细资料。人物关系：只按原文核对关系，先小批10项，确认后再继续全书。</p>
     {eligibility.status === 'ready' && !eligibility.value.covered && <p className="muted">请先完成全书逐章提取。</p>}
     {eligibility.status === 'error' && <p role="alert">{eligibility.message}</p>}
     {scanning && !state?.running && <p role="status">正在刷新名称候选…</p>}

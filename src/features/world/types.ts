@@ -32,6 +32,20 @@ export interface WorldReport {
   assetEdits?: AssetEditRecord[]
   cost: number; usage: { input: number; output: number; totalTokens: number; cost: number; costStatus?: 'estimated' | 'unknown' }; externalChanges: string[]
 }
-export interface AssetReviewItem { workItemId: string; kind: string; id: string; fromId?: string; toId?: string; revision: number; factFingerprint: string; status: 'pending' | 'checked' | 'deferred' | 'skipped'; outcome?: string; reason?: string; taskId?: string; updatedAt: string }
-export interface WorldRun { id: string; bookId: string; recordType: 'run'; stage: 'P2'; phase: string; status: WorldReport['status']; startedAt: string; finishedAt?: string; report: WorldReport; commandIntents?: Row[]; tasks?: Row[]; coverage?: { total: number; checked: number; pendingIds: string[] }; mechanicalQueue?: MechanicalQueue; assetReview?: { version: 1; items: AssetReviewItem[]; updatedAt: string } }
+export interface AssetReviewItem {
+  workItemId: string; kind: string; id: string; fromId?: string; toId?: string; revision: number; factFingerprint: string
+  status: 'pending' | 'checked' | 'deferred' | 'skipped'; outcome?: string; reason?: string; taskId?: string; updatedAt: string
+  sourceFingerprint?: string
+  evidenceReads?: { chapterIndex: string; offset: number; length: number }[]
+  commitIds?: string[]
+  resolvedPairs?: { pairKey: string; fingerprint: string }[]
+}
+export type ReviewScope = 'all_assets' | 'relations'
+export type ReviewMode = 'sample' | 'full'
+export interface WorldRun {
+  id: string; bookId: string; recordType: 'run'; stage: 'P2'; phase: string; status: WorldReport['status']; startedAt: string; finishedAt?: string; report: WorldReport
+  commandIntents?: Row[]; tasks?: Row[]; coverage?: { total: number; checked: number; pendingIds: string[] }; mechanicalQueue?: MechanicalQueue
+  assetReview?: { version: 1; items: AssetReviewItem[]; updatedAt: string }
+  reviewScope?: ReviewScope; reviewMode?: ReviewMode; relationReviewVersion?: 1
+}
 export const emptyReport = (counts: Counts): WorldReport => ({ beforeCounts: counts, afterCounts: counts, groups: [], optimizedIds: [], skipped: [], failed: [], conflicted: [], status: 'running', cost: 0, usage: { input: 0, output: 0, totalTokens: 0, cost: 0, costStatus: 'estimated' }, externalChanges: [] })

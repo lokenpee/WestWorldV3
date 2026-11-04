@@ -3,16 +3,18 @@ import type { JsonValue } from '@earendil-works/pi-ai'
 import type { AgentRepository, Row } from './repository'
 import { canonical, hash, records, resultContracts, strings, summarySchema, text, toolContracts, validate, type Summary } from './contracts'
 import { assertScope, readTool, toolBytes, type Scope } from './queries'
-import { assetReviewTools, checkLease, commitCommand, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
+import { assetReviewTools, checkLease, commitCommand, relationTools, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
 
 const tableOf: Record<string, string> = { get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
 export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
   const reads: ReadSet = structuredClone(options.initialReadSet ?? { records: [], queries: [] })
   let summary: Summary | undefined
   let readCalls = 0; let writeCalls = 0
+  const relationOnly = scope.phase === 'asset_review' && scope.reviewScope === 'relations'
   const contracts = toolContracts[scope.profile].filter(contract => scope.phase === 'asset_review'
     ? contract.name !== 'commit_asset_changes'
     : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
+    .filter(contract => !relationOnly || contract.kind !== 'write' || (relationTools as readonly string[]).includes(contract.name))
   const tools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
     parameters: scope.phase !== 'optimize' && ((contract.parameters as { properties?: Row }).properties)?.include_facts ? { ...contract.parameters, properties: { ...((contract.parameters as { properties?: Row }).properties), include_facts: { type: 'boolean', const: false } } } : contract.parameters,
     outputSchema: resultContracts.get(contract.name),
@@ -98,9 +100,22 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
           const kind = text(work?.kind)
           const changed = records(task.reviewedItems).some(row => row.workItemId === item.workItemId && row.outcome === 'changed')
           if (kind === 'relation') {
-            if (!work || !reads.queries.some(query => query.tool === 'get_character_relation')) throw new Error('INVALID_ARGS:关系结论须有实际读取依据。')
+            if (!work || !reads.queries.some(query => query.tool === 'get_character_relation' && text((query.args as Row).fromId) === text(work.fromId) && text((query.args as Row).toId) === text(work.toId))) throw new Error('INVALID_ARGS:关系结论须有实际读取本人物对的依据。')
             if (item.outcome === 'changed' && (!actual.length || !changed)) throw new Error('INVALID_ARGS:修改结论缺少该项的真实写入依据。')
             if (item.outcome === 'no_change' && changed) throw new Error('INVALID_ARGS:该项关系已修改，请在总结中如实说明。')
+            continue
+          }
+          if (kind === 'legacy_relation') {
+            if (!work || !reads.queries.some(query => query.tool === 'get_legacy_relation_records' && strings((query.args as Row).ids).includes(text(work.id)))) throw new Error('INVALID_ARGS:旧关系结论须实际读取该旧记录原值。')
+            if (item.outcome === 'changed' && (!actual.length || !changed)) throw new Error('INVALID_ARGS:修改结论缺少该项的真实写入依据。')
+            if (item.outcome === 'no_change' && changed) throw new Error('INVALID_ARGS:该旧关系已提交修改，请在总结中如实说明。')
+            continue
+          }
+          if (kind === 'character_relation_scan') {
+            if (!work || !reads.queries.some(query => query.tool === 'get_character_detail' && strings((query.args as Row).ids).includes(text(work.id)))) throw new Error('INVALID_ARGS:人物关系扫描须先读取该人物详情。')
+            if (!reads.queries.some(query => query.tool === 'read_original')) throw new Error('INVALID_ARGS:人物关系扫描须实际读取相关原文。')
+            if (item.outcome === 'changed' && (!actual.length || !changed)) throw new Error('INVALID_ARGS:修改结论缺少该项的真实写入依据。')
+            if (item.outcome === 'no_change' && changed) throw new Error('INVALID_ARGS:该项已提交关系修改，请在总结中如实说明。')
             continue
           }
           const table = ({ character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[kind]

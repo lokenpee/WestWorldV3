@@ -23,6 +23,7 @@ export interface AgentTaskOptions {
   afterCommit?: (ack: CommitAck) => Promise<void>
   leaseOwner?: string; retainLease?: boolean
   requiredLineIds?: string[]
+  reviewScope?: 'all_assets' | 'relations'
 }
 export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; itemFailure?: string; readCalls: number; writeCalls: number }
 const initialReadSet = (): ReadSet => ({ records: [], queries: [] })
@@ -33,6 +34,10 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
   async function run(repo: AgentRepository, options: AgentTaskOptions): Promise<AgentTaskResult> {
     const key = `${repo.bookId}:${options.profile}`
     const scope: Scope = { bookId: repo.bookId, profile: options.profile, phase: options.phase, runId: options.runId ?? crypto.randomUUID(), taskId: options.taskId ?? crypto.randomUUID(), owner: options.leaseOwner ?? crypto.randomUUID(), sessionId: options.sessionId, probe: options.probe, workItemIds: options.workItems.map(row => text(row.workItemId)) }
+    if (options.phase === 'asset_review') {
+      const requested = options.reviewScope ?? text(options.input.reviewScope)
+      scope.reviewScope = requested === 'relations' ? 'relations' : 'all_assets'
+    }
     const outcome: AgentTaskResult = { ok: false, bookId: scope.bookId, runId: scope.runId, taskId: scope.taskId, commitIds: [], readCalls: 0, writeCalls: 0 }
     scope.requiredLineIds = options.requiredLineIds
     if (active.has(key)) return { ...outcome, error: '本书当前职责已有运行任务。' }

@@ -6,7 +6,7 @@ import type { Character, CharacterRelation, EventNode, Lifecycle } from '../asse
 import { hasClearedEndpoints, repairRelationBindings } from '../assets/repair'
 
 export const tableSchemas = {
-  chapters: 'Chapter', chapterTexts: 'ChapterText', characters: 'StoredCharacter', locations: 'StoredLocation', nodes: 'StoredNode', eventLines: 'StoredEventLine', characterRelations: 'StoredRelation', characterRelationEdits: 'CharacterRelationEdit', compileProgress: 'CompileProgress', storyEditorMemory: 'StoryEditorMemory', storyEditorNotes: 'StoryEditorNote', storyEditorCheckpoints: 'StoryEditorCheckpoint', storySessions: 'StorySession', storySessionEntries: 'StorySessionEntry', extractionReceipts: 'ExtractionReceipt', assetLifecycle: 'AssetLifecycle', pipelineRuns: 'PipelineRun',
+  chapters: 'Chapter', chapterTexts: 'ChapterText', characters: 'StoredCharacter', locations: 'StoredLocation', nodes: 'StoredNode', eventLines: 'StoredEventLine', characterRelations: 'StoredRelation', characterRelationEdits: 'CharacterRelationEdit', legacyRelationRecords: 'LegacyRelationRecord', compileProgress: 'CompileProgress', storyEditorMemory: 'StoryEditorMemory', storyEditorNotes: 'StoryEditorNote', storyEditorCheckpoints: 'StoryEditorCheckpoint', storySessions: 'StorySession', storySessionEntries: 'StorySessionEntry', extractionReceipts: 'ExtractionReceipt', assetLifecycle: 'AssetLifecycle', pipelineRuns: 'PipelineRun',
 } as const
 export type TableName = keyof typeof tableSchemas
 export type Row = Record<string, unknown>
@@ -114,7 +114,20 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
     if (forward.length > 20 || reverse.length > 20 || [...forward, ...reverse].some(label => !label.trim() || label.length > 100)) fail(`${path}`, '关系标签数量或长度不符。')
     for (const evidence of rows(edit.evidence)) if (!hasChapter(evidence.chapterIndex)) fail(`${path}/evidence`, '关系编辑依据章节不存在。')
     if (!Number.isSafeInteger(edit.revision) || Number(edit.revision) < 1) fail(`${path}/revision`, '关系编辑修订号无效。')
-    if (!['manual', 'agent'].includes(String(edit.updatedBy)) || !String(edit.commitId ?? '').trim()) fail(`${path}`, '关系编辑来源或确认号缺失。')
+    if (!['manual', 'agent', 'migration'].includes(String(edit.updatedBy)) || !String(edit.commitId ?? '').trim()) fail(`${path}`, '关系编辑来源或确认号缺失。')
+    for (const id of strings(edit.legacyRecordIds)) if (!tables.legacyRelationRecords.some(row => row.id === id && row.bookId === edit.bookId)) fail(`${path}/legacyRecordIds`, `旧关系归档不存在：${id}`)
+  }
+  for (const [index, record] of tables.legacyRelationRecords.entries()) {
+    const path = `legacyRelationRecords[${index}]`
+    if (record.schema !== 'legacy-left-right-v1') fail(`${path}/schema`, '旧关系归档结构版本不符。')
+    if (!['converted', 'unresolved', 'excluded'].includes(String(record.disposition))) fail(`${path}/disposition`, '旧关系归档处置无效。')
+    if (!record.original || typeof record.original !== 'object' || Array.isArray(record.original)) fail(`${path}/original`, '旧关系原始记录须为对象。')
+    if (record.migrationVersion !== 1 || typeof record.migratedAt !== 'string') fail(`${path}`, '旧关系归档版本或迁移时间缺失。')
+    const keys = strings(record.pairKeys)
+    if (keys.length !== new Set(keys).size) fail(`${path}/pairKeys`, '旧关系人物对键重复。')
+    for (const key of keys) {
+      try { const value = JSON.parse(key); if (!Array.isArray(value) || value.length !== 2 || value[0] === value[1]) throw new Error() } catch { fail(`${path}/pairKeys`, '旧关系人物对键格式不符。') }
+    }
   }
   const sessions = new Map(tables.storySessions.map(row => [row.id, row]))
   const entries = new Map(tables.storySessionEntries.map(row => [row.id, row]))

@@ -1,5 +1,5 @@
 import type { createWorkspace } from '../../lib/storage/workspace'
-import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterPairResult, type CharacterRelation, type CharacterRelationEdit, type EventLine, type EventNode, type Lifecycle, type LocationAsset, type RelationEvidence } from './types'
+import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterPairResult, type CharacterRelation, type CharacterRelationEdit, type EventLine, type EventNode, type LegacyRelationRecord, type Lifecycle, type LocationAsset, type RelationEvidence } from './types'
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
 import { normalizeCharacterNames } from './characterNames'
@@ -8,6 +8,7 @@ import { dexieMergeStore, mergeWorldAssets } from './mergeCore'
 import { invalidateAssetProgress } from './invalidate'
 import { deleteCharacterPair, saveCharacterPair, type PairWriteInput, type PairWriteResult } from './relationEdits'
 import { edgesFor, effectivePairs, paginateCharacterPairs, pairFromPerspective, pairView, projectRelations, relationView, syncRelations } from './relations'
+import type { LegacyMigrationReport } from './legacyRelations'
 import type { WorldRun } from '../world/types'
 
 type Workspace = ReturnType<typeof createWorkspace>
@@ -388,6 +389,22 @@ export function createAssetService(workspace: Workspace) {
         const { characters, pairs } = await relationContext(db, bookId, ownerId, ownerId)
         return paginateCharacterPairs(pairs, characters, ownerId, offset, limit)
       })
+    },
+    async readLegacyRelations(bookId: string, options: { ids?: string[]; offset?: number; limit?: number } = {}) {
+      const db = await database(bookId)
+      return db.transaction('r', db.tables, async () => {
+        const ids = options.ids ? new Set(options.ids) : undefined
+        const rows = (await db.table<LegacyRelationRecord>('legacyRelationRecords').toArray()).filter(row => !ids || ids.has(row.id)).sort((a, b) => a.id.localeCompare(b.id))
+        const offset = Math.max(0, Math.trunc(options.offset ?? 0) || 0), limit = Math.min(Math.max(1, Math.trunc(options.limit ?? 50) || 50), 50)
+        const items = rows.slice(offset, offset + limit)
+        return { items, total: rows.length, offset, nextOffset: offset + items.length < rows.length ? offset + items.length : null }
+      })
+    },
+    async migrationReports(bookId: string) {
+      const db = await database(bookId)
+      const runs = await db.table<Record<string, unknown>>('pipelineRuns').where('stage').equals('asset_edit').toArray()
+      return runs.filter(row => (row.result as LegacyMigrationReport | undefined)?.kind === 'legacy_relation_migration')
+        .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)) || String(b.id).localeCompare(String(a.id)))
     },
     saveRelationPair: (bookId: string, input: RelationPairInput) => mutateRelationPair(bookId, input, 'save'),
     deleteRelationPair: (bookId: string, input: RelationPairInput) => mutateRelationPair(bookId, input, 'delete'),

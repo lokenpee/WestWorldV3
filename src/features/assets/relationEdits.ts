@@ -107,6 +107,7 @@ async function writePair(store: MergeStore, input: PairWriteInput, state: 'activ
     pairKey, bookId, aId, bId, state,
     aToBLabels: aToB, bToALabels: bToA, directionUnclear, evidence,
     sourceRelationIds: state === 'active' ? [...current.sourceRelationIds] : (previous?.sourceRelationIds ?? []),
+    legacyRecordIds: [...new Set([...(previous?.legacyRecordIds ?? []), ...(current.legacyRecordIds ?? [])])].sort(),
     revision: Number(previous?.revision ?? 0) + 1, updatedAt: timestamp, updatedBy: input.actor, commitId: input.commitId,
   }
   await store.put('characterRelationEdits', edit as unknown as Row)

@@ -70,21 +70,22 @@ async function remapPairEdits(store: MergeStore, bookId: string, fromCharacters:
   const mapId = (id: string) => redirects.get(id) ?? id
   const affected = before.filter(pair => memberIds.includes(pair.fromId) || memberIds.includes(pair.toId))
   if (!affected.length) return
-  const groups = new Map<string, { aId: string; bId: string; aLabels: string[]; bLabels: string[]; evidence: CharacterRelation['evidence']; sourceIds: string[]; active: boolean; anyEdit: boolean; unclear: boolean; revision: number; updatedBy: 'manual' | 'agent' }>()
+  const groups = new Map<string, { aId: string; bId: string; aLabels: string[]; bLabels: string[]; evidence: CharacterRelation['evidence']; sourceIds: string[]; legacyIds: string[]; active: boolean; anyEdit: boolean; unclear: boolean; revision: number; updatedBy: 'manual' | 'agent' }>()
   for (const pair of affected) {
     const fromId = mapId(pair.fromId), toId = mapId(pair.toId)
     if (fromId === toId) continue
     const [aId, bId] = [fromId, toId].sort()
     const pairKey = pairKeyOf(aId, bId)
-    const group = groups.get(pairKey) ?? { aId, bId, aLabels: [], bLabels: [], evidence: [], sourceIds: [], active: false, anyEdit: false, unclear: false, revision: 0, updatedBy: 'manual' }
+    const group = groups.get(pairKey) ?? { aId, bId, aLabels: [], bLabels: [], evidence: [], sourceIds: [], legacyIds: [], active: false, anyEdit: false, unclear: false, revision: 0, updatedBy: 'manual' }
     const forward = fromId === aId
     group.aLabels = [...new Set([...group.aLabels, ...(forward ? pair.forwardLabels : pair.reverseLabels)])]
     group.bLabels = [...new Set([...group.bLabels, ...(forward ? pair.reverseLabels : pair.forwardLabels)])]
     for (const item of pair.evidence) if (!group.evidence.some(row => row.chapterIndex === item.chapterIndex && row.quote === item.quote)) group.evidence.push(item)
     group.sourceIds = [...new Set([...group.sourceIds, ...pair.sourceRelationIds])]
+    group.legacyIds = [...new Set([...group.legacyIds, ...pair.legacyRecordIds])]
     if (pair.state === 'active') { group.active = true; group.unclear = group.unclear || pair.directionUnclear }
     const edit = editsByKey.get(pair.pairKey)
-    if (edit) { group.anyEdit = true; group.revision = Math.max(group.revision, edit.revision); if (edit.updatedBy === 'agent' && !editsByKey.get(pairKey)?.updatedBy) group.updatedBy = 'agent' }
+    if (edit) { group.anyEdit = true; group.legacyIds = [...new Set([...group.legacyIds, ...(edit.legacyRecordIds ?? [])])]; group.revision = Math.max(group.revision, edit.revision); if (edit.updatedBy === 'agent' && !editsByKey.get(pairKey)?.updatedBy) group.updatedBy = 'agent' }
     groups.set(pairKey, group)
   }
   for (const [pairKey, group] of groups) {
@@ -96,6 +97,7 @@ async function remapPairEdits(store: MergeStore, bookId: string, fromCharacters:
       aToBLabels: state === 'active' ? group.aLabels : [], bToALabels: state === 'active' ? group.bLabels : [],
       directionUnclear: state === 'active' ? group.unclear : false, evidence: group.evidence,
       sourceRelationIds: [...new Set([...group.sourceIds, ...(previous?.sourceRelationIds ?? [])])],
+      legacyRecordIds: group.legacyIds.sort(),
       revision: Math.max(group.revision, previous?.revision ?? 0) + 1, updatedAt: timestamp,
       updatedBy: options.actor ?? group.updatedBy, commitId: options.commitId ?? crypto.randomUUID(),
     } as unknown as Row)
