@@ -7,7 +7,7 @@ import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRu
 import { dexieMergeStore, mergeWorldAssets } from './mergeCore'
 import { invalidateAssetProgress } from './invalidate'
 import { deleteCharacterPair, saveCharacterPair, type PairWriteInput, type PairWriteResult } from './relationEdits'
-import { edgesFor, effectivePairs, paginateCharacterPairs, pairFromPerspective, pairView, projectRelations, relationView, syncRelations } from './relations'
+import { effectivePairs, paginateCharacterPairs, pairFromPerspective, pairView, projectRelations, relationView, syncRelations } from './relations'
 import type { LegacyMigrationReport } from './legacyRelations'
 import type { WorldRun } from '../world/types'
 
@@ -116,7 +116,7 @@ export function createAssetService(workspace: Workspace) {
     const leases = await db.table<Lease & { owner?: string; runId?: string; expiresAt?: number }>('pipelineRuns').where('recordType').equals('lease').toArray()
     if (queued) {
       const lease = leases.find(row => row.id === 'lease:world')
-      if (lease?.owner !== queued.owner || lease.runId !== queued.runId || leases.some(row => row.lockKey === 'extraction' && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new AssetError('ASSET_DOMAIN_LOCKED', '机械合并队列的执行权已变化。')
+      if (lease?.owner !== queued.owner || lease.runId !== queued.runId || leases.some(row => row.lockKey?.startsWith('extraction') && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new AssetError('ASSET_DOMAIN_LOCKED', '机械合并队列的执行权已变化。')
       const run = await db.table<WorldRun>('pipelineRuns').get(queued.runId)
       const item = run?.mechanicalQueue?.items.find(item => item.id === queued.itemId)
       if (run?.bookId !== bookId || run.phase !== 'mechanical_queue' || item?.status !== 'running' || item.kind !== kind || item.request.keepId !== options.keepId || item.request.canonicalName !== options.canonicalName || item.request.memberIds.length !== options.memberIds.length || item.request.memberIds.some(id => !options.memberIds.includes(id) || item.request.expectedRevisions[id] !== expected?.[id])) throw new AssetError('ASSET_DOMAIN_LOCKED', '本组不属于当前已确认的机械合并队列。')
@@ -356,28 +356,44 @@ export function createAssetService(workspace: Workspace) {
     })
   }
 
+  async function readContent(bookId: string): Promise<Omit<AssetSnapshot, 'locks'>> {
+    const db = await database(bookId)
+    return db.transaction('r', db.tables, async () => {
+      const [storedCharacters, locations, storedNodes, eventLines, lifecycle, relationRows, editRows] = await Promise.all([
+        db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<CharacterRelation>('characterRelations').toArray(), db.table<CharacterRelationEdit>('characterRelationEdits').toArray(),
+      ])
+      const characters = storedCharacters.map(normalizeCharacterNames)
+      const relations = relationRows
+      const pairs = effectivePairs(relations, editRows, characters)
+      const view = pairView(pairs, characters)
+      const types = new Map(relations.map(relation => [relation.id, relation.relationType]))
+      const edges = view.edges.map(edge => ({ ...edge, types: [...new Set(edge.relationIds.flatMap(id => types.get(id) ?? []))] }))
+      const unresolved = relationView(relations, characters, false).unresolved
+      const byId = new Map(characters.map(person => [person.id, person]))
+      const relationEdges = Object.fromEntries(characters.map(person => [person.id, [] as typeof edges]))
+      for (const edge of edges) {
+        relationEdges[edge.fromId]?.push(edge)
+        if (edge.toId !== edge.fromId) relationEdges[edge.toId]?.push(edge)
+      }
+      const projected = characters.map(person => ({ ...person, relations: projectRelations(relationEdges[person.id], [], [], person.id, characters, byId).relations }))
+      const nodes = storedNodes.map(node => node.actorIds === undefined ? bindNodeCharacters(node, characters) : node)
+      const references = resolveReferences(nodes, characters)
+      const lineCharacterIds = Object.fromEntries(eventLines.map(line => [line.id, [...new Set(line.nodeIds.flatMap(id => references[id]?.actorIds ?? []))]]))
+      const manualMerges = (await db.table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
+      return { characters: projected, locations, nodes, eventLines, lifecycle, references, lineCharacterIds, relations, relationEdges, unresolvedRelations: unresolved, pairs, manualMerges }
+    })
+  }
+
+  async function readLocks(bookId: string): Promise<AssetSnapshot['locks']> {
+    const db = await database(bookId)
+    return lockState(await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray(), bookId)
+  }
+
   return {
+    readContent, readLocks,
     async read(bookId: string): Promise<AssetSnapshot> {
-      const db = await database(bookId)
-      return db.transaction('r', db.tables, async () => {
-        const [storedCharacters, locations, storedNodes, eventLines, lifecycle, leases, relationRows, editRows] = await Promise.all([
-          db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray(), db.table<CharacterRelation>('characterRelations').toArray(), db.table<CharacterRelationEdit>('characterRelationEdits').toArray(),
-        ])
-        const characters = storedCharacters.map(normalizeCharacterNames)
-        const relations = relationRows
-        const pairs = effectivePairs(relations, editRows, characters)
-        const view = pairView(pairs, characters)
-        const types = new Map(relations.map(relation => [relation.id, relation.relationType]))
-        const edges = view.edges.map(edge => ({ ...edge, types: [...new Set(edge.relationIds.flatMap(id => types.get(id) ?? []))] }))
-        const unresolved = relationView(relations, characters).unresolved
-        const relationEdges = Object.fromEntries(characters.map(person => [person.id, edgesFor(edges, person.id)]))
-        const projected = characters.map(person => ({ ...person, relations: projectRelations(edges, relations, unresolved, person.id, characters).relations }))
-        const nodes = storedNodes.map(node => node.actorIds === undefined ? bindNodeCharacters(node, characters) : node)
-        const references = resolveReferences(nodes, characters)
-        const lineCharacterIds = Object.fromEntries(eventLines.map(line => [line.id, [...new Set(line.nodeIds.flatMap(id => references[id]?.actorIds ?? []))]]))
-        const manualMerges = (await db.table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
-        return { characters: projected, locations, nodes, eventLines, lifecycle, locks: lockState(leases, bookId), references, lineCharacterIds, relations, relationEdges, unresolvedRelations: unresolved, pairs, manualMerges }
-      })
+      const [content, locks] = await Promise.all([readContent(bookId), readLocks(bookId)])
+      return { ...content, locks }
     },
     async create<K extends AssetKind>(bookId: string, kind: K, input: AssetInput) { validateInput(kind, input); return (await mutate(bookId, kind, input))! },
     async update<K extends AssetKind>(bookId: string, kind: K, id: string, expectedRevision: number, input: AssetInput) { validateInput(kind, input); return (await mutate(bookId, kind, input, id, expectedRevision))! },

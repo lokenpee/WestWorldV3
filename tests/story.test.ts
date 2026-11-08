@@ -57,7 +57,7 @@ it('Pi跨三个窗口追加同一事件线，重叠节点复用，检查点和�
   const calls = windows.length; await service.start('a'); expect(windows).toHaveLength(calls)
   const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
   expect(await validateBookData({ book, tables })).toEqual([])
-})
+}, 30000)
 it('单窗超过100节点分任务读取，全部页覆盖后才完成窗口', async () => {
   const { service, db } = await setup(1, Array(105).fill(1))
   await service.start('a')

@@ -4,7 +4,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createWorkspace } from '../src/lib/storage/workspace'
 import { createModelService } from '../src/features/models/service'
 import { defaultConfig } from '../src/features/models/types'
-import { createMemoryAgentRepository, createBookAgentRepository } from '../src/features/agents/repository'
+import { createBookAgentRepository, createMemoryAgentRepository } from '../src/features/agents/repository'
+import { isObservationEntry } from '../src/features/agents/context'
 import { createAgentRuntime } from '../src/features/agents/runtime'
 import { createAgentTools } from '../src/features/agents/tools'
 import { agentStream, createAgentFixture, scriptedAgentFetcher } from './support/agent-streams'
@@ -182,7 +183,7 @@ it('两个正式书籍使用独立Pi实例，重建运行器仍恢复同一会�
   }
   expect(runtime.instance('a', 'story_editor')).toBeDefined()
   expect(runtime.instance('a', 'story_editor')).not.toBe(runtime.instance('b', 'story_editor'))
-  const original = (await workspace.openBook('a').table('storySessionEntries').toArray()).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
+  const original = (await workspace.openBook('a').table('storySessionEntries').toArray()).filter(row => !isObservationEntry(row)).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
   const repo = await runBook('a', createAgentRuntime(models.agent))
   const restored = (await repo.transaction(false, store => store.rows('storySessionEntries'))).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
   expect(restored.length).toBeGreaterThan(original.length)

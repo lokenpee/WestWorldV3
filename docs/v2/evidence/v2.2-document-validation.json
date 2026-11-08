@@ -1,9 +1,14 @@
 {
   "documentVersion": "2.2",
-  "validatedAt": "2026-10-24T09:19:06.110771+00:00",
+  "validatedAt": "2026-11-07T15:11:32.876361+00:00",
   "kind": "documentation-only",
   "applicationTestsRun": false,
   "checks": [
+    {
+      "check": "json:resources\\v2.2\\acceptance\\book-session-cases.json",
+      "passed": true,
+      "detail": ""
+    },
     {
       "check": "json:resources\\v2.2\\acceptance\\bugfix-cases.json",
       "passed": true,
@@ -11,6 +16,11 @@
     },
     {
       "check": "json:resources\\v2.2\\acceptance\\recovery-cases.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\acceptance\\stage0-cases.json",
       "passed": true,
       "detail": ""
     },
@@ -60,7 +70,17 @@
       "detail": ""
     },
     {
+      "check": "json:resources\\v2.2\\manual-command-error.schema.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
       "check": "json:resources\\v2.2\\model-output-contract.json",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "json:resources\\v2.2\\node-reference-contract.json",
       "passed": true,
       "detail": ""
     },
@@ -286,7 +306,7 @@
     },
     {
       "check": "counts",
-      "passed": true,
+      "passed": false,
       "detail": ""
     },
     {
@@ -560,7 +580,22 @@
       "detail": ""
     },
     {
+      "check": "markdown-header:p2-asset-review.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:p2-character-organization.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
       "check": "markdown-header:p2-identity.md",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "check": "markdown-header:p2-relation-review.md",
       "passed": true,
       "detail": ""
     },
@@ -606,8 +641,8 @@
     },
     {
       "check": "local-links",
-      "passed": true,
-      "detail": ""
+      "passed": false,
+      "detail": "08-追溯与验证记录.md -> ../../../app/src/App.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/app-shell/AppShell.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/store/ui-store.ts; 08-追溯与验证记录.md -> ../../../app/src/features/settings/SettingsPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/config/settings.ts; 08-追溯与验证记录.md -> ../../../app/src/core/config/settings.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/models.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/provider.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/credentials.ts; 08-追溯与验证记录.md -> ../../../app/src/features/settings/SettingsPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/config/settings.ts; 08-追溯与验证记录.md -> ../../../app/src/core/config/settings.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/probe.ts; 08-追溯与验证记录.md -> ../../../app/src/features/import/ImportPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/import/ImportPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/decode-text.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/split-chapters.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/split-chapters.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/split-chapters.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/split-chapters.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/import-book.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/repo.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/repo.ts; 08-追溯与验证记录.md -> ../../../app/src/queries/index.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-all.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-all.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/compilation-lock.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/p1.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/p1.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-p1.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/repo.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-merge.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/asset-merge-policy.ts; 08-追溯与验证记录.md -> ../../../app/src/core/shared/fuse-assets.ts; 08-追溯与验证记录.md -> ../../../app/src/core/shared/fuse-assets.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/asset-frequency.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/character-merge-policy.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/character-merge-policy.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-merge.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-merge.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-merge.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-link.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-link.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-link.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-link.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-merge.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-link.ts; 08-追溯与验证记录.md -> ../../../app/src/core/memory/story-editor.ts; 08-追溯与验证记录.md -> ../../../app/src/features/compile/StageTestPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-test-stage.ts; 08-追溯与验证记录.md -> ../../../app/src/features/assets/AssetsPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/assets/TryOnePanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/try-one.ts; 08-追溯与验证记录.md -> ../../../app/src/features/compile/CompilePanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/store/compile-store.ts; 08-追溯与验证记录.md -> ../../../app/src/features/store/compile-store.ts; 08-追溯与验证记录.md -> ../../../app/src/queries/index.ts; 08-追溯与验证记录.md -> ../../../app/src/features/assets/BookSidebar.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/assets/AssetsPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/assets/AssetDetail.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/assets/AssetDetail.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/assets/edit.ts; 08-追溯与验证记录.md -> ../../../app/src/core/assets/edit.ts; 08-追溯与验证记录.md -> ../../../app/src/core/assets/edit.ts; 08-追溯与验证记录.md -> ../../../app/src/core/assets/edit.ts; 08-追溯与验证记录.md -> ../../../app/src/core/assets/edit.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/publish.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/publish.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/publish.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/publish.ts; 08-追溯与验证记录.md -> ../../../app/src/features/assets/EditorMemoryPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/memory/story-editor.ts; 08-追溯与验证记录.md -> ../../../app/src/core/memory/story-editor.ts; 08-追溯与验证记录.md -> ../../../app/src/core/memory/story-editor.ts; 08-追溯与验证记录.md -> ../../../app/src/core/session/store.ts; 08-追溯与验证记录.md -> ../../../app/src/core/session/store.ts; 08-追溯与验证记录.md -> ../../../app/src/core/agent/profiles.ts; 08-追溯与验证记录.md -> ../../../app/src/features/assets/SessionHistory.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/session/compaction.ts; 08-追溯与验证记录.md -> ../../../app/src/core/session/compaction.ts; 08-追溯与验证记录.md -> ../../../app/src/core/session/pi-context.ts; 08-追溯与验证记录.md -> ../../../app/src/core/tools/compile-tools.ts; 08-追溯与验证记录.md -> ../../../app/src/core/tools/compile-tools.ts; 08-追溯与验证记录.md -> ../../../app/src/core/tools/compile-tools.ts; 08-追溯与验证记录.md -> ../../../app/src/core/agent/run.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/call.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/call.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/errors.ts; 08-追溯与验证记录.md -> ../../../app/src/core/agent/run.ts; 08-追溯与验证记录.md -> ../../../app/src/core/agent/run.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/normalize-result.ts; 08-追溯与验证记录.md -> ../../../app/src/core/export/export-book.ts; 08-追溯与验证记录.md -> ../../../app/src/core/export/manifest.ts; 08-追溯与验证记录.md -> ../../../app/src/core/export/manifest.ts; 08-追溯与验证记录.md -> ../../../app/src/core/export/import-book.ts; 08-追溯与验证记录.md -> ../../../app/src/core/export/import-book.ts; 08-追溯与验证记录.md -> ../../../app/src/features/settings/SettingsPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/assets/local-file-export.ts; 08-追溯与验证记录.md -> ../../../app/src/core/export/local-file.ts; 08-追溯与验证记录.md -> ../../../app/src/core/export/local-file.ts; 08-追溯与验证记录.md -> ../../../app/src/features/assets/local-file-export.ts; 08-追溯与验证记录.md -> ../../../app/src/features/assets/BookSidebar.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/assets/library.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/repo.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/canon.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/settings.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/stores.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/canon.ts; 08-追溯与验证记录.md -> ../../../app/src/core/schema/book.ts; 08-追溯与验证记录.md -> ../../../app/src/core/schema/node.ts; 08-追溯与验证记录.md -> ../../../app/src/core/schema/event-line.ts; 08-追溯与验证记录.md -> ../../../app/src/features/play/PlayPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/play/PlayPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/app-shell/AppShell.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/assets/AssetFields.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/schema/common.ts; 08-追溯与验证记录.md -> ../../../app/src/core/schema/character-snapshot.ts; 08-追溯与验证记录.md -> ../../../app/src/core/schema/node.ts; 08-追溯与验证记录.md -> ../../../app/src/core/schema/location-snapshot.ts; 08-追溯与验证记录.md -> ../../../app/vite.config.ts; 08-追溯与验证记录.md -> ../../../app/tests/setup.ts; 08-追溯与验证记录.md -> ../../../app/tests/llm-session-wiring.test.ts; 08-追溯与验证记录.md -> ../../../app/src/core/schema/node.ts; 08-追溯与验证记录.md -> ../../../app/src/core/db/stores.ts; 08-追溯与验证记录.md -> ../../../app/src/features/network/NetworkPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/play/PlayPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/prompts/index.ts; 08-追溯与验证记录.md -> ../../../app/src/core/prompts/extraction/01-extract-world-assets.md; 08-追溯与验证记录.md -> ../../../app/src/core/prompts/extraction/02-extract-narrative-assets.md; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/p1.ts; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/run-merge.ts; 08-追溯与验证记录.md -> ../../../app/src/features/assets/AssetsPanel.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/assets/AssetDetail.tsx; 08-追溯与验证记录.md -> ../../../app/src/features/assets/AssetDetail.tsx; 08-追溯与验证记录.md -> ../../../app/src/core/pipeline/asset-merge-policy.ts; 08-追溯与验证记录.md -> ../../../app/src/features/store/compile-store.ts; 08-追溯与验证记录.md -> ../../../app/src/core/llm/models.ts"
     },
     {
       "check": "markdown-tables",
@@ -616,7 +651,7 @@
     },
     {
       "check": "operation-doc-machine-alignment",
-      "passed": true,
+      "passed": false,
       "detail": ""
     },
     {
@@ -625,8 +660,8 @@
       "detail": ""
     }
   ],
-  "passed": 124,
-  "failed": 0,
+  "passed": 128,
+  "failed": 3,
   "limitations": [
     "No application workflow execution",
     "Schema example checks cover required keys, not full JSON Schema semantics",

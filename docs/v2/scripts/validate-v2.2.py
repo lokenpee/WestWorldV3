@@ -46,13 +46,13 @@ check("tables", (data["globalTableCount"], data["perBookTableCount"], data["tota
 check("new-tables", {t["name"] for t in data["newTables"]} == {"extractionReceipts", "assetLifecycle", "pipelineRuns"})
 check("P1-serial-and-no-auto-start", pipeline["stages"]["P1"]["chaptersInFlight"] == 1 and pipeline["stages"]["P1"]["onComplete"] == "unlock-P2-and-P3-without-auto-start")
 check("P2-P3-parallel", pipeline["stages"]["P2"]["canRunWith"] == ["P3"] and pipeline["stages"]["P3"]["canRunWith"] == ["P2"])
-check("P3-same-session", pipeline["stages"]["P3"]["newSessionOnRecheck"] is False and pipeline["stages"]["P2"]["storySession"] is False)
+check("P3-same-session", pipeline["stages"]["P3"]["newSessionOnRecheck"] is False and pipeline["stages"]["P2"]["storySession"] == "one-active-asset-editor-session-per-book")
 check("P3-high-confidence", pipeline["stages"]["P3"]["firstPass"]["minConfidence"] == 0.85)
 check("mechanical-boundary", pipeline["mechanicalPolicy"]["strictlyGreaterThan"] == 0.9 and pipeline["manualMerge"]["callsAi"] is False)
 check("direct-storage-no-publish", pipeline["directStorage"]["publishAction"] is False and pipeline["directStorage"]["draftLayer"] is False and "publication" not in pipeline)
 check("no-publish-operation", not {"OP-30", "OP-31"}.intersection(o["id"] for o in operations))
 check("stable-current-entities", pipeline["directStorage"]["authoritativeTables"] == ["characters", "locations", "nodes", "eventLines"])
-check("backup-v5", pipeline["backup"]["targetFormatVersion"] == 5 and pipeline["backup"]["excludeLeaseRecords"])
+check("backup-v5", pipeline["backup"]["targetFormatVersion"] == 10 and pipeline["backup"]["excludeLeaseRecords"])
 
 # Validate documented window examples independently of application code.
 w = pipeline["stages"]["P3"]["window"]
@@ -70,7 +70,7 @@ def windows(count):
 check("window-policy", (w["size"], w["overlap"], w["stride"]) == (100, 20, 80))
 check("window-examples", windows(0) == [] and windows(100) == [[0, 100]] and windows(180) == [[0, 100], [80, 180]] and windows(240) == [[0, 100], [80, 180], [160, 240]])
 
-check("tool-profile-counts", len(tools["profiles"]["asset_editor"]) == 10 and len(tools["profiles"]["story_editor"]) == 15 and len(results) == 16)
+check("tool-profile-counts", len(tools["profiles"]["asset_editor"]) == 30 and len(tools["profiles"]["story_editor"]) == 16 and len(results) == 37)
 check("tool-name-alignment", {t["name"] for t in results} == {t["name"] for ts in tools["profiles"].values() for t in ts})
 for toolname, example_key in [("query_characters", "queryCharacters"), ("query_locations", "queryLocations")]:
     declaration = next(t for t in tools["profiles"]["story_editor"] if t["name"] == toolname)
@@ -82,13 +82,14 @@ for toolname, example_key in [("query_characters", "queryCharacters"), ("query_l
 runtime = load("ai-runtime-contract.json")
 check("Pi-shared-model-boundary", runtime["modelBoundary"]["sharedBy"] == ["direct", "agent"] and runtime["modelBoundary"]["businessRawInferenceHttpAllowed"] is False and runtime["modelBoundary"]["settingsRawInferenceHttpAllowed"] is False)
 check("Pi-mode-ownership", runtime["modes"]["direct"]["usesAgentCoreLoop"] is False and runtime["modes"]["agent"]["runtimeStateOwner"] == "pi-agent-core" and runtime["modes"]["agent"]["persistedMemoryOwner"] == "application IndexedDB")
-check("Pi-read-write-count", tools["uniqueReadToolCount"] == 14 and tools["uniqueWriteToolCount"] == 2 and tools["uniqueBusinessToolCount"] == 16)
+check("Pi-read-write-count", tools["uniqueReadToolCount"] == 22 and tools["uniqueWriteToolCount"] == 15 and tools["uniqueBusinessToolCount"] == 37)
 write_names = {t["name"] for ts in tools["profiles"].values() for t in ts if t["kind"] == "write"}
-check("Pi-write-scope", write_names == {"commit_asset_changes", "commit_story_changes"})
+envelope_writes = {"commit_asset_changes", "commit_story_changes"}
+check("Pi-write-scope", write_names == envelope_writes | {"edit_character", "edit_location", "edit_event_node", "edit_event_line", "set_character_relation", "delete_character_relation", "save_candidate_group", "resolve_candidate_group", "clear_candidate_groups", "record_organization_progress", "merge_assets", "submit_profile_review", "submit_relation_review"})
 check("Pi-write-before-tool-result", runtime["writePolicy"]["commitBeforeToolResult"] and runtime["writePolicy"]["atomicMemoryAndAssets"] and runtime["writePolicy"]["noWriteOnValidationFailure"])
 check("Pi-finalizer-no-repeat-write", tools["finalizer"]["writesDatabase"] is False and tools["finalizer"]["schema"] == "AgentTaskSummarySchema" and "AgentTaskSummarySchema" in models)
 check("Pi-app-idempotency-ledger", runtime["writePolicy"]["ledger"] == "pipelineRuns.appliedCommands" and "appliedCommands" in data["schemas"]["$defs"]["PipelineRun"]["properties"])
-for name in sorted(write_names):
+for name in sorted(envelope_writes):
     schema = next(t for t in results if t["name"] == name)
     check(name + ":command-envelope", {"operationKey", "payload"}.issubset(schema["input"]["required"]) and schema["runtimeChecksReturn"])
 receipt_schema = next(t for t in results if t["name"] == "commit_story_changes")["success"]

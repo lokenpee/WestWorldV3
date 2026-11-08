@@ -5,6 +5,9 @@ import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import { records, strings, text } from './contracts'
 import type { Row } from './repository'
 
+export const observationTypes = new Set(['request_trace', 'prompt_snapshot', 'tool_snapshot'])
+export const isObservationEntry = (row: Row) => observationTypes.has(String(row.type))
+
 export function estimateTextTokens(value: string): number {
   let weight = 0
   for (const char of value) weight += /[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/u.test(char) ? 1.5 : char.codePointAt(0)! > 127 ? 1 : 0.25
@@ -30,6 +33,7 @@ export function sessionPath(entries: Row[], leafId?: string): Row[] {
   return path.reverse()
 }
 export function entryMessages(entry: Row): AgentMessage[] {
+  if (isObservationEntry(entry)) return []
   if (entry.type === 'message') return [entry.message as AgentMessage]
   if (entry.type === 'commit') return [{ role: 'user', content: `[代码提交确认] ${text(entry.summary)}`, timestamp: Date.parse(text(entry.createdAt)) }]
   if (entry.type === 'compaction') return [
@@ -58,7 +62,8 @@ export function repairToolPairs(messages: AgentMessage[], flushTail = true): Age
   return out
 }
 export function projectSession(entries: Row[], leafId?: string) {
-  const path = sessionPath(entries, leafId)
+  const businessEntries = entries.filter(row => !isObservationEntry(row))
+  const path = sessionPath(businessEntries, leafId)
   const omitted = new Set(path.flatMap(row => row.type === 'omit' ? strings(row.omittedEntryIds) : []))
   const last = path.findLastIndex(row => row.type === 'compaction')
   let visible = path

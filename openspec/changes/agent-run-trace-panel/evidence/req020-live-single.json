@@ -1,0 +1,836 @@
+{
+  "book": "红楼之挽天-三河帮（导入）",
+  "character": {
+    "id": "C1-P022",
+    "name": "贾政",
+    "before": {
+      "name": "贾政",
+      "identity": "贾府文字辈，荣国府二老爷（政老爷），工部官员；贾母之子、贾赦之弟、宝玉与元春之父；曾于朝堂举荐贾珩为贾族族长，率阖族迎贾珩归族",
+      "profile": {
+        "gender": "男",
+        "ageText": ""
+      },
+      "personality": "端方正直，重文教、敬重贤才，推崇读书人立功立言立德；酷爱读书，兼好时人笔记与小说话本；重视子弟读书，对下人乱传流言动怒，酒后易发怒；为兄长之过不便直言，丧子而伤怀",
+      "confidence": 0.9,
+      "id": "C1-P022",
+      "bookId": "ec42cc00-a98f-4f44-a274-1e6bbb5991a8",
+      "revision": 161,
+      "createdBy": "P1",
+      "chapterIndex": "1",
+      "chapterName": "第一百二十一章 勉为其难",
+      "sourceChapters": [
+        "1",
+        "2",
+        "3",
+        "19",
+        "20",
+        "23",
+        "24",
+        "25",
+        "26"
+      ],
+      "nameSource": "automatic",
+      "aliases": [
+        "二老爷",
+        "政老爷"
+      ],
+      "speechStyleSample": "子钰之贤，士林公论，如今我贾族正需要子钰这样的德才兼备之人才能光大我贾族门楣，子钰不要再推辞了，如是再推辞，阖族人心都会惶恐不安。；谁让你们在此妄动口舌，诅咒我贾族族长的？；子钰所言是理。；读书人立功、立言、立德而三不朽，子钰辞爵而已现贤德之相，这话本也是论史之作，虽难说圣贤典籍，但也算是立一家之言了；老太太在屋里等着呢，快进来吧。；母亲，府中一些下人着实是不像话。；子钰，我送送你。；上不得台面的东西，让你去东府，为什么不去？",
+      "mergeFacts": [
+        {
+          "id": "F1b86fcb6",
+          "field": "identity",
+          "text": "荣府二老爷",
+          "chapters": [
+            "26"
+          ]
+        },
+        {
+          "id": "F1be6e2ba",
+          "field": "appearance",
+          "text": "捻着胡须",
+          "chapters": [
+            "2"
+          ]
+        },
+        {
+          "id": "F1d7c4008",
+          "field": "identity",
+          "text": "工部官员，荣国府二老爷",
+          "chapters": [
+            "19"
+          ]
+        },
+        {
+          "id": "F3fd08432",
+          "field": "identity",
+          "text": "贾母之子，宝玉之父",
+          "chapters": [
+            "3"
+          ]
+        },
+        {
+          "id": "F442b191",
+          "field": "appearance",
+          "text": "儒雅面容，手捻胡须",
+          "chapters": [
+            "25"
+          ]
+        },
+        {
+          "id": "F4916fdd4",
+          "field": "identity",
+          "text": "贾府中人，二老爷",
+          "chapters": [
+            "24"
+          ]
+        },
+        {
+          "id": "F49b5f0f5",
+          "field": "appearance",
+          "text": "儒雅面容",
+          "chapters": [
+            "23"
+          ]
+        },
+        {
+          "id": "F5e042519",
+          "field": "personality",
+          "text": "酒后易发怒",
+          "chapters": [
+            "3"
+          ]
+        },
+        {
+          "id": "F60867b02",
+          "field": "personality",
+          "text": "推崇读书人立功立言立德",
+          "chapters": [
+            "20"
+          ]
+        },
+        {
+          "id": "F67af3222",
+          "field": "personality",
+          "text": "丧子而伤怀",
+          "chapters": [
+            "2"
+          ]
+        },
+        {
+          "id": "F6a00ef1b",
+          "field": "personality",
+          "text": "重文教、敬重贤才",
+          "chapters": [
+            "2"
+          ]
+        },
+        {
+          "id": "F6c7bf9d3",
+          "field": "personality",
+          "text": "对下人乱传流言动怒",
+          "chapters": [
+            "19"
+          ]
+        },
+        {
+          "id": "F73bc2d0a",
+          "field": "personality",
+          "text": "苦苦相劝与哀求",
+          "chapters": [
+            "1"
+          ]
+        },
+        {
+          "id": "F7e43aa87",
+          "field": "identity",
+          "text": "贾母之子，贾赦之弟",
+          "chapters": [
+            "20"
+          ]
+        },
+        {
+          "id": "F86284d9e",
+          "field": "personality",
+          "text": "重视子弟读书",
+          "chapters": [
+            "3"
+          ]
+        },
+        {
+          "id": "F8922a46c",
+          "field": "identity",
+          "text": "荣国府主子",
+          "chapters": [
+            "25"
+          ]
+        },
+        {
+          "id": "F921a3705",
+          "field": "identity",
+          "text": "贾族政老爷，荣国府主人之一",
+          "chapters": [
+            "23"
+          ]
+        },
+        {
+          "id": "F97638a3c",
+          "field": "appearance",
+          "text": "着儒衫长袍",
+          "chapters": [
+            "3"
+          ]
+        },
+        {
+          "id": "F9c1cedd6",
+          "field": "personality",
+          "text": "面色激动，急于光大贾族门楣",
+          "chapters": [
+            "1"
+          ]
+        },
+        {
+          "id": "Fa12cad44",
+          "field": "identity",
+          "text": "贾府老爷，曾于朝堂举荐贾珩为贾族族长",
+          "chapters": [
+            "2"
+          ]
+        },
+        {
+          "id": "Fb1a57203",
+          "field": "identity",
+          "text": "贾府文字辈，率阖族老少爷们儿迎贾珩归族",
+          "chapters": [
+            "1"
+          ]
+        },
+        {
+          "id": "Fbe010e6",
+          "field": "background",
+          "text": "自幼酷爱读书，得祖父宠爱",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fc108cc1a",
+          "field": "personality",
+          "text": "为兄长之过不便直言",
+          "chapters": [
+            "20"
+          ]
+        },
+        {
+          "id": "Fc56a831c",
+          "field": "personality",
+          "text": "见贾珩回府现出激动之色",
+          "chapters": [
+            "23"
+          ]
+        },
+        {
+          "id": "Ff2fdf756",
+          "field": "personality",
+          "text": "端方正直",
+          "chapters": [
+            "19"
+          ]
+        },
+        {
+          "id": "Ffe5aee23",
+          "field": "personality",
+          "text": "酷爱读书（兼爱时人笔记、小说话本）",
+          "chapters": [
+            "19"
+          ]
+        },
+        {
+          "id": "F29fc3eda",
+          "field": "identity",
+          "text": "曾于朝堂举荐贾珩为贾族族长，率阖族迎贾珩归族",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "F30d66eb8",
+          "field": "personality",
+          "text": "重视子弟读书，对下人乱传流言动怒，酒后易发怒",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "F5f49288d",
+          "field": "appearance",
+          "text": "儒雅面容，常捻着胡须，着儒衫长袍",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "F77d848a8",
+          "field": "identity",
+          "text": "贾母之子、贾赦之弟、宝玉与元春之父",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "F96dab10",
+          "field": "identity",
+          "text": "贾府文字辈，荣国府二老爷（政老爷），工部官员",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fa6d027e9",
+          "field": "personality",
+          "text": "酷爱读书，兼好时人笔记与小说话本",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fa76b1c05",
+          "field": "personality",
+          "text": "端方正直，重文教、敬重贤才，推崇读书人立功立言立德",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fb9922b3f",
+          "field": "personality",
+          "text": "为兄长之过不便直言，丧子而伤怀",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        }
+      ],
+      "frequency": {
+        "chapters": 9,
+        "mentions": 66,
+        "scopeChapters": 57,
+        "percentile": 0.24817518248175183
+      },
+      "roleWeight": "重要配角",
+      "roleWeightSource": "frequency",
+      "manualSourceNote": "",
+      "manualKeep": false,
+      "updatedAt": "2026-11-05T14:39:28.418Z",
+      "optimizedFactIds": [],
+      "appearance": "儒雅面容，常捻着胡须，着儒衫长袍",
+      "background": "自幼酷爱读书，得祖父宠爱",
+      "verifiedAliases": [],
+      "mergeNotes": []
+    },
+    "after": {
+      "name": "贾政",
+      "identity": "贾府文字辈，荣国府二老爷（政老爷），工部官员；贾母之子、贾赦之弟、宝玉与元春之父；曾于朝堂举荐贾珩为贾族族长，并率阖族老少爷们儿迎贾珩归族",
+      "profile": {
+        "gender": "男",
+        "ageText": ""
+      },
+      "personality": "端方正直，重文教、敬重贤才，推崇读书人立功立言立德；酷爱读书，兼好时人笔记与小说话本；重视子弟读书，对下人乱传流言动怒，酒后易发怒；为兄长之过不便直言，丧子而伤怀",
+      "confidence": 0.9,
+      "id": "C1-P022",
+      "bookId": "ec42cc00-a98f-4f44-a274-1e6bbb5991a8",
+      "revision": 162,
+      "createdBy": "P1",
+      "chapterIndex": "1",
+      "chapterName": "第一百二十一章 勉为其难",
+      "sourceChapters": [
+        "1",
+        "2",
+        "3",
+        "19",
+        "20",
+        "23",
+        "24",
+        "25",
+        "26"
+      ],
+      "nameSource": "automatic",
+      "aliases": [
+        "二老爷",
+        "政老爷"
+      ],
+      "speechStyleSample": "子钰之贤，士林公论，如今我贾族正需要子钰这样的德才兼备之人才能光大我贾族门楣，子钰不要再推辞了，如是再推辞，阖族人心都会惶恐不安。；谁让你们在此妄动口舌，诅咒我贾族族长的？；子钰所言是理。；读书人立功、立言、立德而三不朽，子钰辞爵而已现贤德之相，这话本也是论史之作，虽难说圣贤典籍，但也算是立一家之言了；老太太在屋里等着呢，快进来吧。；母亲，府中一些下人着实是不像话。；子钰，我送送你。；上不得台面的东西，让你去东府，为什么不去？",
+      "mergeFacts": [
+        {
+          "id": "F1be6e2ba",
+          "field": "appearance",
+          "text": "捻着胡须",
+          "chapters": [
+            "2"
+          ]
+        },
+        {
+          "id": "F30d66eb8",
+          "field": "personality",
+          "text": "重视子弟读书，对下人乱传流言动怒，酒后易发怒",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "F442b191",
+          "field": "appearance",
+          "text": "儒雅面容，手捻胡须",
+          "chapters": [
+            "25"
+          ]
+        },
+        {
+          "id": "F49b5f0f5",
+          "field": "appearance",
+          "text": "儒雅面容",
+          "chapters": [
+            "23"
+          ]
+        },
+        {
+          "id": "F5e042519",
+          "field": "personality",
+          "text": "酒后易发怒",
+          "chapters": [
+            "3"
+          ]
+        },
+        {
+          "id": "F5f49288d",
+          "field": "appearance",
+          "text": "儒雅面容，常捻着胡须，着儒衫长袍",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "F60867b02",
+          "field": "personality",
+          "text": "推崇读书人立功立言立德",
+          "chapters": [
+            "20"
+          ]
+        },
+        {
+          "id": "F67af3222",
+          "field": "personality",
+          "text": "丧子而伤怀",
+          "chapters": [
+            "2"
+          ]
+        },
+        {
+          "id": "F6a00ef1b",
+          "field": "personality",
+          "text": "重文教、敬重贤才",
+          "chapters": [
+            "2"
+          ]
+        },
+        {
+          "id": "F6c7bf9d3",
+          "field": "personality",
+          "text": "对下人乱传流言动怒",
+          "chapters": [
+            "19"
+          ]
+        },
+        {
+          "id": "F73bc2d0a",
+          "field": "personality",
+          "text": "苦苦相劝与哀求",
+          "chapters": [
+            "1"
+          ]
+        },
+        {
+          "id": "F77d848a8",
+          "field": "identity",
+          "text": "贾母之子、贾赦之弟、宝玉与元春之父",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "F86284d9e",
+          "field": "personality",
+          "text": "重视子弟读书",
+          "chapters": [
+            "3"
+          ]
+        },
+        {
+          "id": "F96dab10",
+          "field": "identity",
+          "text": "贾府文字辈，荣国府二老爷（政老爷），工部官员",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "F97638a3c",
+          "field": "appearance",
+          "text": "着儒衫长袍",
+          "chapters": [
+            "3"
+          ]
+        },
+        {
+          "id": "F9c1cedd6",
+          "field": "personality",
+          "text": "面色激动，急于光大贾族门楣",
+          "chapters": [
+            "1"
+          ]
+        },
+        {
+          "id": "Fa6d027e9",
+          "field": "personality",
+          "text": "酷爱读书，兼好时人笔记与小说话本",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fa76b1c05",
+          "field": "personality",
+          "text": "端方正直，重文教、敬重贤才，推崇读书人立功立言立德",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fb86f044a",
+          "field": "identity",
+          "text": "曾于朝堂举荐贾珩为贾族族长，并率阖族老少爷们儿迎贾珩归族",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fb9922b3f",
+          "field": "personality",
+          "text": "为兄长之过不便直言，丧子而伤怀",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fbe010e6",
+          "field": "background",
+          "text": "自幼酷爱读书，得祖父宠爱",
+          "chapters": [
+            "1",
+            "2",
+            "3",
+            "19",
+            "20",
+            "23",
+            "24",
+            "25",
+            "26"
+          ]
+        },
+        {
+          "id": "Fc108cc1a",
+          "field": "personality",
+          "text": "为兄长之过不便直言",
+          "chapters": [
+            "20"
+          ]
+        },
+        {
+          "id": "Fc56a831c",
+          "field": "personality",
+          "text": "见贾珩回府现出激动之色",
+          "chapters": [
+            "23"
+          ]
+        },
+        {
+          "id": "Ff2fdf756",
+          "field": "personality",
+          "text": "端方正直",
+          "chapters": [
+            "19"
+          ]
+        },
+        {
+          "id": "Ffe5aee23",
+          "field": "personality",
+          "text": "酷爱读书（兼爱时人笔记、小说话本）",
+          "chapters": [
+            "19"
+          ]
+        }
+      ],
+      "frequency": {
+        "chapters": 9,
+        "mentions": 66,
+        "scopeChapters": 57,
+        "percentile": 0.24817518248175183
+      },
+      "roleWeight": "重要配角",
+      "roleWeightSource": "frequency",
+      "manualSourceNote": "",
+      "manualKeep": false,
+      "updatedAt": "2026-11-07T18:30:11.595Z",
+      "optimizedFactIds": [],
+      "appearance": "儒雅面容，常捻着胡须，着儒衫长袍",
+      "background": "自幼酷爱读书，得祖父宠爱",
+      "verifiedAliases": [],
+      "mergeNotes": []
+    }
+  },
+  "outcome": "changed",
+  "reason": "身份字段已涵盖文字辈、荣国府二老爷、工部官员及亲属关系，仅补足迎贾珩归族的具体表述（阖族老少爷们儿），其余外貌、性格、背景、说话样本与事实底稿一致，无需改动。",
+  "commitIds": [
+    "d59d0a1f-52e8-4757-80cf-3ff0ed8a616f"
+  ],
+  "requests": 1,
+  "ledger": [
+    {
+      "attemptId": "8106be79-59ee-495d-9e7b-45e2529d96c5",
+      "requestId": "0a3eff88-4df3-4e83-af4b-278d81e283cd",
+      "executionId": "58f3a7d6-5ab8-4e85-b559-97ca662fead7",
+      "stage": "P2",
+      "workId": "profile:C1-P022",
+      "characterId": "C1-P022",
+      "contextId": "profiles",
+      "purpose": "work",
+      "status": "succeeded",
+      "startedAt": "2026-11-07T18:30:09.827Z",
+      "finishedAt": "2026-11-07T18:30:11.810Z",
+      "estimatedInput": 18154,
+      "outputReserve": 8192,
+      "input": 17027,
+      "cacheRead": 0,
+      "cacheWrite": 0,
+      "output": 290,
+      "totalTokens": 17317,
+      "usageStatus": "reported",
+      "cost": 0.0054561,
+      "currency": "USD",
+      "costStatus": "estimated",
+      "modelSnapshot": "deepseek/deepseek-flash"
+    }
+  ],
+  "usage": {
+    "input": 17027,
+    "output": 290,
+    "totalTokens": 17317,
+    "cost": 0.0054561,
+    "costStatus": "estimated"
+  },
+  "reportUsage": {
+    "input": 17027,
+    "output": 290,
+    "totalTokens": 17317,
+    "cost": 0.0054561,
+    "costStatus": "estimated"
+  },
+  "cost": 0.0054561,
+  "status": "cancelled",
+  "error": "人物整理已取消，已提交成果保留。",
+  "messageEntries": 550,
+  "contexts": {
+    "identity": {
+      "id": "identity",
+      "status": "completed",
+      "pendingWorkId": null
+    },
+    "profiles": {
+      "id": "profiles",
+      "status": "completed",
+      "pendingWorkId": null
+    },
+    "relations": {
+      "id": "relations",
+      "status": "active",
+      "pendingWorkId": "relations:C1-P021"
+    }
+  },
+  "traceRequests": [
+    {
+      "requestId": "0a3eff88-4df3-4e83-af4b-278d81e283cd",
+      "executionId": "58f3a7d6-5ab8-4e85-b559-97ca662fead7",
+      "purpose": "work",
+      "status": "succeeded",
+      "complete": true,
+      "final": true,
+      "model": "deepseek/deepseek-flash",
+      "text": "{\"ok\":true,\"commitId\":\"d59d0a1f-52e8-4757-80cf-3ff0ed8a616f\",\"operationKey\":\"632b1ef0e8a203d71df88d73d26fcf6d4859c34c0cd",
+      "toolCalls": [
+        "submit_profile_review"
+      ],
+      "usage": {
+        "input": 17027,
+        "output": 290,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 17317,
+        "cost": 0.0054561,
+        "costStatus": "estimated",
+        "provider": "reported"
+      }
+    }
+  ],
+  "traceSnapshots": [
+    {
+      "type": "prompt_snapshot",
+      "snapshotId": "58f3a7d6-5ab8-4e85-b559-97ca662fead7:prompt:business:479d1510",
+      "length": 2739
+    },
+    {
+      "type": "prompt_snapshot",
+      "snapshotId": "58f3a7d6-5ab8-4e85-b559-97ca662fead7:prompt:system:8ad40ce8",
+      "length": 3788
+    },
+    {
+      "type": "tool_snapshot",
+      "snapshotId": "58f3a7d6-5ab8-4e85-b559-97ca662fead7:tools:04465f58",
+      "length": 30
+    }
+  ],
+  "note": "单人验证在第一个 profile 工作项完成后主动取消，只用于质量与请求构成检查。"
+}

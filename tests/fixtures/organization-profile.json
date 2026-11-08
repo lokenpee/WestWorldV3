@@ -1,0 +1,166 @@
+{
+  "name": "崇平帝",
+  "identity": "大明皇帝；原文称谓：陛下、圣上、朕；皇帝；原文称谓：圣上；当朝皇帝；原文称谓：圣上、陛下；陈汉皇帝；皇帝，年号崇平，现为崇平十四年；原文称谓：圣上、朕；在位皇帝，年号崇平；皇帝，膝下育有五子三女；原文称谓：圣上、陛下、父皇；大明皇帝，御极天下十四载，亲政六年；当朝天子；以庶出之身夺嫡登位；大汉皇帝；陈芷、陈泽之父；皇帝，天子",
+  "aliases": [
+    "天子"
+  ],
+  "profile": {
+    "gender": "男",
+    "ageText": ""
+  },
+  "mergeFacts": [
+    {
+      "id": "F1d0c863d",
+      "field": "identity",
+      "text": "皇帝",
+      "chapters": [
+        "11",
+        "21",
+        "49"
+      ]
+    },
+    {
+      "id": "F23831bdc",
+      "field": "identity",
+      "text": "大明皇帝",
+      "chapters": [
+        "6"
+      ]
+    },
+    {
+      "id": "F3088916d",
+      "field": "identity",
+      "text": "当朝皇帝",
+      "chapters": [
+        "18",
+        "38",
+        "44"
+      ]
+    },
+    {
+      "id": "F3fe3faef",
+      "field": "identity",
+      "text": "以庶出之身夺嫡登位",
+      "chapters": [
+        "51"
+      ]
+    },
+    {
+      "id": "F56084b11",
+      "field": "identity",
+      "text": "原文称谓：圣上",
+      "chapters": [
+        "11",
+        "18",
+        "22",
+        "44"
+      ]
+    },
+    {
+      "id": "F7eeb2dd8",
+      "field": "identity",
+      "text": "皇帝，年号崇平，现为崇平十四年",
+      "chapters": [
+        "39"
+      ]
+    },
+    {
+      "id": "F87a3ff1e",
+      "field": "identity",
+      "text": "皇帝，膝下育有五子三女",
+      "chapters": [
+        "42"
+      ]
+    },
+    {
+      "id": "F93ee91a8",
+      "field": "identity",
+      "text": "当朝天子",
+      "chapters": [
+        "51"
+      ]
+    },
+    {
+      "id": "F9f77213f",
+      "field": "identity",
+      "text": "原文称谓：圣上、朕",
+      "chapters": [
+        "40"
+      ]
+    },
+    {
+      "id": "Fa1a3f83d",
+      "field": "identity",
+      "text": "大汉皇帝",
+      "chapters": [
+        "55"
+      ]
+    },
+    {
+      "id": "Fa717f682",
+      "field": "identity",
+      "text": "原文称谓：圣上、陛下、父皇",
+      "chapters": [
+        "42"
+      ]
+    },
+    {
+      "id": "Fc0df360a",
+      "field": "identity",
+      "text": "陈汉皇帝",
+      "chapters": [
+        "22",
+        "40"
+      ]
+    },
+    {
+      "id": "Fc89707ea",
+      "field": "identity",
+      "text": "原文称谓：陛下、圣上、朕",
+      "chapters": [
+        "6"
+      ]
+    },
+    {
+      "id": "Fd301e1f9",
+      "field": "identity",
+      "text": "大明皇帝，御极天下十四载，亲政六年",
+      "chapters": [
+        "50"
+      ]
+    },
+    {
+      "id": "Fe83b48fd",
+      "field": "identity",
+      "text": "陈芷、陈泽之父",
+      "chapters": [
+        "55"
+      ]
+    },
+    {
+      "id": "Fec6da1aa",
+      "field": "identity",
+      "text": "皇帝，天子",
+      "chapters": [
+        "9"
+      ]
+    },
+    {
+      "id": "Ff3603c45",
+      "field": "identity",
+      "text": "在位皇帝，年号崇平",
+      "chapters": [
+        "41"
+      ]
+    },
+    {
+      "id": "Ffe1fc60e",
+      "field": "identity",
+      "text": "原文称谓：圣上、陛下",
+      "chapters": [
+        "21",
+        "41"
+      ]
+    }
+  ]
+}

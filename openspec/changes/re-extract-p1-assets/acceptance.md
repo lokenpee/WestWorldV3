@@ -52,3 +52,46 @@ npm run openspec -- validate re-extract-p1-assets --strict
 | 2026-11-04 | 类型/静态/构建/治理/规格 | typecheck、build、governance、OpenSpec通过；lint仅既有CharacterNetwork警告 | 新增运行时字段和参数已同步资源归属哈希 |
 | 未执行 | 真实模型重提 | 待实施 | 需用户确认模型、样本和费用；任务5.6 |
 | 未执行 | 用户原书验收 | 待用户验收 | 任务6；不得由开发Agent代勾 |
+
+## 独立验收复查
+
+2026-11-04，核对REQ-018的服务、清空事务、凭证恢复与界面入口。验收期间HEAD更新为6888b12，工作区另出现0.4.2修改，以下复现以更新后的代码为准。
+
+| 缺陷 | 前置、操作和实际结果 | 根因和修复方向 |
+|---|---|---|
+| BUG-23 | 完成P1后令目标chapterTexts缺失，执行整书世界重提。预期清空前拒绝，实际旧人物全部删除，然后才报告原文缺失。独立探针失败 | reExtractPreview与清空前检查没有读取目标原文，execute在清空后才逐章读取。按REXTRACT-06在清空前校验，并在执行时重新核对 |
+| BUG-25 | 单章世界重提模型失败，随后模型恢复，调用章节按钮使用的service.retry。成功凭证已保存，但progress.reExtract仍存在，回收按钮继续禁用。独立探针失败 | selection存在时activeScope被设为undefined，完成分支因此无法清除原待继续范围。重试后应按已保存范围检查完成 |
+
+此前关系悬空目标和地点未失效探针均失败。验收期间工作区已增加syncRelations和location失效项，最新复验这两个探针均通过，不再列为当前未修复缺陷。
+
+用户反馈回收与失败重试无法点击，随后确认其页面正存在“继续重提世界资产／叙事资产”任务导致锁定。该现场原因已澄清。新增的章节失败重试入口仍存在BUG-25。
+
+本轮实际检查为相关单元54项通过、提取及机械队列开发/生产浏览器26项通过，以及更新中的0.4.2工作区全量42文件370项通过。原文缺失和重试范围探针为额外反例，未计入原有测试通过数。浏览器26项发生在最新0.4.2修改之前。真实模型、用户原书和重提刷新中断仍待验收。
+
+## BUG-23与BUG-25修复结果
+
+2026-11-04，用户授权直接修复BUG-23、BUG-25和BUG-26，并要求按AGENTS.md记录状态和结果。
+
+| 缺陷 | 修改与数据结果 | 检查 | 用户自测 |
+|---|---|---|---|
+| BUG-23 | service.reExtractPreview检查目标原文；执行在清空事务内再次检查缺失/空白原文，拒绝时保留旧资产与成功凭证。字段和备份格式无变化 | 整书/单章缺失原文、预览后原文变为空白、单章不误检查其他章的单元回归通过 | 原文可用时正常重提；原文缺失时提示具体章节并保留旧资料 |
+| BUG-25 | 章节retry继续携带已保存的reExtract范围，只请求点击的子步骤。保存凭证后按原范围判断完成，全部完成即清除标记，尚有缺项则保留 | 单章重试成功解锁、整书逐章重试直到范围完成的单元回归通过 | 单章重提失败后点击章节失败标签重试，成功后回收按钮恢复；整书还有失败项时保留继续入口 |
+
+提取与报告相关单元共33项通过。完整自动检查和浏览器结果在完成后追加。用户自测尚未执行，缺陷修复交付后状态为待验收；自测通过后改为已完成并同步归档。
+
+### 本轮自动检查与交付状态
+
+2026-11-04，BUG-23、BUG-25、BUG-26开发修复完成，状态为待验收。修复涉及的实现、测试及记录均保留为工作区差异。
+
+| 命令与范围 | 实际结果 |
+|---|---|
+| npx vitest run tests/extraction.test.ts tests/world-report.test.ts | 2文件33项通过 |
+| npm run test | 43文件379项通过 |
+| npm run typecheck | 通过 |
+| npm run lint | 通过，仅既有CharacterNetwork set-state-in-effect警告 |
+| npx playwright test --config playwright.workspace.config.ts tests/browser/extraction.spec.ts tests/browser/mechanical-queue.spec.ts --project development --project production --workers 2 | 28项通过，含新增单章失败重试后回收按钮解锁，开发与生产各14项 |
+| 浏览器检查的生产服务构建 | npm run build通过，沿用既有SDK node:fs外置和包体积提示 |
+| npm run governance:check | ok=true、issues=[] |
+| 三份OpenSpec严格校验 | improve-merge-candidates、consolidate-world-reports、re-extract-p1-assets均有效 |
+
+单元及浏览器均使用固定响应。真实模型和用户原书自测仍待用户执行。缺陷编号和历史证据保留，用户自测通过后改为已完成；真实模型、重提刷新中断等原任务不因本次修复自动勾选。

@@ -19,8 +19,6 @@
 .chapter-step.completed { background: #edf5ec; color: #356331; border-color: #c7dbc3; }
 .chapter-step.failed, .chapter-step.interrupted { background: #fff4ee; color: #9b4227; border-color: #edcabb; }
 .chapter-step.running { background: #eef3fb; color: #315b91; border-color: #c6d6ec; }
-.chapter-step:not(:disabled) { cursor: pointer; }
-.chapter-step:not(:disabled):hover { border-color: currentColor; }
 .chapter-number { width: 20px; flex-shrink: 0; font-size: 11px; color: #a3a3a3; font-variant-numeric: tabular-nums; }
 .chapter-list small { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .chapter-scroll { max-height: min(320px, 35dvh); overflow-y: auto; }

@@ -11,6 +11,8 @@ import { recoverStoryCoverage, saveStoryCoverage, storyFingerprint, validStoryCo
 import { hash } from '../agents/contracts'
 import { buildStoryContext, lineDigest, selectStoryBatch, storyBatchBudget } from './retrieval'
 import type { SessionStatus } from '../agents/compaction'
+import { readBookTrace } from '../agents/trace'
+import { isObservationEntry } from '../agents/context'
 import storyPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-story.md?raw'
 import taskTemplate from '../../../docs/v2/resources/v2.2/prompts/active/story.txt?raw'
 
@@ -45,7 +47,7 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
       const runtime = createAgentRuntime(models.agent, { generate: models.generate, onStatus: sessionStatus => set(bookId, { sessionStatus }) })
       await repo.transaction(true, async store => {
         const leases = await store.rows('pipelineRuns')
-        if (leases.some(row => row.recordType === 'lease' && ['extraction', 'narrative'].includes(text(row.lockKey)) && Number(row.expiresAt ?? Infinity) > Date.now())) throw new Error('本书已有叙事或提取任务，请等待其结束。')
+        if (leases.some(row => row.recordType === 'lease' && ['extraction', 'extraction:worldAssets', 'extraction:narrativeAssets', 'narrative'].includes(text(row.lockKey)) && Number(row.expiresAt ?? Infinity) > Date.now())) throw new Error('本书已有叙事或提取任务，请等待其结束。')
         if (!coverage(chapters, await store.rows('extractionReceipts') as unknown as Receipt[]).allCovered) throw new Error('请先完成全书逐章提取。')
         const session = await resolveSession(store, bookId)
         if (session.leaseOwner && Number(session.leaseUntil) > Date.now()) throw new Error('本书会话正在其他窗口运行。')
@@ -203,24 +205,25 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
         const current = windowNodes(window, chapters, nodes as unknown as EventNode[])
         if (checkpoint.status === 'completed' && ![await store.wait(windowFingerprint(window, current)), await store.wait(hash({ window, nodes: current }))].includes(checkpoint.sourceFingerprint)) checkpoint.status = 'failed'
       }
-      const leases = await store.rows('pipelineRuns')
+      const leaseIds = ['lease:narrative', 'lease:extraction', 'lease:extraction:worldAssets', 'lease:extraction:narrativeAssets']
+      const leases = (await Promise.all(leaseIds.map(id => store.get('pipelineRuns', id)))).filter((row): row is Row => !!row)
       const covered = coverage(chapters, await store.rows('extractionReceipts') as unknown as Receipt[]).allCovered
-      const locked = leases.some(row => row.recordType === 'lease' && ['narrative', 'extraction'].includes(String(row.lockKey)) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
-      const leaseExpiry = leases.filter(row => row.recordType === 'lease' && ['narrative', 'extraction'].includes(String(row.lockKey)) && typeof row.expiresAt === 'number' && row.expiresAt > Date.now()).reduce<number | undefined>((expiry, row) => Math.min(expiry ?? Infinity, Number(row.expiresAt)), undefined)
+      const locked = leases.some(row => row.recordType === 'lease' && ['narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(String(row.lockKey)) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
+      const leaseExpiry = leases.filter(row => row.recordType === 'lease' && ['narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(String(row.lockKey)) && typeof row.expiresAt === 'number' && row.expiresAt > Date.now()).reduce<number | undefined>((expiry, row) => Math.min(expiry ?? Infinity, Number(row.expiresAt)), undefined)
       const entries = progress?.editorSessionId ? (await store.rows('storySessionEntries')).filter(row => row.sessionId === progress.editorSessionId).sort((a, b) => Number(a.ordinal) - Number(b.ordinal)) : []
       const compact = entries.findLast(row => row.type === 'compaction')
       const review = run ? await reviewQueue(store, progress!.runId, progress!.editorSessionId) : undefined
       const memory = progress?.editorSessionId ? await store.get('storyEditorMemory', progress.editorSessionId) : undefined
-      return { progress, windows, covered, locked, leaseExpiry, checkpoints, completed: checkpoints.filter(row => row.status === 'completed').length, tasks: evidenceEntries((run?.tasks as Row[] | undefined) ?? [], nodes, lines), usage: run?.usage as { totalTokens: number; cost: number; costStatus?: string } | undefined, commits: (run?.appliedCommands as Row[] | undefined) ?? [], memory, notes: review?.items.filter(row => row.queue === 'review_notes').map(row => row.row) ?? [], session: { id: progress?.editorSessionId, entryCount: entries.length, compactions: entries.filter(row => row.type === 'compaction').length, compact }, review: { total: review?.items.length ?? 0, pending: review?.pending.length ?? 0, conclusions: review?.coverage ?? [] } }
+      return { progress, windows, covered, locked, leaseExpiry, checkpoints, completed: checkpoints.filter(row => row.status === 'completed').length, tasks: evidenceEntries((run?.tasks as Row[] | undefined) ?? [], nodes, lines), usage: run?.usage as { totalTokens: number; cost: number; costStatus?: string } | undefined, requestLedger: (run?.requestLedger as Row[] | undefined) ?? [], runStatus: run?.status as string | undefined, runStartedAt: run?.startedAt as string | undefined, commits: (run?.appliedCommands as Row[] | undefined) ?? [], memory, notes: review?.items.filter(row => row.queue === 'review_notes').map(row => row.row) ?? [], session: { id: progress?.editorSessionId, entryCount: entries.length, compactions: entries.filter(row => row.type === 'compaction').length, compact }, review: { total: review?.items.length ?? 0, pending: review?.pending.length ?? 0, conclusions: review?.coverage ?? [] } }
     })
   }
   async function history(bookId: string, offset = 0) {
     const db = workspace.openBook(bookId)
     const sessions = await db.table('storySessions').toArray()
     const session = sessions.find(row => row.profile === 'story_editor' && row.status === 'active')
-    const entries = session ? await db.table<Row>('storySessionEntries').where('sessionId').equals(session.id).sortBy('ordinal') : []
+    const entries = session ? await db.table<Row>('storySessionEntries').where('sessionId').equals(session.id).sortBy('ordinal').then(rows => rows.filter(row => !isObservationEntry(row))) : []
     return { sessionId: session?.id as string | undefined, total: entries.length, entries: entries.slice(offset, offset + 20) }
   }
-  return { start: (bookId: string) => start(bookId), review: (bookId: string) => start(bookId, 'global_review'), read, history, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => controllers.get(bookId)?.abort(), subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } } }
+  return { start: (bookId: string) => start(bookId), review: (bookId: string) => start(bookId, 'global_review'), read, history, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => controllers.get(bookId)?.abort(), subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } } }
 }
 export type StoryService = ReturnType<typeof createStoryService>

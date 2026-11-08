@@ -3,6 +3,8 @@ import { getCurrentSystemMessage } from '@earendil-works/pi-ai'
 import type { ModelService } from '../models/service'
 import { ModelError, type UsageSummary } from '../models/types'
 import { appendEntry, checkLease } from './commands'
+import { TraceSession } from './trace'
+import { appendRequestLedger } from './ledger'
 import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, entryMessages, findCutPoint, projectSession, settingsForWindow } from './context'
 import { text, validate } from './contracts'
 import { withOutputDiscipline } from './output-discipline'
@@ -22,7 +24,7 @@ export async function sessionProjection(repo: AgentRepository, sessionId: string
     const session = await store.get('storySessions', sessionId)
     if (!session || session.bookId !== repo.bookId) throw new Error('会话不属于当前书籍。')
     const entries = (await store.rows('storySessionEntries')).filter(row => row.sessionId === sessionId)
-    return { ...projectSession(entries, text(session.leafId) || undefined), session, allEntries: entries }
+    return { ...projectSession(entries, text(session.leafId) || undefined), session, allEntries: [...entries, ...(await repo.traceRows()).filter(row => row.sessionId === sessionId)] }
   })
 }
 function withTask(messages: AgentMessage[], prompt: string) {
@@ -39,6 +41,8 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
   const capacity = options.contextWindow - settings.reserve
   if (!options.force && before <= capacity) return withTask(projection.messages, options.prompt)
   options.onStatus?.({ state: 'compressing', before })
+  const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
+  const trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.prompt, purpose: 'compaction' })
   try {
     let cut = findCutPoint(projection.entries, settings.keep)
     if (!cut) cut = findCutPoint(projection.entries, 64)
@@ -66,22 +70,33 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
     if (chunk) chunks.push(chunk)
     const usage = { input: 0, output: 0, totalTokens: 0, cost: 0 }
     const maxTokens = Math.min(16384, Math.max(128, Math.floor(options.contextWindow / 8)))
-    const maxChars = Math.min(64000, Math.max(64, Math.floor(maxTokens / 2)))
+    const maxChars = Math.max(64, Math.floor(maxTokens / 2))
     const outputSchema = { ...summarySchema, properties: { summary: { ...summarySchema.properties.summary, maxLength: maxChars } } }
     for (const part of chunks) {
       options.signal?.throwIfAborted()
       await repo.transaction(false, store => checkLease(store, scope, options.signal))
+      let validation: { code: string; path?: string; actualLength?: number; allowedLength?: number } | undefined
       const result = await options.generate({ role: 'aggregation', context: { systemPrompt: withOutputDiscipline(`${compactPrompt}\n本次摘要最多${maxChars}字符。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。`), messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: outputSchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
         validate(message) {
+          const summaryError = (code: string, detail: string, extra: { actualLength?: number; allowedLength?: number } = {}) => {
+            validation = { code, path: 'summary', ...extra }
+            return new ModelError('validation', `${code}:${detail}`)
+          }
+          if (message.stopReason === 'length') throw summaryError('OUTPUT_TRUNCATED', `模型输出被截断，未能返回完整摘要。`)
           const calls = message.content.filter(part => part.type === 'toolCall')
-          if (calls.length !== 1 || calls[0].name !== 'submit_result') throw new ModelError('validation', '压缩摘要须通过指定工具返回。')
-          try { validate(outputSchema, calls[0].arguments, '压缩摘要格式或长度不符。') } catch { throw new ModelError('validation', `压缩摘要须包含非空summary，长度至多${maxChars}字符。`) }
-          const value = calls[0].arguments as { summary: string }
-          if (!value.summary.trim()) throw new ModelError('validation', '压缩摘要为空。')
-          return value
-        }, repairPrompt: `请仅通过submit_result返回summary，摘要至多${maxChars}字符，合并重复信息，保留判断与回查编号。`, signal: options.signal, maxTokens, temperature: 0 })
+          if (calls.length !== 1 || calls[0].name !== 'submit_result') throw summaryError('SUMMARY_TOOL', `压缩摘要须且只须通过submit_result返回，本次工具调用${calls.length}个。`)
+          const args = calls[0].arguments as Row | undefined
+          if (!args || typeof args !== 'object' || !Object.hasOwn(args, 'summary')) throw summaryError('SUMMARY_MISSING', '结果缺少summary字段。')
+          if (typeof args.summary !== 'string') throw summaryError('SUMMARY_TYPE', `summary须为字符串，实际为${Array.isArray(args.summary) ? 'array' : typeof args.summary}。`)
+          if (!args.summary.trim()) throw summaryError('SUMMARY_EMPTY', 'summary内容为空或只有空白。')
+          if (args.summary.length > maxChars) throw summaryError('SUMMARY_TOO_LONG', `summary实际${args.summary.length}字符，允许最多${maxChars}字符。`, { actualLength: args.summary.length, allowedLength: maxChars })
+          try { validate(outputSchema, args, '压缩摘要格式不符。') } catch (error) { throw summaryError('SUMMARY_TYPE', error instanceof Error ? error.message : 'summary结构不符合Schema。') }
+          return { summary: args.summary }
+        }, repairPrompt: `请仅通过submit_result返回summary，摘要至多${maxChars}字符，合并重复信息，保留判断与回查编号。`, signal: options.signal, maxTokens, temperature: 0, trace: trace.hooks, tracePurpose: 'compaction' })
       await repo.transaction(true, async store => {
         await checkLease(store, scope)
+        await appendEntry(store, scope, { type: 'request_trace', attemptId: crypto.randomUUID(), purpose: validation ? 'compaction_repair' : 'compaction', ok: result.ok, errorCode: validation?.code ?? result.error?.kind, validation: validation ?? null, message: result.message ?? null, usage: result.usage, attempts: result.attempts }, { advanceLeaf: false })
+        await appendRequestLedger(store, scope, result.attempts, result.snapshot as Row | undefined, validation ? 'repair' : 'compaction')
         const run = (await store.get('pipelineRuns', scope.runId))!
         await store.put('pipelineRuns', { ...run, usage: addUsage(run.usage as Row | undefined, result.usage), cost: Number(run.cost ?? 0) + (result.usage.cost ?? 0) })
       })
@@ -102,4 +117,5 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
     options.onStatus?.({ state: 'compacted', before, after })
     return messages
   } catch (error) { options.onStatus?.({ state: 'compression_failed', before }); throw error }
+  finally { await trace.close() }
 }

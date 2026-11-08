@@ -3,7 +3,7 @@ import Dexie from 'dexie'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWorkspace } from '../src/lib/storage/workspace'
 import { createModelService } from '../src/features/models/service'
-import { defaultConfig, ModelError, type ModelConfig } from '../src/features/models/types'
+import { defaultConfig, ModelError, type ModelConfig, type ModelTraceEnd, type ModelTraceStart } from '../src/features/models/types'
 import { abortableDelay, classifyError, redact, retryDelay } from '../src/features/models/policy'
 import type { GatewayEnvironment } from '../src/features/models/gateway'
 import { Type } from 'typebox'
@@ -215,6 +215,26 @@ describe('模型配置与统一调用', () => {
     expect(first.messages.some((message: { role: string; content: string | { type: string; text?: string }[] }) => message.role === 'user' && (typeof message.content === 'string' ? message.content : message.content.map(part => part.text ?? '').join('')) === '请执行调用者的任务')).toBe(true)
     const continued = JSON.parse(fetcher.mock.calls[1][1]?.body as string)
     expect(continued.messages.some((message: { role: string; tool_call_id?: string }) => message.role === 'tool' && message.tool_call_id === 'call-1')).toBe(true)
+  })
+
+  it('记录进入最终streamFunction的输入、请求编号和物理attempt', async () => {
+    const { executeAgent } = await import('../src/features/models/gateway')
+    const { resolveModel } = await import('../src/features/models/registry')
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream('', { arguments: '{"ok":true}' })).mockResolvedValueOnce(stream('完成'))
+    const resolved = await resolveModel(savedConfig, key, 'aggregation')
+    const starts: ModelTraceStart[] = []; const ends: ModelTraceEnd[] = []
+    const result = await executeAgent(resolved, { maxRequests: 3, maxTokens: 128, trace: { start: value => starts.push(value), modelEnd: value => ends.push(value) } }, { fetch: fetcher }, {
+      prompt: '原始任务', systemPrompt: '系统要求',
+      prepareRequest: ({ context }) => ({ context: { ...context, messages: [...context.messages, { role: 'user', content: '转换后追加', timestamp: 2 }] } }),
+    })
+    expect(result).toMatchObject({ ok: true, text: '完成' })
+    expect(starts).toHaveLength(2)
+    expect(starts[0]).toMatchObject({ purpose: 'work', model: { providerId: 'custom', modelId: 'saved-aggregation' } })
+    const messages = JSON.stringify((starts[0].context as { messages: unknown[] }).messages)
+    expect(messages).toContain('原始任务')
+    expect(messages).toContain('转换后追加')
+    expect(ends[0]).toMatchObject({ status: 'succeeded' })
+    expect((ends[0].attempts as { requestId?: string; attemptId?: string }[])[0]).toMatchObject({ requestId: starts[0].requestId, attemptId: expect.any(String) })
   })
 
   it('Agent基础调用失败同样受三次探测预算约束', async () => {

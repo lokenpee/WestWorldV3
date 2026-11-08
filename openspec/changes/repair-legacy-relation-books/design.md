@@ -25,7 +25,7 @@
 | characterRelationEdits | 扩展 | updatedBy增加 migration；legacyRecordIds | legacyRecordIds可选，字符串数组去重，缺省[]，每项引用本书legacyRelationRecords；migration仅由迁移赋值，人工/模型不能自行传此来源 | 迁移/人物对核心写，详情、报告和网络读 | 其他字段沿现有含义；旧manual/agent值不变；编辑/删除时继续保留legacyRecordIds |
 | CharacterPairResult、关系工具结果 | 新增 | legacyRecordIds | 字符串数组，默认[]；纳入当前结果指纹 | effectivePairs与查询产生 | sourceRelationIds仍只引用新格式事实表，不能塞入不同结构的旧记录ID；工具和UI可分页查旧依据 |
 | 迁移记录：pipelineRuns | 新增记录类型内容，复用容器 | recordType=asset_edit、stage=asset_edit；result.kind=legacy_relation_migration、version=1、sourceSchemas、counts、recordMappings、affectedIds | 复用现有运行记录基础必填字段；counts包含输入/归档/已投影/未解析/排除/冲突数量；recordMappings为每个旧ID→归档ID/人物对键/处置原因；无记录被悄悄丢弃 | 同一迁移事务写一次；报告和备份读 | 不冒充AI调用/用户操作，不产生模型费用；原值在归档表，无需再次复制整本书 |
-| P2运行：pipelineRuns | 新增 | reviewScope、reviewMode、relationReviewVersion | reviewScope:all_assets/relations，旧运行缺省all_assets；reviewMode:sample/full，专项必填，初次sample；relationReviewVersion=1；用户开始时固定，恢复不得切成其他范围 | world服务写，运行器/命令层/界面读 | 可随格式8备份恢复，恢复为暂停，不能自动请求模型 |
+| P2运行：pipelineRuns | 新增 | reviewScope、reviewMode、relationReviewVersion | reviewScope:all_assets/relations，旧运行缺省all_assets；reviewMode:sample/full，专项必填，初次sample；relationReviewVersion=2（兼容旧值1）；用户开始时固定，恢复不得切成其他范围 | world服务写，运行器/命令层/界面读 | 可随格式8备份恢复，恢复为暂停，不能自动请求模型 |
 | P2 assetReview.items | 扩展 | kind、id、workItemId、sourceFingerprint、evidenceReads、commitIds、resolvedPairs | 复用既有状态pending/checked/deferred/skipped；专项kind为relation、legacy_relation、character_relation_scan；id分别为pairKey、旧ID、人物ID；workItemId确定性由范围+kind+id生成；sourceFingerprint为当前事实/编辑/归档/原文依赖指纹；evidenceReads为已实际读取的章及范围，默认[]；commitIds为实际提交ID数组，默认[]；resolvedPairs为本项实际核对的{pairKey,fingerprint}数组，默认[] | 队列与工具执行记录，模型不能伪造读集或确认；报告读 | 既有全资产item无新必填；专项记录plan范围和余项，不把全资产检查完成状态当成专项完成 |
 
 未变字段：人物/地点业务字段、事件节点/事件线正文、P1凭证和原文均无结构变化；人物对提交引起的两端revision/updatedAt和相关派生、覆盖失效沿既有机制。不得把迁移误当新的P1结果，或清空P1完成状态。
@@ -152,3 +152,17 @@ sample结束显示已核对/修改/无需修改/待核对/剩余数量、实际�
 详细场景和命令在 [acceptance.md](acceptance.md)，实施顺序在 [tasks.md](tasks.md)。优先最小历史7缺表样本+真实备份副本，验证开书、迁移无丢失、重复打开、保存删除、导出恢复，再进入专项核对。首次真实AI仅运行副本小批，用户核对原文后再继续全书。
 
 主要风险及验证：历史角色方向与当前箭头语义通过明确主仆/父女双视角样本固定；未知旧结构不以兜底空值掩盖；current/legacy混合避免覆盖新编辑；升级失败保留旧库；旧格式7缺表与损坏当前7包分开测试；原始归档体积和工具分页须验证；任务自身写入不得使计划无穷重跑。
+
+## 阶段C 身份标签与展示
+
+用户确认与模块影响见提案阶段C。数据结构、备份格式和写权限无变化。增加共享关系标签展示函数，区分身份标签、明显称呼、未知和单次互动。仅识别明确的称呼模式与已报告互动词，不限制合法身份标签的词表。
+
+- P1保留当前依据长度规则；标签必须是身份/关系，依据应直接支持两端身份及方向。只出现称呼、想起某人或打趣，不足以认定亲属或恋人，写未知并保留相关原文。明显称呼在提交校验中降为未知，不因称呼错误丢弃整章。
+- 人工和AI保存共用校验，明显称呼/互动标签返回可理解的修正提示；未知允许保存。AI核对必须实际读取原文，旧标签不能当身份依据。没有足够证据时可将不受支持标签改为未知，保留相关原文。
+- 旧关系的称呼标签在列表、编辑初值和网络悬停中显示未知；原标签通过详情保留可查。存储行与读取指纹保持原值，保存仍使用原指纹，不静默重写原库。
+- 正向模板为当前人物--自身身份-->对方；反向为当前人物<--对方身份--对方。姓名和箭头由代码生成；多标签用顿号连接，缺失或旧未知标记显示未知。编辑器图例为“当前人物是对方的什么人”和“对方是当前人物的什么人”，包含实时箭头预览。
+- 相关原文始终可查看；未知关系标明原文尚不能确认身份，避免把相关情节当作确定身份的证明。
+
+既有relationReviewVersion从1升级为2，存储Schema接受1或2，沿用当前备份格式。恢复旧规则的暂停专项时，保留提交记录和费用，将旧核对项重置为待核对；保存新核对进度时写2。同版本继续仍只补剩余项。只有用户主动启动或继续关系专项才调用模型。
+
+C01为林黛玉/宝玉妹妹与兄长提取；C02为正反视角与改名后模板；C03为宝二哥、林妹妹、珩大爷及打趣降为未知并保留原文；C04为编辑并刷新后方向不变；C05为仅想到青衫少年的片段不得推定恋人；C06为共享保存校验与未知允许保存。

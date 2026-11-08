@@ -20,3 +20,10 @@
 .mechanical-queue strong, .mechanical-queue span, .mechanical-queue small { display: block; margin-bottom: 4px; }
 
 .report-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+
+.organization-progress { margin: 1rem 0; padding: 1rem; border: 1px solid var(--border, #ddd); border-radius: .5rem; }
+.organization-progress > section { padding: .65rem 0; border-top: 1px solid var(--border, #ddd); }
+.organization-progress h4, .organization-progress h5 { margin: .35rem 0; }
+.organization-progress p { margin: .4rem 0; overflow-wrap: anywhere; }
+.organization-progress article { margin: .75rem 0; padding: .65rem; background: var(--surface, #f7f7f7); }
+.organization-change { padding: .4rem 0; }

@@ -30,9 +30,11 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange }:
   const [characterView, setCharacterView] = useState<'list' | 'network'>('list')
   const [lastReport, setLastReport] = useState<string>()
   const [mergeMessage, setMergeMessage] = useState('')
-  const query = useCallback(() => service.read(bookId), [service, bookId])
+  const query = useCallback(() => service.readContent(bookId), [service, bookId])
   const chapterQuery = useCallback(() => repository.listChapters(bookId), [repository, bookId])
   const data = useLiveResult(query, attempt)
+  const locksQuery = useCallback(() => service.readLocks(bookId), [service, bookId])
+  const locks = useLiveResult(locksQuery, attempt)
   const chapters = useLiveResult(chapterQuery, attempt)
   const navigate = useCallback((action: () => void) => { if (editorRef.current?.isDirty()) setPendingLeave({ action }); else action() }, [])
   useEffect(() => { setLeaveGuard(navigate); return () => setLeaveGuard(undefined) }, [navigate])
@@ -75,7 +77,7 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange }:
   if (selection && selection !== 'new' && selection.saved && current && current.revision >= selection.saved.revision) setSelection({ id: selection.id })
   const confirmed = selection && selection !== 'new' ? selection.saved : undefined
   const selected = confirmed && (!current || confirmed.revision > current.revision) ? confirmed : current
-  const locked = data.value.locks[kind === 'character' || kind === 'location' ? 'world' : 'narrative']
+  const locked = (locks.status === 'ready' ? locks.value : { world: true, narrative: true })[kind === 'character' || kind === 'location' ? 'world' : 'narrative']
   const worldKind = kind === 'character' || kind === 'location' ? kind : undefined
   const eventNetworkVisible = networkView && (kind === 'node' || kind === 'eventLine')
   const characterNetworkVisible = kind === 'character' && characterView === 'network'
@@ -99,7 +101,7 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange }:
         ? <CharacterNetwork key={bookId} bookId={bookId} characters={data.value.characters} pairs={data.value.pairs} selectedId={selection && selection !== 'new' ? selection.id : undefined} onSelect={id => navigate(() => setSelection({ id }))} />
         : <div className="asset-results"><EventNetwork key={bookId} bookId={bookId} nodes={data.value.nodes} lines={data.value.eventLines} chapters={chapters.value} active={eventNetworkVisible} selectedId={kind === 'node' && selection && selection !== 'new' ? selection.id : undefined} onSelectNode={id => { onKindChange('node'); setSelection({ id }) }} onEditLine={id => { onKindChange('eventLine'); setSelection({ id }) }} /><div hidden={eventNetworkVisible} className="asset-list-view"><p className="result-count">显示 {visible.length} / {rows.length} 条 · {normalized ? '按相关度排列' : kind === 'character' ? '按层级与姓名排列' : '按名称排列'}</p>{visible.length === 0 ? <p className="asset-empty">{rows.length ? '没有匹配的资产，请调整搜索或筛选。' : `还没有${assetLabels[kind]}，可以点击上方按钮新增。`}</p> : <ul className="asset-list">{visible.map(row => <li key={row.id}>{mergeMode ? <label className="merge-selection"><input type="checkbox" aria-label={`选择合并 ${assetName(row)} ${row.id}`} checked={mergeIds.includes(row.id)} onChange={event => setMergeIds(ids => event.target.checked ? [...ids, row.id] : ids.filter(id => id !== row.id))} /><span><strong>{assetName(row)}</strong><small>{row.id} · {'chapterName' in row ? row.chapterName || '人工来源' : ''}</small></span></label> : <button className={selection && selection !== 'new' && selection.id === row.id ? 'selected' : ''} aria-label={`编辑 ${assetName(row)}`} onClick={() => navigate(() => setSelection({ id: row.id }))}><strong>{assetName(row)}</strong><span>{'summary' in row ? row.summary : 'identity' in row ? row.identity : 'description' in row ? row.description : ''}</span><small>{row.createdBy === 'manual' ? '人工' : '提取'} · {'chapterName' in row ? row.chapterName || '无章节来源' : '事件线'} · 修订 {row.revision}</small><code>{row.id}</code></button>}</li>)}</ul>}</div></div>}
       {selection
-        ? <AssetEditor ref={editorRef} key={`${kind}:${selection === 'new' ? 'new' : selection.id}`} kind={kind} asset={selected} creating={selection === 'new'} snapshot={data.value} chapters={chapters.value} service={service} repository={repository} bookId={bookId} onClose={() => navigate(() => setSelection(undefined))} onSaved={row => setSelection({ id: row.id, saved: row })} onSelect={id => navigate(() => setSelection({ id }))} />
+        ? <AssetEditor ref={editorRef} key={`${kind}:${selection === 'new' ? 'new' : selection.id}`} kind={kind} asset={selected} creating={selection === 'new'} snapshot={{ ...data.value, locks: locks.status === 'ready' ? locks.value : { world: true, narrative: true } }} chapters={chapters.value} service={service} repository={repository} bookId={bookId} onClose={() => navigate(() => setSelection(undefined))} onSaved={row => setSelection({ id: row.id, saved: row })} onSelect={id => navigate(() => setSelection({ id }))} />
         : kind === 'character' ? <div className="asset-editor editor-placeholder" role="status">请选择人物查看或编辑</div> : null}
     </div>
     {previewOpen && worldKind && <MergeDialog bookId={bookId} kind={worldKind} memberIds={mergeIds} service={service} locked={locked} onClose={() => setPreviewOpen(false)} onMerged={(asset, reportId, reduced) => { setPreviewOpen(false); setMergeMode(false); setMergeIds([]); setQueryText(''); setRole(''); setSelection({ id: asset.id, saved: asset }); setLastReport(reportId); setMergeMessage(`合并完成，保留“${assetName(asset)}”，减少 ${reduced} 条。`) }} />}

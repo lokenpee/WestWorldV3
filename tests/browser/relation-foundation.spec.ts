@@ -14,6 +14,53 @@ async function readRows(page: Page, bookId: string, table: string) {
   }, { bookId, table })
 }
 
+test('身份关系按当前人物生成双向箭头，旧称呼未知并保留原文，编辑刷新方向正确', async ({ page }) => {
+  const support = '林黛玉是宝玉的妹妹，宝玉是她的兄长。'
+  const clue = '黛玉凝了凝罥烟眉，清眸中却是不由浮现起那青衫少年的身影。'
+  await page.goto('/')
+  await page.getByLabel('小说TXT文件').setInputFiles({ name: '关系身份.txt', mimeType: 'text/plain', buffer: Buffer.from(`第一章 关系\n${support}\n${clue}`) })
+  await page.getByRole('button', { name: '仅导入', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '关系身份', exact: true })).toBeVisible()
+  const bookId = await page.evaluate(async ({ clue }) => {
+    const name = (await indexedDB.databases()).find(db => db.name?.startsWith('westworld_canon_'))!.name!
+    const bookId = name.slice('westworld_canon_'.length)
+    const request = indexedDB.open(name)
+    const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(['characters', 'characterRelations'], 'readwrite')
+      for (const [id, name] of [['D', '林黛玉'], ['B', '宝玉']]) tx.objectStore('characters').put({ id, name, bookId, revision: 1, confidence: 1, createdBy: 'P1', aliases: [], chapterIndex: '1', sourceChapters: ['1'] })
+      const now = new Date().toISOString()
+      tx.objectStore('characterRelations').put({ id: 'R-ROLE', bookId, originCharacterId: 'D', sourceId: 'D', sourceName: '林黛玉', targetName: '宝玉', targetIds: ['B'], forwardLabel: '宝二哥', reverseLabel: '林妹妹', relationType: 'unknown', direction: 'unspecified', evidence: [{ chapterIndex: '1', quote: clue }], revision: 1, createdAt: now, updatedAt: now })
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error)
+    })
+    db.close(); return bookId
+  }, { clue })
+  await page.reload()
+  await page.getByRole('button', { name: '编辑 林黛玉', exact: true }).click()
+  const relations = page.getByRole('region', { name: '人物关系', exact: true })
+  await expect(relations).toContainText('林黛玉--未知-->宝玉')
+  await expect(relations).toContainText('林黛玉<--未知--宝玉')
+  await relations.getByText('查看相关原文与原标签', { exact: true }).click()
+  await expect(relations).toContainText(clue)
+  await expect(relations).toContainText('原正向标签：宝二哥')
+  expect((await readRows(page, bookId, 'characterRelations'))[0].forwardLabel).toBe('宝二哥')
+  await relations.getByRole('button', { name: '编辑', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '编辑人物关系', exact: true })
+  await expect(dialog.getByRole('group', { name: '林黛玉是宝玉的什么人' })).toBeVisible()
+  await page.getByLabel('正向标签 1').fill('妹妹')
+  await page.getByLabel('反向标签 1').fill('兄长')
+  await dialog.getByRole('checkbox', { name: '关系身份待核对（不确定的一方填未知）' }).uncheck()
+  await expect(dialog.getByLabel('关系预览')).toContainText('林黛玉--妹妹-->宝玉')
+  await dialog.getByText('补填本次依据（可选）', { exact: true }).click()
+  await page.getByLabel('依据原文').fill(support)
+  await dialog.getByRole('button', { name: '保存关系', exact: true }).click()
+  await expect(relations).toContainText('林黛玉<--兄长--宝玉')
+  await page.reload()
+  await page.getByRole('button', { name: '编辑 宝玉', exact: true }).click()
+  await expect(relations).toContainText('宝玉--兄长-->林黛玉')
+  await expect(relations).toContainText('宝玉<--妹妹--林黛玉')
+})
+
 test('旧资料打开修复，地点合并与节点移除可保存，备份副本保留编辑及修复记录', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('小说TXT文件').setInputFiles({ name: '基础修复.txt', mimeType: 'text/plain', buffer: Buffer.from('第一章 开始\n张三记得张蕾。') })

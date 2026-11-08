@@ -1,4 +1,10 @@
 export type AssetKind = 'character' | 'location' | 'node' | 'eventLine'
+export type BasisSource =
+  | { kind: 'asset'; assetKind: AssetKind; id: string; fields?: string[] }
+  | { kind: 'chapter'; chapterIndex: string; offset?: number; length?: number }
+  | { kind: 'relation'; fromId: string; toId: string }
+  | { kind: 'legacy_relation'; id: string }
+export interface Basis { summary: string; source: BasisSource }
 export type RoleWeight = '主要人物' | '重要配角' | 'NPC' | '路人'
 export type RoleWeightSource = 'frequency' | 'manual' | 'agent'
 export const assetLabels: Record<AssetKind, string> = { character: '人物', location: '地点', node: '事件节点', eventLine: '事件线' }
@@ -73,6 +79,7 @@ export interface CharacterRelationEdit {
   evidence: RelationEvidence[]
   sourceRelationIds: string[]
   legacyRecordIds?: string[]
+  basis?: Basis[]
   revision: number; updatedAt: string; updatedBy: 'manual' | 'agent' | 'migration'; commitId: string
 }
 /** 人物对的当前有效结果，由原始事实叠加编辑结果生成。 */
@@ -82,6 +89,7 @@ export interface CharacterPairResult {
   state: 'active' | 'deleted' | 'absent'
   editRevision: number; fingerprint: string
   evidence: RelationEvidence[]; sourceRelationIds: string[]; legacyRecordIds: string[]
+  basis?: Basis[]
   directionUnclear: boolean
   endpointRevisions: Record<string, number>
 }
@@ -100,6 +108,7 @@ export interface AssetFieldChange { field: string; before: unknown; after: unkno
 export interface AssetEditRecord {
   commitId: string; tool: string; kind: AssetKind | 'relation'; id: string
   fieldChanges: AssetFieldChange[]; reason: string; evidence: RelationEvidence[]
+  basis?: Basis[]
   timestamp: string; actor: 'manual' | 'agent'
 }
 export interface AssetByKind { character: Character; location: LocationAsset; node: EventNode; eventLine: EventLine }

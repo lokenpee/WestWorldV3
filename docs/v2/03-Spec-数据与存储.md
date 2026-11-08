@@ -11,7 +11,7 @@
 | 编号 | 库/表 | 主键与索引 | 权威数据/写入者 |
 |---|---|---|---|
 | T01 | 全局 credentials | providerId | 明文凭据，设置修改；不备份到单书 |
-| T02 | 全局 appSettings | key | 两模式共用llm.config/Provider适配描述；目录句柄；P1固定单章在途 |
+| T02 | 全局 appSettings | key | 两模式共用llm.config/Provider适配描述；目录句柄；P1每类单章在途，两类可并行 |
 | T03 | 全局 books | id, createdAt | 书名/来源/导入时间，无草稿/已入库状态 |
 | T04 | 单书 chapters | chapterIndex, order | 章节元数据，导入生成 |
 | T05 | 单书 chapterTexts | chapterIndex | 原章/切块正文，导入生成 |
@@ -85,7 +85,7 @@ name、aliases、来源、revision、createdBy、confidence、frequency、mergeN
 
 字段key/bookId/chapterIndex/substep/inputFingerprint/originIds/committedAt/runId均必填；substep=worldAssets或narrativeAssets；key=`章:子步骤`。仅成功提交写凭证，可有空originIds；legacy=true仅保守迁移可证实的旧成功步骤。
 
-每个P1成功事务同时写当前实体、live来源、凭证、进度与run覆盖。已有凭证跳过该子步骤，用户修改/并入/删除不删凭证。原文/提取策略变化不自动覆盖人工成果，本轮不增加破坏性强制重提按钮。
+每个P1成功事务同时写当前实体、live来源、凭证、进度与run覆盖。已有凭证跳过该子步骤，用户修改/并入/删除不删凭证。原文或提取策略变化不自动覆盖人工成果。显式重新提取先核对原文，再清空所选范围的资产与凭证，保留删除生命周期记录。
 
 ### 4.2 T19 assetLifecycle
 
@@ -98,11 +98,13 @@ name、aliases、来源、revision、createdBy、confidence、frequency、mergeN
 | 分支 | 必填 | 可选/生命周期 |
 |---|---|---|
 | recordType=run | id、bookId、stage=P1/P2/P3/manual_merge、status、startedAt、planVersion | phase、scope、finishedAt、coverage、input/outputFingerprint、cost/usage、report、aiMode、modelSnapshot、appliedCommands；当前提交结果立即有效，无publish分支 |
-| recordType=lease | id=`lease:resource`、bookId、lockKey、owner、runId、expiresAt | resource=extraction/world/narrative；事务获取/续租/释放，导出排除 |
+| recordType=lease | id=`lease:resource`、bookId、lockKey、owner、runId、expiresAt | lockKey为extraction/world/narrative或extraction:worldAssets/extraction:narrativeAssets；P1分步骤记录extractionStep，另持有对应领域锁；事务获取/续租/释放，导出排除 |
 
 报告含前后数量、机械/AI/手工合并组、成员ID/旧名、保留ID/主名、别名/来源、整编前后tokens、失败/冲突/跳过、externalChanges和费用。报告记录已经生效的修改，不是等待审核生效的合并申请；取消/失败仍保存已提交结果和报告。无合并也有零变更报告。
 
 ## 5. 进度、会话与事务
+
+P1在T12可选保存extractionJobs（两类任务范围与控制状态）、stepStates（步骤状态及错误摘要）和usage（用量）。旧任务首次读取后补存摘要，界面随后不再加载含原文的历史任务。字段类型见存储Schema的CompileProgress定义。暂停保留任务，取消清除控制范围并保留成功凭证。
 
 T12保留P1/P2/P3各自进度，增加runId/phase/unit/scope=fullBook/planVersion='2.2'/validity/coverage/dependencyFingerprint。status包含idle/running/paused/cancelling/cancelled/failed/degraded/completed。validity=current/stale仅标识整理结果是否需复核，绝不决定资产能否使用。
 

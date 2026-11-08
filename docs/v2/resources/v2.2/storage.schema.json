@@ -629,6 +629,15 @@
           "items": {
             "$ref": "#/$defs/AssetEditRecord"
           }
+        },
+        "candidateDecisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OrganizationCandidateDecision"
+          }
+        },
+        "organizationSummary": {
+          "$ref": "#/$defs/OrganizationSummary"
         }
       },
       "required": [
@@ -752,6 +761,10 @@
                 "type": "string",
                 "description": "持久子任务ID；同run不能将其他子任务确认作为本次总结",
                 "minLength": 1
+              },
+              "result": {
+                "type": "object",
+                "additionalProperties": true
               }
             }
           }
@@ -843,7 +856,10 @@
           ]
         },
         "relationReviewVersion": {
-          "const": 1
+          "enum": [
+            1,
+            2
+          ]
         },
         "assetReview": {
           "type": "object",
@@ -866,6 +882,22 @@
             "updatedAt": {
               "type": "string"
             }
+          }
+        },
+        "workflow": {
+          "const": "character_organization_v1"
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "organization": {
+          "$ref": "#/$defs/OrganizationState"
+        },
+        "requestLedger": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RequestLedgerEntry"
           }
         }
       },
@@ -915,7 +947,9 @@
           "enum": [
             "extraction",
             "world",
-            "narrative"
+            "narrative",
+            "extraction:worldAssets",
+            "extraction:narrativeAssets"
           ]
         },
         "owner": {
@@ -927,6 +961,12 @@
         "expiresAt": {
           "type": "integer",
           "minimum": 0
+        },
+        "extractionStep": {
+          "enum": [
+            "worldAssets",
+            "narrativeAssets"
+          ]
         }
       },
       "required": [
@@ -2223,6 +2263,151 @@
         },
         "coverage": {
           "$ref": "#/$defs/Coverage"
+        },
+        "extractionJobs": {
+          "description": "P1两类提取任务，暂停保留范围，取消后移除。",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "worldAssets": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "step",
+                "scope",
+                "startedAt",
+                "mode",
+                "group",
+                "status"
+              ],
+              "properties": {
+                "step": {
+                  "enum": [
+                    "worldAssets",
+                    "narrativeAssets"
+                  ]
+                },
+                "scope": {
+                  "enum": [
+                    "all",
+                    "chapter"
+                  ]
+                },
+                "chapterIndex": {
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "mode": {
+                  "enum": [
+                    "extract",
+                    "replace"
+                  ]
+                },
+                "group": {
+                  "enum": [
+                    "together",
+                    "single"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "running",
+                    "paused",
+                    "completed",
+                    "failed"
+                  ]
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "usage": {
+                  "$ref": "#/$defs/Usage"
+                }
+              }
+            },
+            "narrativeAssets": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "step",
+                "scope",
+                "startedAt",
+                "mode",
+                "group",
+                "status"
+              ],
+              "properties": {
+                "step": {
+                  "enum": [
+                    "worldAssets",
+                    "narrativeAssets"
+                  ]
+                },
+                "scope": {
+                  "enum": [
+                    "all",
+                    "chapter"
+                  ]
+                },
+                "chapterIndex": {
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "mode": {
+                  "enum": [
+                    "extract",
+                    "replace"
+                  ]
+                },
+                "group": {
+                  "enum": [
+                    "together",
+                    "single"
+                  ]
+                },
+                "status": {
+                  "enum": [
+                    "running",
+                    "paused",
+                    "completed",
+                    "failed"
+                  ]
+                },
+                "runId": {
+                  "type": "string"
+                },
+                "usage": {
+                  "$ref": "#/$defs/Usage"
+                }
+              }
+            }
+          }
+        },
+        "stepStates": {
+          "description": "P1章节步骤轻量状态，界面读取时无需加载含原文的任务历史。",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
         }
       }
     },
@@ -2563,7 +2748,10 @@
           "type": "string"
         },
         "profile": {
-          "const": "story_editor",
+          "enum": [
+            "story_editor",
+            "asset_editor"
+          ],
           "type": "string"
         },
         "kind": {
@@ -2574,6 +2762,10 @@
             },
             {
               "const": "review",
+              "type": "string"
+            },
+            {
+              "const": "organization",
               "type": "string"
             }
           ]
@@ -2614,6 +2806,12 @@
         },
         "leaseUntil": {
           "type": "number"
+        },
+        "workflow": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "string"
         }
       }
     },
@@ -2706,6 +2904,14 @@
                   "type": "number"
                 }
               }
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unitId": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -2835,6 +3041,14 @@
                   "type": "number"
                 }
               }
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unitId": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -2891,6 +3105,14 @@
             },
             "reason": {
               "type": "string"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unitId": {
+              "type": "string",
+              "minLength": 1
             }
           }
         },
@@ -2941,7 +3163,362 @@
             "summary": {
               "maxLength": 2000,
               "type": "string"
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unitId": {
+              "type": "string",
+              "minLength": 1
             }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sessionId",
+            "bookId",
+            "ordinal",
+            "parentId",
+            "createdAt",
+            "type",
+            "workId",
+            "contextId",
+            "data"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "bookId": {
+              "type": "string"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "parentId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "type": {
+              "const": "work_input",
+              "type": "string"
+            },
+            "workId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "characterId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "unitId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sessionId",
+            "bookId",
+            "ordinal",
+            "parentId",
+            "createdAt",
+            "type",
+            "purpose"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "bookId": {
+              "type": "string"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "parentId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "type": {
+              "const": "request_trace",
+              "type": "string"
+            },
+            "attemptId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "purpose": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ok": {
+              "type": "boolean"
+            },
+            "errorCode": {
+              "type": "string"
+            },
+            "validation": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "message": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "attempts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "contextId": {
+              "type": "string"
+            },
+            "unitId": {
+              "type": "string"
+            },
+            "requestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "parentRequestId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "requestOrdinal": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "traceId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "runId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "characterId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "startedAt": {
+              "type": "string"
+            },
+            "modelFinishedAt": {
+              "type": "string"
+            },
+            "finishedAt": {
+              "type": "string"
+            },
+            "input": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "providerPayloadRef": {
+              "type": "string",
+              "minLength": 1
+            },
+            "thinking": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "toolCalls": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "usage": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "attemptIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "error": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "missingRefs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "final": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sessionId",
+            "bookId",
+            "ordinal",
+            "parentId",
+            "createdAt",
+            "type",
+            "snapshotId",
+            "promptKind",
+            "content",
+            "contentHash"
+          ],
+          "properties": {
+            "id": { "type": "string" },
+            "sessionId": { "type": "string" },
+            "bookId": { "type": "string" },
+            "ordinal": { "type": "integer", "minimum": 0 },
+            "parentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+            "createdAt": { "type": "string" },
+            "type": { "const": "prompt_snapshot", "type": "string" },
+            "snapshotId": { "type": "string", "minLength": 1 },
+            "promptKind": { "type": "string", "minLength": 1 },
+            "content": { "type": "string" },
+            "contentHash": { "type": "string", "minLength": 1 },
+            "truncated": { "type": "boolean" },
+            "runId": { "type": "string" },
+            "executionId": { "type": "string" },
+            "taskId": { "type": "string" },
+            "contextId": { "type": "string" },
+            "unitId": { "type": "string" },
+            "characterId": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "sessionId",
+            "bookId",
+            "ordinal",
+            "parentId",
+            "createdAt",
+            "type",
+            "snapshotId",
+            "toolNames",
+            "schema",
+            "schemaHash"
+          ],
+          "properties": {
+            "id": { "type": "string" },
+            "sessionId": { "type": "string" },
+            "bookId": { "type": "string" },
+            "ordinal": { "type": "integer", "minimum": 0 },
+            "parentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+            "createdAt": { "type": "string" },
+            "type": { "const": "tool_snapshot", "type": "string" },
+            "snapshotId": { "type": "string", "minLength": 1 },
+            "toolNames": { "type": "array", "items": { "type": "string" } },
+            "schema": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+            "schemaHash": { "type": "string", "minLength": 1 },
+            "truncated": { "type": "boolean" },
+            "runId": { "type": "string" },
+            "executionId": { "type": "string" },
+            "taskId": { "type": "string" },
+            "contextId": { "type": "string" },
+            "unitId": { "type": "string" },
+            "characterId": { "type": "string" }
           }
         }
       ]
@@ -4220,6 +4797,9 @@
             },
             {
               "$ref": "#/$defs/AssetReviewTask"
+            },
+            {
+              "$ref": "#/$defs/CharacterOrganizationTask"
             }
           ]
         },
@@ -5118,6 +5698,85 @@
             "payload"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "taskId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "toolCallId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "state": {
+              "enum": [
+                "prepared",
+                "applied",
+                "rejected",
+                "abandoned"
+              ]
+            },
+            "payloadFingerprint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedReadSet": {
+              "$ref": "#/$defs/ReadSet"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "string"
+            },
+            "commitId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "error": {
+              "$ref": "#/$defs/TaskError"
+            },
+            "toolName": {
+              "enum": [
+                "edit_character",
+                "edit_location",
+                "edit_event_node",
+                "edit_event_line",
+                "set_character_relation",
+                "delete_character_relation",
+                "merge_assets",
+                "save_candidate_group",
+                "resolve_candidate_group",
+                "clear_candidate_groups",
+                "record_organization_progress",
+                "submit_profile_review",
+                "submit_relation_review"
+              ]
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "operationKey",
+            "taskId",
+            "toolCallId",
+            "state",
+            "payloadFingerprint",
+            "expectedReadSet",
+            "createdAt",
+            "updatedAt",
+            "toolName",
+            "payload"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -5592,6 +6251,12 @@
         "commitId": {
           "type": "string",
           "minLength": 1
+        },
+        "basis": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Basis"
+          }
         }
       }
     },
@@ -5721,6 +6386,12 @@
             "manual",
             "agent"
           ]
+        },
+        "basis": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Basis"
+          }
         }
       }
     },
@@ -5925,6 +6596,1207 @@
           "type": "string"
         },
         "updatedAt": {
+          "type": "string"
+        }
+      }
+    },
+    "BasisSource": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "assetKind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "asset"
+            },
+            "assetKind": {
+              "enum": [
+                "character",
+                "location",
+                "node",
+                "eventLine"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "chapterIndex"
+          ],
+          "properties": {
+            "kind": {
+              "const": "chapter"
+            },
+            "chapterIndex": {
+              "type": "string",
+              "minLength": 1
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "length": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "fromId",
+            "toId"
+          ],
+          "properties": {
+            "kind": {
+              "const": "relation"
+            },
+            "fromId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "toId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "legacy_relation"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "Basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "source"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "$ref": "#/$defs/BasisSource"
+        }
+      }
+    },
+    "OrganizationScanPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pageId",
+        "ids",
+        "nextCursor",
+        "status"
+      ],
+      "properties": {
+        "pageId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "nextCursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "issued",
+            "checked"
+          ]
+        },
+        "lastError": {
+          "$ref": "#/$defs/OrganizationWorkError"
+        }
+      }
+    },
+    "OrganizationCandidateGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "memberIds",
+        "reason",
+        "status",
+        "revision",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memberIds": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "resolved"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "memberNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastError": {
+          "$ref": "#/$defs/OrganizationWorkError"
+        }
+      }
+    },
+    "OrganizationCandidateDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "groupId",
+        "memberIds",
+        "memberNames",
+        "outcome",
+        "reason",
+        "basis",
+        "commitIds",
+        "createdAt"
+      ],
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memberIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "memberNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outcome": {
+          "enum": [
+            "merged",
+            "not_same",
+            "uncertain",
+            "partial"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "basis": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Basis"
+          }
+        },
+        "commitIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      }
+    },
+    "OrganizationItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "outcome",
+        "reason",
+        "contentFingerprint",
+        "readRefs",
+        "commitIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "checked"
+          ]
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "enum": [
+                "changed",
+                "no_change",
+                "uncertain",
+                "unavailable"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "contentFingerprint": {
+          "type": "string"
+        },
+        "readRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "commitIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "uncertainFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastError": {
+          "$ref": "#/$defs/OrganizationWorkError"
+        }
+      }
+    },
+    "OrganizationPairCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pairKey",
+        "fingerprint",
+        "outcome",
+        "reason",
+        "basis",
+        "commitIds"
+      ],
+      "properties": {
+        "pairKey": {
+          "type": "string",
+          "minLength": 2
+        },
+        "fingerprint": {
+          "type": "string"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "enum": [
+                "changed",
+                "no_change",
+                "uncertain"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "basis": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Basis"
+          }
+        },
+        "commitIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "readFingerprint": {
+          "type": "string"
+        }
+      }
+    },
+    "OrganizationState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "step",
+        "revision",
+        "scanIds",
+        "scanPages",
+        "candidateGroups",
+        "candidateDecisions",
+        "profileItems",
+        "relationItems",
+        "pairChecks",
+        "statisticsPending"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "step": {
+          "enum": [
+            "scan",
+            "resolve",
+            "profiles",
+            "relations",
+            "finalize",
+            "done"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scanIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scanPages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OrganizationScanPage"
+          }
+        },
+        "candidateGroups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OrganizationCandidateGroup"
+          }
+        },
+        "candidateDecisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OrganizationCandidateDecision"
+          }
+        },
+        "profileItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OrganizationItem"
+          }
+        },
+        "relationItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OrganizationItem"
+          }
+        },
+        "pairChecks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OrganizationPairCheck"
+          }
+        },
+        "statisticsPending": {
+          "type": "boolean"
+        },
+        "reviewVersion": {
+          "type": "integer",
+          "const": 2
+        },
+        "reviewStartedAt": {
+          "type": "string"
+        },
+        "repairNotice": {
+          "type": "string"
+        },
+        "executionVersion": {
+          "type": "integer",
+          "minimum": 4
+        },
+        "contexts": {
+          "$ref": "#/$defs/OrganizationContexts"
+        },
+        "activeWork": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OrganizationActiveWork"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pauseNotice": {
+          "type": "string"
+        }
+      }
+    },
+    "OrganizationSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scannedPages",
+        "candidateGroups",
+        "merged",
+        "uncertain",
+        "profilesChecked",
+        "relationsChecked",
+        "statistics"
+      ],
+      "properties": {
+        "scannedPages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidateGroups": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "merged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncertain": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "profilesChecked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "relationsChecked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "statistics": {
+          "enum": [
+            "pending",
+            "completed"
+          ]
+        }
+      }
+    },
+    "CharacterOrganizationTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bookId",
+        "runId",
+        "taskId",
+        "planVersion",
+        "stage",
+        "phase",
+        "remainingCount",
+        "resume",
+        "workItems",
+        "step",
+        "organizationRevision"
+      ],
+      "properties": {
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planVersion": {
+          "const": "2.2"
+        },
+        "stage": {
+          "const": "P2"
+        },
+        "phase": {
+          "const": "character_organization"
+        },
+        "remainingCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resume": {
+          "$ref": "#/$defs/ResumeInfo"
+        },
+        "workItems": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "workItemId",
+              "kind",
+              "id",
+              "revision",
+              "factFingerprint"
+            ],
+            "properties": {
+              "workItemId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "kind": {
+                "const": "organization"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "factFingerprint": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "step": {
+          "enum": [
+            "scan",
+            "resolve",
+            "profiles",
+            "relations",
+            "finalize",
+            "done"
+          ]
+        },
+        "organizationRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sessionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unitId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "work": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "stage",
+            "targetIds",
+            "contextId"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "enum": [
+                "directory",
+                "candidate",
+                "profile",
+                "relations"
+              ]
+            },
+            "stage": {
+              "enum": [
+                "scan",
+                "resolve",
+                "profiles",
+                "relations"
+              ]
+            },
+            "targetIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "contextId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "snapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "summary": {
+              "type": "string"
+            },
+            "data": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "characterId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "OrganizationContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "pendingWorkId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "active",
+            "completed"
+          ]
+        },
+        "pendingUnitId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "pendingWorkId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "OrganizationContexts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "profiles",
+        "relations"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/OrganizationContext"
+        },
+        "profiles": {
+          "$ref": "#/$defs/OrganizationContext"
+        },
+        "relations": {
+          "$ref": "#/$defs/OrganizationContext"
+        }
+      }
+    },
+    "OrganizationActiveWork": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "contextId",
+        "status",
+        "requestCount",
+        "draft",
+        "commitIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "directory",
+            "candidate",
+            "profile",
+            "relations"
+          ]
+        },
+        "characterId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "completed",
+            "error"
+          ]
+        },
+        "requestCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "draft": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "commitIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dataVersion": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastError": {
+          "$ref": "#/$defs/OrganizationWorkError"
+        },
+        "targetIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "snapshotId": {
+          "type": "string"
+        },
+        "consecutiveNoProgress": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "readCoverage": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "stage": {
+          "enum": [
+            "scan",
+            "resolve",
+            "profiles",
+            "relations",
+            "finalize",
+            "done"
+          ]
+        }
+      }
+    },
+    "WorkSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "bookId",
+        "runId",
+        "contextId",
+        "targetIds",
+        "revisions",
+        "fields",
+        "factIds",
+        "ranges",
+        "contentFingerprint",
+        "deliveredAttemptIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contextId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "revisions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "factIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "from",
+              "to"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "from": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "to": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "contentFingerprint": {
+          "type": "string"
+        },
+        "deliveredAttemptIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "OrganizationWorkError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "message",
+        "action"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "enum": [
+            "retry",
+            "reload",
+            "defer",
+            "pause"
+          ]
+        }
+      }
+    },
+    "RequestLedgerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attemptId",
+        "stage",
+        "purpose",
+        "status",
+        "startedAt",
+        "finishedAt",
+        "estimatedInput",
+        "outputReserve",
+        "input",
+        "cacheRead",
+        "cacheWrite",
+        "output",
+        "totalTokens",
+        "usageStatus",
+        "cost",
+        "costStatus"
+      ],
+      "properties": {
+        "attemptId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requestId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "type": "string"
+        },
+        "workId": {
+          "type": "string"
+        },
+        "characterId": {
+          "type": "string"
+        },
+        "contextId": {
+          "type": "string"
+        },
+        "purpose": {
+          "enum": [
+            "work",
+            "retry",
+            "compaction",
+            "compaction_repair",
+            "repair"
+          ]
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "startedAt": {
+          "type": "string"
+        },
+        "finishedAt": {
+          "type": "string"
+        },
+        "estimatedInput": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "outputReserve": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "input": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cacheRead": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cacheWrite": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "totalTokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usageStatus": {
+          "enum": [
+            "reported",
+            "partial",
+            "missing"
+          ]
+        },
+        "cost": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "const": "USD"
+        },
+        "costStatus": {
+          "enum": [
+            "estimated",
+            "unknown"
+          ]
+        },
+        "modelSnapshot": {
+          "type": "string"
+        },
+        "traceEntryId": {
+          "type": "string"
+        },
+        "errorCode": {
           "type": "string"
         }
       }

@@ -20,14 +20,18 @@ export interface NodeBindingOptions {
 
 interface SideInput { mentions: string[]; existing: CharacterBinding[]; manual: string[]; legacy: string[] }
 
-function bindSide(input: SideInput, characters: Character[], index: Map<string, string[]>, lifecycle: Lifecycle[], options: NodeBindingOptions) {
-  const known = new Set(characters.map(person => person.id))
+export function createNodeBindingContext(characters: Character[], lifecycle: Lifecycle[] = []) {
+  return { index: characterNameIndex(characters), people: new Map(characters.map(person => [person.id, person])), mappings: new Map(lifecycle.filter(row => row.kind === 'character').map(row => [row.originId, row])) }
+}
+
+function bindSide(input: SideInput, characters: Character[], index: Map<string, string[]>, lifecycle: Lifecycle[], options: NodeBindingOptions, context: ReturnType<typeof createNodeBindingContext>) {
+  const known = context.people
   const removed = new Set((options.removedMentions ?? []).map(value => value.trim()))
   const dropped = new Set((options.droppedMentions ?? []).map(value => value.trim()))
   const ignore = new Set((options.ignoreMentions ?? []).map(value => value.trim()))
-  const remap = (ids: string[]) => unique(ids.map(id => resolveLifecycleId(id, lifecycle) ?? id).filter(id => known.has(id)))
+  const remap = (ids: string[]) => unique(ids.map(id => resolveLifecycleId(id, lifecycle, 'character', context.mappings) ?? id).filter(id => known.has(id)))
   const manual = remap(input.manual), legacy = remap(input.legacy)
-  const groupNames = new Set(unique(input.existing.flatMap(group => group.ids)).map(id => characters.find(person => person.id === id)?.name).filter((name): name is string => !!name))
+  const groupNames = new Set(unique(input.existing.flatMap(group => group.ids)).map(id => context.people.get(id)?.name).filter((name): name is string => !!name))
   const requested = unique(input.mentions).filter(mention => !ignore.has(mention))
   const covered = new Set([...input.existing.map(group => group.mention), ...groupNames])
   const mentions = unique([...input.existing.map(group => group.mention), ...requested.filter(mention => !covered.has(mention))])
@@ -40,16 +44,16 @@ function bindSide(input: SideInput, characters: Character[], index: Map<string, 
     groups.push({ mention, ids })
   }
   const ids = unique([...groups.flatMap(group => group.ids), ...manual, ...legacy])
-  const names = unique([...ids.map(id => characters.find(person => person.id === id)!.name), ...groups.filter(group => !group.ids.length).map(group => group.mention)])
+  const names = unique([...ids.map(id => context.people.get(id)!.name), ...groups.filter(group => !group.ids.length).map(group => group.mention)])
   return { groups, manual, legacy, ids, names }
 }
 
 /** 保存节点：称呼组各自保存全部命中，人工明确编号与旧资料编号单独保留。 */
-export function bindNodeCharacters(node: EventNode, characters: Character[], options: NodeBindingOptions = {}): EventNode {
-  const index = characterNameIndex(characters)
+export function bindNodeCharacters(node: EventNode, characters: Character[], options: NodeBindingOptions = {}, context = createNodeBindingContext(characters, options.lifecycle)): EventNode {
+  const index = context.index
   const lifecycle = options.lifecycle ?? []
-  const actors = bindSide({ mentions: node.actors, existing: node.actorBindings ?? [], manual: options.actorIds ?? node.manualActorIds ?? [], legacy: node.legacyActorIds ?? [] }, characters, index, lifecycle, options)
-  const targets = bindSide({ mentions: node.targets ?? [], existing: node.targetBindings ?? [], manual: options.targetCharacterIds ?? node.manualTargetCharacterIds ?? [], legacy: node.legacyTargetCharacterIds ?? [] }, characters, index, lifecycle, options)
+  const actors = bindSide({ mentions: node.actors, existing: node.actorBindings ?? [], manual: options.actorIds ?? node.manualActorIds ?? [], legacy: node.legacyActorIds ?? [] }, characters, index, lifecycle, options, context)
+  const targets = bindSide({ mentions: node.targets ?? [], existing: node.targetBindings ?? [], manual: options.targetCharacterIds ?? node.manualTargetCharacterIds ?? [], legacy: node.legacyTargetCharacterIds ?? [] }, characters, index, lifecycle, options, context)
   return {
     ...node,
     actors: actors.names, actorIds: actors.ids, actorBindings: actors.groups, manualActorIds: actors.manual, legacyActorIds: actors.legacy,
@@ -113,6 +117,7 @@ export function setNodeParticipants(node: EventNode, characters: Character[], se
 
 /** 人物新增、改名、删除或合并后维护节点：历史绑定按编号保留，新命中自动补齐。 */
 export function remapCharacterLinks(nodes: EventNode[], before: Character[], after: Character[], redirects: ReadonlyMap<string, string> = new Map()) {
+  const context = createNodeBindingContext(after)
   const known = new Set(after.map(person => person.id))
   const beforeNames = new Map(before.map(person => [person.id, person.name]))
   const mapId = (id: string) => redirects.get(id) ?? id
@@ -133,7 +138,7 @@ export function remapCharacterLinks(nodes: EventNode[], before: Character[], aft
       legacyTargetCharacterIds: unique(legacyTargets.map(mapId)).filter(id => known.has(id)),
       actorIds: unique((node.actorIds ?? []).map(mapId)).filter(id => known.has(id)),
       targetCharacterIds: unique((node.targetCharacterIds ?? []).map(mapId)).filter(id => known.has(id)),
-    }, after, { ignoreMentions, droppedMentions })
+    }, after, { ignoreMentions, droppedMentions }, context)
     // 有效编号与显示名称都没变时不写回，避免无关人物变化给旧节点补元数据并触发失效。
     const same = (a: string[] | undefined, b: string[] | undefined) => JSON.stringify(a ?? []) === JSON.stringify(b ?? [])
     return same(next.actorIds, node.actorIds) && same(next.targetCharacterIds, node.targetCharacterIds) && same(next.actors, node.actors) && same(next.targets, node.targets) ? node : next

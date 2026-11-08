@@ -1,16 +1,17 @@
+import { liveQuery } from 'dexie'
 import type { Chapter, createWorkspace } from '../../lib/storage/workspace'
 import type { ModelService } from '../models/service'
 import type { CallResult, CallProgress } from '../models/types'
 import { classifyError } from '../models/policy'
-import { bindNodeCharacters, remapCharacterLinks } from '../assets/characterLinks'
+import { bindNodeCharacters, createNodeBindingContext, remapCharacterLinks } from '../assets/characterLinks'
 import { dexieMergeStore } from '../assets/mergeCore'
 import { invalidateAssetProgress, type AssetChange } from '../assets/invalidate'
 import { extractedRelation, syncRelations, type ExtractedRelationInput } from '../assets/relations'
 import { normalizeCharacterNames } from '../assets/characterNames'
-import { rebuildFacts, updateFrequencies } from '../assets/derive'
+import { rebuildFacts, updateFrequencies, createFrequencyCounter } from '../assets/derive'
 import type { Character, CharacterRelation, EventNode, Lifecycle, LocationAsset } from '../assets/types'
 import { stepLabels, substeps, type ExtractionData, type ExtractedRow, type Substep } from './types'
-import { checkReceiptSources, coverage, withExtractionLock, type Lease, type Progress, type Receipt, type ReExtractScope, type Run, type SavedUsage, type StoredTask } from './recovery'
+import { checkReceiptSources, coverage, withExtractionLock, type Lease, type ExtractionJob, type Progress, type Receipt, type ReExtractScope, type Run, type SavedUsage, type StoredTask } from './recovery'
 import { clearReExtractData, previewReExtractData } from './reextract'
 
 type Workspace = ReturnType<typeof createWorkspace>
@@ -29,53 +30,89 @@ const scopeComplete = (receipts: Receipt[], chapters: Chapter[], scope: ReExtrac
   const keys = new Set(receipts.filter(row => row.substep === scope.step).map(row => row.chapterIndex))
   return scope.scope === 'chapter' ? keys.has(scope.chapterIndex ?? '') : chapters.length > 0 && chapters.every(chapter => keys.has(chapter.chapterIndex))
 }
+const extractionLeaseIds = ['lease:extraction', ...substeps.map(step => `lease:extraction:${step}`)]
 const activeLease = (row: Lease) => row.recordType === 'lease' && (row.expiresAt === undefined || Number(row.expiresAt) > Date.now())
+
+async function reExtractTextErrors(db: ReturnType<Workspace['openBook']>, chapters: Chapter[], scope: ReExtractScope): Promise<string[]> {
+  const targets = chapters.filter(chapter => scope.scope === 'all' || chapter.chapterIndex === scope.chapterIndex)
+  const texts = await db.table<{ text: string }>('chapterTexts').bulkGet(targets.map(chapter => chapter.chapterIndex))
+  return targets.filter((_, index) => !texts[index]?.text?.trim()).map(chapter => `第${chapter.chapterIndex}章原文缺失或为空，无法重新提取。`)
+}
 
 export function createExtractionService(workspace: Workspace, models: Pick<ModelService, 'generate' | 'settings'>) {
   const states = new Map<string, ExtractionState>()
   const controllers = new Map<string, AbortController>()
+  const laneControllers = new Map<string, Map<string, AbortController>>()
+  const laneStates = new Map<string, Partial<Record<Substep, ExtractionState>>>()
+  const lanePromises = new Map<string, Promise<void>>()
+  const pausedLanes = new Set<string>()
+  const cancelVersions = new Map<string, number>()
   const listeners = new Set<() => void>()
   const set = (bookId: string, change: Partial<ExtractionState>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, results: [] }), ...change }); listeners.forEach(listener => listener()) }
-  async function execute(bookId: string, selection?: Selection, options: { reExtract?: ReExtractScope; clear?: boolean } = {}) {
-    if (controllers.has(bookId)) return
-    const controller = new AbortController(); controllers.set(bookId, controller)
+  async function execute(bookId: string, selection?: Selection, options: { reExtract?: ReExtractScope; clear?: boolean; lane?: Substep; job?: ExtractionJob } = {}) {
+    const activeControllers = options.lane ? laneControllers.get(bookId) ?? new Map<string, AbortController>() : controllers
+    const executionKey = options.lane ?? bookId
+    if (activeControllers.has(executionKey) || options.lane && controllers.has(bookId)) return
+    if (options.lane) laneControllers.set(bookId, activeControllers)
+    const controller = new AbortController(); activeControllers.set(executionKey, controller)
+    const leaseId = options.lane ? `lease:extraction:${options.lane}` : 'lease:extraction'
+    const pauseKey = `${bookId}:${options.lane}`
+    const update = (change: Partial<ExtractionState>) => {
+      if (options.lane) {
+        const current = laneStates.get(bookId) ?? {}
+        current[options.lane] = { ...(current[options.lane] ?? { running: false, results: [] }), ...change }
+        laneStates.set(bookId, current)
+        set(bookId, { ...change, running: controllers.has(bookId) || Object.values(current).some(state => state?.running) })
+      } else set(bookId, change)
+    }
     const db = workspace.openBook(bookId)
     let runId: string = crypto.randomUUID(); const owner = crypto.randomUUID()
     let acquired = false
     let heartbeat: ReturnType<typeof setInterval> | undefined
     let heartbeatError: unknown
+    let executionWatch: { unsubscribe(): void } | undefined
     let chapters: Chapter[] = []
-    const initialProgress = await db.table<Progress>('compileProgress').get('P1')
-    const activeScope = options.reExtract ?? (selection ? undefined : initialProgress?.reExtract)
-    const domainLease = activeScope ? (activeScope.step === 'worldAssets' ? 'world' : 'narrative') : undefined
+    let activeScope = options.reExtract
+    let domainLease = options.lane ? (options.lane === 'worldAssets' ? 'world' : 'narrative') : activeScope ? (activeScope.step === 'worldAssets' ? 'world' : 'narrative') : undefined
     const usage: SavedUsage = { input: 0, output: 0, totalTokens: 0, cost: 0, costStatus: 'estimated' }
     const checkLease = async () => {
       controller.signal.throwIfAborted()
-      const lease = await db.table<Lease>('pipelineRuns').get('lease:extraction')
+      const lease = await db.table<Lease>('pipelineRuns').get(leaseId)
       if (lease?.owner !== owner || lease.runId !== runId) throw new ExecutionLost('提取任务已由其他执行者接管，当前任务已停止写入。')
       const progress = await db.table<Progress>('compileProgress').get('P1')
-      if (progress?.runId !== runId) throw new ExecutionLost('当前书籍已有其他提取任务。')
+      if ((options.lane ? progress?.extractionJobs?.[options.lane]?.runId : progress?.runId) !== runId) throw new ExecutionLost('当前书籍已有其他提取任务。')
       if (domainLease) {
         const domain = await db.table<Lease>('pipelineRuns').get(`lease:${domainLease}`)
-        if (domain?.owner !== owner || domain.runId !== runId || Number(domain.expiresAt ?? 0) <= Date.now()) throw new ExecutionLost('重提目标范围的执行权已失效。')
+        if (domain?.owner !== owner || domain.runId !== runId) throw new ExecutionLost('重提目标范围的执行权已失效。')
       }
       const others = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
-      if (others.some(row => row.recordType === 'lease' && row.id !== lease.id && !(row.owner === owner && row.runId === runId) && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new ExecutionLost('本书已有其他处理任务，当前提取已暂停。')
+      if (others.some(row => row.recordType === 'lease' && row.id !== lease.id && !(row.owner === owner && row.runId === runId) && !(options.lane && row.extractionStep && row.extractionStep !== options.lane) && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new ExecutionLost('本书已有其他处理任务，当前提取已暂停。')
       await db.table('pipelineRuns').update(lease.id, { expiresAt: Date.now() + 30000 })
       if (domainLease) await db.table('pipelineRuns').update(`lease:${domainLease}`, { expiresAt: Date.now() + 30000 })
     }
     async function saveProgress(status: string) {
       const receipts = await db.table<Receipt>('extractionReceipts').toArray()
+      const keys = new Set(receipts.map(row => row.key))
       const previous = await db.table<Progress>('compileProgress').get('P1')
-      const run = await db.table<Run>('pipelineRuns').get(runId)
-      const latest = new Map((run?.tasks ?? []).map(task => [`${task.input.chapterIndex}:${task.phase}`, task]))
-      const failed = latest.size ? [...latest.values()].filter(task => task.status === 'failed' && !receipts.some(row => row.key === `${task.input.chapterIndex}:${task.phase}`)).map(task => task.input.chapterIndex) : previous?.failedChapters ?? []
+      const stepStates = { ...previous?.stepStates }
+      const failed = Object.entries(stepStates).filter(([key, item]) => item.status === 'failed' && !keys.has(key)).map(([key]) => key.slice(0, key.lastIndexOf(':')))
       const { completedChapters, failedChapters, partialChapters } = coverage(chapters, receipts, failed)
-      await db.table('compileProgress').put({ bookId, stage: 'P1', status, totalChapters: chapters.length, completedChapters, failedChapters, partialChapters, updatedAt: new Date().toISOString(), runId, scope: 'fullBook', planVersion: '2.2', unit: 'chapter', validity: 'current', ...(previous?.reExtract ? { reExtract: previous.reExtract } : {}) })
+      const extractionJobs = { ...previous?.extractionJobs }
+      let totalUsage = usage
+      if (options.lane && options.job) {
+        const scope = options.job
+        const jobStatus = ['paused', 'cancelled'].includes(status) ? 'paused' : scopeComplete(receipts, chapters, scope) ? 'completed' : status === 'running' ? 'running' : status === 'failed' ? 'failed' : 'paused'
+        extractionJobs[options.lane] = { ...options.job, runId, status: jobStatus, usage: { ...usage } }
+        if (Object.values(extractionJobs).some(job => job?.status === 'running')) status = 'running'
+        totalUsage = Object.values(extractionJobs).reduce<SavedUsage>((sum, job) => ({ input: sum.input + (job?.usage?.input ?? 0), output: sum.output + (job?.usage?.output ?? 0), totalTokens: sum.totalTokens + (job?.usage?.totalTokens ?? 0), cost: sum.cost + (job?.usage?.cost ?? 0), costStatus: sum.costStatus === 'unknown' || job?.usage?.costStatus === 'unknown' ? 'unknown' : 'estimated' }), { input: 0, output: 0, totalTokens: 0, cost: 0, costStatus: 'estimated' })
+      }
+      await db.table('compileProgress').put({ ...previous, bookId, stage: 'P1', status, totalChapters: chapters.length, completedChapters, failedChapters, partialChapters, updatedAt: new Date().toISOString(), runId, scope: 'fullBook', planVersion: '2.2', unit: 'chapter', validity: 'current', stepStates, usage: totalUsage, ...(options.lane ? { extractionJobs } : {}) })
       return completedChapters.length === chapters.length
     }
-    set(bookId, { running: true, results: [], error: undefined, progress: undefined })
+    update({ running: true, results: options.lane ? states.get(bookId)?.results ?? [] : [], error: undefined, progress: undefined })
     try {
+      if (!options.lane && !activeScope) activeScope = (await db.table<Progress>('compileProgress').get('P1'))?.reExtract
+      domainLease = options.lane ? (options.lane === 'worldAssets' ? 'world' : 'narrative') : activeScope ? (activeScope.step === 'worldAssets' ? 'world' : 'narrative') : undefined
       const { fingerprint, promptOf, schemaOf, validateExtraction } = await import('./contracts')
       if (!await workspace.settings.books.get(bookId)) throw new Error('书籍已删除。')
       const configured = await models.settings.read()
@@ -83,51 +120,69 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
       chapters = await db.chapters.orderBy('order').toArray()
       if (!chapters.length) throw new Error('请先导入章节。')
       if (selection && (!chapters.some(chapter => chapter.chapterIndex === selection.chapterIndex) || !substeps.includes(selection.step))) throw new Error('补提取的章节或步骤不存在。')
+      if (options.job?.scope === 'chapter' && !chapters.some(chapter => chapter.chapterIndex === options.job?.chapterIndex)) throw new Error('目标章节不存在。')
+      if (options.clear && activeScope) {
+        const errors = await reExtractTextErrors(db, chapters, activeScope)
+        if (errors.length) throw new Error(errors.join('；'))
+      }
       await db.transaction('r', db.tables, () => checkReceiptSources(db, bookId))
       await db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), async () => {
         const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
-        if (leases.some(row => row.recordType === 'lease' && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务，请等待其结束。')
-        await db.table('pipelineRuns').put({ id: 'lease:extraction', recordType: 'lease', bookId, lockKey: 'extraction', owner, runId, expiresAt: Date.now() + 30000 })
+        if (leases.some(row => row.recordType === 'lease' && !(options.lane && row.extractionStep && row.extractionStep !== options.lane) && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务，请等待其结束。')
+        await db.table('pipelineRuns').put({ id: leaseId, ...(options.lane ? { extractionStep: options.lane } : {}), recordType: 'lease', bookId, lockKey: options.lane ? `extraction:${options.lane}` : 'extraction', owner, runId, expiresAt: Date.now() + 30000 })
         const previous = await db.table<Progress>('compileProgress').get('P1')
-        const existing = previous?.runId ? await db.table<Run>('pipelineRuns').get(previous.runId) : undefined
+        const existingId = options.lane ? options.job?.runId : previous?.runId
+        const existing = existingId ? await db.table<Run>('pipelineRuns').get(existingId) : undefined
         if (existing?.stage === 'P1' && existing.status !== 'completed') {
           runId = existing.id
           Object.assign(usage, existing.usage)
           const { finishedAt: _finishedAt, ...resumed } = existing
           await db.table('pipelineRuns').put({ ...resumed, status: 'running', tasks: (existing.tasks ?? []).map(task => task.status === 'running' ? { ...task, status: 'partial' } : task) })
         } else await db.table('pipelineRuns').put({ id: runId, recordType: 'run', bookId, stage: 'P1', status: 'running', startedAt: new Date().toISOString(), planVersion: '2.2', aiMode: 'direct', tasks: [] })
-        await db.table('pipelineRuns').update('lease:extraction', { runId })
-        if (domainLease) await db.table('pipelineRuns').put({ id: `lease:${domainLease}`, recordType: 'lease', bookId, lockKey: domainLease, owner, runId, expiresAt: Date.now() + 30000 })
-        await db.table('compileProgress').update('P1', { runId })
+        await db.table('pipelineRuns').update(leaseId, { runId })
+        if (domainLease) await db.table('pipelineRuns').put({ id: `lease:${domainLease}`, ...(options.lane ? { extractionStep: options.lane } : {}), recordType: 'lease', bookId, lockKey: domainLease, owner, runId, expiresAt: Date.now() + 30000 })
+        if (options.lane && options.job) {
+          const next = { bookId, stage: 'P1', status: 'running', totalChapters: chapters.length, completedChapters: [], failedChapters: [], updatedAt: new Date().toISOString(), ...previous, runId, extractionJobs: { ...previous?.extractionJobs, [options.lane]: { ...options.job, runId, status: 'running' } } }
+          if (next.reExtract?.step === options.lane) delete next.reExtract
+          await db.table('compileProgress').put(next)
+        } else await db.table('compileProgress').update('P1', { runId })
       }); acquired = true
-      heartbeat = setInterval(() => { void db.transaction('rw', db.table('pipelineRuns'), async () => {
-        const lease = await db.table<Lease>('pipelineRuns').get('lease:extraction')
-        if (lease?.owner !== owner || lease.runId !== runId) throw new ExecutionLost('提取任务已由其他执行者接管。')
-        await db.table('pipelineRuns').update(lease.id, { expiresAt: Date.now() + 30000 })
-        if (domainLease) {
-          const domain = await db.table<Lease>('pipelineRuns').get(`lease:${domainLease}`)
-          if (domain?.owner !== owner || domain.runId !== runId) throw new ExecutionLost('重提目标范围的执行权已失效。')
-          await db.table('pipelineRuns').update(`lease:${domainLease}`, { expiresAt: Date.now() + 30000 })
-        }
-      }).catch(error => { if (error instanceof ExecutionLost) { heartbeatError = error; controller.abort() } }) }, 8000)
+      heartbeat = setInterval(() => { void db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), checkLease).catch(error => { if (error instanceof ExecutionLost) { heartbeatError = error; controller.abort() } }) }, 8000)
+      executionWatch = liveQuery(async () => {
+        const lease = await db.table<Lease>('pipelineRuns').get(leaseId)
+        const progress = await db.table<Progress>('compileProgress').get('P1')
+        const currentRun = options.lane ? progress?.extractionJobs?.[options.lane]?.runId : progress?.runId
+        return lease?.owner === owner && lease.runId === runId && currentRun === runId
+      }).subscribe({
+        next: valid => {
+          if (valid || controller.signal.aborted) return
+          heartbeatError = new ExecutionLost('提取执行权已撤销，已停止请求。')
+          controller.abort()
+        },
+        error: error => { heartbeatError = error; controller.abort() },
+      })
       if (options.clear && activeScope) {
+        const clearScope = activeScope
         await db.transaction('rw', db.tables, async () => {
           await checkLease()
-          await clearReExtractData(db, activeScope, chapters, new Date().toISOString())
+          const textErrors = await reExtractTextErrors(db, chapters, clearScope)
+          if (textErrors.length) throw new Error(textErrors.join('；'))
+          await clearReExtractData(db, clearScope, chapters, new Date().toISOString())
           const previous = await db.table<Progress>('compileProgress').get('P1')
-          if (previous) await db.table('compileProgress').put({ ...previous, reExtract: activeScope, status: 'running', updatedAt: new Date().toISOString() })
+          if (previous && !options.lane) await db.table('compileProgress').put({ ...previous, reExtract: activeScope, status: 'running', updatedAt: new Date().toISOString() })
           await saveProgress('running')
         })
       }
       await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), () => saveProgress('running'))
       for (const chapter of chapters) for (const step of substeps) {
         if (selection && (chapter.chapterIndex !== selection.chapterIndex || step !== selection.step)) continue
+        if (options.lane && (step !== options.lane || options.job?.scope === 'chapter' && chapter.chapterIndex !== options.job.chapterIndex)) continue
         if (!selection && activeScope && (step !== activeScope.step || activeScope.scope === 'chapter' && chapter.chapterIndex !== activeScope.chapterIndex)) continue
         controller.signal.throwIfAborted()
         await db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), checkLease)
         const key = `${chapter.chapterIndex}:${step}`
         if (await db.table('extractionReceipts').get(key)) continue
-        set(bookId, { chapter: chapter.chapterName, step, progress: undefined })
+        update({ chapter: chapter.chapterName, step, progress: undefined })
         const textRow = await db.table<{ text: string }>('chapterTexts').get(chapter.chapterIndex)
         const text = textRow?.text ?? ''
         const inputFingerprint = await fingerprint(`${step}\n${promptOf(step)}\n${chapter.chapterIndex}\n${chapter.chapterName}\n${text}`)
@@ -139,13 +194,15 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
           const timestamp = new Date().toISOString()
           const task: StoredTask = { taskId, ordinal: run.tasks?.length ?? 0, callId: crypto.randomUUID(), phase: step, status: 'running', workItemIds: [`P1:${step}:chapter:${chapter.chapterIndex}`], input: { chapterIndex: chapter.chapterIndex, chapterName: chapter.chapterName, text }, inputFingerprint, promptHash, attempt: 0, repairCount: 0, stepsUsed: 0, appliedCommitIds: [], reviewedItems: [], readSet: { records: [], queries: [] }, createdAt: timestamp, updatedAt: timestamp }
           await db.table('pipelineRuns').update(runId, { tasks: [...(run.tasks ?? []), task] })
+          const saved = await db.table<Progress>('compileProgress').get('P1')
+          await db.table('compileProgress').update('P1', { stepStates: { ...saved?.stepStates, [key]: { status: 'running' } } })
         })
         const failedResult = (error: unknown): CallResult => ({ ok: false, mode: 'direct', text: '', elapsedMs: 0, attempts: [], usage: { input: 0, output: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, costStatus: 'unknown' }, error: classifyError(error) })
-        const result: CallResult & { value?: ExtractionData } = !text ? failedResult('本章原文缺失。') : await models.generate<ExtractionData>({ role: 'extraction', signal: controller.signal, maxRequests: 3, repairAttempts: 2,
+        const result: CallResult & { value?: ExtractionData } = !text.trim() ? failedResult('本章原文缺失。') : await models.generate<ExtractionData>({ role: 'extraction', signal: controller.signal, maxRequests: 3, repairAttempts: 2,
           context: { systemPrompt: promptOf(step), messages: [{ role: 'user', content: `章节标识：${chapter.chapterIndex}\n章节名：${chapter.chapterName}\n\n--- 正文开始 ---\n${text}\n--- 正文结束 ---`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交本章提取结果', parameters: schemaOf(step), constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
-          validate: message => validateExtraction(step, message, text), repairPrompt: '请按字段要求修正并调用唯一的 submit_result 提交本章结果；其他工具未执行。',
+          validate: message => validateExtraction(step, message), repairPrompt: '请按字段要求修正并调用唯一的 submit_result 提交本章结果；其他工具未执行。',
           beforeRequest: () => db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), checkLease),
-          onProgress: progress => set(bookId, { progress }),
+          onProgress: progress => update({ progress }),
         }).catch(error => { if (error instanceof ExecutionLost || controller.signal.aborted) throw error; return failedResult(error) })
         usage.input += result.usage.input; usage.output += result.usage.output; usage.totalTokens += result.usage.totalTokens; usage.cost += result.usage.cost ?? 0
         if (result.usage.costStatus === 'unknown') usage.costStatus = 'unknown'
@@ -155,6 +212,8 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
           const run = (await db.table<Run>('pipelineRuns').get(runId))!
           const tasks = (run.tasks ?? []).map(task => task.taskId === taskId ? { ...task, status: entry.ok ? 'completed' : 'failed', attempt: entry.attempts, repairCount: Math.max(0, ...result.attempts.map(attempt => attempt.turn - 1)), stepsUsed: entry.attempts, updatedAt: new Date().toISOString(), ...(entry.ok ? {} : { lastError: { code: result.error?.kind ?? 'validation', message: entry.message } }) } : task)
           await db.table('pipelineRuns').update(runId, { tasks, usage, cost: usage.cost })
+          const saved = await db.table<Progress>('compileProgress').get('P1')
+          await db.table('compileProgress').update('P1', { stepStates: { ...saved?.stepStates, [key]: { status: entry.ok ? 'completed' : 'failed', ...(!entry.ok ? { message: entry.message } : {}) } } })
         }
         if (result.ok && result.value) {
           try {
@@ -166,6 +225,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
             const originIds: string[] = []
             const beforeCharacters = await db.table<Character>('characters').toArray()
             const pendingRelations: { person: Character; input: ExtractedRelationInput }[] = []
+            const bindingContext = createNodeBindingContext(beforeCharacters)
             const timestamp = new Date().toISOString()
             async function insert(table: 'characters' | 'locations' | 'nodes', kind: 'character' | 'location' | 'node', code: string, rows: ExtractedRow[]) {
               let sequence = 1
@@ -180,7 +240,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
                   const quote = source.quote as string; const offset = quote ? text.indexOf(quote) : -1
                   delete row.offset
                   Object.assign(row, { order: nodeOrder++, eventLineIds: [], quoteStatus: !quote ? 'empty' : offset < 0 ? 'unmatched' : 'matched', ...(offset < 0 ? {} : { offset }) })
-                  Object.assign(row, bindNodeCharacters(row as unknown as EventNode, await db.table<Character>('characters').toArray()))
+                  Object.assign(row, bindNodeCharacters(row as unknown as EventNode, beforeCharacters, {}, bindingContext))
                 } else {
                   Object.assign(row, { sourceChapters: [chapter.chapterIndex], nameSource: 'extracted' })
                   if (kind === 'character') {
@@ -211,7 +271,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
               const mappings = await db.table<Lifecycle>('assetLifecycle').toArray()
               const created = pendingRelations.map(item => extractedRelation(item.person, item.input, people, mappings, timestamp))
               const existing = await db.table<CharacterRelation>('characterRelations').toArray()
-              const known = new Set(existing.map(row => row.id))
+              const known = new Map(existing.map(row => [row.id, row]))
               const fresh = created.filter(row => !known.has(row.id))
               if (fresh.length) await db.table('characterRelations').bulkPut(fresh)
               const synced = syncRelations([...existing, ...fresh], people, mappings, timestamp)
@@ -221,21 +281,24 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
               for (const node of changedNodes) await db.table('nodes').put({ ...node, revision: node.revision + 1 })
               const changes: AssetChange[] = changedNodes.map(node => ({ kind: 'node', id: node.id }))
               for (const relation of [...fresh, ...synced.changed]) {
-                const before = existing.find(row => row.id === relation.id)
+                const before = known.get(relation.id)
                 for (const id of [before?.sourceId, ...(before?.targetIds ?? []), relation.sourceId, ...relation.targetIds]) if (id) changes.push({ kind: 'character', id })
               }
-              for (const person of people) if (!beforeCharacters.some(row => row.id === person.id)) changes.push({ kind: 'character', id: person.id })
-              await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp)
+              for (const person of people) if (!bindingContext.people.has(person.id)) changes.push({ kind: 'character', id: person.id })
+              const dependentRuns = await db.table('pipelineRuns').where('stage').anyOf(['P2', 'P3']).toArray()
+              await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp, dependentRuns)
             }
+            if (step === 'worldAssets' && !options.lane) {
             const texts = await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()
             for (const [table, people] of [['characters', true], ['locations', false]] as const) {
               const before = await db.table<Character | LocationAsset>(table).toArray()
               const after = updateFrequencies(before, texts, people)
               for (const [index, row] of after.entries()) if (JSON.stringify(row) !== JSON.stringify(before[index])) await db.table(table).put({ ...row, revision: row.revision + 1 })
             }
+            }
             await db.table('extractionReceipts').add({ key, bookId, chapterIndex: chapter.chapterIndex, substep: step, inputFingerprint, originIds, committedAt: timestamp, runId })
-            await saveProgress('running')
             await finishTask()
+            await saveProgress('running')
             controller.signal.throwIfAborted()
           })
           } catch (error) {
@@ -244,11 +307,30 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
             entry.message = error instanceof Error ? error.message : '本章结果保存校验失败。'
           }
         }
-        set(bookId, { results: [...states.get(bookId)!.results, entry] })
-        await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), async () => {
+        update({ results: [...states.get(bookId)!.results, entry] })
+        if (!entry.ok) await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), async () => {
           await checkLease()
           await finishTask()
           await saveProgress('running')
+        })
+      }
+      if (options.lane === 'worldAssets') {
+        update({ progress: undefined, chapter: '正在更新出场统计' })
+        const people = await db.table<Character>('characters').toArray()
+        const places = await db.table<LocationAsset>('locations').toArray()
+        const personCounter = createFrequencyCounter(people, true), placeCounter = createFrequencyCounter(places, false)
+        for (const chapter of chapters) {
+          controller.signal.throwIfAborted()
+          const text = await db.table<{ text: string }>('chapterTexts').get(chapter.chapterIndex)
+          if (text) { personCounter.add({ chapterIndex: chapter.chapterIndex, text: text.text }); placeCounter.add({ chapterIndex: chapter.chapterIndex, text: text.text }) }
+          await new Promise<void>(resolve => setTimeout(resolve, 0))
+        }
+        await db.transaction('rw', db.tables, async () => {
+          await checkLease()
+          for (const [table, before, after] of [['characters', people, personCounter.result()], ['locations', places, placeCounter.result()]] as const) {
+            const changed = after.filter((row, index) => JSON.stringify(row) !== JSON.stringify(before[index])).map(row => ({ ...row, revision: row.revision + 1 }))
+            if (changed.length) await db.table(table).bulkPut(changed)
+          }
         })
       }
       await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), async () => {
@@ -258,33 +340,43 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
         const status = complete ? 'completed' : current?.failedChapters.length ? 'failed' : 'paused'
         const receipts = await db.table<Receipt>('extractionReceipts').toArray()
         const scopeDone = activeScope ? scopeComplete(receipts, chapters, activeScope) : false
+        let runStatus = status
         if (current) {
           const next: Progress = { ...current, status }
-          if (activeScope && scopeDone) delete next.reExtract
+          if (activeScope && scopeDone && !options.lane) delete next.reExtract
+          if (options.lane && next.extractionJobs?.[options.lane]) {
+            const job = next.extractionJobs[options.lane]!
+            job.status = scopeComplete(receipts, chapters, options.job!) ? 'completed' : selection && options.job?.scope === 'all' ? 'paused' : 'failed'
+            runStatus = job.status
+            if (Object.values(next.extractionJobs).some(item => item?.status === 'running')) next.status = 'running'
+          }
           await db.table('compileProgress').put(next)
         } else await db.table('compileProgress').update('P1', { status })
-        await db.table('pipelineRuns').update(runId, { status, usage, cost: usage.cost, finishedAt: new Date().toISOString() })
+        await db.table('pipelineRuns').update(runId, { status: runStatus, usage, cost: usage.cost, finishedAt: new Date().toISOString() })
       })
     } catch (error) {
       const cause = heartbeatError ?? error
       const cancelled = controller.signal.aborted && !heartbeatError
-      const message = cancelled ? '提取已取消，已保存的成果保留。' : cause instanceof Error ? cause.message : '提取中断，已保存的成果保留。'
-      set(bookId, { error: message })
+      const paused = options.lane && pausedLanes.has(pauseKey)
+      const message = paused ? '提取已暂停，已保存的成果保留。' : cancelled ? '提取已取消，已保存的成果保留。' : cause instanceof Error ? cause.message : '提取中断，已保存的成果保留。'
+      update({ error: message })
       if (acquired) await db.transaction('rw', db.table('pipelineRuns'), db.table('extractionReceipts'), db.table('compileProgress'), async () => {
-        if ((await db.table<Lease>('pipelineRuns').get('lease:extraction'))?.owner !== owner) return
-        const status = cancelled ? 'cancelled' : 'paused'
+        if ((await db.table<Lease>('pipelineRuns').get(leaseId))?.owner !== owner) return
+        if (options.lane && (await db.table<Progress>('compileProgress').get('P1'))?.extractionJobs?.[options.lane]?.runId !== runId) return
+        const status = paused ? 'paused' : cancelled ? 'cancelled' : 'paused'
         await saveProgress(status)
         const run = await db.table<Run>('pipelineRuns').get(runId)
-        const tasks = (run?.tasks ?? []).map(task => task.status === 'running' ? { ...task, status: cancelled ? 'cancelled' : 'partial', updatedAt: new Date().toISOString(), lastError: { code: cancelled ? 'cancelled' : 'interrupted', message } } : task)
+        const tasks = (run?.tasks ?? []).map(task => task.status === 'running' ? { ...task, status: cancelled && !paused ? 'cancelled' : 'partial', updatedAt: new Date().toISOString(), lastError: { code: cancelled ? 'cancelled' : 'interrupted', message } } : task)
         await db.table('pipelineRuns').update(runId, { status, tasks, usage, cost: usage.cost, finishedAt: new Date().toISOString() })
-      }).catch(() => set(bookId, { error: `${message}；进度保存失败，请检查本地存储。` }))
+      }).catch(() => update({ error: `${message}；进度保存失败，请检查本地存储。` }))
     } finally {
       clearInterval(heartbeat)
+      executionWatch?.unsubscribe()
       if (acquired) await db.transaction('rw', db.table('pipelineRuns'), async () => {
-        if ((await db.table<Lease>('pipelineRuns').get('lease:extraction'))?.owner === owner) await db.table('pipelineRuns').delete('lease:extraction')
+        if ((await db.table<Lease>('pipelineRuns').get(leaseId))?.owner === owner) await db.table('pipelineRuns').delete(leaseId)
         if (domainLease && (await db.table<Lease>('pipelineRuns').get(`lease:${domainLease}`))?.owner === owner) await db.table('pipelineRuns').delete(`lease:${domainLease}`)
-      }).catch(() => set(bookId, { error: '任务已结束，执行锁等待到期释放。' }))
-      controllers.delete(bookId); set(bookId, { running: false, progress: undefined })
+      }).catch(() => update({ error: '任务已结束，执行锁等待到期释放。' }))
+      activeControllers.delete(executionKey); pausedLanes.delete(pauseKey); update({ running: false, progress: undefined })
     }
   }
   async function start(bookId: string, selection?: Selection) {
@@ -306,6 +398,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
     const configured = await models.settings.read()
     if (!configured.configured || !configured.config.extractionModel) blockers.push('请先在设置中保存提取模型和密钥。')
     const scope: ReExtractScope = { ...request, startedAt: new Date().toISOString() }
+    blockers.push(...await reExtractTextErrors(db, chapters, scope))
     const counts = request.scope === 'chapter' && !chapters.some(chapter => chapter.chapterIndex === request.chapterIndex)
       ? { characters: 0, locations: 0, relations: 0, nodes: 0, eventLines: 0 }
       : await db.transaction('r', db.tables, () => previewReExtractData(db, scope, chapters))
@@ -323,14 +416,142 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
     if (!progress?.reExtract) throw new Error('没有待继续的重提任务。')
     await withExtractionLock(workspace.scope.settingsName, bookId, () => execute(bookId, undefined, { reExtract: progress.reExtract }), () => { set(bookId, { error: '本书已有处理任务，请等待其结束。' }) })
   }
+  async function cancelReExtract(bookId: string) {
+    const db = workspace.openBook(bookId)
+    const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
+    if (leases.some(activeLease)) throw new Error('提取任务正在运行，请先取消或等待结束。')
+    const progress = await db.table<Progress>('compileProgress').get('P1')
+    if (!progress?.reExtract) throw new Error('没有待继续的重提任务。')
+    const chapters = await db.chapters.orderBy('order').toArray()
+    const receipts = await db.table<Receipt>('extractionReceipts').toArray()
+    const { allCovered, completedSteps: _completedSteps, ...counts } = coverage(chapters, receipts, progress.failedChapters)
+    const next: Progress = { ...progress, ...counts, status: allCovered ? 'completed' : 'paused' }
+    delete next.reExtract
+    await db.table('compileProgress').put(next)
+  }
+  async function previewLane(bookId: string, step: Substep): Promise<ReExtractPreview> {
+    const db = workspace.openBook(bookId)
+    const chapters = await db.chapters.orderBy('order').toArray()
+    const scope: ReExtractScope = { step, scope: 'all', startedAt: new Date().toISOString() }
+    const blockers = await reExtractTextErrors(db, chapters, scope)
+    if (!chapters.length) blockers.push('本书没有章节。')
+    const configured = await models.settings.read()
+    if (!configured.configured || !configured.config.extractionModel) blockers.push('请先配置提取模型和密钥。')
+    const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
+    if (leases.some(row => activeLease(row) && (!row.extractionStep || row.extractionStep === step))) blockers.push('该类资产已有处理任务，请先暂停或取消。')
+    return { blockers, counts: await db.transaction('r', db.tables, () => previewReExtractData(db, scope, chapters)) }
+  }
+  async function startLane(bookId: string, step: Substep, options: { replace?: boolean; chapterIndex?: string; resume?: boolean; group?: 'together' | 'single' } = {}) {
+    const key = `${bookId}:${step}`
+    if (lanePromises.has(key) || controllers.has(bookId)) return
+    const version = cancelVersions.get(bookId) ?? 0
+    const db = workspace.openBook(bookId)
+    const previous = await db.table<Progress>('compileProgress').get('P1')
+    if ((cancelVersions.get(bookId) ?? 0) !== version) return
+    const legacy = previous?.reExtract?.step === step ? previous.reExtract : undefined
+    const saved = previous?.extractionJobs?.[step] ?? (legacy ? { ...legacy, mode: 'replace' as const, group: 'single' as const, status: 'paused' as const, runId: previous?.runId } : undefined)
+    const retained = options.chapterIndex && saved?.scope === 'all' && saved.group === 'single' ? saved : undefined
+    const job: ExtractionJob = retained ? { ...retained, status: 'running' } : options.resume && saved ? { ...saved, status: 'running' } : { step, scope: options.chapterIndex ? 'chapter' : 'all', ...(options.chapterIndex ? { chapterIndex: options.chapterIndex } : {}), mode: options.replace ? 'replace' : 'extract', group: options.group ?? 'single', status: 'running', startedAt: new Date().toISOString() }
+    const scope: ReExtractScope | undefined = options.chapterIndex ? options.replace ? { step, scope: 'chapter', chapterIndex: options.chapterIndex, startedAt: job.startedAt } : undefined : job.mode === 'replace' ? job : undefined
+    const promise = withExtractionLock(workspace.scope.settingsName, bookId, () => execute(bookId, options.chapterIndex ? { chapterIndex: options.chapterIndex, step } : undefined, { lane: step, job, reExtract: scope, clear: !!options.replace && !options.resume }), () => { set(bookId, { error: '该类提取正在其他标签页运行。' }) }, step)
+    lanePromises.set(key, promise)
+    try { await promise } finally { if (lanePromises.get(key) === promise) lanePromises.delete(key) }
+  }
+  async function startTogether(bookId: string) {
+    const version = cancelVersions.get(bookId) ?? 0
+    const saved = await workspace.openBook(bookId).table<Progress>('compileProgress').get('P1')
+    if ((cancelVersions.get(bookId) ?? 0) !== version) return
+    if (saved?.reExtract || Object.values(saved?.extractionJobs ?? {}).some(job => job?.group === 'single' && job.scope === 'all')) throw new Error('请先取消独立提取任务，再一起提取。')
+    await Promise.all(substeps.map(step => startLane(bookId, step, { group: 'together', resume: saved?.extractionJobs?.[step]?.group === 'together' })))
+  }
+  function pauseLane(bookId: string, step: Substep) {
+    const controller = laneControllers.get(bookId)?.get(step)
+    if (!controller) return
+    pausedLanes.add(`${bookId}:${step}`)
+    controller.abort()
+  }
+  function pauseTogether(bookId: string) { for (const step of substeps) pauseLane(bookId, step) }
+  async function cancelAll(bookId: string) {
+    cancelVersions.set(bookId, (cancelVersions.get(bookId) ?? 0) + 1)
+    controllers.get(bookId)?.abort()
+    for (const controller of laneControllers.get(bookId)?.values() ?? []) controller.abort()
+    const db = workspace.openBook(bookId)
+    await db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), db.table('extractionReceipts'), db.chapters, async () => {
+      const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
+      const extraction = leases.filter(lease => extractionLeaseIds.includes(lease.id))
+      for (const lease of extraction) {
+        await db.table('pipelineRuns').delete(lease.id)
+        for (const domain of leases.filter(row => ['lease:world', 'lease:narrative'].includes(row.id) && row.owner === lease.owner && row.runId === lease.runId)) await db.table('pipelineRuns').delete(domain.id)
+      }
+      for (const runId of new Set(extraction.map(lease => lease.runId).filter((id): id is string => !!id))) {
+        const run = await db.table<Run>('pipelineRuns').get(runId)
+        if (run?.stage === 'P1' && ['running', 'paused', 'cancelling'].includes(run.status)) await db.table('pipelineRuns').update(runId, { status: 'cancelled', finishedAt: new Date().toISOString() })
+      }
+      const previous = await db.table<Progress>('compileProgress').get('P1')
+      if (!previous) return
+      const receipts = await db.table<Receipt>('extractionReceipts').toArray()
+      const chapters = await db.chapters.orderBy('order').toArray()
+      const { allCovered, completedSteps: _completedSteps, ...counts } = coverage(chapters, receipts, previous.failedChapters)
+      const stepStates = Object.fromEntries(Object.entries(previous.stepStates ?? {}).map(([key, state]) => [key, state.status === 'running' ? { status: 'cancelled' } : state]))
+      const next = { ...previous, ...counts, stepStates, status: allCovered ? 'completed' : 'paused', updatedAt: new Date().toISOString() }
+      delete next.extractionJobs; delete next.reExtract
+      await db.table('compileProgress').put(next)
+    })
+    await Promise.all(substeps.map(step => lanePromises.get(`${bookId}:${step}`)))
+  }
+  async function extractChapter(bookId: string, chapterIndex: string, step: Substep) {
+    const receipt = await workspace.openBook(bookId).table('extractionReceipts').get(`${chapterIndex}:${step}`)
+    await startLane(bookId, step, { chapterIndex, replace: !!receipt })
+  }
+  async function recoverLanes(bookId: string, progress?: Progress) {
+    const db = workspace.openBook(bookId)
+    for (const step of substeps) {
+      if (laneControllers.get(bookId)?.has(step)) continue
+      const leaseId = `lease:extraction:${step}`
+      const lease = await db.table<Lease>('pipelineRuns').get(leaseId)
+      const job = progress?.extractionJobs?.[step]
+      if (lease && activeLease(lease) && job || !lease && job?.status !== 'running') continue
+      await withExtractionLock(workspace.scope.settingsName, bookId, async () => {
+        await db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), async () => {
+          const current = await db.table<Progress>('compileProgress').get('P1')
+          const currentLease = await db.table<Lease>('pipelineRuns').get(leaseId)
+          if (currentLease && activeLease(currentLease) && current?.extractionJobs?.[step]) return
+          if (current?.extractionJobs) {
+            const currentJob = current.extractionJobs[step]
+            if (currentJob?.status === 'running') currentJob.status = 'paused'
+            const status = Object.values(current.extractionJobs).some(item => item?.status === 'running') ? 'running' : current.status === 'completed' ? 'completed' : 'paused'
+            await db.table('compileProgress').put({ ...current, status })
+          }
+          if (currentLease) {
+            await db.table('pipelineRuns').delete(leaseId)
+            const domainId = `lease:${step === 'worldAssets' ? 'world' : 'narrative'}`
+            const domain = await db.table<Lease>('pipelineRuns').get(domainId)
+            if (domain?.owner === currentLease.owner && domain?.runId === currentLease.runId) await db.table('pipelineRuns').delete(domainId)
+          }
+        })
+      }, () => undefined, step)
+    }
+  }
   async function recover(bookId: string) {
     if (controllers.has(bookId)) return
     const target = workspace.openBook(bookId)
+    const saved = await target.table<Progress>('compileProgress').get('P1')
+    if (saved && !saved.stepStates && saved.runId) {
+      await target.transaction('rw', target.table('pipelineRuns'), target.table('compileProgress'), async () => {
+        const current = await target.table<Progress>('compileProgress').get('P1')
+        if (!current?.runId || current.stepStates) return
+        const run = await target.table<Run>('pipelineRuns').get(current.runId)
+        const stepStates = Object.fromEntries((run?.tasks ?? []).map(task => [`${task.input.chapterIndex}:${task.phase}`, { status: task.status, ...(task.lastError ? { message: task.lastError.message } : {}) }]))
+        await target.table('compileProgress').put({ ...current, stepStates, ...(run?.usage ? { usage: run.usage } : {}) })
+      })
+    }
+    await recoverLanes(bookId, saved)
+    if (saved?.extractionJobs) return
     const needed = await target.transaction('r', target.chapters, target.table('pipelineRuns'), target.table('extractionReceipts'), target.table('compileProgress'), async () => {
       const previous = await target.table<Progress>('compileProgress').get('P1')
       if (!previous || previous.status === 'idle') return false
       const lease = await target.table<Lease>('pipelineRuns').get('lease:extraction')
-      if (lease && (lease.expiresAt === undefined || lease.expiresAt > Date.now())) return false
+      if (lease && activeLease(lease) && ['running', 'cancelling'].includes(previous.status)) return false
       if (!lease && !['running', 'cancelling', 'completed'].includes(previous.status)) return false
       if (!lease && previous.status === 'completed' && coverage(await target.chapters.toArray(), await target.table<Receipt>('extractionReceipts').toArray()).allCovered) return false
       return true
@@ -342,42 +563,54 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
         const previous = await db.table<Progress>('compileProgress').get('P1')
         if (!previous) return
         const lease = await db.table<Lease>('pipelineRuns').get('lease:extraction')
-        if (lease && (lease.expiresAt === undefined || lease.expiresAt > Date.now())) return
+        if (lease && activeLease(lease) && ['running', 'cancelling'].includes(previous.status)) return
         const receipts = await checkReceiptSources(db, bookId)
         const chapters = await db.chapters.orderBy('order').toArray()
         const { allCovered, completedSteps: _completedSteps, ...counts } = coverage(chapters, receipts, previous.failedChapters)
         const status = allCovered ? 'completed' : ['running', 'cancelling', 'completed'].includes(previous.status) ? 'paused' : previous.status
         const next = { ...previous, ...counts, status }
         if (JSON.stringify(next) !== JSON.stringify(previous)) await db.table('compileProgress').put(next)
-        if (lease) await db.table('pipelineRuns').delete(lease.id)
+        if (lease) {
+          await db.table('pipelineRuns').delete(lease.id)
+          for (const id of ['lease:world', 'lease:narrative']) {
+            const domain = await db.table<Lease>('pipelineRuns').get(id)
+            if (domain?.owner === lease.owner && domain?.runId === lease.runId) await db.table('pipelineRuns').delete(id)
+          }
+        }
         const run = previous.runId ? await db.table<Run>('pipelineRuns').get(previous.runId) : undefined
         if (run && (run.status === 'running' || run.status === 'completed' && !allCovered)) await db.table('pipelineRuns').update(run.id, { status: allCovered ? 'completed' : 'paused', tasks: (run.tasks ?? []).map(task => task.status === 'running' ? { ...task, status: 'partial', updatedAt: new Date().toISOString(), lastError: { code: 'interrupted', message: '任务中断，可继续处理尚未完成的步骤。' } } : task) })
       })
     }, () => undefined)
   }
-  return { start, retry: (bookId: string, chapterIndex: string, step: Substep) => start(bookId, { chapterIndex, step }), reExtractPreview, reExtract, continueReExtract, recover, cancel: (bookId: string) => controllers.get(bookId)?.abort(), state: (bookId: string) => states.get(bookId),
+  return { startTogether, startLane, pauseLane, pauseTogether, cancelAll, extractChapter, previewLane, laneState: (bookId: string, step: Substep) => laneStates.get(bookId)?.[step], start, retry: (bookId: string, chapterIndex: string, step: Substep) => start(bookId, { chapterIndex, step }), reExtractPreview, reExtract, continueReExtract, cancelReExtract, recover, cancel: (bookId: string) => controllers.get(bookId)?.abort(), state: (bookId: string) => states.get(bookId),
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
     async progress(bookId: string) {
       const db = workspace.openBook(bookId)
       return db.transaction('r', db.chapters, db.table('extractionReceipts'), db.table('compileProgress'), db.table('pipelineRuns'), async () => {
-        const progress = await db.table<Progress>('compileProgress').get('P1')
-        if (!progress) return undefined
-        const run = progress.runId ? await db.table<Run>('pipelineRuns').get(progress.runId) : undefined
+        const saved = await db.table<Progress>('compileProgress').get('P1')
+        const progress: Progress = saved ?? { bookId, stage: 'P1', status: 'idle', totalChapters: 0, completedChapters: [], failedChapters: [], updatedAt: new Date().toISOString(), stepStates: {} }
+        const run = !progress.stepStates && progress.runId ? await db.table<Run>('pipelineRuns').get(progress.runId) : undefined
         const chapters = await db.chapters.orderBy('order').toArray()
         const receipts = await db.table<Receipt>('extractionReceipts').toArray()
-        const lease = await db.table<Lease>('pipelineRuns').get('lease:extraction')
-        const { allCovered, ...counts } = coverage(chapters, receipts, progress.failedChapters)
-        const status = progress.status === 'completed' && !allCovered || progress.status === 'failed' && !counts.failedChapters.length ? 'paused' : progress.status
-        const failures = [...new Map((run?.tasks ?? []).filter(task => task.status === 'failed' || task.status === 'partial').filter(task => !receipts.some(receipt => receipt.key === `${task.input.chapterIndex}:${task.phase}`)).map(task => [`${task.input.chapterIndex}:${task.phase}`, { chapterIndex: task.input.chapterIndex, step: task.phase, message: task.lastError?.message ?? '任务中断，可继续提取。' }])).values()]
-        const latest = new Map((run?.tasks ?? []).map(task => [`${task.input.chapterIndex}:${task.phase}`, task]))
+        const keys = new Set(receipts.map(row => row.key))
+        const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
+        const extractionLeases = leases.filter(row => row.id.startsWith('lease:extraction'))
+        const legacyLease = extractionLeases.find(row => row.id === 'lease:extraction')
+        const stored = progress.stepStates ?? Object.fromEntries((run?.tasks ?? []).map(task => [`${task.input.chapterIndex}:${task.phase}`, { status: task.status, message: task.lastError?.message }]))
+        const failures = Object.entries(stored).filter(([key, item]) => ['failed', 'partial'].includes(item.status) && !keys.has(key)).map(([key, item]) => ({ chapterIndex: key.slice(0, key.lastIndexOf(':')), step: key.slice(key.lastIndexOf(':') + 1) as Substep, message: item.message ?? '任务中断，可继续提取。' }))
+        const { allCovered, ...counts } = coverage(chapters, receipts, failures.filter(item => stored[`${item.chapterIndex}:${item.step}`]?.status === 'failed').map(item => item.chapterIndex))
+        const status = !saved && allCovered ? 'completed' : progress.status === 'completed' && !allCovered || progress.status === 'failed' && !counts.failedChapters.length ? 'paused' : progress.status
         const steps = Object.fromEntries(chapters.map(chapter => [chapter.chapterIndex, Object.fromEntries(substeps.map(step => {
-          const key = `${chapter.chapterIndex}:${step}`, task = latest.get(key)
-          const state: ExtractionStepStatus = receipts.some(row => row.key === key) ? 'completed' : task?.status === 'running' && !!lease ? 'running' : task?.status === 'failed' ? 'failed' : task ? 'interrupted' : 'pending'
-          return [step, { status: state, message: task?.lastError?.message }]
+          const key = `${chapter.chapterIndex}:${step}`, task = stored[key]
+          const leased = !!legacyLease || extractionLeases.some(row => row.extractionStep === step)
+          const state: ExtractionStepStatus = keys.has(key) ? 'completed' : task?.status === 'running' && leased ? 'running' : task?.status === 'failed' ? 'failed' : task ? 'interrupted' : 'pending'
+          return [step, { status: state, message: task?.message }]
         }))])) as Record<string, Record<Substep, { status: ExtractionStepStatus; message?: string }>>
-        return { ...progress, ...counts, status, steps, busy: !!lease, canOrganize: allCovered && status === 'completed' && !lease, usage: run?.usage, failures }
-
+        const extractionJobs = { ...progress.extractionJobs }
+        if (progress.reExtract && !extractionJobs[progress.reExtract.step]) extractionJobs[progress.reExtract.step] = { ...progress.reExtract, mode: 'replace', group: 'single', status: legacyLease ? 'running' : 'paused', runId: progress.runId }
+        return { ...progress, ...counts, extractionJobs, status, steps, busy: extractionLeases.length > 0, externalBusy: leases.some(row => !row.extractionStep && !row.id.startsWith('lease:extraction') && activeLease(row)), canOrganize: allCovered && status === 'completed' && extractionLeases.length === 0, usage: progress.usage ?? run?.usage, failures }
       })
+
     },
   }
 }

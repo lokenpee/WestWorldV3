@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createWorkspace } from '../src/lib/storage/workspace'
 import { createModelService } from '../src/features/models/service'
 import { createExtractionService } from '../src/features/extraction/service'
+import { validateExtraction } from '../src/features/extraction/contracts'
 import { defaultConfig } from '../src/features/models/types'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
 import { createAssetService } from '../src/features/assets/service'
@@ -29,6 +30,16 @@ async function setup(fetcher: typeof fetch, count = 1) {
   return { book, workspace, db, models, service: createExtractionService(workspace, models) }
 }
 afterEach(async () => { for (const workspace of workspaces.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
+
+const extractionMessage = (value: unknown) => ({ content: [{ type: 'toolCall', name: 'submit_result', arguments: value }] }) as unknown as Parameters<typeof validateExtraction>[1]
+const relationWorld = (quote: string) => ({ characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'friend', relation_label: '朋友', reverse_label: '朋友', direction: 'bidirectional', quote }] }], locations: [] })
+
+it('人物关系依据只要求有简明内容，不要求逐字匹配本章原文', () => {
+  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('二人是多年朋友，这是模型概括的依据。')))).not.toThrow()
+  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('朋友')))).not.toThrow()
+  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('朋')))).toThrow('长度2–500字')
+  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('依'.repeat(501))))).toThrow('长度2–500字')
+})
 
 it('整书重提世界资产先清空再提取，保留叙事节点并清除P2', async () => {
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
@@ -103,6 +114,98 @@ it('单章重提合并编号后其他章节凭证仍有效，首章失败可继�
   expect(await db.table('extractionReceipts').get('2:worldAssets')).toBeTruthy()
   expect(await db.table('characters').count()).toBeGreaterThan(0)
 }, 30000)
+
+it.each(['all', 'chapter'] as const)('原文缺失时%s世界重提保留旧资产和凭证', async scope => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db } = await setup(fetcher, 2)
+  await service.start('a')
+  const beforePeople = await db.table('characters').toArray()
+  const beforeReceipts = await db.table('extractionReceipts').toArray()
+  await db.table('chapterTexts').delete('2')
+  fetcher.mockClear()
+  const request = scope === 'all' ? { scope, step: 'worldAssets' as const } : { scope, chapterIndex: '2', step: 'worldAssets' as const }
+  expect((await service.reExtractPreview('a', request)).blockers).toContain('第2章原文缺失或为空，无法重新提取。')
+  await expect(service.reExtract('a', request)).rejects.toThrow('第2章原文缺失')
+  expect(await db.table('characters').toArray()).toEqual(beforePeople)
+  expect(await db.table('extractionReceipts').toArray()).toEqual(beforeReceipts)
+  expect(fetcher).not.toHaveBeenCalled()
+})
+
+it('预览后原文变为空白，清空事务仍拒绝且单章不检查其他章节', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db, models } = await setup(fetcher, 2)
+  await service.start('a')
+  await db.table('chapterTexts').delete('2')
+  const request = { scope: 'chapter' as const, chapterIndex: '1', step: 'worldAssets' as const }
+  expect((await service.reExtractPreview('a', request)).blockers).toEqual([])
+  const beforePeople = await db.table('characters').toArray()
+  const beforeReceipts = await db.table('extractionReceipts').toArray()
+  const readSettings = models.settings.read.bind(models.settings)
+  let reads = 0
+  vi.spyOn(models.settings, 'read').mockImplementation(async () => {
+    if (++reads === 2) await db.table('chapterTexts').update('1', { text: ' \n\t' })
+    return readSettings()
+  })
+  fetcher.mockClear()
+  await service.reExtract('a', request)
+  expect(service.state('a')?.error).toContain('第1章原文缺失或为空')
+  expect(await db.table('characters').toArray()).toEqual(beforePeople)
+  expect(await db.table('extractionReceipts').toArray()).toEqual(beforeReceipts)
+  expect((await service.progress('a'))?.reExtract).toBeUndefined()
+  expect(fetcher).not.toHaveBeenCalled()
+})
+
+it.each(['all', 'chapter'] as const)('%s重提失败后章节重试成功按原范围解除标记', async scope => {
+  let failing = false
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const isWorld = !!JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters
+    return stream(isWorld ? failing ? { characters: [{ name: '', confidence: 1 }], locations: [] } : world : narrative)
+  })
+  const { service, db } = await setup(fetcher, 2)
+  await service.start('a')
+  const narrativeReceipts = await db.table('extractionReceipts').where('substep').equals('narrativeAssets').toArray()
+  failing = true
+  await service.reExtract('a', scope === 'all' ? { scope, step: 'worldAssets' } : { scope, chapterIndex: '1', step: 'worldAssets' })
+  expect((await service.progress('a'))?.reExtract?.scope).toBe(scope)
+  failing = false
+  fetcher.mockClear()
+  await service.retry('a', '1', 'worldAssets')
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(await db.table('extractionReceipts').get('1:worldAssets')).toBeTruthy()
+  if (scope === 'all') {
+    expect((await service.progress('a'))?.reExtract?.scope).toBe('all')
+    await service.retry('a', '2', 'worldAssets')
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  }
+  expect((await service.progress('a'))?.reExtract).toBeUndefined()
+  expect((await service.reExtractPreview('a', { scope: 'chapter', chapterIndex: '1', step: 'worldAssets' })).blockers).toEqual([])
+  expect(await db.table('extractionReceipts').where('substep').equals('narrativeAssets').toArray()).toEqual(narrativeReceipts)
+}, 30000)
+
+it('取消待继续重提不写入Schema外字段，备份仍可校验', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db, book } = await setup(fetcher)
+  await service.start('a')
+  await db.table('compileProgress').update('P1', { reExtract: { step: 'worldAssets', scope: 'all', startedAt: new Date().toISOString() } })
+  await service.cancelReExtract('a')
+  const progress = await db.table('compileProgress').get('P1')
+  expect(progress).not.toHaveProperty('reExtract')
+  expect(progress).not.toHaveProperty('completedSteps')
+  expect(progress).toMatchObject({ status: 'completed' })
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+})
+
+it('取消全部提取后不写入Schema外字段，备份校验通过', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db, book } = await setup(fetcher)
+  await service.start('a')
+  await service.cancelAll('a')
+  const progress = await db.table('compileProgress').get('P1')
+  expect(progress).not.toHaveProperty('completedSteps')
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+})
 
 it('续期延迟超过有效期时，同一执行者保存回复并继续所有章节', async () => {
   const fetcher = vi.fn<typeof fetch>()
@@ -387,15 +490,17 @@ it('P1关系按落库人物编号保存，目标全部命中，人物行不再�
   expect(await db.table('characters').get('C1-P001')).not.toHaveProperty('relations')
 })
 
-it('关系引文不在本章原文时拒绝该子步骤，不留下半份关系', async () => {
-  const invalid = { characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'parent_child', relation_label: '父亲', reverse_label: '子女', direction: 'directed', quote: '本章没有这句话' }] }], locations: [] }
+it('关系依据不要求逐字匹配本章原文，有简明依据即可保存', async () => {
+  const valid = { characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'parent_child', relation_label: '父亲', reverse_label: '子女', direction: 'directed', quote: '模型概括的父子关系依据' }] }], locations: [] }
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string)
-    return stream(body.tools[0].function.parameters.properties.characters ? invalid : { nodes: [] })
+    return stream(body.tools[0].function.parameters.properties.characters ? valid : { nodes: [] })
   })
   const { service, db } = await setup(fetcher)
   await service.start('a')
-  expect(await db.table('characterRelations').count()).toBe(0)
-  expect(await db.table('extractionReceipts').get('1:worldAssets')).toBeUndefined()
-  expect(service.state('a')?.results.find(row => row.step === 'worldAssets')?.ok).toBe(false)
+  const relations = await db.table('characterRelations').toArray()
+  expect(relations).toHaveLength(1)
+  expect(relations[0]).toMatchObject({ originCharacterId: 'C1-P001', targetName: '顾衡', evidence: [{ chapterIndex: '1', quote: '模型概括的父子关系依据' }] })
+  expect(await db.table('extractionReceipts').get('1:worldAssets')).toBeTruthy()
+  expect(service.state('a')?.results.find(row => row.step === 'worldAssets')?.ok).toBe(true)
 })

@@ -26,14 +26,13 @@
       "resource": "world",
       "phases": [
         "mechanical",
-        "ai_identity",
-        "optimize",
+        "character_organization",
         "report"
       ],
       "canRunWith": [
         "P3"
       ],
-      "storySession": false,
+      "storySession": "one-active-asset-editor-session-per-book",
       "identityInput": "paginated-summary-tools",
       "detailRead": "on-demand-for-verification-or-optimization",
       "onEnd": "persist-report-for-every-terminal-status",
@@ -44,8 +43,7 @@
         "queryMaxResults": 100
       },
       "aiModes": {
-        "ai_identity": "agent",
-        "optimize": "direct"
+        "character_organization": "agent"
       },
       "entryPoints": {
         "code": {
@@ -61,12 +59,44 @@
         "ai": {
           "callsAi": true,
           "steps": [
-            "ai_identity",
-            "optimize",
+            "character_organization",
             "report"
           ],
           "requiresCodeEntry": false
         }
+      },
+      "organization": {
+        "workflow": "character_organization_v1",
+        "executionVersion": 4,
+        "pageSize": 100,
+        "basis": "traceable-summary-not-verbatim-quote",
+        "steps": [
+          "scan",
+          "resolve",
+          "profiles",
+          "relations",
+          "finalize"
+        ],
+        "workKinds": [
+          "directory",
+          "candidate",
+          "profile",
+          "relations"
+        ],
+        "perPersonContext": true,
+        "submitTools": [
+          "submit_profile_review",
+          "submit_relation_review"
+        ],
+        "doneSemantics": "done=false saves partial and keeps current person; done=true saves and completes",
+        "preloadedProfile": "non-relation fields, facts and sources",
+        "preloadedRelations": "full current relation list for one person",
+        "assetCreateDelete": false,
+        "assetMerge": true,
+        "relationAddDelete": true,
+        "fixedRequestOrTokenLimits": false,
+        "requestLedger": true,
+        "normalCompletionNeedsSummary": false
       }
     },
     "P3": {
@@ -229,7 +259,7 @@
     "maxInvalidationsPerWorkItem": 3
   },
   "backup": {
-    "targetFormatVersion": 5,
+    "targetFormatVersion": 10,
     "additionalFiles": [
       "data/extractionReceipts.json",
       "data/assetLifecycle.json",

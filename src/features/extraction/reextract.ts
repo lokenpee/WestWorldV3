@@ -108,7 +108,7 @@ export async function clearReExtractData(db: Database, scope: ReExtractScope, ch
       const p3 = await db.table<{ validity?: string; updatedAt?: string }>('compileProgress').get('P3')
       if (p3) await db.table('compileProgress').put({ ...p3, validity: 'stale', updatedAt: timestamp })
     } else {
-      const runs = await db.table<Run>('pipelineRuns').toArray()
+      const runs = await db.table<Run>('pipelineRuns').where('stage').anyOf(['P2', 'P3']).toArray()
       await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp, runs as unknown as Row[])
     }
   } else {
@@ -152,7 +152,7 @@ export async function clearReExtractData(db: Database, scope: ReExtractScope, ch
         }
       }
       for (const id of removedNodeIds) changes.push({ kind: 'node', id })
-      const runs = await db.table<Run>('pipelineRuns').toArray()
+      const runs = await db.table<Run>('pipelineRuns').where('stage').anyOf(['P2', 'P3']).toArray()
       await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp, runs as unknown as Row[])
     }
     for (const receipt of scopedReceipts) await db.table('extractionReceipts').delete(receipt.key)

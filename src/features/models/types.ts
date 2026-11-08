@@ -1,10 +1,20 @@
-import type { AssistantMessage, Context, Model, Usage } from '@earendil-works/pi-ai'
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, Usage } from '@earendil-works/pi-ai'
 
 export const modelApis = ['openai-completions', 'openai-responses', 'anthropic-messages'] as const
 export type ModelApi = typeof modelApis[number]
 export type ModelRole = 'extraction' | 'aggregation'
 export type CallMode = 'direct' | 'agent' | 'catalog'
 export type ErrorKind = 'network' | 'rate_limit' | 'server' | 'auth' | 'context_length' | 'content_policy' | 'validation' | 'budget' | 'cancelled' | 'unsupported_provider' | 'unsupported_capability' | 'unknown'
+export type TracePurpose = 'work' | 'compaction' | 'repair'
+export interface ModelTraceStart {
+  requestId: string; parentRequestId?: string; purpose: TracePurpose; model: { providerId: string; modelId: string }
+  context: Context; turn: number; startedAt: string
+}
+export interface ModelTraceEnd {
+  requestId: string; message?: AssistantMessage; usage?: Usage; attempts: Attempt[]; error?: ModelFailure
+  status: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
+}
+export interface ModelTraceHooks { start(value: ModelTraceStart): void; delta?(value: { requestId: string; event: AssistantMessageEvent }): void; modelEnd(value: ModelTraceEnd): void }
 export interface ModelConfig {
   providerId: string; api: ModelApi; baseUrl: string; extractionModel: string; aggregationModel: string; aggregationContextWindow?: number
 }
@@ -22,6 +32,7 @@ export interface ResolvedModel { snapshot: ModelSnapshot; model: Model<ModelApi>
 export interface ModelFailure { kind: ErrorKind; message: string; stopReason?: string; status?: number }
 export interface Attempt {
   ordinal: number; turn: number; elapsedMs: number; status?: number; errorKind?: ErrorKind; usage?: Usage
+  estimatedInput?: number; outputReserve?: number; requestId?: string; attemptId?: string
 }
 export interface UsageSummary { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; costStatus: 'estimated' | 'unknown'; cost?: number; currency?: 'USD' }
 export interface CallResult {
@@ -29,7 +40,7 @@ export interface CallResult {
   usage: UsageSummary; error?: ModelFailure; message?: AssistantMessage
 }
 export interface CallProgress { state: 'preparing' | 'requesting' | 'waiting'; attempts: number; delayMs?: number }
-export interface CallOptions { beforeRequest?: () => Promise<void>; signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; cooperativeTimeout?: boolean; requestTimeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number }
+export interface CallOptions { beforeRequest?: () => Promise<void>; signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; cooperativeTimeout?: boolean; requestTimeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number; unboundedRequests?: boolean; trace?: ModelTraceHooks; tracePurpose?: TracePurpose }
 export interface DirectRequest<T = string> extends CallOptions {
   role: ModelRole; context: Context; validate?: (message: AssistantMessage) => T; repairPrompt?: string; repairAttempts?: number
 }

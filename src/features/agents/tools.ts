@@ -4,32 +4,43 @@ import type { AgentRepository, Row } from './repository'
 import { canonical, hash, records, resultContracts, strings, summarySchema, text, toolContracts, validate, type Summary } from './contracts'
 import { assertScope, readTool, toolBytes, type Scope } from './queries'
 import { assetReviewTools, checkLease, commitCommand, relationTools, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
+import { noteOrganizationRead } from './organizationReview'
 
 const tableOf: Record<string, string> = { get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
 export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
   const reads: ReadSet = structuredClone(options.initialReadSet ?? { records: [], queries: [] })
   let summary: Summary | undefined
   let readCalls = 0; let writeCalls = 0
+  let completedWork = false
   const relationOnly = scope.phase === 'asset_review' && scope.reviewScope === 'relations'
-  const contracts = toolContracts[scope.profile].filter(contract => scope.phase === 'asset_review'
+  const organization = scope.phase === 'character_organization'
+  const contracts = toolContracts[scope.profile].filter(contract => organization
     ? contract.name !== 'commit_asset_changes'
-    : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
+    : scope.phase === 'asset_review'
+      ? contract.name !== 'commit_asset_changes'
+      : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
     .filter(contract => !relationOnly || contract.kind !== 'write' || (relationTools as readonly string[]).includes(contract.name))
   const tools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
-    parameters: scope.phase !== 'optimize' && ((contract.parameters as { properties?: Row }).properties)?.include_facts ? { ...contract.parameters, properties: { ...((contract.parameters as { properties?: Row }).properties), include_facts: { type: 'boolean', const: false } } } : contract.parameters,
+    parameters: scope.phase !== 'optimize' && !organization && ((contract.parameters as { properties?: Row }).properties)?.include_facts ? { ...contract.parameters, properties: { ...((contract.parameters as { properties?: Row }).properties), include_facts: { type: 'boolean', const: false } } } : contract.parameters,
     outputSchema: resultContracts.get(contract.name),
     async execute(toolCallId, parameters, signal) {
       assertScope(scope, repo.bookId); signal?.throwIfAborted(); validate(contract.parameters, parameters)
       if (toolBytes(parameters) > 65536) throw new Error('TOO_LARGE:工具参数超过单次处理上限。')
       const args = parameters as Row
+      if (organization && (contract.name === 'submit_profile_review' || contract.name === 'submit_relation_review')) {
+        const { operationKey: _key, ...payload } = args
+        args.operationKey = await hash({ taskId: scope.taskId, unitId: scope.unitId, tool: contract.name, payload })
+      }
       if (scope.probe && !(scope.profile === 'asset_editor' ? ['get_character_detail', 'read_original', 'commit_asset_changes'] : ['get_editor_memory', 'commit_story_changes']).includes(contract.name)) throw new Error('INVALID_ARGS:探针仅允许指定调用。')
       let value: Row
       if (contract.kind === 'write') {
         const ack = await commitCommand(repo, scope, contract.name, toolCallId, args, reads, signal)
+        if (ack.complete === true) completedWork = true
         writeCalls++; await options.afterCommit?.(ack)
         value = ack as unknown as Row
       } else {
-        value = await repo.transaction(false, async store => { await checkLease(store, scope, signal); return readTool(store, scope, contract.name, args, contract.maxResults) })
+        const binding = organization && (contract.name === 'query_character_profile' || contract.name === 'query_relation_work')
+        value = await repo.transaction(binding, async store => { await checkLease(store, scope, signal); return readTool(store, scope, contract.name, args, contract.maxResults) })
         if (toolBytes(value) > 65536) throw new Error('TOO_LARGE:工具结果超过单次返回上限。')
         const output = resultContracts.get(contract.name)
         if (output) validate(output, value, `INVALID_RESULT:${contract.name}返回结构不符合要求。`)
@@ -39,10 +50,12 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         if (at < 0) reads.queries.push(query); else reads.queries[at] = query
         await repo.transaction(true, async store => {
           await checkLease(store, scope, signal)
+          const complete = await noteOrganizationRead(store, scope, contract.name, args, value)
           const table = tableOf[contract.name]
           const items = records(value.data)
           if (table) for (const item of items) {
             if (item.fields_omitted) continue
+            if (organization && typeof item.charOffset === 'number' && !complete.has(text(item.id))) continue
             const id = strings(item.resolvedFrom)[0] || text(item.id); const resolvedId = text(item.id)
             const row = await store.get(table, resolvedId)
             const dependency = { table, id, resolvedId, revision: Number(row?.revision ?? 0), factFingerprint: await store.wait(hash(row ?? null)) }
@@ -98,6 +111,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         if (!scope.probe) for (const item of proposed.reviewedItems) {
           const work = records((task.input as Row).workItems).find(work => work.workItemId === item.workItemId)
           const kind = text(work?.kind)
+          if (kind === 'organization') continue
           const changed = records(task.reviewedItems).some(row => row.workItemId === item.workItemId && row.outcome === 'changed')
           if (kind === 'relation') {
             if (!work || !reads.queries.some(query => query.tool === 'get_character_relation' && text((query.args as Row).fromId) === text(work.fromId) && text((query.args as Row).toId) === text(work.toId))) throw new Error('INVALID_ARGS:关系结论须有实际读取本人物对的依据。')
@@ -130,5 +144,5 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue }
     },
   })
-  return { tools, reads, get summary() { return summary }, get readCalls() { return readCalls }, get writeCalls() { return writeCalls } }
+  return { tools, reads, get summary() { return summary }, get readCalls() { return readCalls }, get writeCalls() { return writeCalls }, get completed() { return completedWork } }
 }

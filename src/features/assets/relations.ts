@@ -65,9 +65,8 @@ export function characterNameHits(name: string, characters: Character[], index =
 }
 
 /** 沿生命周期映射解析到当前人物编号；已删除、缺失或跨书返回空。 */
-export function resolveLifecycleId(id: string | null | undefined, lifecycle: Lifecycle[], kind: Lifecycle['kind'] = 'character'): string | null {
+export function resolveLifecycleId(id: string | null | undefined, lifecycle: Lifecycle[], kind: Lifecycle['kind'] = 'character', mappings = new Map(lifecycle.filter(row => row.kind === kind).map(row => [row.originId, row]))): string | null {
   if (!id) return null
-  const mappings = new Map(lifecycle.filter(row => row.kind === kind).map(row => [row.originId, row]))
   const seen = new Set<string>()
   let current = id
   for (;;) {
@@ -88,19 +87,18 @@ export function resolveSourceId(originCharacterId: string, characters: Character
 }
 
 /** 目标编号：已有编号沿映射收敛，加入称呼的当前全部命中，并把命中的同名条目一并收进。 */
-export function bindTargetIds(relation: Pick<CharacterRelation, 'targetName' | 'targetIds'>, characters: Character[], lifecycle: Lifecycle[], index = characterNameIndex(characters)): string[] {
-  const known = new Set(characters.map(person => person.id))
+export function bindTargetIds(relation: Pick<CharacterRelation, 'targetName' | 'targetIds'>, characters: Character[], lifecycle: Lifecycle[], index = characterNameIndex(characters), byId = new Map(characters.map(person => [person.id, person])), mappings = new Map(lifecycle.filter(row => row.kind === 'character').map(row => [row.originId, row]))): string[] {
   const ids = new Set<string>()
   for (const id of relation.targetIds ?? []) {
-    const resolved = resolveLifecycleId(id, lifecycle)
-    if (resolved && known.has(resolved)) ids.add(resolved)
+    const resolved = resolveLifecycleId(id, lifecycle, 'character', mappings)
+    if (resolved && byId.has(resolved)) ids.add(resolved)
   }
   for (const id of characterNameHits(relation.targetName, characters, index)) ids.add(id)
   for (const id of [...ids]) {
-    const person = characters.find(row => row.id === id)
+    const person = byId.get(id)
     if (person) for (const hit of characterNameHits(person.name, characters, index)) ids.add(hit)
   }
-  return [...ids].filter(id => known.has(id)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  return [...ids].filter(id => byId.has(id)).sort(relationIdOrder.compare)
 }
 
 export interface RelationBindingResult { relations: CharacterRelation[]; changed: CharacterRelation[] }
@@ -108,10 +106,13 @@ export interface RelationBindingResult { relations: CharacterRelation[]; changed
 /** 统一绑定处理：来源只按原始编号解析，目标按称呼全命中；真实变化才递增修订号。 */
 export function syncRelations(relations: CharacterRelation[], characters: Character[], lifecycle: Lifecycle[], timestamp = new Date().toISOString()): RelationBindingResult {
   const index = characterNameIndex(characters)
+  const byId = new Map(characters.map(person => [person.id, person]))
+  const mappings = new Map(lifecycle.filter(row => row.kind === 'character').map(row => [row.originId, row]))
   const changed: CharacterRelation[] = []
   const next = relations.map(relation => {
-    const sourceId = resolveSourceId(relation.originCharacterId, characters, lifecycle)
-    const targetIds = bindTargetIds(relation, characters, lifecycle, index)
+    const resolved = resolveLifecycleId(relation.originCharacterId, lifecycle, 'character', mappings)
+    const sourceId = resolved && byId.has(resolved) ? resolved : null
+    const targetIds = bindTargetIds(relation, characters, lifecycle, index, byId, mappings)
     if (sourceId === relation.sourceId && JSON.stringify(targetIds) === JSON.stringify(relation.targetIds ?? [])) return relation
     const updated = { ...relation, sourceId, targetIds, revision: relation.revision + 1, updatedAt: timestamp }
     changed.push(updated)
@@ -124,9 +125,10 @@ const evidenceKey = (item: RelationEvidence) => `${item.chapterIndex}\u0000${ite
 const uniqueStrings = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))]
 
 export interface RelationView { edges: RelationEdge[]; unresolved: UnresolvedRelation[] }
+const relationIdOrder = new Intl.Collator(undefined, { numeric: true })
 
 /** 有向关系结果：每条关系在两端各生成一个方向；同一有序端点对汇总去重标签与依据。 */
-export function relationView(relations: CharacterRelation[], characters: Character[]): RelationView {
+export function relationView(relations: CharacterRelation[], characters: Character[], includeEdges = true): RelationView {
   const known = new Set(characters.map(person => person.id))
   const edges = new Map<string, RelationEdge>()
   const unresolved: UnresolvedRelation[] = []
@@ -152,13 +154,15 @@ export function relationView(relations: CharacterRelation[], characters: Charact
     let self = false
     for (const targetId of targets) {
       if (targetId === relation.sourceId) { self = true; continue }
-      add(relation.sourceId, targetId, relation, [relation.forwardLabel])
-      add(targetId, relation.sourceId, relation, [relation.reverseLabel])
+      if (includeEdges) {
+        add(relation.sourceId, targetId, relation, [relation.forwardLabel])
+        add(targetId, relation.sourceId, relation, [relation.reverseLabel])
+      }
     }
     if (self) unresolved.push({ ...summary, reason: 'self' })
   }
   return {
-    edges: [...edges.values()].sort((a, b) => a.fromId.localeCompare(b.fromId, undefined, { numeric: true }) || a.toId.localeCompare(b.toId, undefined, { numeric: true })),
+    edges: [...edges.values()].sort((a, b) => relationIdOrder.compare(a.fromId, b.fromId) || relationIdOrder.compare(a.toId, b.toId)),
     unresolved,
   }
 }
@@ -169,10 +173,10 @@ export function edgesFor(edges: RelationEdge[], characterId: string): RelationEd
 }
 
 /** 人物详情兼容字段：把关系表投影回旧的 relations 形状，不写回持久人物行。 */
-export function projectRelations(edges: RelationEdge[], relations: CharacterRelation[], unresolved: UnresolvedRelation[], characterId: string, characters: Character[]) {
-  const person = characters.find(row => row.id === characterId)
+export function projectRelations(edges: RelationEdge[], relations: CharacterRelation[], unresolved: UnresolvedRelation[], characterId: string, characters: Character[], byId = new Map(characters.map(person => [person.id, person]))) {
+  const person = byId.get(characterId)
   const names = new Set([characterId, ...(person ? [person.name, ...characterMatchNames(person)] : [])])
-  const name = (id: string) => characters.find(row => row.id === id)?.name ?? id
+  const name = (id: string) => byId.get(id)?.name ?? id
   const projected = edges.filter(edge => edge.fromId === characterId).map(edge => ({
     target: name(edge.toId), targetId: edge.toId, relation_type: edge.types[0] ?? '', relation_label: edge.labels.join('、'),
     direction: edge.directionUnclear ? 'unspecified' : 'directed', evidence: edge.evidence,
@@ -262,7 +266,7 @@ export function effectivePairs(relations: CharacterRelation[], edits: CharacterR
     const withRevisions = { ...pair, endpointRevisions: { [pair.fromId]: Number(known.get(pair.fromId)?.revision ?? 0), [pair.toId]: Number(known.get(pair.toId)?.revision ?? 0) } }
     return { ...withRevisions, fingerprint: pairFingerprint(withRevisions) }
   })
-  return result.sort((a, b) => a.fromId.localeCompare(b.fromId, undefined, { numeric: true }) || a.toId.localeCompare(b.toId, undefined, { numeric: true }))
+  return result.sort((a, b) => relationIdOrder.compare(a.fromId, b.fromId) || relationIdOrder.compare(a.toId, b.toId))
 }
 
 /** 从调用方视角返回人物对；deleted/absent 也返回状态，不当作未找到。 */
@@ -301,7 +305,7 @@ export function pairView(pairs: CharacterPairResult[], characters: Character[]):
     add(pair.toId, pair.fromId, pair.reverseLabels, pair)
   }
   return {
-    edges: [...edges.values()].sort((a, b) => a.fromId.localeCompare(b.fromId, undefined, { numeric: true }) || a.toId.localeCompare(b.toId, undefined, { numeric: true })),
+    edges: [...edges.values()].sort((a, b) => relationIdOrder.compare(a.fromId, b.fromId) || relationIdOrder.compare(a.toId, b.toId)),
     unresolved: [],
   }
 }

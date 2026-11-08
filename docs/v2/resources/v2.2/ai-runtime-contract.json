@@ -202,7 +202,7 @@
   },
   "readToolCount": 14,
   "writeToolCount": 2,
-  "uniqueBusinessToolCount": 16,
+  "uniqueBusinessToolCount": 37,
   "finalizerSeparate": true,
   "applicationImplementationVerified": false,
   "packageBoundary": {
@@ -225,7 +225,7 @@
     "migrationSpecification": "../../02-架构与技术规格.md#ar-12-pi接入coding包取舍与迁移顺序",
     "status": "target-not-implemented"
   },
-  "contractRevision": "2026-10-24",
+  "contractRevision": "2026-11-06",
   "taskIdentity": "pipelineRuns.tasks.taskId",
   "bugfixPolicyRevision": "2026-10-24.fix-first",
   "requestBudget": {
@@ -261,6 +261,25 @@
       "unsupported_capability",
       "unknown"
     ],
-    "contextRecovery": "one persistent-Agent compaction recovery within remaining parent budget; summary direct call has its own accounted budget"
+    "contextRecovery": "one persistent-Agent compaction recovery within remaining parent budget; summary direct call has its own accounted budget",
+    "characterOrganization": {
+      "revision": "2026-11-06.v3",
+      "fixedRequestLimit": false,
+      "inputTokenLimit": null,
+      "totalTokenLimit": null,
+      "extensionUi": false,
+      "perWorkItem": true,
+      "perPersonContext": true,
+      "completionTool": [
+        "submit_profile_review",
+        "submit_relation_review"
+      ],
+      "doneFalse": "save-partial-keep-person",
+      "doneTrue": "save-and-switch-person",
+      "normalCompletionNeedsSummary": false,
+      "requestLedger": "pipelineRuns.requestLedger",
+      "unknownUsage": "missing-not-zero",
+      "repeatIdenticalError": "defer-person-after-no-progress"
+    }
   }
 }

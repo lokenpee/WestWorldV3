@@ -125,6 +125,7 @@
 .relation-candidates small { color: var(--muted); font-size: 10px; }
 .relation-candidates em { font-size: 10px; color: #9a6700; font-style: normal; }
 .relation-labels { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.relation-pair-labels p, .relation-preview p { margin: 4px 0; overflow-wrap: anywhere; }
 .relation-label-row { display: flex; gap: 6px; align-items: center; }
 .relation-label-row input { flex: 1; }
 .relation-dialog-pair { margin: 8px 0; font-size: 12px; }

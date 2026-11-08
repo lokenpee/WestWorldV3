@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLiveResult } from '../../hooks/useLiveResult'
 import type { StoryService } from './service'
 import { SessionHistory } from './SessionHistory'
+import { AgentRunPanel } from '../agents/AgentRunPanel'
 import './StoryPanel.css'
 
 export function StoryPanel({ bookId, service }: { bookId: string; service: StoryService }) {
   const [, refresh] = useState(0)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [traceOpen, setTraceOpen] = useState(false)
   useEffect(() => service.subscribe(() => refresh(value => value + 1)), [service])
   const [leaseAttempt, retryLease] = useState(0)
   const saved = useLiveResult(useCallback(() => service.read(bookId), [service, bookId]), leaseAttempt)
@@ -22,7 +24,7 @@ export function StoryPanel({ bookId, service }: { bookId: string; service: Story
   const reviewing = running && state.phase === 'global_review'
   const reviewReady = finished || value?.progress?.phase === 'global_review'
   const interrupted = !!value?.progress && !finished
-  return <section className="story-panel" aria-label="事件线窗口串联"><div className="story-heading"><h2>P3 叙事整理</h2><button className="primary-button" disabled={!value?.covered || value.locked || running} onClick={() => void service.start(bookId)}>{running && !reviewing ? '正在串联…' : finished ? '重新串联事件线' : interrupted ? '继续串联事件线' : '串联事件线'}</button><button className="secondary-button" disabled={!reviewReady || value?.locked || running} onClick={() => void service.review(bookId)}>{reviewing ? '正在复核…' : reviewed ? '重新复核全书' : value?.progress?.phase === 'global_review' ? '继续全书复核' : '全书复核'}</button>{running && <button className="secondary-button" onClick={() => service.cancel(bookId)}>{reviewing ? '取消复核' : '取消串联'}</button>}</div>
+  return <section className="story-panel" aria-label="事件线窗口串联"><div className="story-heading"><h2>P3 叙事整理</h2><button className="primary-button" disabled={!value?.covered || value.locked || running} onClick={() => void service.start(bookId)}>{running && !reviewing ? '正在串联…' : finished ? '重新串联事件线' : interrupted ? '继续串联事件线' : '串联事件线'}</button><button className="secondary-button" disabled={!reviewReady || value?.locked || running} onClick={() => void service.review(bookId)}>{reviewing ? '正在复核…' : reviewed ? '重新复核全书' : value?.progress?.phase === 'global_review' ? '继续全书复核' : '全书复核'}</button>{running && <button className="secondary-button" onClick={() => service.cancel(bookId)}>{reviewing ? '取消复核' : '取消串联'}</button>}{(running || value?.progress?.runId) && <button className="text-button" onClick={() => setTraceOpen(true)}>整理详情</button>}</div>
     <div className="story-body"><p>每100原章处理一个窗口，相邻窗口重叠20章；已有节点与事件线继续复用。每批最多20项，以5分钟、20次请求收尾，第15次或剩余60秒提醒提交。</p>
     {!value?.covered && saved.status === 'ready' && <p className="muted">请先完成全书逐章提取。</p>}
     {value?.locked && !running && <p role="status">本书已有叙事或提取任务，请等待执行权释放。</p>}
@@ -40,5 +42,7 @@ export function StoryPanel({ bookId, service }: { bookId: string; service: Story
       {value.tasks.map((task, i) => <article key={task.id}><strong>子任务 {i + 1} · {task.status === 'completed' ? '完成' : task.status === 'failed' ? '失败，成果已保留' : '保留进度'}</strong><p>分配 {task.total} 项 · 实际请求 {task.requests} 次 · 已核实 {task.reviewed.length} 项 · 待处理 {task.remaining.length} 项</p>{task.reviewed.map((row, index) => <div key={index}><p>{row.title || row.assetId}（{row.assetId}）：{({ changed: '已保存修改', no_change: '保持现状', needs_review: '待人工复核' } as Record<string, string>)[String(row.outcome)] ?? String(row.outcome)} · {String(row.reason)}</p>{row.lineTitles.length > 0 && <p>当前所属事件线：{row.lineTitles.join('、')}</p>}</div>)}{task.remaining.length > 0 && <p>剩余编号：{task.remaining.join('、')}</p>}{task.error && <p>当时反馈：{task.error}</p>}<details><summary>提交确认（{task.commits.length}）</summary>{task.commits.map(id => <p key={id}>{id}</p>)}</details></article>)}
       {value.review.conclusions.map(row => <p key={String(row.workItemId)}>全书复核 · {String(row.id)} · {String(row.reason)}</p>)}
     </div></details>}
-    </div></section>
+    </div>
+  {traceOpen && (running || value?.progress?.runId) && <AgentRunPanel bookId={bookId} runId={value?.progress?.runId} mode="p3" load={service.trace} run={value?.progress?.runId ? { id: value.progress.runId, status: value.runStatus, startedAt: value.runStartedAt, requestLedger: value.requestLedger } : undefined} onClose={() => setTraceOpen(false)} />}
+  </section>
 }

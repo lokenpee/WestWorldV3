@@ -248,7 +248,7 @@ describe('阶段A 备份预检与往返', () => {
     const tables = emptyTables()
     for (const name of tableNames) tables[name] = await db.table(name).toArray()
     const exported = await encodeBackup({ book: { id: 'legacy', title: '旧书', sourceFileName: 'old.txt', createdAt: ts }, tables })
-    expect(exported.manifest.formatVersion).toBe(8)
+    expect(exported.manifest.formatVersion).toBe(11)
     const inspected = await inspectBackup(exported.bytes)
     expect(inspected.errors).toEqual([])
     expect(inspected.data!.tables.legacyRelationRecords).toHaveLength(5)

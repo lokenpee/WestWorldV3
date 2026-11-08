@@ -7,6 +7,7 @@ import narrativePrompt from '../../../docs/v2/resources/v2.2/prompts/active/p1-n
 import { withOutputDiscipline } from '../agents/output-discipline'
 import { ModelError } from '../models/types'
 import type { Substep, ExtractionData } from './types'
+import { relationRoleLabel } from '../assets/relationLabels'
 const schemas = JSON.parse(schemaText) as Record<string, TSchema>
 export const schemaOf = (step: Substep) => schemas[step === 'worldAssets' ? 'WorldAssetsExtractionSchema' : 'NarrativeAssetsExtractionSchema']
 export const promptOf = (step: Substep) => withOutputDiscipline((step === 'worldAssets' ? worldPrompt : narrativePrompt).replace(/^---[\s\S]*?---\s*/, ''))
@@ -23,7 +24,7 @@ function normalize(schema: TSchema, value: unknown): unknown {
     return [[key, child ? normalize(child, item) : item]]
   }))
 }
-export function validateExtraction(step: Substep, message: AssistantMessage, chapterText = ''): ExtractionData {
+export function validateExtraction(step: Substep, message: AssistantMessage): ExtractionData {
   const calls = message.content.filter(part => part.type === 'toolCall')
   if (calls.length !== 1 || calls[0].name !== 'submit_result') throw new ModelError('validation', '请通过唯一的 submit_result 提交本章结果。')
   const schema = schemaOf(step)
@@ -35,9 +36,14 @@ export function validateExtraction(step: Substep, message: AssistantMessage, cha
     const relations = Array.isArray(character.relations) ? character.relations as Record<string, unknown>[] : []
     for (const relation of relations) {
       const fields = ['target', 'relation_type', 'relation_label', 'reverse_label', 'quote']
-      if (fields.some(field => typeof relation[field] !== 'string' || !(relation[field] as string).trim())) throw new ModelError('validation', '每条人物关系须有目标、类型、正反标签和本章原文依据。')
+      if (fields.some(field => typeof relation[field] !== 'string' || !(relation[field] as string).trim())) throw new ModelError('validation', '每条人物关系须有目标、类型、正反标签和依据。')
       if (!['directed', 'bidirectional', 'unspecified'].includes(relation.direction as string)) throw new ModelError('validation', '关系方向须为 directed、bidirectional 或 unspecified。')
-      if (!chapterText.includes((relation.quote as string).trim())) throw new ModelError('validation', '关系依据须为本章连续原文，请逐字复制。')
+      const quote = (relation.quote as string).trim()
+      if (quote.length < 2 || quote.length > 500) throw new ModelError('validation', '关系依据须有简明内容，长度2–500字，不需要逐字匹配本章原文。')
+      relation.relation_label = relationRoleLabel(relation.relation_label as string)
+      relation.reverse_label = relationRoleLabel(relation.reverse_label as string)
+      if (relation.relation_label === '未知' || relation.reverse_label === '未知') relation.direction = 'unspecified'
+      if (relation.relation_label === '未知' && relation.reverse_label === '未知') relation.relation_type = 'unknown'
     }
   }
   return data

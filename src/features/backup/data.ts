@@ -131,9 +131,11 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
   }
   const sessions = new Map(tables.storySessions.map(row => [row.id, row]))
   const entries = new Map(tables.storySessionEntries.map(row => [row.id, row]))
+  const observationTypes = new Set(['request_trace', 'prompt_snapshot', 'tool_snapshot'])
+  const businessEntries = tables.storySessionEntries.filter(row => !observationTypes.has(String(row.type)))
   for (const session of tables.storySessions) {
     const ordinals = new Set<unknown>()
-    const members = tables.storySessionEntries.filter(row => row.sessionId === session.id)
+    const members = businessEntries.filter(row => row.sessionId === session.id)
     for (const entry of members) { if (ordinals.has(entry.ordinal)) fail(`storySessions/${session.id}`, '会话条目顺序重复。'); ordinals.add(entry.ordinal) }
     if (session.nextOrdinal !== members.reduce((max, row) => Math.max(max, Number(row.ordinal) + 1), 0)) fail(`storySessions/${session.id}`, '下一条目序号不符。')
     if (session.leafId && entries.get(session.leafId)?.sessionId !== session.id) fail(`storySessions/${session.id}`, '当前会话末端不存在。')
@@ -141,7 +143,7 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
     let parent = session.parentSessionId
     while (parent) { if (visited.has(parent) || !sessions.has(parent)) { fail(`storySessions/${session.id}`, '父会话不存在或形成循环。'); break }; visited.add(parent); parent = sessions.get(parent)?.parentSessionId }
   }
-  for (const entry of tables.storySessionEntries) if (!sessions.has(entry.sessionId) || (entry.parentId !== null && (entries.get(entry.parentId)?.sessionId !== entry.sessionId || Number(entries.get(entry.parentId)?.ordinal) >= Number(entry.ordinal)))) fail(`storySessionEntries/${entry.id}`, '会话归属或父条目链不符。')
+  for (const entry of businessEntries) if (!sessions.has(entry.sessionId) || (entry.parentId !== null && (entries.get(entry.parentId)?.sessionId !== entry.sessionId || Number(entries.get(entry.parentId)?.ordinal) >= Number(entry.ordinal)))) fail(`storySessionEntries/${entry.id}`, '会话归属或父条目链不符。')
   for (const name of ['storyEditorMemory', 'storyEditorNotes', 'storyEditorCheckpoints', 'compileProgress'] as const) for (const row of tables[name]) if ((row.sessionId !== undefined && !sessions.has(row.sessionId)) || (row.editorSessionId !== undefined && !sessions.has(row.editorSessionId))) fail(`${name}/${row.id ?? row.stage}`, '引用的会话不存在。')
   const p1 = tables.compileProgress.find(row => row.stage === 'P1')
   let currentMechanicalQueues = 0
@@ -160,16 +162,39 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
     }
   }
   if (currentMechanicalQueues > 1) fail('pipelineRuns/mechanicalQueue', '本书存在多个当前机械合并队列。')
+  const alive = new Set(tables.characters.map(row => String(row.id)))
+  const mappings = tables.assetLifecycle as unknown as Lifecycle[]
+  const characterExists = (id: string) => { const resolved = resolveLifecycleId(id, mappings); return !!resolved && alive.has(resolved) }
+  for (const run of tables.pipelineRuns) if (run.workflow === 'character_organization_v1') {
+    const path = `pipelineRuns/${run.id}`
+    const session = sessions.get(String(run.sessionId))
+    if (!session || session.bookId !== run.bookId || session.profile !== 'asset_editor') fail(`${path}/sessionId`, '人物整理会话不存在或不属于本书。')
+    const state = run.organization as Row | undefined
+    if (!state || typeof state !== 'object' || Array.isArray(state)) { fail(`${path}/organization`, '人物整理进度缺失。'); continue }
+    for (const group of rows(state.candidateGroups)) for (const id of strings(group.memberIds)) if (!characterExists(id)) fail(`${path}/organization/candidateGroups`, `疑似组成员没有可用的生命周期或人物资料：${id}`)
+    for (const decision of rows(state.candidateDecisions)) for (const id of strings(decision.memberIds)) if (!characterExists(id)) fail(`${path}/organization/candidateDecisions`, `疑似组结论成员没有可用的生命周期或人物资料：${id}`)
+    for (const item of [...rows(state.profileItems), ...rows(state.relationItems)]) if (!characterExists(String(item.id))) fail(`${path}/organization/items`, `人物工作项没有可用的生命周期或人物资料：${String(item.id)}`)
+    const pairKeys = new Set<string>()
+    for (const pair of rows(state.pairChecks)) {
+      try {
+        const ids: unknown = JSON.parse(String(pair.pairKey))
+        if (!Array.isArray(ids) || ids.length !== 2 || ids[0] === ids[1] || ids.some(id => typeof id !== 'string' || !characterExists(id)) || pairKeys.has(String(pair.pairKey))) fail(`${path}/organization/pairChecks`, '人物对编号、端点或重复记录无效。')
+        pairKeys.add(String(pair.pairKey))
+      } catch { fail(`${path}/organization/pairChecks`, '人物对编号无法解析。') }
+    }
+  }
   if (p1 && (p1.totalChapters !== chapters.size || [...strings(p1.completedChapters), ...strings(p1.failedChapters)].some(id => !chapters.has(id)))) fail('compileProgress/P1', '提取进度的章节数量或范围不符。')
   return errors
 }
 
 export function pauseBookData(data: BookData): BookData {
   const result = structuredClone(data)
+  for (const row of result.tables.compileProgress) delete row.completedSteps
   result.tables.pipelineRuns = result.tables.pipelineRuns.filter(row => row.recordType === 'run' || row.recordType === 'asset_edit')
   for (const name of ['storySessions', 'compileProgress', 'pipelineRuns'] as const) for (const row of result.tables[name]) {
     delete row.leaseOwner; delete row.leaseUntil; delete row.owner; delete row.expiresAt; delete row.lockKey
     if (row.status === 'running' || row.status === 'cancelling') row.status = 'paused'
+    for (const job of Object.values((row.extractionJobs ?? {}) as Record<string, Row>)) if (job.status === 'running') job.status = 'paused'
     for (const task of rows(row.tasks)) if (['pending', 'running', 'prepared'].includes(task.status as string)) task.status = 'partial'
     for (const intent of rows(row.commandIntents)) if (intent.state === 'prepared') intent.state = 'abandoned'
     for (const item of rows((row.mechanicalQueue as Row | undefined)?.items)) if (item.status === 'running') item.status = 'pending'

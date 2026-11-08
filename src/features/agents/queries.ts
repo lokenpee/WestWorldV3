@@ -1,13 +1,15 @@
 import type { AgentStore, Row } from './repository'
-import { hash, strings, text, type AgentProfile } from './contracts'
+import { hash, records, strings, text, type AgentProfile } from './contracts'
 import { characterCandidates } from '../assets/characterLinks'
-import { edgesFor, effectivePairs, pairFromPerspective, pairView, projectRelations, relationView, syncRelations } from '../assets/relations'
+import { edgesFor, effectivePairs, pairFromPerspective, pairView, projectRelations, relationView, resolveLifecycleId, syncRelations } from '../assets/relations'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { storyContent } from '../story/coverage'
 import { searchStoryContext } from '../story/retrieval'
 import type { Character, CharacterRelation, CharacterRelationEdit, Lifecycle } from '../assets/types'
+import { refreshReview } from './organizationReview'
+import { profileWork, relationWork } from './organizationData'
 
-export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations' }
+export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; contextId?: string; unitId?: string }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
 const canonicalCursor = (value: unknown) => JSON.stringify(Array.isArray(value) ? value.map(String) : [])
@@ -161,6 +163,84 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     if (args.mode !== 'full') rows = rows.map(row => ({ id: row.id, ordinal: row.ordinal, type: row.type, createdAt: row.createdAt, preview: JSON.stringify(row.message ?? row.summary ?? row.reason ?? '').slice(0, 300) }))
     return page(rows, args, args.mode === 'full' ? 20 : 50)
   }
+  if (name === 'query_character_catalog') {
+    const run = await store.get('pipelineRuns', scope.runId)
+    const organization = (run?.organization ?? {}) as Row
+    const scanIds = strings(organization.scanIds)
+    const people = (await scopedRows(store, scope, 'characters')) as unknown as Character[]
+    const byId = new Map(people.map(row => [row.id, row]))
+    const search = text(args.search).trim().toLowerCase()
+    const limit = Math.min(Math.max(Number(args.limit ?? 100), 1), 100)
+    let pageIndex = 0, offset = 0
+    if (args.cursor !== undefined && args.cursor !== null) {
+      if (typeof args.cursor !== 'string') throw new Error('INVALID_ARGS:目录游标格式不正确。')
+      try { const value = JSON.parse(args.cursor) as Row; pageIndex = Math.max(0, Number(value.page ?? 0)); offset = Math.max(0, Number(value.offset ?? 0)) } catch { throw new Error('INVALID_ARGS:目录游标无法解析。') }
+    }
+    const project = (row: Character) => ({ id: row.id, name: row.name, aliases: row.aliases ?? [], identity: row.identity ?? '' })
+    if (search) {
+      const matches = people.filter(row => [row.name, ...(row.aliases ?? [])].some(value => value.toLowerCase().includes(search))).sort((a, b) => compare(a.id, b.id))
+      const data = matches.slice(offset, offset + limit).map(project)
+      const next = offset + data.length < matches.length ? JSON.stringify({ page: 0, offset: offset + data.length }) : null
+      return { data, pageId: null, nextCursor: next, total: matches.length, fieldContinuations: [] }
+    }
+    const pages = (organization.scanPages ?? []) as Row[]
+    const page = pages[pageIndex]
+    if (!page) return { data: [], pageId: null, nextCursor: null, total: scanIds.length, fieldContinuations: [] }
+    const ids = strings(page.ids)
+    const data = ids.slice(offset, offset + limit).map(id => byId.get(id)).filter((row): row is Character => !!row).map(project)
+    const nextOffset = offset + data.length
+    const next = nextOffset < ids.length ? JSON.stringify({ page: pageIndex, offset: nextOffset }) : pageIndex + 1 < pages.length ? JSON.stringify({ page: pageIndex + 1, offset: 0 }) : null
+    return { data, pageId: page.pageId, nextCursor: next, total: scanIds.length, fieldContinuations: [] }
+  }
+  if (name === 'get_organization_progress') {
+    const run = await store.get('pipelineRuns', scope.runId)
+    if (!run || run.bookId !== scope.bookId) throw new Error('SCOPE:整理运行不属于当前书籍。')
+    const organization = structuredClone(run.organization ?? {}) as Row
+    await refreshReview(store, organization)
+    const pages = records(organization.scanPages), groups = records(organization.candidateGroups), profiles = records(organization.profileItems), relations = records(organization.relationItems), pairs = records(organization.pairChecks)
+    const nextPage = pages.find(row => row.status !== 'checked')
+    return {
+      step: text(organization.step), revision: Number(organization.revision ?? 1), statisticsPending: organization.statisticsPending === true, repairNotice: text(organization.repairNotice),
+      scan: { total: pages.length, checked: pages.filter(row => row.status === 'checked').length, nextPageId: nextPage ? text(nextPage.pageId) : null },
+      candidates: { total: groups.length, pending: groups.filter(row => row.status === 'pending').length, resolved: groups.filter(row => row.status === 'resolved').length },
+      profiles: { total: profiles.length, pending: profiles.filter(row => row.status === 'pending').length, pendingIds: profiles.filter(row => row.status === 'pending').slice(0, 50).map(row => text(row.id)) },
+      relations: { total: relations.length, pending: relations.filter(row => row.status === 'pending').length, pairs: pairs.length, pendingIds: relations.filter(row => row.status === 'pending').slice(0, 20).map(row => text(row.id)), pendingPairs: pairs.filter(row => !row.outcome).slice(0, 20).map(row => ({ pairKey: row.pairKey, memberIds: JSON.parse(text(row.pairKey)) })) },
+    }
+  }
+  if (name === 'query_candidate_groups') {
+    const run = await store.get('pipelineRuns', scope.runId)
+    if (!run || run.bookId !== scope.bookId) throw new Error('SCOPE:整理运行不属于当前书籍。')
+    const organization = (run.organization ?? {}) as Row
+    const status = text(args.status), offset = Math.max(0, Number(args.offset ?? 0)), limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 100)
+    const all = records(organization.candidateGroups).filter(row => !status || row.status === status).sort((a, b) => text(a.createdAt).localeCompare(text(b.createdAt)) || compare(text(a.id), text(b.id)))
+    const lifecycle = await store.rows('assetLifecycle') as never
+    const items = all.slice(offset, offset + limit).map(row => ({ ...row, resolvedIds: strings(row.memberIds).map(id => resolveLifecycleId(id, lifecycle)) }))
+    return { items, nextCursor: offset + items.length < all.length ? String(offset + items.length) : null, total: all.length, fingerprint: await store.wait(hash(all)) }
+  }
+  if (name === 'query_character_profile') {
+    const run = await store.get('pipelineRuns', scope.runId)
+    if (!run?.organization) throw new Error('INVALID_ARGS:当前运行不是人物整理任务。')
+    const organization = run.organization as Row
+    const active = organization.activeWork as Row | undefined
+    const id = text(args.id) || text(active?.characterId)
+    if (!id) throw new Error('INVALID_ARGS:请提供人物编号。')
+    const row = await store.get('characters', id) as unknown as Character | undefined
+    if (!row || row.bookId !== scope.bookId) throw new Error('NOT_FOUND:人物不存在或不属于本书。')
+    if (active?.kind === 'profile' && text(active.characterId) === id) { active.dataVersion = Number(row.revision); await store.put('pipelineRuns', { ...run, organization }) }
+    return { data: await profileWork(row) }
+  }
+  if (name === 'query_relation_work') {
+    const run = await store.get('pipelineRuns', scope.runId)
+    if (!run?.organization) throw new Error('INVALID_ARGS:当前运行不是人物整理任务。')
+    const organization = run.organization as Row
+    const active = organization.activeWork as Row | undefined
+    const id = text(args.characterId) || text(active?.characterId)
+    if (!id) throw new Error('INVALID_ARGS:请提供人物编号。')
+    const data = await relationWork(store, id, records(organization.pairChecks))
+    if (!data) throw new Error('NOT_FOUND:人物不存在或不属于本书。')
+    if (active?.kind === 'relations' && text(active.characterId) === id) { active.dataVersion = Number(data.revision); await store.put('pipelineRuns', { ...run, organization }) }
+    return { data }
+  }
   if (name === 'get_character_relation') {
     const fromId = text(args.fromId), toId = text(args.toId)
     if (!fromId || !toId || fromId === toId) throw new Error('INVALID_ARGS:请给出两个不同的人物编号。')
@@ -230,7 +310,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
   }
   const table = name.includes('character') ? 'characters' : name.includes('location') ? 'locations' : name.includes('event_line') ? 'eventLines' : 'nodes'
   const detail = name.startsWith('get_')
-  if (detail && args.include_facts && (scope.profile !== 'asset_editor' || scope.phase !== 'optimize')) throw new Error('INVALID_ARGS:事实底稿仅供世界资产整编读取。')
+  if (detail && args.include_facts && (scope.profile !== 'asset_editor' || !['optimize', 'character_organization'].includes(scope.phase))) throw new Error('INVALID_ARGS:事实底稿仅供世界资产整编读取。')
   if (detail) {
     let characterRelations: { people: Character[]; rows: CharacterRelation[]; view: ReturnType<typeof pairView>; unresolved: ReturnType<typeof relationView>['unresolved']; pairs: ReturnType<typeof effectivePairs> } | undefined
     if (table === 'characters') {
@@ -269,7 +349,8 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
       if (existing) existing.resolvedFrom = [...new Set([...strings(existing.resolvedFrom), ...strings(row.resolvedFrom)])]
       else rows.push(row)
     }
-    return page(['get_node_detail', 'get_event_line_detail'].includes(name) ? detailFragments(rows, args) : rows, {}, maxResults, { missingIds: missing })
+    const projected = name === 'get_character_detail' ? rows.map(row => bytes(row) > 60000 || args.char_offset !== undefined || args.maxChars !== undefined ? detailFragments([row], args)[0] : row) : ['get_node_detail', 'get_event_line_detail'].includes(name) ? detailFragments(rows, args) : rows
+    return page(projected, {}, maxResults, { missingIds: missing })
   }
   if (args.after_id !== undefined && args.offset !== undefined) throw new Error('INVALID_ARGS:稳定游标与页偏移请选用一种。')
   let rows = (await scopedRows(store, scope, table)).sort((a, b) => compare(text(a.id), text(b.id)))

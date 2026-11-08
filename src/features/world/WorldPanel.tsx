@@ -6,16 +6,18 @@ import type { MergeRequest } from '../assets/merge'
 import type { MechanicalQueueItem } from './types'
 import { MergeDialog } from '../assets/MergeDialog'
 import { WorldReportDialog } from './WorldReportDialog'
+import { AgentRunPanel } from '../agents/AgentRunPanel'
+import { OrganizationProgress } from './OrganizationProgress'
+import { needsOrganizationReview } from './organizationReport'
 import './WorldPanel.css'
 
 export function WorldPanel({ bookId, service, assets }: { bookId: string; service: WorldService; assets: AssetService }) {
   const [, refresh] = useState(0); const [candidates, setCandidates] = useState<Candidate[]>()
   const [selected, setSelected] = useState<Candidate>(); const [memberIds, setMemberIds] = useState<string[]>([])
-  const [preview, setPreview] = useState(false); const [reportOpen, setReportOpen] = useState(false); const [error, setError] = useState(''); const [scanning, setScanning] = useState(false)
+  const [preview, setPreview] = useState(false); const [reportOpen, setReportOpen] = useState(false); const [traceOpen, setTraceOpen] = useState(false); const [error, setError] = useState(''); const [scanning, setScanning] = useState(false)
   const [prepared, setPrepared] = useState<MergeRequest>(); const [merging, setMerging] = useState(false); const [message, setMessage] = useState('')
   const [chosenName, setChosenName] = useState('')
   const [queueSaving, setQueueSaving] = useState(false)
-  const [reviewScope, setReviewScope] = useState<'all_assets' | 'relations'>('all_assets')
   const drafts = useRef(new Map<string, { memberIds: string[]; prepared?: MergeRequest; chosenName: string }>())
   const submitting = useRef(false)
   const [leaseAttempt, retryLease] = useState(0)
@@ -54,11 +56,13 @@ export function WorldPanel({ bookId, service, assets }: { bookId: string; servic
   const queueItems = queueData?.items ?? []
   const queueRunning = !!queueData?.running || !!state?.running && state.mode === 'mechanical'
   const aiRunning = !!state?.running && state.mode !== 'mechanical'
-  const relationRun = reports.status === 'ready' ? reports.value.find(row => row.reviewScope === 'relations') : undefined
-  const relationRemaining = !!relationRun?.assetReview?.items.some(item => item.status === 'pending' || item.status === 'deferred')
+  const organizationRuns = reports.status === 'ready' ? reports.value.filter(row => row.workflow === 'character_organization_v1') : []
+  const organizationRun = organizationRuns[0]
+  const organizationResumable = !!organizationRun && (needsOrganizationReview(organizationRun) || ['paused', 'cancelled', 'failed', 'running'].includes(organizationRun.status))
   const busy = !!state?.running || merging || queueRunning || queueSaving
   const queuedIds = new Set(queueItems.filter(item => item.status === 'pending' || item.status === 'running').flatMap(item => item.request.memberIds.map(id => `${item.kind}:${id}`)))
   const selectedRows = selected && snapshot.status === 'ready' ? (selected.kind === 'character' ? snapshot.value.characters : snapshot.value.locations).filter(row => selected.memberIds.includes(row.id)) : []
+  const characterNames = snapshot.status === 'ready' ? new Map(snapshot.value.characters.map(row => [row.id, row.name])) : undefined
   const candidateNames = (candidate: Candidate) => snapshot.status === 'ready' ? [...new Set((candidate.kind === 'character' ? snapshot.value.characters : snapshot.value.locations).filter(row => candidate.memberIds.includes(row.id)).map(row => row.name))].slice(0, 3).join('、') : candidate.memberIds[0]
   const fresh = !!prepared && snapshot.status === 'ready' && prepared.memberIds.every(id => selectedRows.some(row => row.id === id && row.revision === prepared.expectedRevisions[id]))
   const mergingRows = selectedRows.filter(row => memberIds.includes(row.id))
@@ -133,21 +137,19 @@ export function WorldPanel({ bookId, service, assets }: { bookId: string; servic
     finally { submitting.current = false; setMerging(false) }
   }
   return <section className="world-panel" aria-label="世界资产整理"><div className="world-heading"><h2>P2 世界资产整理</h2><div>
-      <label>整理范围 <select aria-label="整理范围" value={reviewScope} disabled={busy} onChange={event => setReviewScope(event.target.value as 'all_assets' | 'relations')}><option value="all_assets">全部资产</option><option value="relations">人物关系</option></select></label>
       <button className="secondary-button" disabled={!ready || scanning || busy} onClick={() => void scan()}>{scanning ? '正在查找候选…' : '代码整理'}</button>
       <button className="secondary-button" disabled={!ready || scanning || busy || queue.status !== 'ready' || !queueData?.pending && !queueData?.statisticsPending} onClick={() => void runQueue()}>{queueRunning ? queueData?.pending === 0 && queueData.statisticsPending ? '更新统计中…' : '机械合并中…' : queueData?.statisticsPending && !queueData.pending ? '完成合并收尾' : `一键机械合并（${queueData?.pending ?? 0}组）`}</button>
-      {reviewScope === 'relations'
-        ? <button className="primary-button" disabled={!ready || scanning || busy} onClick={() => { setError(''); setMessage(''); void (relationRemaining ? service.continueRelations(bookId) : service.start(bookId, { reviewScope: 'relations', reviewMode: 'sample' })) }}>{aiRunning ? '人物关系核对中…' : relationRemaining ? '继续全书核对' : '人物关系核对（先10项）'}</button>
-        : <button className="primary-button" disabled={!ready || scanning || busy} onClick={() => { setError(''); void service.start(bookId) }}>{aiRunning ? 'AI整理中…' : eligibility.status === 'ready' && eligibility.value.resumable ? '继续AI整理' : 'AI整理'}</button>}
+      <button className="primary-button" disabled={!ready || scanning || busy} onClick={() => { setError(''); setMessage(''); void service.startOrganization(bookId) }}>{aiRunning ? '整理中…' : organizationResumable ? '继续AI整理' : 'AI整理'}</button>
       {aiRunning && <button className="text-button" onClick={() => service.cancel(bookId)}>取消AI整理</button>}
       {queueRunning && <button className="text-button" onClick={() => { void service.mechanical.stop(bookId).catch(failure => setError(failure instanceof Error ? failure.message : '停止请求失败。')) }}>停止机械合并</button>}
-      {reports.status === 'ready' && reports.value.length > 0 && <button className="text-button" onClick={() => setReportOpen(true)}>查看整理报告</button>}
+      {(organizationRun || aiRunning || organizationRuns.length > 0) && <button className="text-button" onClick={() => setTraceOpen(true)}>整理详情</button>}
     </div></div>
-    <p>代码整理：先自动合并完整同名项，其余候选核对后合并，可按需预览。AI整理：核对原文后合并，按需整编详细资料。人物关系：只按原文核对关系，先小批10项，确认后再继续全书。</p>
+    <p>代码整理：先自动合并完整同名项，其余候选核对后合并，可按需预览。AI人物整理：同一个人物会话依次扫描全目录、核实疑似同人、优化人物资料、整理人物关系并更新出场统计；暂停后从剩余工作继续。</p>
     {eligibility.status === 'ready' && !eligibility.value.covered && <p className="muted">请先完成全书逐章提取。</p>}
     {eligibility.status === 'error' && <p role="alert">{eligibility.message}</p>}
     {scanning && !state?.running && <p role="status">正在刷新名称候选…</p>}
-    {(aiRunning || queueRunning) && <p role="status">{state?.running ? `${state.phase} · 已处理 ${state.processed}/${state.total}` : `${queueData?.pending === 0 && queueData.statisticsPending ? '正在更新出场统计' : '机械合并队列处理中'} · 已处理 ${(queueData?.completed ?? 0) + (queueData?.failed ?? 0)}/${queueItems.length}`}</p>}
+    {organizationRun && <OrganizationProgress run={organizationRun} running={aiRunning} />}
+    {((aiRunning && !organizationRun) || queueRunning) && <p role="status">{state?.running ? `${state.phase} · 已处理 ${state.processed}/${state.total}` : `${queueData?.pending === 0 && queueData.statisticsPending ? '正在更新出场统计' : '机械合并队列处理中'} · 已处理 ${(queueData?.completed ?? 0) + (queueData?.failed ?? 0)}/${queueItems.length}`}</p>}
     {queue.status === 'error' && <p role="alert">{queue.message}</p>}
     {(error || state?.error) && <p role="alert">{error || state?.error}</p>}
     {message && <p role="status">{message}</p>}
@@ -155,5 +157,6 @@ export function WorldPanel({ bookId, service, assets }: { bookId: string; servic
     {selected && <div className="world-selection"><p>{selected.reason}</p>{selectedRows.map(row => <label key={row.id}><input type="checkbox" disabled={busy || queuedIds.has(`${selected.kind}:${row.id}`)} checked={memberIds.includes(row.id)} onChange={event => { setMemberIds(current => event.target.checked ? [...current, row.id] : current.filter(id => id !== row.id)); setPrepared(undefined); setChosenName('') }} />{row.name} · {row.id}{queuedIds.has(`${selected.kind}:${row.id}`) ? '（已加入队列）' : ''} · {'identity' in row ? row.identity : 'description' in row ? row.description : ''}</label>)}{!sameName && !prepared && <div className="world-name-choice"><label htmlFor="world-merge-name">合并后主名</label><select id="world-merge-name" value={canonicalName} disabled={busy} onChange={event => setChosenName(event.target.value)}><option value="">请选择主名</option>{names.map(name => <option key={name} value={name}>{name}</option>)}</select></div>}{canonicalName && <p>{prepared && fresh ? '已预览：' : ''}保留 {keepId}，主名“{canonicalName}”。</p>}{prepared && !fresh && <p className="muted">资料已更新，请核对当前候选后确认。</p>}<div className="world-selection-actions"><button className="secondary-button" disabled={memberIds.length < 2 || !ready || busy} onClick={() => { if (canConfirm) setPrepared(requestForSelection()); setPreview(true) }}>预览代码合并</button><button className="secondary-button" disabled={!canConfirm || !ready || busy || queue.status !== 'ready'} onClick={() => void addQueue()}>加入待合并</button><button className="primary-button" disabled={!canConfirm || !ready || busy} onClick={() => void confirm()}>{merging ? '正在合并…' : '确认机械合并'}</button><button className="text-button" disabled={busy} onClick={() => choose(undefined)}>收起候选</button></div></div>}
     {preview && selected && <MergeDialog bookId={bookId} kind={selected.kind} memberIds={memberIds} service={assets} locked={!ready} initialRequest={prepared} onClose={() => setPreview(false)} onPrepared={request => { setPrepared(request); setPreview(false) }} onMerged={() => undefined} />}
     {reportOpen && reports.status === 'ready' && <WorldReportDialog runs={reports.value} initialId={state?.reportId} queue={queueData ? { items: queueItems, pending: queueData.pending, completed: queueData.completed, failed: queueData.failed } : undefined} queueBusy={busy || queueSaving} onRemoveQueue={removeQueue} onReviewQueue={reviewQueue} onClose={() => setReportOpen(false)} />}
+    {traceOpen && (organizationRun || aiRunning || organizationRuns.length > 0) && <AgentRunPanel bookId={bookId} runId={organizationRun?.id} mode="p2" load={service.trace} run={organizationRun} runs={organizationRuns} assetEdits={organizationRun?.report.assetEdits as unknown as Record<string, unknown>[]} characterNames={characterNames} onOpenReport={() => { setTraceOpen(false); setReportOpen(true) }} onClose={() => setTraceOpen(false)} />}
   </section>
 }

@@ -476,12 +476,12 @@
               "minLength": 1
             },
             "relation_label": {
-              "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+              "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
               "type": "string",
               "minLength": 1
             },
             "reverse_label": {
-              "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+              "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
               "type": "string",
               "minLength": 1
             },
@@ -607,12 +607,12 @@
               "minLength": 1
             },
             "relation_label": {
-              "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+              "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
               "type": "string",
               "minLength": 1
             },
             "reverse_label": {
-              "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+              "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
               "type": "string",
               "minLength": 1
             },
@@ -2715,12 +2715,12 @@
         "minLength": 1
       },
       "relation_label": {
-        "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+        "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
         "type": "string",
         "minLength": 1
       },
       "reverse_label": {
-        "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+        "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
         "type": "string",
         "minLength": 1
       },
@@ -2872,12 +2872,12 @@
               "minLength": 1
             },
             "relation_label": {
-              "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+              "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
               "type": "string",
               "minLength": 1
             },
             "reverse_label": {
-              "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+              "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
               "type": "string",
               "minLength": 1
             },
@@ -4282,12 +4282,12 @@
                     "minLength": 1
                   },
                   "relation_label": {
-                    "description": "本人物对目标的说法，用原文里的词。例：父亲 / 暗恋 / 知己。",
+                    "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
                     "type": "string",
                     "minLength": 1
                   },
                   "reverse_label": {
-                    "description": "目标对本人物这一关系的说法。例：子女 / 被暗恋 / 知己；对称关系与正向相同。",
+                    "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
                     "type": "string",
                     "minLength": 1
                   },

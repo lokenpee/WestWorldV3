@@ -72,7 +72,7 @@ it('B01 人物关系先10项后等待，继续全书处理余项', async () => {
   expect(batches).toHaveLength(1)
   expect(batches[0]).toHaveLength(10)
   let report = (await world.reports('a'))[0]
-  expect(report).toMatchObject({ reviewScope: 'relations', reviewMode: 'sample', status: 'paused', relationReviewVersion: 1 })
+  expect(report).toMatchObject({ reviewScope: 'relations', reviewMode: 'sample', status: 'paused', relationReviewVersion: 2 })
   expect(report.assetReview!.items.filter(item => item.status === 'checked')).toHaveLength(10)
   expect(report.assetReview!.items.filter(item => item.status === 'pending').length).toBe(3)
   batches.length = 0
@@ -83,6 +83,15 @@ it('B01 人物关系先10项后等待，继续全书处理余项', async () => {
   report = (await world.reports('a'))[0]
   expect(report).toMatchObject({ reviewScope: 'relations', reviewMode: 'full', status: 'completed' })
   expect(report.assetReview!.items.every(item => item.status === 'checked')).toBe(true)
+  // 旧规则已核对的暂停运行，在新身份规则下需要重新读原文。
+  await workspace.openBook('a').table('pipelineRuns').update(report.id, { status: 'paused', relationReviewVersion: 1 })
+  await workspace.openBook('a').table('compileProgress').update('P2', { status: 'paused' })
+  batches.length = 0
+  await world.continueRelations('a')
+  expect(world.state('a')?.error).toBeUndefined()
+  expect(batches).toHaveLength(1)
+  expect(batches[0]).toHaveLength(13)
+  expect((await world.reports('a'))[0].relationReviewVersion).toBe(2)
 }, 30000)
 
 it('B05 专项按原文恢复已删除人物对，只改指定两个编号', async () => {

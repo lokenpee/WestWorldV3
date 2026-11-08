@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Character, CharacterPairResult } from '../assets/types'
 import { characterNetworkCacheKey, saveCharacterNetworkCache } from './cache'
 import { searchCharacters } from '../assets/search'
+import { relationLines } from '../assets/relationLabels'
 import { segmentDistance, vacantPosition, PositionIndex, type Point } from './geometry'
 import './CharacterNetwork.css'
 
@@ -284,6 +285,6 @@ export function CharacterNetwork({ bookId, characters, pairs, selectedId, onSele
     </div>
     {warning && <p className="character-network-warning" role="status">{warning}</p>}
     {hoverPerson && <div className="character-network-hover" role="tooltip"><strong>{hoverPerson.name}</strong><small>{hoverPerson.identity ? `${hoverPerson.identity} · ` : ''}{hoverPerson.id} · {roleLabel(hoverPerson.roleWeight)}</small></div>}
-    {hoverPair && <div className="character-network-hover" role="tooltip"><strong>{fromPerson?.name}（{hoverPair.fromId}） ↔ {toPerson?.name}（{hoverPair.toId}）</strong>{hoverPair.forwardLabels.length > 0 && <p>{fromPerson?.name} → {toPerson?.name}：{hoverPair.forwardLabels.join('、')}</p>}{hoverPair.reverseLabels.length > 0 && <p>{toPerson?.name} → {fromPerson?.name}：{hoverPair.reverseLabels.join('、')}</p>}{hoverPair.directionUnclear && <p>方向未明确</p>}</div>}
+    {hoverPair && <div className="character-network-hover" role="tooltip"><strong>{fromPerson?.name}（{hoverPair.fromId}） ↔ {toPerson?.name}（{hoverPair.toId}）</strong>{relationLines(fromPerson?.name ?? hoverPair.fromId, toPerson?.name ?? hoverPair.toId, hoverPair.forwardLabels, hoverPair.reverseLabels).map((line, index) => <p key={index}>{line}</p>)}{hoverPair.directionUnclear && <p>关系身份待核对</p>}</div>}
   </div>
 }

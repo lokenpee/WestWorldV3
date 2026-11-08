@@ -1,4 +1,4 @@
-import { AssetError, assetTables, roleWeights, type AssetEditRecord, type AssetFieldChange, type AssetKind, type Character, type EventLine, type EventNode, type LocationAsset, type RelationEvidence, type RoleWeight } from './types'
+import { AssetError, assetTables, roleWeights, type AssetEditRecord, type AssetFieldChange, type AssetKind, type Basis, type Character, type EventLine, type EventNode, type LocationAsset, type RelationEvidence, type RoleWeight } from './types'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
 import { normalizeCharacterNames } from './characterNames'
 import { rebuildFacts } from './derive'
@@ -14,6 +14,7 @@ export interface AssetPatchInput {
   bookId: string; kind: AssetKind; id: string
   expectedRevision: number; patch: Row
   reason: string; evidence: RelationEvidence[]
+  basis?: Basis[]
   commitId: string; tool: string; actor: 'manual' | 'agent'
   timestamp?: string
 }
@@ -267,7 +268,7 @@ export async function applyAssetPatch(store: PatchStore, input: AssetPatchInput)
   }
   const record: AssetEditRecord = {
     commitId: input.commitId, tool: input.tool, kind: input.kind, id: input.id,
-    fieldChanges: result.changes, reason: input.reason, evidence: input.evidence, timestamp, actor: input.actor,
+    fieldChanges: result.changes, reason: input.reason, evidence: input.evidence, basis: input.basis ?? [], timestamp, actor: input.actor,
   }
   return { asset: result.row, changes: result.changes, affected: result.affected, record }
 }

@@ -1,6 +1,7 @@
-import type { AssetEditRecord, Character, CharacterPairResult, CharacterRelationEdit, RelationEvidence } from './types'
+import type { AssetEditRecord, Basis, Character, CharacterPairResult, CharacterRelationEdit, RelationEvidence } from './types'
 import { effectivePairs, pairEndpointIds, pairFingerprint, pairFromPerspective, pairKeyOf } from './relations'
 import type { MergeStore, Row } from './mergeCore'
+import { isNonRoleLabel, relationRoleLabel } from './relationLabels'
 
 export interface PairWriteInput {
   bookId: string
@@ -8,6 +9,7 @@ export interface PairWriteInput {
   forwardLabels: string[]; reverseLabels: string[]
   directionUnclear?: boolean
   evidence?: RelationEvidence[]
+  basis?: Basis[]
   reason: string
   expectedFingerprint?: string
   actor: 'manual' | 'agent'
@@ -29,8 +31,9 @@ export function validatePairLabels(forward: string[], reverse: string[], state: 
   const a = cleaned(forward), b = cleaned(reverse)
   if (a.length > 20 || b.length > 20) throw new Error('INVALID_ARGS:每个方向的标签最多20项。')
   if ([...a, ...b].some(label => label.length > 100)) throw new Error('INVALID_ARGS:单项关系标签最多100字。')
+  if ([...a, ...b].some(isNonRoleLabel)) throw new Error('INVALID_ARGS:请填写人物自身的关系身份，如妹妹、兄长、朋友；宝二哥、林妹妹等称呼及打趣等互动不能作为关系标签。不确定请填未知并保留相关原文。')
   if (state === 'active' && !a.length && !b.length) throw new Error('INVALID_ARGS:有效人物对至少一个方向要有标签；双向清空请使用删除工具。')
-  return { forward: a, reverse: b }
+  return { forward: a.map(relationRoleLabel), reverse: b.map(relationRoleLabel) }
 }
 
 async function loadPair(store: MergeStore, bookId: string, fromId: string, toId: string) {
@@ -96,7 +99,7 @@ async function writePair(store: MergeStore, input: PairWriteInput, state: 'activ
       { field: 'forwardLabels', before: current.forwardLabels, after: labels.forward },
       { field: 'reverseLabels', before: current.reverseLabels, after: labels.reverse },
     ],
-    reason: input.reason, evidence, timestamp, actor: input.actor,
+    reason: input.reason, evidence, basis: input.basis ?? [], timestamp, actor: input.actor,
   }
   if (unchanged) {
     await appendRecord(store, bookId, input, record)
@@ -108,6 +111,7 @@ async function writePair(store: MergeStore, input: PairWriteInput, state: 'activ
     aToBLabels: aToB, bToALabels: bToA, directionUnclear, evidence,
     sourceRelationIds: state === 'active' ? [...current.sourceRelationIds] : (previous?.sourceRelationIds ?? []),
     legacyRecordIds: [...new Set([...(previous?.legacyRecordIds ?? []), ...(current.legacyRecordIds ?? [])])].sort(),
+    basis: input.basis ?? [],
     revision: Number(previous?.revision ?? 0) + 1, updatedAt: timestamp, updatedBy: input.actor, commitId: input.commitId,
   }
   await store.put('characterRelationEdits', edit as unknown as Row)

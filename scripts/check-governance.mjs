@@ -86,7 +86,12 @@ for (const cells of requestRows) {
   check(Boolean(title && next), `${id} 缺少名称或下一步`)
   check(['小修改', '中型', '大型'].includes(size), `${id} 需求级别错误：${size}`)
   check(allowedStates.has(status), `${id} 需求状态错误：${status}`)
-  const match = entry.match(/\[[^\]]+\]\(([^)]+)\)/)
+  const links = [...entry.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)]
+  for (const link of links) {
+    const linked = path.posix.normalize(path.posix.join('openspec', link[1].split('#')[0])).match(/^(openspec\/changes\/(?:archive\/)?[^/]+)\//)
+    if (linked) referencedChanges.add(linked[1])
+  }
+  const match = links[0]
   if (!match) { issues.push(`${id} 缺少资料入口链接`); continue }
   const target = path.posix.normalize(path.posix.join('openspec', match[1].split('#')[0]))
   if (!exists(target)) continue // 链接检查已经报告具体目标。

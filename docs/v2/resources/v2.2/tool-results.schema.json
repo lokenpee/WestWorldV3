@@ -1209,6 +1209,15 @@
           "include_facts": {
             "type": "boolean",
             "default": false
+          },
+          "char_offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "maxChars": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6000
           }
         }
       },
@@ -1421,15 +1430,10 @@
                       "type": "string"
                     },
                     "roleWeightSource": {
-                      "anyOf": [
-                        {
-                          "const": "frequency",
-                          "type": "string"
-                        },
-                        {
-                          "const": "manual",
-                          "type": "string"
-                        }
+                      "enum": [
+                        "frequency",
+                        "manual",
+                        "agent"
                       ]
                     },
                     "id": {
@@ -1665,6 +1669,48 @@
                     "hint"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "text",
+                    "totalChars",
+                    "charOffset",
+                    "truncated",
+                    "nextCharOffset"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "totalChars": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "charOffset": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "nextCharOffset": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
                 }
               ]
             }
@@ -5768,27 +5814,63 @@
                 "fragment"
               ],
               "properties": {
-                "id": { "type": "string" },
-                "disposition": { "enum": ["converted", "unresolved", "excluded"] },
-                "pairKeys": { "type": "array", "items": { "type": "string" } },
-                "issues": { "type": "array", "items": { "type": "string" } },
+                "id": {
+                  "type": "string"
+                },
+                "disposition": {
+                  "enum": [
+                    "converted",
+                    "unresolved",
+                    "excluded"
+                  ]
+                },
+                "pairKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "original": {
                   "anyOf": [
-                    { "type": "object" },
-                    { "type": "null" }
+                    {
+                      "type": "object"
+                    },
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
                 "fragment": {
                   "anyOf": [
-                    { "type": "null" },
+                    {
+                      "type": "null"
+                    },
                     {
                       "additionalProperties": false,
                       "type": "object",
-                      "required": ["offset", "text", "totalLength"],
+                      "required": [
+                        "offset",
+                        "text",
+                        "totalLength"
+                      ],
                       "properties": {
-                        "offset": { "type": "integer", "minimum": 0 },
-                        "text": { "type": "string" },
-                        "totalLength": { "type": "integer", "minimum": 0 }
+                        "offset": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "totalLength": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
                       }
                     }
                   ]
@@ -5798,12 +5880,90 @@
           },
           "nextCursor": {
             "anyOf": [
-              { "type": "string" },
-              { "type": "null" }
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
-          "fingerprint": { "type": "string" }
+          "fingerprint": {
+            "type": "string"
+          }
         }
+      }
+    },
+    {
+      "name": "query_character_catalog",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_organization_progress",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "save_candidate_group",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "query_candidate_groups",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "resolve_candidate_group",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "clear_candidate_groups",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "record_organization_progress",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "merge_assets",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "query_character_profile",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "query_relation_work",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "submit_profile_review",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "submit_relation_review",
+      "success": {
+        "type": "object"
       }
     }
   ],

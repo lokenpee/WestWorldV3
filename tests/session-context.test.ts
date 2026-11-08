@@ -43,7 +43,24 @@ it('压缩追加摘要、保留原历史，重建投影保留任务编号并统�
 it.each([{ label: '空摘要', summary: '' }, { label: '空白摘要', summary: ' '.repeat(5) }, { label: '仍超窗', summary: '巨大摘要'.repeat(10000) }])('无效或仍超窗摘要保留原历史且不追加压缩记录：$label', async ({ summary }) => {
   const repo = await fixture(), before = (await sessionProjection(repo, 'session')).allEntries
   await expect(compactSession(repo, scope, { generate: generator(summary), contextWindow: 8192, prompt: '当前任务精确编号N-123' })).rejects.toThrow()
-  expect((await sessionProjection(repo, 'session')).allEntries).toEqual(before)
+  expect((await sessionProjection(repo, 'session')).allEntries.filter(row => row.type !== 'request_trace')).toEqual(before)
+  expect((await sessionProjection(repo, 'session')).allEntries.filter(row => row.type === 'request_trace').length).toBeGreaterThan(0)
+})
+
+it.each([
+  { label: '缺字段', call: { name: 'submit_result', arguments: {} }, code: 'SUMMARY_MISSING' },
+  { label: '类型错误', call: { name: 'submit_result', arguments: { summary: 42 } }, code: 'SUMMARY_TYPE' },
+  { label: '空白', call: { name: 'submit_result', arguments: { summary: '   ' } }, code: 'SUMMARY_EMPTY' },
+  { label: '超长', call: { name: 'submit_result', arguments: { summary: 'x'.repeat(600) } }, code: 'SUMMARY_TOO_LONG' },
+  { label: '错误工具', call: { name: 'other', arguments: { summary: '有效' } }, code: 'SUMMARY_TOOL' },
+  { label: '输出截断', content: [], stopReason: 'length', code: 'OUTPUT_TRUNCATED' },
+] as const)('summary错误分类可追踪：$label', async ({ call, content, stopReason, code }) => {
+  const repo = await fixture()
+  const message = { role: 'assistant', content: content ?? [{ type: 'toolCall', id: 'call', name: (call as { name: string }).name, arguments: (call as { arguments: unknown }).arguments }], api: 'openai-completions', provider: 'custom', model: 'fixture', usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: stopReason ?? 'toolUse', timestamp: Date.now() }
+  const generate = vi.fn(async (request: Parameters<ModelService['generate']>[0]) => { try { request.validate?.(message as never); return result('有效摘要') } catch (error) { return { ...result(''), ok: false, error: { kind: 'validation', message: (error as Error).message }, message } } }) as unknown as ModelService['generate']
+  await expect(compactSession(repo, scope, { generate, contextWindow: 8192, prompt: '当前任务精确编号N-123' })).rejects.toThrow(code)
+  const trace = (await sessionProjection(repo, 'session')).allEntries.find(row => row.type === 'request_trace')
+  expect(trace).toMatchObject({ errorCode: code, validation: { code } })
 })
 
 it('压缩取消和会话末端变化时不提交摘要，可再次压缩恢复', async () => {

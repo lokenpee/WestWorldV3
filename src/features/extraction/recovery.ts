@@ -3,9 +3,13 @@ import { substeps, type Substep } from './types'
 
 export type ExtractionDatabase = ReturnType<ReturnType<typeof createWorkspace>['openBook']>
 export interface Receipt { key: string; bookId: string; chapterIndex: string; substep: Substep; originIds: string[]; inputFingerprint: string }
-export interface Lease { id: string; recordType: string; owner?: string; runId?: string; expiresAt?: number }
+export interface Lease { id: string; recordType: string; owner?: string; runId?: string; expiresAt?: number; extractionStep?: Substep }
 export interface ReExtractScope { step: Substep; scope: 'all' | 'chapter'; chapterIndex?: string; startedAt: string }
-export interface Progress { bookId: string; stage: string; status: string; totalChapters: number; completedChapters: string[]; failedChapters: string[]; partialChapters?: Record<string, Substep[]>; updatedAt: string; runId?: string; reExtract?: ReExtractScope }
+export interface ExtractionJob extends ReExtractScope {
+  mode: 'extract' | 'replace'; group: 'together' | 'single'; status: 'running' | 'paused' | 'completed' | 'failed'; runId?: string; usage?: SavedUsage
+}
+export interface StepState { status: string; message?: string }
+export interface Progress { bookId: string; stage: string; status: string; totalChapters: number; completedChapters: string[]; failedChapters: string[]; partialChapters?: Record<string, Substep[]>; updatedAt: string; runId?: string; reExtract?: ReExtractScope; extractionJobs?: Partial<Record<Substep, ExtractionJob>>; stepStates?: Record<string, StepState>; usage?: SavedUsage }
 export interface SavedUsage { input: number; output: number; totalTokens: number; cost: number; costStatus: 'estimated' | 'unknown' }
 export interface StoredTask {
   taskId: string; ordinal: number; callId: string; phase: Substep; status: string; workItemIds: string[]
@@ -56,8 +60,12 @@ export async function checkReceiptSources(db: ExtractionDatabase, bookId: string
   return receipts
 }
 
-export async function withExtractionLock<T>(namespace: string, bookId: string, work: () => Promise<T>, busy: () => T): Promise<T> {
+export async function withExtractionLock<T>(namespace: string, bookId: string, work: () => Promise<T>, busy: () => T, step?: Substep): Promise<T> {
   const locks = globalThis.navigator?.locks
   if (!locks) return work()
-  return locks.request(`westworld-extraction:${namespace}:${bookId}`, { mode: 'exclusive', ifAvailable: true }, lock => lock ? work() : busy())
+  const name = `westworld-extraction:${namespace}:${bookId}`
+  if (!step) return locks.request(name, { mode: 'exclusive', ifAvailable: true }, lock => lock ? work() : busy())
+  return locks.request(name, { mode: 'shared', ifAvailable: true }, lock => lock
+    ? locks.request(`${name}:${step}`, { mode: 'exclusive', ifAvailable: true }, lane => lane ? work() : busy())
+    : busy())
 }

@@ -1,6 +1,7 @@
 import Dexie from 'dexie'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import { canonical } from './contracts'
+import { isObservationEntry } from './context'
 
 export type Row = Record<string, unknown>
 export interface AgentStore {
@@ -10,7 +11,8 @@ export interface AgentStore {
   remove(table: string, id: string): Promise<void>
   wait<T>(promise: Promise<T>): Promise<T>
 }
-export interface AgentRepository { bookId: string; transaction<T>(write: boolean, work: (store: AgentStore) => Promise<T>): Promise<T> }
+export interface AgentRepository { bookId: string; transaction<T>(write: boolean, work: (store: AgentStore) => Promise<T>): Promise<T>; tracePut(rows: Row[]): Promise<void>; traceRows(): Promise<Row[]> }
+const visible = (table: string, row: Row | undefined) => !!row && (table !== 'storySessionEntries' || !isObservationEntry(row))
 const keyOf = (table: string, row: Row) => String(table === 'chapters' || table === 'chapterTexts' ? row.chapterIndex : table === 'assetLifecycle' || table === 'extractionReceipts' ? row.key : table === 'compileProgress' ? row.stage : row.id)
 class MoreSnapshotData extends Error {}
 class SnapshotConflict extends Error {}
@@ -26,11 +28,11 @@ async function writeSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace
       return points.get(table)!.get(id)
     }
     const store: AgentStore = {
-      async get(table, id) { return structuredClone(changes.get(table)?.has(id) ? changes.get(table)!.get(id) : await base(table, id)) },
+      async get(table, id) { const row = changes.get(table)?.has(id) ? changes.get(table)!.get(id) : await base(table, id); return visible(table, row) ? structuredClone(row) : undefined },
       async rows(table) {
-        if (!full.has(table)) full.set(table, structuredClone(await db.table(table).toArray()))
+        if (!full.has(table)) full.set(table, structuredClone(await db.table(table).toArray()).filter(row => visible(table, row)))
         const rows = new Map(full.get(table)!.map(row => [keyOf(table, row), row]))
-        for (const [id, row] of changes.get(table) ?? []) { if (row) rows.set(id, row); else rows.delete(id) }
+        for (const [id, row] of changes.get(table) ?? []) { if (row && visible(table, row)) rows.set(id, row); else rows.delete(id) }
         return structuredClone([...rows].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, row]) => row))
       },
       async put(table, row) {
@@ -56,8 +58,8 @@ async function writeSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace
     const tables = [...new Set([...full.keys(), ...points.keys(), ...changes.keys(), 'pipelineRuns'])]
     try {
       await db.transaction('rw', tables.map(table => db.table(table)), async transaction => {
-        for (const [table, rows] of full) if (canonical(await transaction.table(table).toArray()) !== canonical(rows)) throw new SnapshotConflict()
-        for (const [table, rows] of points) for (const [id, row] of rows) if (canonical(await transaction.table(table).get(id)) !== canonical(row)) throw new SnapshotConflict()
+        for (const [table, rows] of full) if (canonical((await transaction.table(table).toArray()).filter(row => visible(table, row))) !== canonical(rows)) throw new SnapshotConflict()
+        for (const [table, rows] of points) for (const [id, row] of rows) if (canonical((await transaction.table(table).get(id)) ?? undefined) !== canonical(row)) throw new SnapshotConflict()
         for (const domain of domains) {
           const current = await transaction.table('pipelineRuns').get(`lease:${domain}`)
           if (canonical(current) !== canonical(fences.get(domain))) throw new SnapshotConflict()
@@ -86,15 +88,15 @@ async function readSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace>
     const store: AgentStore = {
       async rows(name) {
         tables.add(name)
-        if (!all.has(name)) { if (attempt) throw new MoreSnapshotData(); all.set(name, structuredClone(await db.table(name).toArray())) }
-        return structuredClone(all.get(name)!)
+        if (!all.has(name)) { if (attempt) throw new MoreSnapshotData(); all.set(name, structuredClone(await db.table(name).toArray()).filter(row => visible(name, row))) }
+        return structuredClone(all.get(name)!.filter(row => visible(name, row)))
       },
       async get(name, id) {
         if (!keys.has(name)) keys.set(name, new Set()); keys.get(name)!.add(id)
-        if (all.has(name)) return structuredClone(all.get(name)!.find(row => keyOf(name, row) === id))
+        if (all.has(name)) return structuredClone(all.get(name)!.find(row => keyOf(name, row) === id && visible(name, row)))
         if (!points.has(name)) points.set(name, new Map())
         if (!points.get(name)!.has(id)) { if (attempt) throw new MoreSnapshotData(); points.get(name)!.set(id, structuredClone(await db.table(name).get(id))) }
-        return structuredClone(points.get(name)!.get(id))
+        const row = points.get(name)!.get(id); return visible(name, row) ? structuredClone(row) : undefined
       },
       async put() { throw new Error('SCOPE:只读快照只用于读取资料。') }, async remove() { throw new Error('SCOPE:只读快照只用于读取资料。') }, wait: promise => promise,
     }
@@ -124,6 +126,12 @@ export function createBookAgentRepository(workspace: ReturnType<typeof createWor
       tail = new Promise<void>(resolve => { release = resolve }); await previous
       try { return await writeSnapshot(db, bookId, work) } finally { release() }
     })
+  }, async tracePut(rows) {
+    if (!rows.length) return
+    if (rows.some(row => row.bookId !== bookId)) throw new Error('SCOPE:观测记录归属与当前书籍不一致。')
+    await Dexie.ignoreTransaction(() => db.table('storySessionEntries').bulkPut(rows))
+  }, async traceRows() {
+    return (await db.table('storySessionEntries').toArray()).filter(row => row.bookId === bookId && isObservationEntry(row))
   } }
 }
 export function createMemoryAgentRepository(bookId: string, initial: Record<string, Row[]> = {}): AgentRepository {
@@ -131,7 +139,7 @@ export function createMemoryAgentRepository(bookId: string, initial: Record<stri
   let tail = Promise.resolve()
   const tableOf = (name: string) => { if (!data.has(name)) data.set(name, new Map()); return data.get(name)! }
   const store: AgentStore = {
-    async rows(table) { return structuredClone([...tableOf(table).values()]) }, async get(table, id) { return structuredClone(tableOf(table).get(id)) },
+    async rows(table) { return structuredClone([...tableOf(table).values()].filter(row => visible(table, row))) }, async get(table, id) { const row = tableOf(table).get(id); return visible(table, row) ? structuredClone(row) : undefined },
     async put(table, row) { if (row.bookId !== bookId) throw new Error('SCOPE:资料归属与当前书籍不一致。'); tableOf(table).set(keyOf(table, row), structuredClone(row)) },
     async remove(table, id) { tableOf(table).delete(id) }, wait: promise => promise,
   }
@@ -140,5 +148,10 @@ export function createMemoryAgentRepository(bookId: string, initial: Record<stri
     tail = new Promise<void>(resolve => { release = resolve }); await previous
     const snapshot = write ? structuredClone(data) : undefined
     try { return await work(store) } catch (error) { if (snapshot) data = snapshot; throw error } finally { release() }
+  }, async tracePut(rows) {
+    if (rows.some(row => row.bookId !== bookId)) throw new Error('SCOPE:观测记录归属与当前书籍不一致。')
+    for (const row of rows) tableOf('storySessionEntries').set(keyOf('storySessionEntries', row), structuredClone(row))
+  }, async traceRows() {
+    return structuredClone([...tableOf('storySessionEntries').values()].filter(row => row.bookId === bookId && isObservationEntry(row)))
   } }
 }

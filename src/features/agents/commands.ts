@@ -7,16 +7,19 @@ import { applyAssetPatch } from '../assets/assetPatch'
 import { deleteCharacterPair, saveCharacterPair } from '../assets/relationEdits'
 import { pairKeyOf } from '../assets/relations'
 import { bindNodeCharacters } from '../assets/characterLinks'
-import type { Character, EventNode, RelationEvidence } from '../assets/types'
+import type { Basis, Character, EventNode, RelationEvidence } from '../assets/types'
 import { acceptIdentityMerge } from '../world/queue'
 import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebaseStoryCoverage, saveStoryCoverage } from '../story/coverage'
 import { applyAliasChecks } from './assetAliases'
+import { applyOrganizationTool, assertBasis, hasCharacterDetailRead, organizationTool } from './organizationCommands'
+import { noteOrganizationWrite } from './organizationReview'
 
 export interface QueryRead { tool: string; args: Row; resultFingerprint: string }
 export interface RecordRead { table: string; id: string; resolvedId: string | null; revision: number; factFingerprint: string }
 export interface ReadSet { records: RecordRead[]; queries: QueryRead[] }
-export interface CommitAck { ok: true; commitId: string; operationKey: string; alreadyApplied: boolean; summary: string; changed?: boolean; affected?: { kind: string; id: string; revision: number }[]; pair?: { pairKey: string; state: string; editRevision: number; fingerprint: string } }
+export interface CommitAck { ok: true; commitId: string; operationKey: string; alreadyApplied: boolean; summary: string; complete?: boolean; changed?: boolean; affected?: { kind: string; id: string; revision: number }[]; pair?: { pairKey: string; state: string; editRevision: number; fingerprint: string; legacyRecordIds?: string[] } }
+interface ToolWriteResult { changed?: boolean; summary?: string; affected?: { kind: string; id: string; revision: number }[]; pair?: { pairKey: string; state: string; editRevision: number; fingerprint: string; legacyRecordIds?: string[] }; asset?: { id: string }; groupId?: string; revision?: number; reused?: boolean; clearedCount?: number; step?: string; action?: string; kind?: string; id?: string }
 export const domainOf = (scope: Scope) => scope.profile === 'asset_editor' ? 'world' : 'narrative'
 export async function checkLease(store: AgentStore, scope: Scope, signal?: AbortSignal) {
   signal?.throwIfAborted()
@@ -27,13 +30,13 @@ export async function checkLease(store: AgentStore, scope: Scope, signal?: Abort
     if (!session || session.bookId !== scope.bookId || session.leaseOwner !== scope.owner || Number(session.leaseUntil) <= Date.now()) throw new Error('SCOPE:会话执行权与本任务不一致。')
   }
 }
-export async function appendEntry(store: AgentStore, scope: Scope, value: Row) {
+export async function appendEntry(store: AgentStore, scope: Scope, value: Row, options: { advanceLeaf?: boolean } = {}) {
   if (!scope.sessionId) return
   const session = await store.get('storySessions', scope.sessionId)
   if (!session || session.bookId !== scope.bookId) throw new Error('SCOPE:消息会话不属于当前书籍。')
   const id = crypto.randomUUID(); const timestamp = new Date().toISOString()
-  await store.put('storySessionEntries', { ...value, ...(value.type === 'compaction' && !value.firstKeptEntryId ? { firstKeptEntryId: id } : {}), id, sessionId: scope.sessionId, bookId: scope.bookId, ordinal: session.nextOrdinal, parentId: session.leafId ?? null, createdAt: timestamp })
-  await store.put('storySessions', { ...session, leafId: id, nextOrdinal: Number(session.nextOrdinal) + 1, updatedAt: timestamp })
+  await store.put('storySessionEntries', { ...value, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { unitId: scope.unitId } : {}), ...(value.type === 'compaction' && !value.firstKeptEntryId ? { firstKeptEntryId: id } : {}), id, sessionId: scope.sessionId, bookId: scope.bookId, ordinal: session.nextOrdinal, parentId: session.leafId ?? null, createdAt: timestamp })
+  await store.put('storySessions', { ...session, ...(options.advanceLeaf === false ? {} : { leafId: id }), nextOrdinal: Number(session.nextOrdinal) + 1, updatedAt: timestamp })
 }
 export async function taskOf(store: AgentStore, scope: Scope) {
   const run = await store.get('pipelineRuns', scope.runId)
@@ -241,6 +244,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
 
 export const assetReviewTools = ['edit_character', 'edit_location', 'edit_event_node', 'edit_event_line', 'set_character_relation', 'delete_character_relation'] as const
 export const relationTools = ['set_character_relation', 'delete_character_relation'] as const
+export const organizationWriteTools = [...assetReviewTools, 'merge_assets', 'save_candidate_group', 'resolve_candidate_group', 'clear_candidate_groups', 'record_organization_progress', 'submit_profile_review', 'submit_relation_review'] as const
 const editTables: Record<string, { table: string; kind: 'character' | 'location' | 'node' | 'eventLine'; detail: string }> = {
   edit_character: { table: 'characters', kind: 'character', detail: 'get_character_detail' },
   edit_location: { table: 'locations', kind: 'location', detail: 'get_location_detail' },
@@ -286,34 +290,46 @@ async function assertRelationReviewItem(store: AgentStore, scope: Scope, args: R
 
 async function applyAgentAssetTool(store: AgentStore, scope: Scope, name: string, args: Row, readSet: ReadSet, commitId: string, timestamp: string) {
   const evidence = records(args.evidence)
-  await assertToolEvidence(store, scope, evidence, readSet)
+  const basis = records(args.basis)
+  if (scope.phase === 'character_organization') await assertBasis(store, scope, basis, readSet)
+  else await assertToolEvidence(store, scope, evidence, readSet)
   if ((relationTools as readonly string[]).includes(name)) {
     const fromId = text(args.fromId), toId = text(args.toId)
     requireRecordRead(readSet, 'characters', fromId, 'get_character_detail')
     requireRecordRead(readSet, 'characters', toId, 'get_character_detail')
     if (!readSet.queries.some(query => query.tool === 'get_character_relation' && text((query.args as Row).fromId) === fromId && text((query.args as Row).toId) === toId)) throw new Error('INVALID_ARGS:修改人物对前须调用get_character_relation读取当前结果和指纹。')
     if (scope.reviewScope === 'relations') await assertRelationReviewItem(store, scope, args, fromId, toId, readSet)
+    if (scope.phase === 'character_organization' && !basis.some(value => ['relation', 'asset', 'chapter'].includes(String((value.source as Row)?.kind)))) throw new Error('INVALID_ARGS:关系修改须有可追溯依据。')
     const write = {
       bookId: scope.bookId, fromId, toId, forwardLabels: strings(args.forwardLabels), reverseLabels: strings(args.reverseLabels),
-      directionUnclear: args.directionUnclear === true, evidence: evidence as unknown as RelationEvidence[], reason: text(args.reason), expectedFingerprint: text(args.expectedFingerprint),
+      directionUnclear: args.directionUnclear === true, evidence: evidence as unknown as RelationEvidence[], basis: basis as unknown as Basis[], reason: text(args.reason), expectedFingerprint: text(args.expectedFingerprint),
       actor: 'agent' as const, commitId, tool: name, operationKey: text(args.operationKey), runId: scope.runId,
     }
     const result = await (name === 'set_character_relation' ? saveCharacterPair : deleteCharacterPair)(store, write)
     return {
       changed: result.changed, affected: result.affected,
-      pair: { pairKey: result.pair.pairKey, state: result.pair.state, editRevision: result.pair.editRevision, fingerprint: result.pair.fingerprint },
+      pair: { pairKey: result.pair.pairKey, state: result.pair.state, editRevision: result.pair.editRevision, fingerprint: result.pair.fingerprint, legacyRecordIds: result.pair.legacyRecordIds },
       summary: name === 'set_character_relation' ? '人物对关系已保存。' : '人物对关系已删除。',
     }
   }
   const target = editTables[name]
   if (!target) throw new Error('INVALID_ARGS:未知的资产编辑工具。')
   const id = text(args.id)
-  requireRecordRead(readSet, target.table, id, target.detail)
+  if (scope.phase === 'character_organization' && target.kind === 'character') {
+    if (!await hasCharacterDetailRead(store, scope, id, readSet)) throw new Error('INVALID_ARGS:修改人物前须实际读完该人物详情，关系端点引用不能代替完整资料。')
+  } else requireRecordRead(readSet, target.table, id, target.detail)
   await assertNarrativeWritable(store, scope, target.kind)
+  const originalFacts = scope.phase === 'character_organization' && target.kind === 'character' ? records((await store.get('characters', id))?.mergeFacts) : []
   const result = await applyAssetPatch(store, {
     bookId: scope.bookId, kind: target.kind, id, expectedRevision: Number(args.expectedRevision),
-    patch: (args.patch ?? {}) as Row, reason: text(args.reason), evidence: evidence as unknown as RelationEvidence[], commitId, tool: name, actor: 'agent', timestamp,
+    patch: (args.patch ?? {}) as Row, reason: text(args.reason), evidence: evidence as unknown as RelationEvidence[],
+    basis: basis as unknown as Basis[], commitId, tool: name, actor: 'agent', timestamp,
   })
+  if (originalFacts.length) {
+    const current = (await store.get('characters', id))!
+    const facts = new Map([...originalFacts, ...records(current.mergeFacts)].map(fact => [text(fact.id), fact]))
+    await store.put('characters', { ...current, mergeFacts: [...facts.values()] })
+  }
   const run = await store.get('pipelineRuns', scope.runId)
   if (run) {
     const report = (run.report ?? {}) as Row
@@ -324,8 +340,9 @@ async function applyAgentAssetTool(store: AgentStore, scope: Scope, name: string
 export async function commitCommand(repo: AgentRepository, scope: Scope, name: string, toolCallId: string, args: Row, readSet: ReadSet, signal?: AbortSignal): Promise<CommitAck> {
   assertScope(scope, repo.bookId)
   const relationOnly = scope.profile === 'asset_editor' && scope.phase === 'asset_review' && scope.reviewScope === 'relations'
+  const organization = scope.phase === 'character_organization'
   const allowed = scope.profile === 'asset_editor'
-    ? (scope.phase === 'asset_review' ? [...(relationOnly ? relationTools : assetReviewTools)] : ['commit_asset_changes'])
+    ? (organization ? [...organizationWriteTools] : scope.phase === 'asset_review' ? [...(relationOnly ? relationTools : assetReviewTools)] : ['commit_asset_changes'])
     : ['commit_story_changes']
   if (!allowed.includes(name)) throw new Error(relationOnly ? 'WRITE_SCOPE_DENIED:人物关系专项只允许保存或删除人物对关系。' : 'SCOPE:当前职责或阶段不能执行此写工具。')
   validate(toolContracts[scope.profile].find(tool => tool.name === name)!.parameters, args)
@@ -358,7 +375,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       const intent = records(run.commandIntents).find(row => row.operationKey === operationKey && row.taskId === scope.taskId && row.state === 'prepared')
       if (!intent) throw new Error('CONFLICT:命令意图未就绪。')
       const expected = intent.expectedReadSet as unknown as ReadSet
-      const queryResults = await validateReadSet(store, scope, expected)
+      const queryResults = organization && name === 'record_organization_progress' ? new Map<QueryRead, Row>() : await validateReadSet(store, scope, expected)
       const previousStory = new Map<string, Row>()
       if (name === 'commit_story_changes') for (const table of ['nodes', 'eventLines', 'storyEditorNotes']) for (const row of await store.rows(table)) previousStory.set(`${table}:${row.id}`, row)
       const workTables: Record<string, string> = { character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' }
@@ -368,7 +385,10 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       if (name === 'commit_asset_changes') await applyAssets(store, scope, payload, expected, commitId)
       else if (name === 'commit_story_changes') await applyStory(store, scope, payload, expected, queryResults)
       signal?.throwIfAborted()
-      const toolResult = (assetReviewTools as readonly string[]).includes(name) ? await applyAgentAssetTool(store, scope, name, args, expected, commitId, timestamp) : undefined
+      const toolResult = organizationTool(name)
+        ? await applyOrganizationTool(store, scope, name, args, expected, commitId, timestamp) as ToolWriteResult
+        : (assetReviewTools as readonly string[]).includes(name) ? await applyAgentAssetTool(store, scope, name, args, expected, commitId, timestamp) as ToolWriteResult : undefined
+      await noteOrganizationWrite(store, scope, name, args, toolResult?.changed === true)
       const summary = toolResult?.summary ?? (name === 'commit_asset_changes' ? '世界资产修改已提交。' : '叙事资产与工作记忆已提交。')
       const latest = (await store.get('pipelineRuns', scope.runId))!
       const changed = [...records(task.reviewedItems)]
@@ -391,6 +411,14 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
         if (work) {
           const existing = changed.findIndex(row => row.workItemId === work.workItemId)
           const proof = { workItemId: work.workItemId, outcome: 'changed', reason: '本任务已提交该人物对的修改。' }
+          if (existing < 0) changed.push(proof); else changed[existing] = proof
+        }
+      }
+      if (organization && toolResult?.changed && ((assetReviewTools as readonly string[]).includes(name) || name === 'merge_assets')) {
+        const work = workItems.find(item => text(item.kind) === 'organization')
+        if (work) {
+          const existing = changed.findIndex(row => row.workItemId === work.workItemId)
+          const proof = { workItemId: work.workItemId, outcome: 'changed', reason: '本任务已提交资产或关系修改。' }
           if (existing < 0) changed.push(proof); else changed[existing] = proof
         }
       }
@@ -420,7 +448,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
         }
         assetReview = { ...(assetReview ?? { version: 1 }), items: reviewItems, updatedAt: timestamp }
       }
-      await store.put('pipelineRuns', { ...latest, ...(assetReview ? { assetReview } : {}), appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { changed: toolResult.changed, affected: toolResult.affected, ...(toolResult.pair ? { pair: toolResult.pair } : {}) } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
+      await store.put('pipelineRuns', { ...latest, ...(assetReview ? { assetReview } : {}), appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { ...toolResult } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
       await appendEntry(store, scope, { type: 'commit', summary: `${commitId}：${summary}` })
       updatedReads = structuredClone(readSet)
       await rebaseReadSet(store, scope, updatedReads)
@@ -431,7 +459,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
         await saveStoryCoverage(store, scope.runId, latestTask, records(latestTask.reviewedItems).filter(item => item.outcome === 'changed'))
       }
       if (name === 'commit_asset_changes') for (const group of records(payload.groups)) await acceptIdentityMerge(store, scope.runId, scope.taskId, text(group.kind), strings(group.memberIds), text(group.keepId), updatedReads)
-      return { ok: true, commitId, operationKey, alreadyApplied: false, summary, ...(toolResult ? { changed: toolResult.changed, affected: toolResult.affected, ...(toolResult.pair ? { pair: toolResult.pair } : {}) } : {}) } as CommitAck
+      return { ok: true, commitId, operationKey, alreadyApplied: false, ...(toolResult ?? {}), summary } as CommitAck
     })
     if (updatedReads) { readSet.records = updatedReads.records; readSet.queries = updatedReads.queries }
     return acknowledgement as CommitAck

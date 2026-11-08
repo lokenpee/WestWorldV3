@@ -52,6 +52,7 @@ async function buildItems(store: { get(table: string, id: string): Promise<Row |
 async function refreshItems(repo: AgentRepository, runId: string, reviewScope: ReviewScope = 'all_assets'): Promise<AssetReviewItem[]> {
   const snapshot = await repo.transaction(false, async store => ({ run: await store.get('pipelineRuns', runId)!, items: await buildItems(store, reviewScope) }))
   const previous = new Map<string, AssetReviewItem>(((snapshot.run?.assetReview as { items?: AssetReviewItem[] } | undefined)?.items ?? []).map(item => [item.workItemId, item]))
+  if (reviewScope === 'relations' && snapshot.run?.relationReviewVersion !== 2) previous.clear()
   const current = new Set(snapshot.items.map(item => item.workItemId))
   const next = snapshot.items.map(item => {
     const old = previous.get(item.workItemId) as AssetReviewItem | undefined
@@ -70,7 +71,7 @@ async function saveItems(repo: AgentRepository, runId: string, owner: string, it
     const run = (await store.get('pipelineRuns', runId)) as unknown as WorldRun
     const current = new Map((await buildItems(store, reviewScope)).map(item => [item.workItemId, item]))
     const next = items.map(item => item.status === 'checked' && current.has(item.workItemId) ? { ...item, revision: current.get(item.workItemId)!.revision, factFingerprint: current.get(item.workItemId)!.factFingerprint } : item)
-    await store.put('pipelineRuns', { ...run, phase: 'asset_review', reviewScope, reviewMode, ...(reviewScope === 'relations' ? { relationReviewVersion: 1 } : {}), assetReview: { version: 1, items: next, updatedAt: new Date().toISOString() } })
+    await store.put('pipelineRuns', { ...run, phase: 'asset_review', reviewScope, reviewMode, ...(reviewScope === 'relations' ? { relationReviewVersion: 2 } : {}), assetReview: { version: 1, items: next, updatedAt: new Date().toISOString() } })
     return next
   })
 }

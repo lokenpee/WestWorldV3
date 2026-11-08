@@ -4242,7 +4242,7 @@
         "src/features/extraction/contracts.ts",
         "src/features/world/optimization.ts"
       ],
-      "sha256": "6bd59b4dd03834e9e1da67dc54540fd58c7b3637d06ad987f3cbc532596df101"
+      "sha256": "f7c9b176789cdcc01d8f3f0c6bed936b9a9ba89cf68d4be5cf0d03a0fb03501f"
     },
     {
       "path": "docs/v2/resources/v2.2/model-output-contract.json",
@@ -4275,7 +4275,7 @@
       "consumers": [
         "src/features/agents/compaction.ts"
       ],
-      "sha256": "55f76b7513cf1524d912374b9d244935fa0fb050a72319d69c8609c8f30e38f2"
+      "sha256": "d4ae3f8eddd56574ed0aed1a9af35b527ba49b394d5efb2f3e39586e06642566"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/location-optimize.md",
@@ -4307,7 +4307,7 @@
       "consumers": [
         "src/features/extraction/contracts.ts"
       ],
-      "sha256": "404d6b158ae95cda5d152e229a66249a6eb428789c9b2585b15a6980bf4d865e"
+      "sha256": "c656c5b7ae2468e70f386722d8b34f512ab1729fcddac126b06cc1886e211770"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-identity.md",
@@ -4365,7 +4365,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "497c59baa62d8eeaf920ca4fd0f28dc9d107fd6dfcdaadd859c74ea73e8f5331"
+      "sha256": "1b9eb634590d88aa9d4f48843412df53160b36a7bfbfbd43ecc5a7b72ffb0b50"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4373,7 +4373,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "3e694a0629c7d2ac3dad6e7c093c3c0ba2470fc9a2db97799e6f92fae9d654d8"
+      "sha256": "2c6f31315ea8600cc4ed678ed0c328c8cba2bef91d9754e7f579273c294f2eff"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4381,7 +4381,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "b780fa4b4244fd6e73e1cd3436cbd4a1e321a326796a776cef02f5e9d7b186f0"
+      "sha256": "7c4f70105cb617ef987d17cca5f6e9bf0912ac6a3ab207d33c00b42a9479626f"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",
@@ -4389,7 +4389,7 @@
       "consumers": [
         "src/features/world/assetReview.ts"
       ],
-      "sha256": "bca397526e9b9a204ba9ce485e19a6e16ca1743d0e44bd4685276e0e1fb9e7dc"
+      "sha256": "98a1d697e4cde844288946ba4da47107b49023079e507d6a9f0267c418618801"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-relation-review.md",
@@ -4397,7 +4397,15 @@
       "consumers": [
         "src/features/world/assetReview.ts"
       ],
-      "sha256": "fff0b1f0e1850ea0db7d7bdef4e4683ffc67e1df8e8b850938c9f62b273b464e"
+      "sha256": "4b3ca7719b9359f620d2eb98c8e145911ffa56e5b48696f9810039be5c5738f4"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-character-organization.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ],
+      "sha256": "1868803217ede17ccca6313c1c73c51e9caac1fa4102d3e66327fbfef8e9fb02"
     }
   ],
   "decisions": [

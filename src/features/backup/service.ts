@@ -3,6 +3,7 @@ import type { createWorkspace } from '../../lib/storage/workspace'
 import type { ImportService } from '../../lib/storage/importService'
 import { emptyTables, tableNames } from './data'
 import { encodeBackup, inspectBackup, restoredTables } from './codec'
+import { withTraceBarrier } from '../agents/trace'
 import { clearCharacterNetworkCache } from '../character-network/cache'
 
 export function createBackupService(workspace: ReturnType<typeof createWorkspace>, importer: ImportService) {
@@ -11,11 +12,11 @@ export function createBackupService(workspace: ReturnType<typeof createWorkspace
     if (!book) throw new Error('书籍不存在，请刷新书架。')
     if (!await Dexie.exists(workspace.scope.bookPrefix + bookId)) throw new Error('本书数据库缺失，无法导出。')
     const db = workspace.openBook(bookId)
-    const tables = await db.transaction('r', db.tables, async () => {
+    const tables = await withTraceBarrier(async () => db.transaction('r', db.tables, async () => {
       const snapshot = emptyTables()
       for (const name of tableNames) snapshot[name] = await db.table(name).toArray()
       return snapshot
-    })
+    }))
     return encodeBackup({ book, tables })
   }
   return {

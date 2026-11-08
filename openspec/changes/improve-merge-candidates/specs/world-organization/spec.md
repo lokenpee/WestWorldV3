@@ -21,15 +21,15 @@
 ### Requirement: CANDIDATE-03 有区分度稀有称呼的重叠系数
 系统 SHALL 按全部非上下文共享称呼计算新增重叠系数。R2 只在两条记录至少共享 `candidateMinimumSharedNames` 个称呼、其中至少一个长度达到 `candidateDistinctiveNameMinLength`，且 `交集数 / min(A称呼数, B称呼数)` 严格大于 `candidateOverlapThreshold` 时成立。
 
-R3 的稀有称呼同时满足：规范化后长度达到 `candidateDistinctiveNameMinLength`，且在本书同类资产中出现次数不超过 `candidateRareNameMaxRecords`。上下文称谓和短泛称不计入 R2/R3。O2 整组相似度还要求至少一组含长度达到 `candidateDistinctiveNameMinLength` 的称呼或主名。
+R3 的稀有称呼同时满足：规范化后长度达到 `candidateDistinctiveNameMinLength`，且在本书同类资产中出现次数不超过 `candidateRareNameMaxRecords`。上下文称谓不计入人物候选；短称呼参与R2计数，R2仍要求至少一个共享长称呼。O2保留整组相似度，主名可满足其区分度检查。系统 SHALL 将这些规则的命中结果作为人工候选，由用户核对成员。
 
 #### Scenario: C04 独有别名不稀释共同称呼
 - **WHEN** 一条记录为“甄妃、北静王妃”，另一条记录为“甄雪、北静王妃、甄家二小姐、甄妃、甄氏”
 - **THEN** 共享“北静王妃”和“甄妃”，重叠为 `2/2=1`，进入同一候选组
 
 #### Scenario: C05 多泛称不连接
-- **WHEN** 三个人物都带“贾家、宁府、东府、西府”四个两字别名，各自主名不同
-- **THEN** 没有长度达到 3 的共享称呼，R2/R3 不命中，O2 也不因整组只有短泛称连接
+- **WHEN** 三个人物分别以“甲、乙、丙”为主名，都带“贾家、宁府、东府、西府”四个两字别名
+- **THEN** R2/R3没有共享长称呼不命中，O2相似度未超过0.9，不连接
 
 #### Scenario: C06 重叠恰好等于阈值不连接
 - **WHEN** A 有 5 个有区分度称呼，B 共享其中 4 个并另有 1 个不同称呼

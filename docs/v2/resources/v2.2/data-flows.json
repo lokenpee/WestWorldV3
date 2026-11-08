@@ -91,9 +91,9 @@
         {
           "input": "bookId/当前run",
           "read": "T04/T05/T18",
-          "transform": "按order逐章；世界/叙事独立请求，单章在途",
-          "write": "T20 run/lease；T12 P1 running",
-          "commit": "仅extraction资源；任务互斥先核",
+          "transform": "每类按order逐章，世界与叙事并行请求",
+          "write": "每类T20 run/lease；T12 P1 extractionJobs/stepStates/usage",
+          "commit": "同类互斥，分别持有对应领域锁",
           "failure": "已有成功凭证跳过，不重写来源",
           "consumer": "P1阶段卡"
         },
@@ -107,13 +107,13 @@
           "consumer": "响应式列表每章可见"
         },
         {
-          "input": "失败/恢复",
-          "read": "成功凭证和缺口",
-          "transform": "只补未成功子步骤",
-          "write": "T12 partial/failed与T20终态",
-          "commit": "失败/取消更新本任务",
-          "failure": "人工已编辑/并入/删除的来源不复活",
-          "consumer": "继续P1；全书成功才解锁P2/P3"
+          "input": "暂停/取消/恢复",
+          "read": "成功凭证、任务范围和缺口",
+          "transform": "暂停保留范围，继续补缺；取消全部执行并清除重提控制",
+          "write": "T12 extractionJobs/stepStates与T20终态",
+          "commit": "每类更新自己的状态并保留另一类状态",
+          "failure": "原范围继续不重复清空，取消后一起提取只补缺",
+          "consumer": "四按钮和单章入口；全书成功才解锁P2/P3"
         }
       ],
       "targetApplicationVerification": "not-run"

@@ -35,6 +35,13 @@ afterEach(async () => {
 })
 
 describe('人物对编辑', () => {
+  it('称呼不能作为身份保存，未知可保留原文并继续人工核对', async () => {
+    const { service, a, b1 } = await setup()
+    const current = await service.getRelationPair('a', a.id, b1.id)
+    await expect(service.saveRelationPair('a', { fromId: a.id, toId: b1.id, forwardLabels: ['宝二哥'], reverseLabels: ['林妹妹'], expectedFingerprint: current.fingerprint, reason: '错误称呼' })).rejects.toThrow('关系身份')
+    const saved = await service.saveRelationPair('a', { fromId: a.id, toId: b1.id, forwardLabels: ['未知'], reverseLabels: ['未知'], evidence: current.evidence, expectedFingerprint: current.fingerprint, directionUnclear: true, reason: '身份待核对' })
+    expect(saved.pair).toMatchObject({ forwardLabels: ['未知'], reverseLabels: ['未知'], evidence: current.evidence })
+  })
   it('只改指定编号对，其余同名人物保持原关系，反向读取方向正确', async () => {
     const { service, db, a, b1, b2, b3 } = await setup()
     const before = await service.getRelationPair('a', a.id, b1.id)

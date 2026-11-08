@@ -1,0 +1,142 @@
+{
+  "book": "真实叙事样本",
+  "status": "paused",
+  "phase": "window_link_complete",
+  "windows": 1,
+  "checkpoints": 1,
+  "tasks": 1,
+  "requests": [
+    {
+      "requestId": "1915e873-ed32-4e93-b357-2a7a8f1901d9",
+      "executionId": "957eea02-f7c9-4517-af78-710cceb7b262",
+      "purpose": "work",
+      "status": "succeeded",
+      "final": true,
+      "complete": true,
+      "tools": [
+        "search_story_context",
+        "query_editor_notes"
+      ],
+      "usage": {
+        "input": 264,
+        "output": 98,
+        "cacheRead": 9216,
+        "cacheWrite": 0,
+        "totalTokens": 9578,
+        "cost": 0.000252096,
+        "costStatus": "estimated",
+        "provider": "reported"
+      }
+    },
+    {
+      "requestId": "32c4ec84-5ea3-432e-a9c8-b28cb641b2f9",
+      "executionId": "957eea02-f7c9-4517-af78-710cceb7b262",
+      "purpose": "work",
+      "status": "succeeded",
+      "final": true,
+      "complete": true,
+      "tools": [
+        "read_original"
+      ],
+      "usage": {
+        "input": 452,
+        "output": 62,
+        "cacheRead": 8832,
+        "cacheWrite": 0,
+        "totalTokens": 9346,
+        "cost": 0.000262992,
+        "costStatus": "estimated",
+        "provider": "reported"
+      }
+    },
+    {
+      "requestId": "3a234de3-b5f2-4921-a874-921a572c2372",
+      "executionId": "957eea02-f7c9-4517-af78-710cceb7b262",
+      "purpose": "work",
+      "status": "succeeded",
+      "final": true,
+      "complete": true,
+      "tools": [
+        "get_node_detail",
+        "query_event_lines"
+      ],
+      "usage": {
+        "input": 8935,
+        "output": 92,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 9027,
+        "cost": 0.0027909,
+        "costStatus": "estimated",
+        "provider": "reported"
+      }
+    },
+    {
+      "requestId": "4f8f6171-3b7e-49ea-9066-51dcc01ddbb7",
+      "executionId": "957eea02-f7c9-4517-af78-710cceb7b262",
+      "purpose": "work",
+      "status": "succeeded",
+      "final": true,
+      "complete": true,
+      "tools": [
+        "submit_result"
+      ],
+      "usage": {
+        "input": 919,
+        "output": 373,
+        "cacheRead": 9472,
+        "cacheWrite": 0,
+        "totalTokens": 10764,
+        "cost": 0.000780132,
+        "costStatus": "estimated",
+        "provider": "reported"
+      }
+    },
+    {
+      "requestId": "969d027d-0b43-4d0a-8fd3-3faf53652d87",
+      "executionId": "957eea02-f7c9-4517-af78-710cceb7b262",
+      "purpose": "work",
+      "status": "succeeded",
+      "final": true,
+      "complete": true,
+      "tools": [
+        "commit_story_changes"
+      ],
+      "usage": {
+        "input": 555,
+        "output": 495,
+        "cacheRead": 9216,
+        "cacheWrite": 0,
+        "totalTokens": 10266,
+        "cost": 0.000815796,
+        "costStatus": "estimated",
+        "provider": "reported"
+      }
+    }
+  ],
+  "snapshots": [
+    {
+      "type": "prompt_snapshot",
+      "snapshotId": "957eea02-f7c9-4517-af78-710cceb7b262:prompt:business:6605bc1e",
+      "length": 2655
+    },
+    {
+      "type": "prompt_snapshot",
+      "snapshotId": "957eea02-f7c9-4517-af78-710cceb7b262:prompt:system:a504cc0e",
+      "length": 3634
+    },
+    {
+      "type": "tool_snapshot",
+      "snapshotId": "957eea02-f7c9-4517-af78-710cceb7b262:tools:c637ee5a",
+      "length": 17
+    }
+  ],
+  "commits": 1,
+  "usage": {
+    "input": 11125,
+    "output": 1120,
+    "totalTokens": 48981,
+    "cost": 0.0046815,
+    "costStatus": "estimated"
+  }
+}

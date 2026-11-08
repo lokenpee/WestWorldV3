@@ -1,7 +1,7 @@
 {
   "version": "2.2",
-  "uniqueReadToolCount": 14,
-  "assetEditorReadToolCount": 9,
+  "uniqueReadToolCount": 22,
+  "assetEditorReadToolCount": 16,
   "storyEditorReadToolCount": 14,
   "profiles": {
     "asset_editor": [
@@ -215,7 +215,7 @@
       },
       {
         "name": "get_character_detail",
-        "description": "按ID读取本书人物详细信息、revision及按来源编号生成的有向关系与未命中关系；include_facts=true仅P2整编允许，返回事实底稿以校验覆盖。",
+        "description": "按编号读取完整人物资料与当前关系；人物整理全程可用include_facts:true读取合并事实底稿。长详情返回分段时，用同一编号和nextCharOffset续读至末尾。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -234,6 +234,15 @@
             "include_facts": {
               "type": "boolean",
               "default": false
+            },
+            "char_offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6000
             }
           }
         },
@@ -637,8 +646,7 @@
             "id",
             "expectedRevision",
             "patch",
-            "reason",
-            "evidence"
+            "reason"
           ],
           "properties": {
             "operationKey": {
@@ -748,6 +756,125 @@
                   "type": "string"
                 }
               }
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
             }
           }
         },
@@ -767,8 +894,7 @@
             "id",
             "expectedRevision",
             "patch",
-            "reason",
-            "evidence"
+            "reason"
           ],
           "properties": {
             "operationKey": {
@@ -841,6 +967,125 @@
                   "type": "string"
                 }
               }
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
             }
           }
         },
@@ -860,8 +1105,7 @@
             "id",
             "expectedRevision",
             "patch",
-            "reason",
-            "evidence"
+            "reason"
           ],
           "properties": {
             "operationKey": {
@@ -992,6 +1236,125 @@
                   "type": "string"
                 }
               }
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
             }
           }
         },
@@ -1011,8 +1374,7 @@
             "id",
             "expectedRevision",
             "patch",
-            "reason",
-            "evidence"
+            "reason"
           ],
           "properties": {
             "operationKey": {
@@ -1084,6 +1446,125 @@
                   ]
                 }
               }
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
             }
           }
         },
@@ -1106,8 +1587,7 @@
             "forwardLabels",
             "reverseLabels",
             "directionUnclear",
-            "reason",
-            "evidence"
+            "reason"
           ],
           "properties": {
             "operationKey": {
@@ -1153,12 +1633,14 @@
               }
             },
             "forwardLabels": {
+              "description": "fromId人物相对于toId的身份，如妹妹；称呼或打趣等互动不能作标签，不确定填未知。",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "reverseLabels": {
+              "description": "toId人物相对于fromId的身份，如兄长；证据不足填未知。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -1171,6 +1653,125 @@
               "type": "string",
               "minLength": 1,
               "description": "人物关系专项中必填，取自本任务工作项。"
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
             }
           }
         },
@@ -1190,8 +1791,7 @@
             "fromId",
             "toId",
             "expectedFingerprint",
-            "reason",
-            "evidence"
+            "reason"
           ],
           "properties": {
             "operationKey": {
@@ -1240,6 +1840,125 @@
               "type": "string",
               "minLength": 1,
               "description": "人物关系专项中必填，取自本任务工作项。"
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
             }
           }
         },
@@ -1296,8 +2015,12 @@
             },
             "cursor": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "limit": {
@@ -1311,6 +2034,1144 @@
         "maxResults": 50,
         "maxBytes": 65536,
         "dependencyTracking": "legacy-archive-record-fingerprint"
+      },
+      {
+        "name": "query_character_catalog",
+        "kind": "read",
+        "maxResults": 100,
+        "maxBytes": 65536,
+        "description": "分页读取本书人物简略目录，只返回姓名、别名、身份和编号；search用于跨页查回，不推进扫描。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cursor": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "search": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "get_organization_progress",
+        "kind": "read",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "description": "读取本轮人物整理步骤、扫描进度、候选组和未完成项分页入口。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      },
+      {
+        "name": "save_candidate_group",
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "description": "保存或补充疑似同人组；成员必须是本书已浏览或读过详情的人物。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationKey",
+            "memberIds",
+            "reason"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "groupId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "memberIds": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      {
+        "name": "query_candidate_groups",
+        "kind": "read",
+        "maxResults": 50,
+        "maxBytes": 65536,
+        "description": "分页读取本轮疑似组及其当前生命周期解析结果。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cursor": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "status": {
+              "enum": [
+                "pending",
+                "resolved"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "resolve_candidate_group",
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "description": "记录疑似组合并、不同人、无法判断或部分合并的结论。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationKey",
+            "groupId",
+            "expectedRevision",
+            "outcome",
+            "reason",
+            "basis"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "groupId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "outcome": {
+              "enum": [
+                "merged",
+                "not_same",
+                "uncertain",
+                "partial"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "commitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "clear_candidate_groups",
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "description": "清空本轮活动疑似组；所有组必须有结论，报告保留。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationKey",
+            "expectedRevision"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevision": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      },
+      {
+        "name": "record_organization_progress",
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "description": "登记当前步骤已实际检查的页/人物/人物对。资料须读完include_facts:true；关系须读完整人物及所有待核人物对。changed必须引用该项真实字段修改确认；uncertainFields说明仍有疑点的资料字段，不能跳过其他可整理字段。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationKey",
+            "action"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "action": {
+              "enum": [
+                "check_item",
+                "advance"
+              ]
+            },
+            "kind": {
+              "enum": [
+                "scan_page",
+                "profile",
+                "relation_scan",
+                "pair"
+              ]
+            },
+            "id": {
+              "type": "string"
+            },
+            "outcome": {
+              "enum": [
+                "changed",
+                "no_change",
+                "uncertain"
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "commitIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "uncertainFields": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "name",
+                  "aliases",
+                  "identity",
+                  "age",
+                  "ageText",
+                  "gender",
+                  "appearance",
+                  "personality",
+                  "background",
+                  "speechStyleSample",
+                  "roleWeight"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "merge_assets",
+        "kind": "write",
+        "maxResults": 1,
+        "maxBytes": 65536,
+        "description": "合并两个以上同类资产；保留两个具体编号中的一个，其余进入生命周期重定向，不能用于删除单个资产。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operationKey",
+            "kind",
+            "memberIds",
+            "keepId",
+            "expectedRevisions",
+            "reason",
+            "basis"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "enum": [
+                "character",
+                "location",
+                "node",
+                "eventLine"
+              ]
+            },
+            "memberIds": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "keepId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedRevisions": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "resultPatch": {
+              "type": "object"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "candidateGroupId": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "query_character_profile",
+        "kind": "read",
+        "description": "读取当前或指定人物的非关系业务字段、事实底稿和来源；程序开始处理人物时已预装同样内容，需要刷新版本时使用。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      {
+        "name": "query_relation_work",
+        "kind": "read",
+        "description": "读取当前或指定人物的完整当前关系列表、必要对象介绍和未解析资料；程序开始处理关系时已预装同样内容，需要补查或刷新时使用。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "characterId": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      },
+      {
+        "name": "submit_profile_review",
+        "kind": "write",
+        "description": "保存当前人物资料修改并声明是否完成。done=false只保存已确定部分并继续当前人物；done=true保存修改与完成状态后直接换下一人。空patch可表示无变化。操作键、人物编号和版本由程序绑定。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "patch",
+            "done"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "patch": {
+              "type": "object",
+              "additionalProperties": false,
+              "minProperties": 0,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "identity": {
+                  "type": "string"
+                },
+                "ageText": {
+                  "type": "string"
+                },
+                "age": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "gender": {
+                  "type": "string"
+                },
+                "appearance": {
+                  "type": "string"
+                },
+                "personality": {
+                  "type": "string"
+                },
+                "background": {
+                  "type": "string"
+                },
+                "speechStyleSample": {
+                  "type": "string"
+                },
+                "roleWeight": {
+                  "type": "string"
+                },
+                "chapterIndex": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "manualSourceNote": {
+                  "type": "string"
+                }
+              }
+            },
+            "done": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "uncertainFields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "submit_relation_review",
+        "kind": "write",
+        "description": "整体保存当前人物的关系修改并声明是否完成。changes可一次修改多条，方向相对当前人物；done=false保存部分并继续，done=true保存并换下一人。编号、版本和操作键由程序绑定。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "changes",
+            "done"
+          ],
+          "properties": {
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
+            "changes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "targetId",
+                  "action"
+                ],
+                "properties": {
+                  "targetId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "action": {
+                    "enum": [
+                      "set",
+                      "delete"
+                    ]
+                  },
+                  "forwardLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "reverseLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "directionUnclear": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "done": {
+              "type": "boolean"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "basis": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "summary",
+                  "source"
+                ],
+                "properties": {
+                  "summary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "assetKind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "asset"
+                          },
+                          "assetKind": {
+                            "enum": [
+                              "character",
+                              "location",
+                              "node",
+                              "eventLine"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "chapterIndex"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "chapter"
+                          },
+                          "chapterIndex": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "length": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "fromId",
+                          "toId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "relation"
+                          },
+                          "fromId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "toId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "legacy_relation"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "unresolved": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "targetId": {
+                    "type": "string"
+                  },
+                  "legacyId": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     ],
     "story_editor": [
@@ -3241,9 +5102,9 @@
     "writeOrdering": "sequential; finalizer must be sole tool call in its batch; validate batch before first mutation",
     "returnValidation": "All target tools validate success against declared success schema; structuredContent plus model-facing JSON; errors set isError."
   },
-  "uniqueWriteToolCount": 2,
-  "uniqueBusinessToolCount": 16,
-  "assetEditorBusinessToolCount": 10,
+  "uniqueWriteToolCount": 15,
+  "uniqueBusinessToolCount": 37,
+  "assetEditorBusinessToolCount": 29,
   "storyEditorBusinessToolCount": 15,
   "finalizer": {
     "name": "submit_result",

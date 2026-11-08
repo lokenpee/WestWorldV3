@@ -1,6 +1,7 @@
 import { expect, firefox, test, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { agentStream } from '../support/agent-protocol'
+import { organizationResponse } from '../support/organization-streams'
 import { storyResponse } from '../support/story-protocol'
 
 async function exportBook(page: Page, title: string) {
@@ -19,6 +20,7 @@ test('固定响应贯通P1至P3，备份从Edge恢复到Firefox并保留网络�
       ? { characters: [{ name: '沈青', confidence: 1 }, { name: '顾衡', confidence: 1 }], locations: [] }
       : { nodes: [{ name: '收信', summary: '沈青收到信', actors: ['沈青'], quote: '沈青收到信。', confidence: 1 }, { name: '接信', summary: '顾衡接过信', actors: ['顾衡'], quote: '顾衡接过信。', confidence: 1 }] } }])
     else if (body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'get_editor_memory')) response = storyResponse(body)
+    else if (organizationResponse(body)) response = organizationResponse(body)!
     else {
       const users = body.messages.filter((row: { role: string }) => row.role === 'user').map((row: { content: string | { text: string }[] }) => typeof row.content === 'string' ? row.content : row.content.map(part => part.text).join(''))
       const input = JSON.parse(users.find((value: string) => value.startsWith('{'))!)
@@ -37,10 +39,10 @@ test('固定响应贯通P1至P3，备份从Edge恢复到Firefox并保留网络�
   const text = '第一章 书信\n沈青收到信。顾衡接过信。'
   await page.getByLabel('小说TXT文件').setInputFiles({ name: '全流程样本.txt', mimeType: 'text/plain', buffer: Buffer.from(text) })
   await page.getByRole('button', { name: '仅导入', exact: true }).click()
-  await page.getByRole('button', { name: '开始提取', exact: true }).click()
+  await page.getByRole('button', { name: '一起提取', exact: true }).click()
   await expect(page.getByRole('button', { name: 'AI整理', exact: true })).toBeEnabled({ timeout: 15000 })
   await page.getByRole('button', { name: 'AI整理', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: '世界资产整理报告', exact: true })).toContainText('完成', { timeout: 15000 })
+  await expect(page.getByRole('dialog', { name: '世界资产整理报告', exact: true })).toContainText('完成', { timeout: 60000 })
   await page.getByRole('button', { name: '关闭报告', exact: true }).click()
   await page.getByRole('button', { name: '串联事件线', exact: true }).click()
   const panel = page.getByRole('region', { name: '事件线窗口串联', exact: true })
