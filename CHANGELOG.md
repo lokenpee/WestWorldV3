@@ -1,5 +1,23 @@
 # 版本记录
 
+## v0.4.3 · 2026-11-08
+
+### 整理详情按 API 会话流展示（BUG-33）
+
+- 整理详情改为单条 API 会话流：顶部统计 API 次数、工具次数、耗时、Token、缓存、费用和模型；每次请求按 SYSTEM → USER → ASSISTANT → TOOL CALL → TOOL EXECUTION → TOOL RESULT 展示，底部显示实际写库修改。
+- P2 先切换人物/工作窗口，人物窗口内再切资料/关系上下文；P3 保持一个持续会话；外部三个入口合并为一个“整理详情”。
+- 每次请求展示完整输入消息，业务提示词已在 SYSTEM 中时不重复渲染；模型只返回工具调用时不显示空的助手文本。
+- 工具参数、工具结果、错误和输入消息可展开查看全文；底部实际修改显示字段前后值、理由和 commitId。
+- 修复每请求工具串线、空结果导致面板崩溃、全文被预览截断、实时更新自动收起和 P2 人物混列。
+
+### 最终请求与系统提示词修复
+
+- 最终请求按消息文本去重人物任务 JSON，兼容字符串与 content block 两种表示；真实单人复验只剩 1 份任务。
+- 组织整理系统提示词改用 `budgetRule`，删除 `100000` 和“最后一次只能调用 submit_result”；目录/疑似组仍用 submit_result，人物资料/关系用 submit_profile_review/submit_relation_review 的 done=true。
+- 修复 `message_end` 把 toolResult 文本覆盖到 assistant 文本的问题。
+- 真实 8 人复验：11 次请求、8 个 executionId，任务无重复、系统提示词无旧规则；单人、8 人、P3 小窗口均通过。
+- 检查：50 个测试文件 472 项通过、3 跳过；开发与生产世界/叙事浏览器测试、typecheck、lint、build、governance 和 OpenSpec 严格校验通过。
+
 ## v0.4.2 · 2026-11-08
 
 ### Agent 运行详情与模型请求回放（REQ-020）

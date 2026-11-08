@@ -33,6 +33,7 @@ export interface AgentTaskOptions {
 export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; itemFailure?: string; readCalls: number; writeCalls: number }
 const initialReadSet = (): ReadSet => ({ records: [], queries: [] })
 const timestamp = () => new Date().toISOString()
+const contentText = (message: AgentMessage) => typeof message.content === 'string' ? message.content : message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('')
 export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { generate: ModelService['generate']; onStatus?: (status: SessionStatus) => void }) {
   const instances = new Map<string, Agent>()
   const active = new Set<string>()
@@ -115,7 +116,15 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       if (organization) repo = withOrganizationLease(repo, scope)
       const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
       if (!scope.probe && scope.sessionId) trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.businessPrompt, purpose: 'work' })
-      const systemPrompt = wrapper.replace(/\{(\w+)\}/g, (_, name: string) => ({ ...scope, maxSteps: maxRequests, roleInstruction: organization ? '按人物整理流程查询和编辑本书全部资产；可以合并同类资产和增删关系，不能删除或新建资产。' : scope.profile === 'asset_editor' ? '只整理人物地点，不读取故事会话或修改叙事资料。' : '只整理节点、事件线和工作记忆，不合并人物地点。', businessPrompt: options.businessPrompt, outputDiscipline } as Record<string, unknown>)[name]?.toString() ?? `{${name}}`)
+      const systemPrompt = wrapper.replace(/\{(\w+)\}/g, (_, name: string) => ({
+        ...scope,
+        budgetRule: organization
+          ? '人物整理按实际进展记账，不设固定请求次数上限。目录页和疑似组用 submit_result 结束本页/本组；人物资料和关系用 submit_profile_review 或 submit_relation_review，done=true 保存并直接结束当前人物。'
+          : `本任务最多${maxRequests}次实际模型请求，修正与网络重发均计入同一总预算，最后一次只能调用submit_result。`,
+        roleInstruction: organization ? '按人物整理流程查询和编辑本书全部资产；可以合并同类资产和增删关系，不能删除或新建资产。' : scope.profile === 'asset_editor' ? '只整理人物地点，不读取故事会话或修改叙事资料。' : '只整理节点、事件线和工作记忆，不合并人物地点。',
+        businessPrompt: options.businessPrompt,
+        outputDiscipline,
+      } as Record<string, unknown>)[name]?.toString() ?? `{${name}}`)
       if (!organization && loadedMessages.length) loadedMessages.push({ role: 'system', content: systemPrompt, timestamp: Date.now() })
       persistedMessages = organization ? loadedMessages.length : loadedMessages.length ? loadedMessages.length - 1 : 0
       const prior = await repo.transaction(false, store => taskOf(store, scope))
@@ -163,8 +172,15 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         prepareRequest: async ({ context, model }) => {
           const messages = await prepareContext(context, model.contextWindow)
           if (!scope.probe) {
-            const base = messages ?? context.messages
-            const withPrompt = organization && !base.some(message => message.role === 'user' && message.content === options.prompt)
+            const rawBase = messages ?? context.messages
+            let seenPrompt = false
+            const base = organization ? rawBase.filter(message => {
+              if (message.role !== 'user' || contentText(message) !== options.prompt) return true
+              if (seenPrompt) return false
+              seenPrompt = true
+              return true
+            }) : rawBase
+            const withPrompt = organization && !base.some(message => message.role === 'user' && contentText(message) === options.prompt)
               ? [{ role: 'user' as const, content: options.prompt, timestamp: Date.now() }, ...base]
               : base
             const left = maxRequests - usedRequests

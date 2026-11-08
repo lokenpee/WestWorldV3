@@ -74,6 +74,21 @@ it('同一持续会话完成扫描、合并、资料、关系和统计，报告�
   expect(sessions[0]).toMatchObject({ profile: 'asset_editor', workflow: 'character_organization_v1', runId: run.id })
 }, 120000)
 
+it('人物整理的最终请求不重复注入任务，系统提示词不含旧预算和最后只能submit_result规则', async () => {
+  const fetcher = organizationFetcher()
+  const { service } = await setup(fetcher)
+  await service.startOrganization('a')
+  const bodies = fetcher.mock.calls.map(([, init]) => JSON.parse(init?.body as string) as { messages: { role: string; content: unknown }[] })
+  const system = bodies.flatMap(body => body.messages.filter(message => message.role === 'system').map(message => contentOf(message.content))).join('\n')
+  expect(system).not.toContain('100000')
+  expect(system).not.toContain('最后一次只能调用submit_result')
+  for (const body of bodies) {
+    const users = body.messages.filter(message => message.role === 'user').map(message => contentOf(message.content))
+    const tasks = users.filter(text => text.trim().startsWith('{') && text.includes('"workItems"'))
+    expect(tasks.length, '每次请求的任务 JSON 数').toBe(new Set(tasks).size)
+  }
+}, 120000)
+
 it('格式10备份保留人物整理会话、候选和进度，恢复为新书后暂停在原轮', async () => {
   const { workspace, db, service } = await setup()
   await service.startOrganization('a')

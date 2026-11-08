@@ -73,6 +73,11 @@ it.skipIf(!key)('真实单人：贾政资料整理只产生一个人物工作项
     const msgs = entries.filter(row => row.type === 'message')
     const traces = entries.filter(row => row.type === 'request_trace' && typeof row.requestId === 'string')
     const snapshots = entries.filter(row => row.type === 'prompt_snapshot' || row.type === 'tool_snapshot')
+    const contentText = (value: unknown) => typeof value === 'string' ? value : Array.isArray(value) ? value.map(part => typeof part === 'object' && part && 'text' in part ? String((part as { text?: unknown }).text ?? '') : '').join('') : ''
+    const traceBodies = traces.map(row => {
+      const input = row.input && typeof row.input === 'object' ? row.input as Record<string, unknown> : {}
+      return { roles: Array.isArray(input.messages) ? (input.messages as Record<string, unknown>[]).map(message => String(message.role ?? '')) : [], users: Array.isArray(input.messages) ? (input.messages as Record<string, unknown>[]).filter(message => message.role === 'user').map(message => contentText(message.content)) : [], systems: Array.isArray(input.messages) ? (input.messages as Record<string, unknown>[]).filter(message => message.role === 'system').map(message => contentText(message.content)) : [] }
+    })
     const evidence = {
       book: book.title, character: { id: target.id, name: target.name, before, after },
       outcome: item?.outcome, reason: item?.reason, commitIds: item?.commitIds,
@@ -80,7 +85,7 @@ it.skipIf(!key)('真实单人：贾政资料整理只产生一个人物工作项
       reportUsage: run.report.usage, cost: run.report.cost, status: run.status, error: service.state(book.id)?.error,
       messageEntries: msgs.length, contexts: run.organization?.contexts,
       traceRequests: traces.map(row => ({ requestId: row.requestId, executionId: row.executionId, purpose: row.purpose, status: row.status, complete: row.complete, final: row.final, model: row.model, text: String(row.text ?? '').slice(0, 120), toolCalls: Array.isArray(row.toolCalls) ? row.toolCalls.map((tool: Record<string, unknown>) => tool.name) : [], usage: row.usage })),
-      traceSnapshots: snapshots.map(row => ({ type: row.type, snapshotId: row.snapshotId, length: String(row.content ?? '').length || (Array.isArray(row.schema) ? row.schema.length : 0) })),
+      traceSnapshots: snapshots.map(row => ({ type: row.type, snapshotId: row.snapshotId, length: String(row.content ?? '').length || (Array.isArray(row.schema) ? row.schema.length : 0) })), traceBodies,
       note: '单人验证在第一个 profile 工作项完成后主动取消，只用于质量与请求构成检查。',
     }
     mkdirSync('test-results', { recursive: true })
@@ -91,6 +96,12 @@ it.skipIf(!key)('真实单人：贾政资料整理只产生一个人物工作项
     if (!traces.length) throw new Error('没有保存运行详情请求记录。')
     if (traces.some(row => !row.executionId || !row.input || !row.requestId || row.final !== true)) throw new Error('运行详情请求记录缺少执行号、输入或收尾标记。')
     if (!snapshots.length) throw new Error('没有保存提示词或工具快照。')
+    for (const body of traceBodies) {
+      const tasks = body.users.filter(value => value.trim().startsWith('{') && value.includes('"workItems"'))
+      if (tasks.length !== new Set(tasks).size) throw new Error('最终请求重复注入人物任务。')
+      const system = body.systems.join('\n')
+      if (system.includes('100000') || system.includes('最后一次只能调用submit_result')) throw new Error('系统提示词仍含旧P2预算或submit_result规则。')
+    }
     if (entries.some(row => ['request_trace', 'prompt_snapshot', 'tool_snapshot'].includes(String(row.type)) && row.parentId !== null)) throw new Error('观测条目不应挂入会话父链。')
   } finally { importer.close() }
 }, 300000)

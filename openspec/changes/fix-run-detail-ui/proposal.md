@@ -21,11 +21,8 @@ BUG-33，中型缺陷。用户实际运行 P2/P3 时，“运行详情”出现�
 
 ## 目标行为
 
-- 外部只保留一个“整理详情”入口。内部为：
-  - 运行过程：P2 先切换人物/工作窗口，人物窗口内再切换资料/关系上下文，最后按回合展示；P3 按持续会话和回合顺序展示。每个回合使用自己的 `row.toolCalls`。
-  - 修改结果：只展示实际写库的 `assetEdits`（字段、修改前、修改后、理由、确认号、保存状态），提交工具参数放在“提交记录”折叠区，不冒充已保存。
-  - 用量：展示 `requestLedger` 逐请求用量和汇总。
-  - system prompt、业务提示词和工具定义放在窗口顶部只展示一次；每回合显示本轮新增的用户/程序消息、助手回复和工具结果。完整累计上下文放进回合详情。
+- 外部只保留一个“整理详情”入口，内部是一条连续 API 会话流：顶部统计 API 次数、工具次数、耗时、Token、费用和模型；每次 API 请求显示 SYSTEM、USER、ASSISTANT、TOOL CALL、TOOL EXECUTION、TOOL RESULT；底部显示实际写库的 `assetEdits`（字段、修改前、修改后、理由、确认号）。
+- P2 先切换人物/工作窗口，人物窗口内再切换资料/关系上下文；P3 按持续会话展示。每个 API 请求使用自己的 `row.toolCalls`。
 - 展开区显示完整内容；只有确实未保存或被降级时显示“未保存/不完整”，不再静默截断。
 - 实时更新只更新对应请求；用户手动展开/收起和滚动位置保持；提供“回到最新”。
 - P2 人物窗口标题优先显示姓名，内部编号放在展开信息；目录/候选阶段作为单独窗口。P3 不套用逐人物窗口。
@@ -37,8 +34,9 @@ BUG-33，中型缺陷。用户实际运行 P2/P3 时，“运行详情”出现�
 |---|---|---|---|---|
 | BUG-33 / REQ-020 | 工具串线、闪烁 → 每请求独立、稳定展开 | agent-session | AgentRunPanel | T01–T03 |
 | BUG-33 / REQ-020 | 预览崩溃/截断 → 安全空值和全文 | agent-session | AgentRunPanel | T04–T05 |
-| BUG-33 / REQ-020 | 三入口重复 → 一个整理详情 | world-organization、story-organization | WorldPanel、StoryPanel、AgentRunPanel | T06 |
-| BUG-33 / REQ-020 | P2 混合长列表 → 人物窗口；P3 单会话 | world-organization、story-organization | AgentRunPanel | T07–T08 || BUG-33 / REQ-020 | 提交参数混入修改结果 → 实际写库记录 | world-organization | AgentRunPanel | T09 |
+| BUG-33 / REQ-020 | 三入口重复 → 一个整理详情、单条会话流 | world-organization、story-organization | WorldPanel、StoryPanel、AgentRunPanel | T06 |
+| BUG-33 / REQ-020 | P2 混合长列表 → 人物窗口；P3 单会话 | world-organization、story-organization | AgentRunPanel | T07–T08 |
+| BUG-33 / REQ-020 | 提交参数混入修改结果 → 实际写库记录 | world-organization | AgentRunPanel | T09 |
 
 ## 确认依据
 

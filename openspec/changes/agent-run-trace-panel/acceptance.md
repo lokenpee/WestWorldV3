@@ -61,5 +61,5 @@
 | 2026-11-08 | 审查修订 | 按用户审查意见修订请求采集、生命周期、快照、日志隔离、备份格式和容量规则；补 T15–T20 | 实施方案待审批；仍未修改业务源码；未提交 Git |
 | 2026-11-08 | 二次审查修订 | 补观测数据隔离、浏览器存储预算、结构化消息、runId/executionId、引用一致性和刷新状态；补 T21–T24 | 实施方案待审批；仍未修改业务源码；未提交 Git |
 | 2026-11-08 | 实施与自动检查 | trace 存储、最终 streamFunction 采集、异步 writer、观测隔离、容量预算、备份格式11、P2/P3 面板和测试落地 | `npm run typecheck`、`npm run lint`（仅既有警告）、`npm run test` 469 通过/3 跳过、`npm run build`、世界/叙事浏览器测试（开发与生产构建）通过；用户验收待做 |
-| 2026-11-08 | 真实模型验收 | DeepSeek Flash：单人贾政 1 次请求、17,317 tokens；8 人小批 18 次请求、526,592 tokens、8 个 executionId；P3 两章窗口 5 次请求、48,981 tokens | 单人、8 人和 P3 均产生 `request_trace` 与提示词/工具快照，轨迹 complete/final 为 true；8 人按人物分布无串线；证据：`evidence/req020-live-single.json`、`evidence/req020-live-eight.json`、`evidence/req020-live-story.json`；用户自测待做 |
+| 2026-11-08 | 真实模型验收 | DeepSeek Flash：单人贾政 1 次请求、17,317 tokens；8 人小批 11 次请求、234,724 tokens、8 个 executionId；P3 两章窗口 5 次请求、48,981 tokens | 单人、8 人和 P3 均产生 `request_trace` 与提示词/工具快照，轨迹 complete/final 为 true；8 人按人物分布无串线；证据：`evidence/req020-live-single.json`、`evidence/req020-live-eight.json`、`evidence/req020-live-story.json`；用户自测待做 |
 | 2026-11-08 | 治理与 OpenSpec | `npm run governance:check`、`npm run openspec -- validate agent-run-trace-panel --strict` | 均通过；未提交 Git |

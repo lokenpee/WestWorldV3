@@ -121,3 +121,85 @@
 .run-usage h3 {
   margin-top: 0.5rem;
 }
+
+.run-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  padding: 0.75rem;
+  margin: 0.75rem 0 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--border) 15%, transparent);
+}
+
+.run-api {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.run-api-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.run-api-meta {
+  margin: 0.4rem 0;
+  color: var(--muted);
+  font-size: 0.92em;
+  word-break: break-all;
+}
+
+.run-role {
+  margin: 0.4rem 0;
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid var(--border);
+  background: color-mix(in srgb, var(--border) 12%, transparent);
+}
+
+.run-role > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.run-role-system { border-left-color: #7a6ab8; }
+.run-role-user { border-left-color: #4a7; }
+.run-role-assistant { border-left-color: #4a78b8; }
+.run-role-toolcall { border-left-color: #c08a3e; }
+.run-role-toolresult { border-left-color: #4a9a8a; }
+.run-role-tools,
+.run-role-business,
+.run-role-thinking { border-left-color: #888; }
+
+.run-tool-call {
+  margin: 0.5rem 0 0.75rem 0.75rem;
+}
+
+.run-tool-execution {
+  margin: 0.2rem 0 0.2rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.run-end {
+  margin: 1.25rem 0;
+  padding: 0.6rem 0.75rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.run-changes {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--border);
+}
+
+.run-change pre {
+  margin: 0.2rem 0 0.6rem;
+}

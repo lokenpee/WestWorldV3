@@ -4259,7 +4259,7 @@
       "consumers": [
         "src/features/agents/runtime.ts"
       ],
-      "sha256": "ec14ce61d25852ab511aaec53d95d17cd0eba08bf647cabc9a87603aa90769c7"
+      "sha256": "162538298edbd25dde29a5eb4ad59e1683f5993a90b6a89a56f5278746780842"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/character-optimize.md",

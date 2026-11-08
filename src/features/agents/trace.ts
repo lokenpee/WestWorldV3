@@ -187,6 +187,7 @@ export class TraceSession {
       this.notify(); return
     }
     if (event.type === 'message_end') {
+      if (event.message.role !== 'assistant') return
       const parts = messageParts(event.message)
       record.text = parts.text || text(record.text); record.thinking = parts.thinking || text(record.thinking)
       for (const tool of parts.tools) this.upsertTool(record, tool.toolCallId, tool)
@@ -201,7 +202,6 @@ export class TraceSession {
     if (event.type === 'turn_end') {
       const parts = messageParts(event.message)
       record.text = parts.text || text(record.text); record.thinking = parts.thinking || text(record.thinking)
-      for (const tool of parts.tools) this.upsertTool(record, tool.toolCallId, tool)
       for (const result of event.toolResults) {
         const id = text((result as Row).toolCallId)
         if (id) this.upsertTool(record, id, { toolName: text((result as Row).toolName), result, resultPreview: preview(result), state: (result as Row).isError ? 'failed' : 'succeeded', isError: !!(result as Row).isError, finishedAt: new Date(this.now()).toISOString() })

@@ -86,6 +86,12 @@ it.skipIf(!key)('真实8人：使用修改前值重建未优化样本，逐人�
     const sessionEntries = (await db.table<Record<string, unknown>>('storySessionEntries').toArray()).filter(entry => entry.sessionId === sessionId)
     const traces = sessionEntries.filter(entry => entry.type === 'request_trace' && typeof entry.requestId === 'string')
     const snapshots = sessionEntries.filter(entry => entry.type === 'prompt_snapshot' || entry.type === 'tool_snapshot')
+    const contentText = (value: unknown) => typeof value === 'string' ? value : Array.isArray(value) ? value.map(part => typeof part === 'object' && part && 'text' in part ? String((part as { text?: unknown }).text ?? '') : '').join('') : ''
+    const traceBodies = traces.map(entry => {
+      const input = entry.input && typeof entry.input === 'object' ? entry.input as Record<string, unknown> : {}
+      const messages = Array.isArray(input.messages) ? input.messages as Record<string, unknown>[] : []
+      return { users: messages.filter(message => message.role === 'user').map(message => contentText(message.content)), systems: messages.filter(message => message.role === 'system').map(message => contentText(message.content)) }
+    })
     const turns = sessionEntries.filter(entry => entry.type === 'message' && (entry.message as Record<string, unknown> | undefined)?.role === 'assistant').map(entry => {
       const message = entry.message as { content?: { type: string; name?: string }[] }
       return { unitId: entry.unitId, tools: (message.content ?? []).filter(part => part.type === 'toolCall').map(part => part.name) }
@@ -96,7 +102,7 @@ it.skipIf(!key)('真实8人：使用修改前值重建未优化样本，逐人�
       characters: after.map(row => ({ id: row.after?.id, name: row.after?.name, outcome: row.item?.outcome, reason: row.item?.reason, commitIds: row.item?.commitIds, before: row.before, after: row.after, edits: row.edits })),
       requests: run.requestLedger?.length ?? 0, ledger: run.requestLedger, usage: (run as typeof run & { usage?: unknown }).usage, reportUsage: run.report.usage, cost: run.report.cost, costStatus: run.report.usage.costStatus,
       traceRequests: traces.map(entry => ({ requestId: entry.requestId, executionId: entry.executionId, unitId: entry.unitId, characterId: entry.characterId, purpose: entry.purpose, status: entry.status, complete: entry.complete, final: entry.final, tools: Array.isArray(entry.toolCalls) ? entry.toolCalls.map((tool: Record<string, unknown>) => tool.name) : [] })),
-      traceSnapshots: snapshots.map(entry => ({ type: entry.type, snapshotId: entry.snapshotId, length: String(entry.content ?? '').length || (Array.isArray(entry.schema) ? entry.schema.length : 0) })),
+      traceSnapshots: snapshots.map(entry => ({ type: entry.type, snapshotId: entry.snapshotId, length: String(entry.content ?? '').length || (Array.isArray(entry.schema) ? entry.schema.length : 0) })), traceBodies,
       status: run.status, error: service.state(book.id)?.error, contexts: run.organization?.contexts,
       note: '5人有旧修改，已按assetEdits的before值和拆分短语重建未优化资料；3人无旧修改。完成8个profile后主动停止。',
     }
@@ -108,6 +114,12 @@ it.skipIf(!key)('真实8人：使用修改前值重建未优化样本，逐人�
     if (!traces.length) throw new Error('8人没有保存请求轨迹。')
     if (traces.some(entry => !entry.executionId || !entry.requestId || !entry.input || entry.final !== true)) throw new Error('8人请求轨迹缺少执行号、输入或收尾标记。')
     if (!snapshots.length) throw new Error('8人没有保存提示词或工具快照。')
+    for (const body of traceBodies) {
+      const tasks = body.users.filter(value => value.trim().startsWith('{') && value.includes('"workItems"'))
+      if (tasks.length !== new Set(tasks).size) throw new Error('8人最终请求重复注入人物任务。')
+      const system = body.systems.join('\n')
+      if (system.includes('100000') || system.includes('最后一次只能调用submit_result')) throw new Error('8人系统提示词仍含旧P2规则。')
+    }
     if (sessionEntries.some(entry => ['request_trace', 'prompt_snapshot', 'tool_snapshot'].includes(String(entry.type)) && entry.parentId !== null)) throw new Error('观测条目不应挂入会话父链。')
   } finally { importer.close() }
 }, 360000)

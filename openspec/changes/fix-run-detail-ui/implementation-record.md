@@ -1,39 +1,51 @@
 # 修改记录
 
-## 2026-11-08 · BUG-33 整理详情改为窗口与回合
+## 2026-11-08 · BUG-33 整理详情改为 API 会话流
 
 ### 为什么改
 
-用户实际运行时，“运行详情”把每次模型 API 调用当成一个独立条目，并重复展示“本次输入”，看起来像每轮都重新新建 Agent 会话。实际运行是同一个 Agent 窗口内的连续回合：system prompt 和之前消息按 API 无状态规则随请求重放，但窗口、会话和工具历史是连续的。旧界面还会把最新请求的工具渲染到旧请求下，空结果可能导致整个面板崩溃。
+用户实际运行时，“整理详情”把每次模型调用展示成独立条目和“本次输入”，看起来像一个窗口只发送 system prompt，无法按正常 Agent 会话阅读。用户要求直接按 API 实际发生顺序展示：SYSTEM → USER → ASSISTANT → TOOL CALL → TOOL RESULT → 下一次 API，最后附实际写库修改；不额外生成解释，不增加模型调用。
+
+同时修复确认存在的代码问题：
+
+- 实时过程每行使用最新请求的 `current.toolCalls`，导致旧请求显示新工具。
+- `preview(undefined)` 读取 `.length` 会抛异常，可能让整个面板崩溃。
+- “完整结果”仍走 1,200 字预览，展开也看不全。
+- P2 请求按时间混列，没有人物窗口；外部同时有报告、用量、运行详情三个重复入口。
+- 工具结果消息被误当成 assistant 文本写入 trace。
 
 ### 改了什么
 
-- 重新按“窗口 → 上下文 → 回合”展示：
-  - P2：人物窗口可切换；同一人物的资料/关系上下文在窗口内切换；目录、候选作为独立工作窗口。
-  - P3：一个持续会话窗口，按回合顺序展示。
-- system prompt、业务提示词和工具定义移到窗口顶部，只展示一次。
-- 每次模型调用显示为“回合”，展示本轮新增的用户/程序消息、助手回复、工具调用和工具结果；完整累计上下文放进回合详情。
-- 每个回合只读取自己的 `toolCalls`，不再复用最新请求的工具。
-- 空值/未返回结果显示“等待返回/未记录”，不再调用 `undefined.length` 导致崩溃。
-- 展开内容改为全文，不再沿用 1,200 字预览截断。
-- 删除受控 `open={status==='running'}`，避免实时更新强制开关；新增“回到最新”。
-- 外部 P2 三个入口合并成一个“整理详情”；内部为运行过程、修改结果、用量；报告从内部打开。
-- 修改结果只展示实际写库的 `assetEdits`，提交工具参数单独放在“提交记录”。
+- 整理详情改为一条连续 API 会话流：
+  - 顶部统计：API 请求次数、工具调用次数、耗时、Token（输入/缓存/输出）、费用、模型。
+  - 每次 API 请求显示完整输入消息：SYSTEM、USER、ASSISTANT、TOOL RESULT；业务提示词和工具定义作为展开项。
+  - 当前模型返回单独显示 ASSISTANT 文本/推理/TOOL CALL。
+  - 程序执行工具显示 TOOL EXECUTION 和 TOOL RESULT；工具结果不再标成助手回复。
+  - 流式更新只更新当前 API 请求对应消息和工具。
+- 底部显示“本次实际修改”：只使用真实写库的 `assetEdits`，包含字段、修改前、修改后、理由和 commitId。
+- P2 先选人物/工作窗口，人物窗口内切资料/关系上下文；P3 保持一个持续会话。
+- 删除“运行过程 / 修改结果 / 用量”三个大标签；外部只保留一个“整理详情”，报告从内部打开。
+- 每个 API 请求只读取自己的 `toolCalls`；空结果显示“等待返回/未记录”；展开全文，无预览截断。
+- 移除受控 `open={status==='running'}`，增加“回到最新”。
+- 修复 `message_end` 把 toolResult 文本覆盖到 assistant 文本的问题；旧日志中与工具结果完全相同的 assistant 文本不再重复显示。
+- 最终请求按消息文本去重人物任务 JSON，避免 string 与 content block 两种表示重复发送；真实单人复验只剩 1 份任务。
+- 组织整理系统提示词改用 `budgetRule`：不再出现 `100000` 和“最后一次只能调用 submit_result”；明确目录/疑似组用 submit_result，人物资料/关系用 submit_profile_review/submit_relation_review 的 done=true 结束。
 
 ### 文件
 
-- `src/features/agents/AgentRunPanel.tsx`：窗口/回合展示、空值安全、全文、P2/P3 分窗、修改结果、用量。
-- `src/features/agents/AgentRunPanel.css`：窗口标签、回合、消息和滚动布局。
-- `src/features/world/WorldPanel.tsx`：单一“整理详情”入口，传入人物名称、运行列表、报告。
-- `src/features/story/StoryPanel.tsx`：P3 单一入口，传入逐请求账本。
-- `src/features/story/service.ts`：返回 `requestLedger`、运行状态和开始时间供用量标签使用。
-- `tests/run-panel.test.ts`：每请求工具、空结果、长内容回归。
-- `tests/browser/world.spec.ts`、`tests/browser/story.spec.ts`：单一入口、P2 人物窗口、P3 单会话、修改结果和用量。
+- `src/features/agents/AgentRunPanel.tsx`：API 会话流、角色块、工具执行结果、统计、人物/上下文窗口、实际修改。
+- `src/features/agents/AgentRunPanel.css`：角色颜色、API 卡片、统计栏和修改区样式。
+- `src/features/agents/trace.ts`：只从 assistant 的 `message_end` 更新助手文本。
+- `src/features/world/WorldPanel.tsx`：单一“整理详情”入口，传入人物名称和运行列表。
+- `src/features/story/StoryPanel.tsx`：P3 单一入口。
+- `src/features/story/service.ts`：返回逐请求账本和运行状态。
+- `tests/run-panel.test.ts`：每请求独立工具、空结果、全文回归。
+- `tests/browser/world.spec.ts`、`tests/browser/story.spec.ts`：API 会话流、P2 人物窗口、P3 单会话、实际修改。
 
 ### 检查
 
-`npm run typecheck`、`npm run lint`、`npm run test`（470 通过/3 跳过）、开发与生产世界/叙事浏览器测试、`npm run build`、`npm run governance:check`、OpenSpec 严格校验均通过。
+`npm run typecheck`、`npm run lint`、`npm run test`（472 通过/3 跳过）、开发与生产世界/叙事浏览器测试、`npm run build`、`npm run governance:check`、OpenSpec 严格校验通过。真实单人复验：最终请求 1 份任务 JSON，系统提示词不含旧预算/最后 submit_result 规则。
 
 ### 未完成
 
-滚动位置保持的专项浏览器测试仍列为部分通过；用户自测通过后再决定归档。未提交 Git。
+滚动位置保持的专项浏览器测试仍列为部分通过；旧版本 trace 的 assistant 文本只能按工具结果文本做去重保护。用户自测通过后再决定归档。未提交 Git。
