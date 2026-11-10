@@ -16,6 +16,8 @@ import { appendEntry } from '../src/features/agents/commands'
 import { reconcileOrganizationAfterWrite } from '../src/features/agents/organizationCommands'
 import { createBookAgentRepository, createMemoryAgentRepository } from '../src/features/agents/repository'
 import { createAgentTools } from '../src/features/agents/tools'
+import { saveCharacterPair } from '../src/features/assets/relationEdits'
+import { relationWork } from '../src/features/agents/organizationData'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
 const person = (id: string, name: string, extra = {}): Character => ({ id, bookId: 'a', name, aliases: [], confidence: 1, revision: 1, createdBy: 'P1', chapterIndex: '1', chapterName: '第1章', ...extra })
@@ -326,6 +328,10 @@ it('每个工作项使用独立上下文，切换不压缩且旧历史不重送'
     expect(body[0].system).toContain('submit_relation_review')
     expect(body[0].system).toContain('默认直接视为保持')
     expect(body[0].system).toContain('多个 `targetIds` 批量查询')
+    expect(body[0].system).toContain('关系存在性优先于标签')
+    expect(body[0].system).toContain('forwardLabels:["族弟"]')
+    expect(body[0].system).toContain('reverseLabels:["族兄"]')
+    expect(body[0].system).toContain('未核实')
     expect(body).toHaveLength(1)
     const prompt = contentOf(body[0].messages.find(isInput)!.content)
     expect(prompt).toContain('"kind":"relations"')
@@ -737,6 +743,48 @@ it('连续三次心跳只暂时无法确认执行权时，保留当前人物并�
   expect(completed.status).toBe('completed')
   expect(completed.organization.profileItems[0]).toMatchObject({ id: 'C1-P001', status: 'checked' })
 }, 180000)
+
+it('关系视角按当前人物输出，贾珩对贾珍的正反向不互换', async () => {
+  const repo = createMemoryAgentRepository('a', {
+    characters: [person('A', '贾珩'), person('B', '贾珍')].map(row => row as unknown as Record<string, unknown>),
+  })
+  await repo.transaction(true, async store => {
+    await saveCharacterPair(store as never, { bookId: 'a', fromId: 'A', toId: 'B', forwardLabels: ['族弟'], reverseLabels: ['族兄'], reason: '原文为族兄', actor: 'manual', commitId: crypto.randomUUID(), tool: 'test' })
+  })
+  const fromJiaHeng = await repo.transaction(false, store => relationWork(store, 'A'))
+  const fromJiaZhen = await repo.transaction(false, store => relationWork(store, 'B'))
+  expect(fromJiaHeng?.relations.find(row => row.targetId === 'B')).toMatchObject({ forward: ['族弟'], reverse: ['族兄'] })
+  expect(fromJiaZhen?.relations.find(row => row.targetId === 'A')).toMatchObject({ forward: ['族兄'], reverse: ['族弟'] })
+})
+
+it('没有证据的实质关系修改返回 unverified，方向对调也会进入待核对', async () => {
+  const character = (id: string, name: string) => ({ ...person(id, name), revision: 1 } as unknown as Record<string, unknown>)
+  const run = { id: 'run', bookId: 'a', recordType: 'run', stage: 'P2', phase: 'character_organization', workflow: 'character_organization_v1', status: 'running', report: {}, tasks: [{ taskId: 'task', workItemIds: ['organization:relations:A'], phase: 'character_organization', input: { workItems: [] }, appliedCommitIds: [], reviewedItems: [], readSet: { records: [], queries: [] } }], commandIntents: [], appliedCommands: [] }
+  const repo = createMemoryAgentRepository('a', {
+    characters: [character('A', '贾珩'), character('B', '贾珍')],
+    pipelineRuns: [run, { id: 'lease:world', bookId: 'a', recordType: 'lease', lockKey: 'world', owner: 'owner', runId: 'run', expiresAt: Date.now() + 30000 }],
+  })
+  await repo.transaction(true, async store => {
+    await saveCharacterPair(store as never, { bookId: 'a', fromId: 'A', toId: 'B', forwardLabels: ['族弟'], reverseLabels: ['族兄'], reason: '原文为族兄', actor: 'manual', commitId: crypto.randomUUID(), tool: 'test' })
+    const current = (await store.get('pipelineRuns', 'run'))!
+    await store.put('pipelineRuns', { ...current, organization: {
+      version: 1, step: 'relations', revision: 1, mode: 'relations', targetCharacterId: 'A', executionVersion: 4,
+      scanIds: [], scanPages: [], candidateGroups: [], candidateDecisions: [], profileItems: [],
+      relationItems: [{ id: 'A', name: '贾珩', status: 'pending', outcome: null, reason: '', contentFingerprint: '', readRefs: [], commitIds: [] }],
+      pairChecks: [], statisticsPending: false,
+      activeWork: { id: 'relations:A', kind: 'relations', characterId: 'A', contextId: 'relations', status: 'running', requestCount: 0, draft: null, commitIds: [], dataVersion: 1 },
+    } })
+  })
+  const scope = { bookId: 'a', profile: 'asset_editor' as const, phase: 'character_organization', workflow: 'character_organization_v1' as const, runId: 'run', taskId: 'task', owner: 'owner', workItemIds: ['organization:relations:A'], contextId: 'relations', unitId: 'relations:A', organizationWorkKind: 'relations' as const }
+  const tool = createAgentTools(repo, scope).tools.find(row => row.name === 'submit_relation_review')!
+  const result = await tool.execute('submit', { changes: [{ targetId: 'B', action: 'set', forwardLabels: ['族兄'], reverseLabels: ['族弟'], reason: '可能方向对调' }], done: true, reason: '测试' }) as { content: { text: string }[] }
+  const ack = JSON.parse(result.content[0]!.text) as { unverified: string[]; applied: string[] }
+  expect(ack.applied).toContain('B')
+  expect(ack.unverified).toContain('B')
+  const saved = await repo.transaction(false, store => store.get('pipelineRuns', 'run'))
+  const organization = saved?.organization as { pairChecks: { pairKey: string; outcome: string }[] }
+  expect(organization.pairChecks.find(row => row.pairKey.includes('A') && row.pairKey.includes('B'))?.outcome).toBe('uncertain')
+}, 120000)
 
 it('提交成功但回执丢失时，恢复入口不会重复写库', async () => {
   const character = { ...person('C1-P001', '沈青'), personality: '旧资料' }

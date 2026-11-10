@@ -273,6 +273,8 @@ it('P1提示词包含关系存在性、未具名指向和传闻不确定性规�
   expect(worldPrompt).toContain('同场出现、看见、听见、一次对话、心里想起、打算让某人办事')
   expect(worldPrompt).toContain('不要用本章之外的背景知识补全关系')
   expect(worldPrompt).toContain('`relations` 可以为空，不要用“未知”代替')
+  expect(worldPrompt).toContain('“未知 ↔ 未知”说明本章没有关系依据')
+  expect(worldPrompt).toContain('“想起长公主”“走近并打量某人”不能创建关系')
   expect(worldPrompt).toContain('不要为同一人建立两套关系')
   expect(promptOf('narrativeAssets')).toContain('猜测、传闻、谎言、未经证实的指控')
 })

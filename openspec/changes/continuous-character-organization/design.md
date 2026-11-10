@@ -308,3 +308,9 @@ summary压缩仍须修复：同一动态约束生成提示词、工具Schema和�
 - **单人物恢复。** 可恢复快照冲突、暂时无法确认执行权或用户暂停时，保留当前人物、工作项、已完成提交和会话；继续复用原 run/workItem。`submit_profile_review`/`submit_relation_review` 的稳定 operationKey 不包含 taskId，丢失回执后命中原 `appliedCommands`，不重复写库；启动前缺少会话时补建组织会话。
 
 检查入口：`tests/concurrency.test.ts`、`tests/organization.test.ts`、`tests/lease-heartbeat.test.ts`；运行类型、非 live 测试、构建、治理和 OpenSpec 校验。
+
+## 关系方向、证据状态与存在性核实（2026-11-10）
+
+- **方向。** `forwardLabels` 始终是当前人物相对目标人物的身份，`reverseLabels` 是目标相对当前人物；`pairFromPerspective` 在读取和保存时按当前人物切换视角。工具契约和提示词加入贾珩—贾珍示例（贾珍为族兄时，贾珩视角正向族弟、反向族兄）。
+- **证据状态。** 实质标签变化没有逐字证据时，`unverified` 必须包含该人物对，`pairChecks` 为 `uncertain`；只移除“未知”或标签集合不变的规范化不强制证据。只对调正反标签且无证据时标记“方向与现有记录相反，需复核”。
+- **存在性。** 已有连线不是关系成立的证据；`未知 ↔ 未知`、只有想起/同场/打量/一次性互动时，P1 不创建连线，P2 必须核实存在性，查不到支持时列入待核对，确认错误时带依据删除，不能默认写成 `no_change`。

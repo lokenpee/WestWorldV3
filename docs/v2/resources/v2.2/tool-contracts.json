@@ -3062,14 +3062,14 @@
                     "items": {
                       "type": "string"
                     },
-                    "description": "人物自身在该方向的关系身份；称呼、互动不能作标签；不确定填“未知”；新增实质关系须提供 evidence。"
+                    "description": "当前人物相对目标人物的身份标签（当前人物是目标的什么人）。例：当前人物贾珩、目标贾珍，若贾珍是族兄，则填写“族弟”。称呼、互动不能作标签；不确定填“未知”；新增实质关系须提供 evidence。"
                   },
                   "reverseLabels": {
                     "type": "array",
                     "items": {
                       "type": "string"
                     },
-                    "description": "人物自身在该方向的关系身份；称呼、互动不能作标签；不确定填“未知”；新增实质关系须提供 evidence。"
+                    "description": "目标人物相对当前人物的身份标签（目标是当前人物的什么人）。例：当前人物贾珩、目标贾珍，若贾珍是族兄，则填写“族兄”。称呼、互动不能作标签；不确定填“未知”；新增实质关系须提供 evidence。"
                   },
                   "directionUnclear": {
                     "type": "boolean",

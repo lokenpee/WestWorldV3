@@ -317,11 +317,24 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
         return problem ? { ...item, verified: false, reason: problem.reason } : { ...item, verified: true }
       })
       const verifiedCount = annotatedEvidence.filter(item => item.verified).length
-      const evidenceStatus: 'verified' | 'unverified' | 'partial' | undefined = evidence.length ? (verifiedCount === evidence.length ? 'verified' : verifiedCount > 0 ? 'partial' : 'unverified') : undefined
-      const review = evidence.length > 0 && evidenceStatus !== 'verified'
+      const labelSet = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))].sort().join('\u0000')
+      const onlyUnknownRemoved = (before: string[], after: string[]) => {
+        const old = new Set(before.map(value => value.trim()).filter(Boolean))
+        const next = new Set(after.map(value => value.trim()).filter(Boolean))
+        return [...next].every(value => old.has(value)) && [...old].filter(value => !next.has(value)).every(value => value === '未知')
+      }
+      const substantive = pair.state !== 'active' || !onlyUnknownRemoved(pair.forwardLabels, forward) || !onlyUnknownRemoved(pair.reverseLabels, reverse)
+      const directionSwap = pair.state === 'active' && substantive && labelSet(forward) === labelSet(pair.reverseLabels) && labelSet(reverse) === labelSet(pair.forwardLabels)
+      const evidenceStatus: 'verified' | 'unverified' | 'partial' | undefined = evidence.length ? (verifiedCount === evidence.length ? 'verified' : verifiedCount > 0 ? 'partial' : 'unverified') : substantive ? 'unverified' : undefined
+      const review = substantive && evidenceStatus !== 'verified'
+      const reviewReason = review && directionSwap
+        ? `方向与现有记录相反且没有可核实证据，需复核：${reason}`
+        : review && !evidence.length
+          ? `实质关系修改未提供可核实证据，需复核：${reason}`
+          : reason
       prepared.push({
         targetId, pair, action, forward, reverse, directionUnclear,
-        evidence: annotatedEvidence, basis: changeBasis, reason, review, allowUnverified: true,
+        evidence: annotatedEvidence, basis: changeBasis, reason: reviewReason, review, allowUnverified: true,
         ...(evidenceStatus ? { evidenceStatus } : {}),
       })
       continue

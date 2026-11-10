@@ -4307,7 +4307,7 @@
       "consumers": [
         "src/features/extraction/contracts.ts"
       ],
-      "sha256": "3aa290e27b35fb3ed12eab727ecf9df653443b599413d65d5089ba137ad2bd5e"
+      "sha256": "cc265ba445beb31365b39fc044f9264e4fe7a84d24af2391aa68ec29b2555adb"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-identity.md",
@@ -4373,7 +4373,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "44f5e18d1b60a9b8829769229e80edba30b7ea3909aff6d7985ce19f5f265d27"
+      "sha256": "e84acd4251c95dc4826a23e0e1e8bf4ff44abf7d7d84016382f93f0af8625db7"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4437,7 +4437,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "58ae58ab412c519f1ad7890d1bda25aca8fd2c35f8bb402fee941fd97600ff8a"
+      "sha256": "bf014e83d45381dc6a74c0fcc6e4953ef9fd5ab6123fb82d18ea15c59d8ef733"
     }
   ],
   "decisions": [
