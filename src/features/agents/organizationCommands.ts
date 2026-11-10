@@ -317,25 +317,11 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
         return problem ? { ...item, verified: false, reason: problem.reason } : { ...item, verified: true }
       })
       const verifiedCount = annotatedEvidence.filter(item => item.verified).length
-      const labelSet = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))].sort().join('\u0000')
-      const onlyUnknownRemoved = (before: string[], after: string[]) => {
-        const old = new Set(before.map(value => value.trim()).filter(Boolean))
-        const next = new Set(after.map(value => value.trim()).filter(Boolean))
-        return [...next].every(value => old.has(value)) && [...old].filter(value => !next.has(value)).every(value => value === '未知')
-      }
-      const substantive = pair.state !== 'active' || !onlyUnknownRemoved(pair.forwardLabels, forward) || !onlyUnknownRemoved(pair.reverseLabels, reverse)
-      const directionSwap = pair.state === 'active' && substantive && labelSet(forward) === labelSet(pair.reverseLabels) && labelSet(reverse) === labelSet(pair.forwardLabels)
-      const evidenceStatus: 'verified' | 'unverified' | 'partial' | undefined = evidence.length ? (verifiedCount === evidence.length ? 'verified' : verifiedCount > 0 ? 'partial' : 'unverified') : substantive ? 'unverified' : undefined
-      const review = substantive && evidenceStatus !== 'verified'
-      const reviewReason = review && directionSwap
-        ? `方向与现有记录相反且没有可核实证据，需复核：${reason}`
-        : review && !evidence.length
-          ? `实质关系修改未提供可核实证据，需复核：${reason}`
-          : reason
+      const evidenceStatus: 'verified' | 'unverified' | 'partial' = evidence.length ? (verifiedCount === evidence.length ? 'verified' : verifiedCount > 0 ? 'partial' : 'unverified') : 'unverified'
       prepared.push({
         targetId, pair, action, forward, reverse, directionUnclear,
-        evidence: annotatedEvidence, basis: changeBasis, reason: reviewReason, review, allowUnverified: true,
-        ...(evidenceStatus ? { evidenceStatus } : {}),
+        evidence: annotatedEvidence, basis: changeBasis, reason, review: evidenceStatus !== 'verified', allowUnverified: true,
+        evidenceStatus,
       })
       continue
     }
@@ -478,11 +464,10 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
     const existing = currentPairs.find(row => text(row.pairKey) === pair.pairKey)
     const explicitUncertain = uncertainReasons.get(targetId)
     const latestStatus = text(latest?.evidenceStatus)
-    const unverified = latestStatus === 'unverified' || latestStatus === 'partial'
     const retainedUncertain = !edits.length && text(existing?.outcome) === 'uncertain'
     const explicitNoChange = !edits.length && explicitUncertain === undefined && text(existing?.outcome) === 'no_change' && records(existing?.basis).length > 0
     const failure = failures.find(item => item.targetId === targetId)
-    const pairOutcome = failure ? 'uncertain' : explicitUncertain !== undefined || unverified || retainedUncertain
+    const pairOutcome = failure || explicitUncertain !== undefined || retainedUncertain
       ? 'uncertain'
       : edits.length ? 'changed' : 'no_change'
     pairOutcomes.set(pair.pairKey, pairOutcome)
@@ -504,7 +489,7 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
   const description = failures.length
     ? `部分关系未提交：${failures.map(failure => `${failure.targetId || '未知目标'}（${failure.code}）`).join('、')}`
     : text(args.reason) || (outcome === 'uncertain' ? '部分关系待核对' : outcome === 'changed' ? '已提交人物关系修改' : '本次未提交修改，未逐对确认。')
-  const uncertainTargets = new Set([...uncertainSeen, ...reviewTargets, ...failedTargets])
+  const uncertainTargets = new Set([...uncertainSeen, ...failedTargets])
   for (const pair of relevantPairs) {
     if (pairOutcomes.get(pair.pairKey) !== 'uncertain') continue
     uncertainTargets.add(pair.fromId === id ? pair.toId : pair.fromId)

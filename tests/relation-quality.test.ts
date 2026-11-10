@@ -91,7 +91,7 @@ describe('关系质量边界（宽松版）', () => {
   it('碧儿无证据去重保存为修改，但标记 unverified 并保持原存疑状态', async () => {
     const { db, repo } = await setup()
     const result = await submit(repo, [{ targetId: 'C4-P011', action: 'set', forwardLabels: ['主子'], reverseLabels: ['丫鬟'], reason: '主子/主人同义去重' }])
-    expect(result).toMatchObject({ changed: true, outcome: 'uncertain', unverified: ['C4-P011'] })
+    expect(result).toMatchObject({ changed: true, outcome: 'changed', unverified: ['C4-P011'] })
     const edit = await db.table('characterRelationEdits').get(pairKeyOf(sourceId, 'C4-P011')) as Record<string, unknown>
     expect(edit).toMatchObject({ aToBLabels: ['主子'], bToALabels: ['丫鬟'], directionUnclear: true, evidenceStatus: 'unverified' })
   })
@@ -111,7 +111,7 @@ describe('关系质量边界（宽松版）', () => {
   it('删除独立维度不再硬拒绝，保存为修改并标记待核对', async () => {
     const { db, repo } = await setup()
     const result = await submit(repo, [{ targetId: 'C1-P037', action: 'set', forwardLabels: ['朋友'], reverseLabels: ['朋友'], reason: '只保留朋友' }])
-    expect(result).toMatchObject({ changed: true, outcome: 'uncertain' })
+    expect(result).toMatchObject({ changed: true, outcome: 'changed' })
     expect((result as unknown as { unverified: string[] }).unverified).toEqual(['C1-P037'])
     expect((await db.table('characterRelationEdits').get(pairKeyOf(sourceId, 'C1-P037')) as { aToBLabels: string[] }).aToBLabels).toEqual(['朋友'])
   })
@@ -119,21 +119,21 @@ describe('关系质量边界（宽松版）', () => {
   it('C1-P024 删除族中同族不再硬拒绝，保存为修改并标记待核对', async () => {
     const { db, repo } = await setup()
     const result = await submit(repo, [{ targetId: 'C1-P024', action: 'set', forwardLabels: ['族中晚辈'], reverseLabels: ['族中长辈'], reason: '去掉重复的族中同族' }])
-    expect(result).toMatchObject({ changed: true, outcome: 'uncertain', unverified: ['C1-P024'] })
+    expect(result).toMatchObject({ changed: true, outcome: 'changed', unverified: ['C1-P024'] })
     expect((await db.table('characterRelationEdits').get(pairKeyOf(sourceId, 'C1-P024')) as { aToBLabels: string[] }).aToBLabels).toEqual(['族中晚辈'])
   })
 
   it('C3-P023 改成未知不再硬拒绝，保存为修改并标记待核对', async () => {
     const { db, repo } = await setup()
     const result = await submit(repo, [{ targetId: 'C3-P023', action: 'set', forwardLabels: ['未知'], reverseLabels: ['未知'], reason: '删除称谓，保留未知' }])
-    expect(result).toMatchObject({ changed: true, outcome: 'uncertain', unverified: ['C3-P023'] })
+    expect(result).toMatchObject({ changed: true, outcome: 'changed', unverified: ['C3-P023'] })
     expect((await db.table('characterRelationEdits').get(pairKeyOf(sourceId, 'C3-P023')) as { aToBLabels: string[] }).aToBLabels).toEqual(['未知'])
   })
 
   it('宋源新增具体关系不再阻塞，保存为修改并标记待核对', async () => {
     const { repo } = await setup()
     const result = await submit(repo, [{ targetId: 'C2-P029', action: 'set', forwardLabels: ['主子'], reverseLabels: ['学生'], reason: '推断师生' }])
-    expect(result).toMatchObject({ changed: true, outcome: 'uncertain' })
+    expect(result).toMatchObject({ changed: true, outcome: 'changed' })
     expect((result as unknown as { unverified: string[] }).unverified).toEqual(['C2-P029'])
   })
 
@@ -144,7 +144,7 @@ describe('关系质量边界（宽松版）', () => {
     const { repo: repo2 } = await setup()
     // 换一个全新 workspace，验证无效引文不被拒绝
     const invalid = await submit(repo2, [{ targetId: 'C1-P037', action: 'set', forwardLabels: ['朋友'], reverseLabels: ['朋友'], reason: '无效原文', evidence: ev('不存在的引文') }])
-    expect(invalid).toMatchObject({ changed: true, outcome: 'uncertain' })
+    expect(invalid).toMatchObject({ changed: true, outcome: 'changed' })
   })
 
   it('删除关系仍要求可追溯依据，带有效引文可以删除', async () => {
@@ -174,7 +174,7 @@ describe('关系质量边界（宽松版）', () => {
     const pairs = (run.organization as Record<string, unknown>).pairChecks as Record<string, unknown>[]
     const pairOf = (targetId: string) => pairs.find(row => row.pairKey === pairKeyOf(sourceId, targetId))!
     expect(pairOf('C1-P037')).toMatchObject({ outcome: 'changed', reason: '原文支持', commitIds: [(result as { commitId: string }).commitId], evidenceStatus: 'verified' })
-    expect(pairOf('C4-P011')).toMatchObject({ outcome: 'uncertain', reason: '实质关系修改未提供可核实证据，需复核：同义去重', commitIds: [(result as { commitId: string }).commitId] })
+    expect(pairOf('C4-P011')).toMatchObject({ outcome: 'changed', reason: '同义去重', commitIds: [(result as { commitId: string }).commitId] })
     expect(pairOf('C4-P011').evidenceStatus).toBe('unverified')
     expect(pairOf('C2-P029')).toMatchObject({ outcome: 'uncertain', reason: '证据不足，待核对', commitIds: [] })
     expect(pairOf('C3-P021')).toMatchObject({ outcome: 'no_change', reason: '本次未提交修改，未逐对确认。', commitIds: [], basis: [] })
@@ -191,7 +191,7 @@ describe('关系质量边界（宽松版）', () => {
     const pairs = (run.organization as Record<string, unknown>).pairChecks as Record<string, unknown>[]
     const pairOf = (targetId: string) => pairs.find(row => row.pairKey === pairKeyOf(sourceId, targetId))!
     expect(pairOf('C1-P037')).toMatchObject({ outcome: 'changed', reason: '第一批修改', commitIds: [firstId] })
-    expect(pairOf('C4-P011')).toMatchObject({ outcome: 'uncertain', reason: '实质关系修改未提供可核实证据，需复核：第二批去重', commitIds: [secondId] })
+    expect(pairOf('C4-P011')).toMatchObject({ outcome: 'changed', reason: '第二批去重', commitIds: [secondId] })
   })
 
   it('先前批次标记的待核对人物对在完成时保留原因', async () => {
@@ -258,7 +258,7 @@ describe('关系质量边界（宽松版）', () => {
   it('实质修改的无效证据保存为 unverified，不拒绝保存', async () => {
     const { db, repo } = await setup()
     const result = await submit(repo, [{ targetId: 'C2-P029', action: 'set', forwardLabels: ['主子'], reverseLabels: ['学生'], reason: '无效证据', evidence: ev('不存在的引文') }])
-    expect(result).toMatchObject({ changed: true, outcome: 'uncertain' })
+    expect(result).toMatchObject({ changed: true, outcome: 'changed' })
     expect(await db.table('characterRelationEdits').get(pairKeyOf(sourceId, 'C2-P029'))).toMatchObject({ evidenceStatus: 'unverified' })
   })
 
@@ -268,7 +268,7 @@ describe('关系质量边界（宽松版）', () => {
       targetId: 'C1-P037', action: 'set', forwardLabels: ['上官', '朋友'], reverseLabels: ['下属', '朋友'], reason: '两条证据一真一假',
       evidence: [...ev(quote.caiquan), ...ev('不存在的引文')],
     }])
-    expect(result).toMatchObject({ changed: true, outcome: 'uncertain' })
+    expect(result).toMatchObject({ changed: true, outcome: 'changed' })
     const edit = await db.table('characterRelationEdits').get(pairKeyOf(sourceId, 'C1-P037')) as { evidenceStatus?: string; evidence?: { verified?: boolean; reason?: string }[] }
     expect(edit.evidenceStatus).toBe('partial')
     expect(edit.evidence?.map(item => item.verified)).toEqual([true, false])

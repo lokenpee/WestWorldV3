@@ -4373,7 +4373,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "e84acd4251c95dc4826a23e0e1e8bf4ff44abf7d7d84016382f93f0af8625db7"
+      "sha256": "6d79a3621e93a99174140ae23f9202b20ab73c8e94cd2758f1fdeb89862b36a4"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4437,7 +4437,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "bf014e83d45381dc6a74c0fcc6e4953ef9fd5ab6123fb82d18ea15c59d8ef733"
+      "sha256": "54d66c7111bbae50921bb654efff66d42cb326b86f492790f9e276d67cac1c15"
     }
   ],
   "decisions": [

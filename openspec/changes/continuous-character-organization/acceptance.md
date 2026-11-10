@@ -303,5 +303,5 @@
 | 2026-11-10 | P3 会话租约写入保护 | 忽略续期时间的快照比较不放宽业务写入前的会话所有权和有效期校验 | `tests/concurrency.test.ts` owner/expired 两种写入拒绝用例通过 |
 | 2026-11-10 | 回执丢失与单人物继续 | 稳定 operationKey + `appliedCommands` 去重；单人物继续入口复用原 run/workItem | `tests/organization.test.ts` 回执丢失、提交前冲突继续用例通过 |
 | 2026-11-10 | 检查 | typecheck、非 live 单元测试、构建、lint、治理和 OpenSpec 校验通过 | 未调用真实模型、未修改正式书库与备份、未 push；正式书库端到端真实运行未验收 |
-| 2026-11-10 | 关系方向与证据状态 | 明确 forward 为当前人物相对目标；贾珩—贾珍示例写入契约和提示词；无证据实质修改返回 unverified 并标 uncertain；方向对调无证据同样待核对 | `tests/organization.test.ts` 方向视角、无证据/方向对调用例；`tests/relation-quality.test.ts` 证据状态回归 |
+| 2026-11-10 | 关系方向与证据状态 | 明确 forward 为当前人物相对目标；贾珩—贾珍示例写入契约和提示词；无证据修改返回 unverified，业务结果仍为 changed；方向对调无证据同样标 unverified，不阻断完成 | `tests/organization.test.ts` 方向视角、无证据/方向对调用例；`tests/relation-quality.test.ts` 证据状态回归 |
 | 2026-11-10 | 未知连线存在性 | P1 明确想起、同场、打量和“未知 ↔ 未知”不创建关系；P2 要求核实已有未知连线存在性，不能默认保持 | `tests/extraction.test.ts` P1 提示词负例；`tests/organization.test.ts` P2 提示词存在性规则 |

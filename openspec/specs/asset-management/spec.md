@@ -174,18 +174,18 @@ P2可以按已读取的原文明确确认或移除现有别名，记录前后称
 - **THEN** 合法人物对正常写入；失败项返回具体原因和修正动作；事务对已写入部分保持原子性。
 
 ### Requirement: RELATION-DIRECTION-01 关系正反向语义
-系统 SHALL 始终以当前人物为视角解释 `forwardLabels` 与 `reverseLabels`：正向是当前人物相对目标人物的身份，反向是目标人物相对当前人物的身份；读取、保存和报告不得互换。与现有记录相比只对调正反标签且没有可核实证据的提交，SHALL 保存为未核实并进入待核对。
+系统 SHALL 始终以当前人物为视角解释 `forwardLabels` 与 `reverseLabels`：正向是当前人物相对目标人物的身份，反向是目标人物相对当前人物的身份；读取、保存和报告不得互换。与现有记录相比只对调正反标签且没有可核实证据的提交，SHALL 保存为未核实并记录证据状态，不阻止保存或完成。
 
 #### Scenario: RELATION-DIRECTION-01 执行约束
 - **WHEN** 当前人物贾珩、目标贾珍，原文确认贾珍是族兄
-- **THEN** 贾珩视角应为正向“族弟”、反向“族兄”；写成正向“族兄”、反向“族弟”时标记为方向待核对，不能作为已核实结果。
+- **THEN** 贾珩视角应为正向“族弟”、反向“族兄”；写成正向“族兄”、反向“族弟”时标记为未核实，不能作为已核实结果。
 
 ### Requirement: RELATION-EVIDENCE-01 关系证据状态
-系统 SHALL 区分已验证、未核实和部分核实。实质关系标签变化未提供逐字证据时，`unverified` 必须包含该人物对，`pairChecks` 记为 `uncertain`；不得因为工具返回成功就把未提供证据的修改显示为已核实。纯去重或仅移除“未知”标签可视为未改变语义。
+系统 SHALL 区分已验证、未核实和部分核实。关系标签变化未提供逐字证据时，`unverified` 必须包含该人物对，并在 `pairChecks` 记录 `evidenceStatus: unverified`；业务结果仍按实际修改记为 `changed`，不得因缺少证据阻止工作项完成，也不得把工具返回的 changed=true 显示为已核实。
 
 #### Scenario: RELATION-EVIDENCE-01 执行约束
-- **WHEN** Agent 提交实质关系修改但没有提供 `evidence`
-- **THEN** 修改仍可保存，但返回 `unverified` 包含该 targetId，报告中该人物对为待核对；提供可逐字核验的 evidence 后才显示 verified。
+- **WHEN** Agent 提交关系修改但没有提供 `evidence`
+- **THEN** 修改仍可保存并完成，但返回 `unverified` 包含该 targetId，报告显示未核实证据；提供可逐字核验的 evidence 后才显示 verified。
 
 ### Requirement: RELATION-EXISTENCE-01 关系存在性核实
 系统 SHALL 先判断关系是否存在，再整理标签；已有连线、`未知 ↔ 未知` 或只有想起、同场、打量、一次性互动等依据时，不得默认视为有效关系。P1 没有关系存在依据时不创建该连线；P2 对未知或依据不足的已有连线核实存在性，查不到支持时列入待核对，确认是错误连线时才按删除规则提交带依据的删除。

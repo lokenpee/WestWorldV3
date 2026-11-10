@@ -757,7 +757,7 @@ it('关系视角按当前人物输出，贾珩对贾珍的正反向不互换', a
   expect(fromJiaZhen?.relations.find(row => row.targetId === 'A')).toMatchObject({ forward: ['族兄'], reverse: ['族弟'] })
 })
 
-it('没有证据的实质关系修改返回 unverified，方向对调也会进入待核对', async () => {
+it('没有证据的关系修改返回 unverified，方向对调也会被标出', async () => {
   const character = (id: string, name: string) => ({ ...person(id, name), revision: 1 } as unknown as Record<string, unknown>)
   const run = { id: 'run', bookId: 'a', recordType: 'run', stage: 'P2', phase: 'character_organization', workflow: 'character_organization_v1', status: 'running', report: {}, tasks: [{ taskId: 'task', workItemIds: ['organization:relations:A'], phase: 'character_organization', input: { workItems: [] }, appliedCommitIds: [], reviewedItems: [], readSet: { records: [], queries: [] } }], commandIntents: [], appliedCommands: [] }
   const repo = createMemoryAgentRepository('a', {
@@ -783,7 +783,7 @@ it('没有证据的实质关系修改返回 unverified，方向对调也会进�
   expect(ack.unverified).toContain('B')
   const saved = await repo.transaction(false, store => store.get('pipelineRuns', 'run'))
   const organization = saved?.organization as { pairChecks: { pairKey: string; outcome: string }[] }
-  expect(organization.pairChecks.find(row => row.pairKey.includes('A') && row.pairKey.includes('B'))?.outcome).toBe('uncertain')
+  expect(organization.pairChecks.find(row => row.pairKey.includes('A') && row.pairKey.includes('B'))).toMatchObject({ outcome: 'changed', evidenceStatus: 'unverified' })
 }, 120000)
 
 it('提交成功但回执丢失时，恢复入口不会重复写库', async () => {

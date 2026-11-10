@@ -3024,7 +3024,7 @@
       {
         "name": "submit_relation_review",
         "kind": "write",
-        "description": "保存当前人物关系修改并声明是否完成。普通去重/同义规范化无需 evidence；实质修改可提供 evidence，缺失或无法逐字核验时会保存为未核实并进入待核对；删除整组关系仍须逐字原文或可追溯冲突 basis。done=false 保存后继续，done=true 保存并换下一人。",
+        "description": "保存当前人物关系修改并声明是否完成。普通去重/同义规范化无需 evidence；实质修改可提供 evidence，缺失或无法逐字核验时只标记为未核实，不阻止保存或完成；删除整组关系仍须逐字原文或可追溯冲突 basis。done=false 保存后继续，done=true 保存并换下一人。",
         "parameters": {
           "type": "object",
           "additionalProperties": false,
@@ -3080,7 +3080,7 @@
                   },
                   "evidence": {
                     "type": "array",
-                    "description": "可选。实质修改提供 chapterIndex + 引文；缺失或无法逐字核验时会保存为未核实并待核对，不阻塞其他修改。",
+                    "description": "可选。实质修改提供 chapterIndex + 引文；缺失或无法逐字核验时只标记为未核实，不阻止保存或完成。",
                     "items": {
                       "type": "object",
                       "additionalProperties": false,
