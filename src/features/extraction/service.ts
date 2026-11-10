@@ -7,7 +7,6 @@ import { bindNodeCharacters, createNodeBindingContext, remapCharacterLinks } fro
 import { dexieMergeStore } from '../assets/mergeCore'
 import { invalidateAssetProgress, type AssetChange } from '../assets/invalidate'
 import { extractedRelation, syncRelations, type ExtractedRelationInput } from '../assets/relations'
-import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebuildFacts, updateFrequencies, createFrequencyCounter } from '../assets/derive'
 import type { Character, CharacterRelation, EventNode, Lifecycle, LocationAsset } from '../assets/types'
 import { stepLabels, substeps, type ExtractionData, type ExtractedRow, type Substep } from './types'
@@ -198,7 +197,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
           await db.table('compileProgress').update('P1', { stepStates: { ...saved?.stepStates, [key]: { status: 'running' } } })
         })
         const failedResult = (error: unknown): CallResult => ({ ok: false, mode: 'direct', text: '', elapsedMs: 0, attempts: [], usage: { input: 0, output: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, costStatus: 'unknown' }, error: classifyError(error) })
-        const result: CallResult & { value?: ExtractionData } = !text.trim() ? failedResult('本章原文缺失。') : await models.generate<ExtractionData>({ role: 'extraction', signal: controller.signal, maxRequests: 3, repairAttempts: 2,
+        const result: CallResult & { value?: ExtractionData } = !text.trim() ? failedResult('本章原文缺失。') : await models.generate<ExtractionData>({ role: 'extraction', signal: controller.signal, repairAttempts: 2, unboundedRequests: true,
           context: { systemPrompt: promptOf(step), messages: [{ role: 'user', content: `章节标识：${chapter.chapterIndex}\n章节名：${chapter.chapterName}\n\n--- 正文开始 ---\n${text}\n--- 正文结束 ---`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交本章提取结果', parameters: schemaOf(step), constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
           validate: message => validateExtraction(step, message), repairPrompt: '请按字段要求修正并调用唯一的 submit_result 提交本章结果；其他工具未执行。',
           beforeRequest: () => db.transaction('rw', db.table('pipelineRuns'), db.table('compileProgress'), checkLease),
@@ -245,7 +244,6 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
                   Object.assign(row, { sourceChapters: [chapter.chapterIndex], nameSource: 'extracted' })
                   if (kind === 'character') {
                     row.aliases = source.aliases_mentioned ?? []; delete row.aliases_mentioned
-                    Object.assign(row, normalizeCharacterNames(row as unknown as Character))
                     if (source.speech_style_sample !== undefined) { row.speechStyleSample = source.speech_style_sample; delete row.speech_style_sample }
                   }
                   row.mergeFacts = rebuildFacts([], Object.fromEntries((kind === 'character' ? ['identity', 'appearance', 'personality', 'background'] : ['description']).filter(field => typeof row[field] === 'string').map(field => [field, row[field] as string])), [chapter.chapterIndex])

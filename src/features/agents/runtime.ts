@@ -2,7 +2,7 @@ import type { Agent, AgentEvent, AgentMessage } from '@earendil-works/pi-agent-c
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai'
 import type { AgentInput } from '../models/gateway'
 import { ModelError, type CallOptions, type CallResult } from '../models/types'
-import { appendEntry, checkLease, domainOf, rebaseReadSet, saveTask, taskOf, type ReadSet, type CommitAck } from './commands'
+import { appendEntry, checkLease, domainOf, organizationWriteTools, rebaseReadSet, saveTask, taskOf, type ReadSet, type CommitAck } from './commands'
 import { createAgentTools } from './tools'
 import { canonical, hash, inputSchema, records, strings, text, validate, type AgentProfile, type Summary } from './contracts'
 import type { AgentRepository, Row } from './repository'
@@ -15,6 +15,7 @@ import wrapper from '../../../docs/v2/resources/v2.2/prompts/active/agent-wrappe
 import { outputDiscipline } from './output-discipline'
 import { storyFingerprint, storyTable } from '../story/coverage'
 import { renewOrganizationLease, withOrganizationLease } from './organizationLease'
+import { leaseFailureKind } from '../world/leaseHeartbeat'
 import { appendRequestLedger } from './ledger'
 import { TraceSession } from './trace'
 
@@ -28,7 +29,7 @@ export interface AgentTaskOptions {
   requiredLineIds?: string[]
   reviewScope?: 'all_assets' | 'relations'
   workflow?: 'character_organization_v1'
-  contextId?: string; unitId?: string
+  contextId?: string; unitId?: string; organizationWorkKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string; shouldPause?: () => boolean; shouldCancel?: () => boolean
 }
 export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; itemFailure?: string; readCalls: number; writeCalls: number }
 const initialReadSet = (): ReadSet => ({ records: [], queries: [] })
@@ -39,7 +40,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
   const active = new Set<string>()
   async function run(repo: AgentRepository, options: AgentTaskOptions): Promise<AgentTaskResult> {
     const key = `${repo.bookId}:${options.profile}`
-    const scope: Scope = { bookId: repo.bookId, profile: options.profile, phase: options.phase, runId: options.runId ?? crypto.randomUUID(), executionId: crypto.randomUUID(), taskId: options.taskId ?? crypto.randomUUID(), owner: options.leaseOwner ?? crypto.randomUUID(), sessionId: options.sessionId, probe: options.probe, workItemIds: options.workItems.map(row => text(row.workItemId)), workflow: options.workflow, contextId: options.contextId, unitId: options.unitId }
+    const scope: Scope = { bookId: repo.bookId, profile: options.profile, phase: options.phase, runId: options.runId ?? crypto.randomUUID(), executionId: crypto.randomUUID(), taskId: options.taskId ?? crypto.randomUUID(), owner: options.leaseOwner ?? crypto.randomUUID(), sessionId: options.sessionId, probe: options.probe, workItemIds: options.workItems.map(row => text(row.workItemId)), workflow: options.workflow, contextId: options.contextId, unitId: options.unitId, workKind: options.organizationWorkKind, organizationStep: options.organizationStep }
     const organization = options.profile === 'asset_editor' && options.phase === 'character_organization'
     if (options.phase === 'asset_review') {
       const requested = options.reviewScope ?? text(options.input.reviewScope)
@@ -50,18 +51,19 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     if (active.has(key)) return { ...outcome, error: '本书当前职责已有运行任务。' }
     active.add(key)
     let acquired = false; let heartbeat: ReturnType<typeof setInterval> | undefined
+    let heartbeatFailure = ''
     const controller = new AbortController(); const abort = () => controller.abort()
     options.signal?.addEventListener('abort', abort, { once: true }); if (options.signal?.aborted) abort()
     const identity = !options.probe && options.profile === 'asset_editor' && options.phase === 'ai_identity'
     const resumable = identity || organization || !options.probe && (options.profile === 'story_editor' || options.phase === 'asset_review')
-    const ceiling = options.probe ? 3 : organization ? 100000 : identity ? 8 : resumable ? 20 : 6
-    const maxRequests = Math.min(options.maxRequests ?? ceiling, ceiling)
+    const maxRequests = options.probe ? 3 : options.maxRequests ?? 1_000_000
     const started = Date.now(), duration = organization ? 3600000 : identity ? 180000 : resumable ? 300000 : options.timeoutMs ?? 180000
     const timeLeft = () => Math.max(0, duration - (Date.now() - started))
     let agent: Agent | undefined; let loadedMessages: AgentMessage[] = []; let persistedMessages = 0
     let trace: TraceSession | undefined
     let deferredAfterValidation = false
     let failedSignatures = new Set<string>()
+    let organizationConflicts = 0
     let adapter: ReturnType<typeof createAgentTools> | undefined
     try {
       controller.signal.throwIfAborted()
@@ -116,11 +118,35 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       if (organization) repo = withOrganizationLease(repo, scope)
       const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
       if (!scope.probe && scope.sessionId) trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.businessPrompt, purpose: 'work' })
+      const workKind = options.organizationWorkKind
+      const p2Kind = organization ? workKind : undefined
+      const submitRule = p2Kind === 'profile'
+        ? '业务修改以 submit_profile_review 返回持久确认并实际写库为准。本工作项不使用 submit_result。'
+        : p2Kind === 'relations'
+          ? '业务修改以 submit_relation_review 返回持久确认并实际写库为准。本工作项不使用 submit_result。'
+          : p2Kind === 'directory' || p2Kind === 'candidate'
+            ? '业务修改以当前合法写入工具返回持久确认并实际写库为准。本工作项用 submit_result 结束当前目录页或疑似组。'
+            : '只有commit_asset_changes或commit_story_changes返回持久commitId才表示业务修改成功。submit_result只提交本任务总结，不重演业务写入。'
+      const budgetRule = p2Kind
+        ? '本工作项按实际进展处理，不设固定请求次数上限；当前工作项可以多轮调用。'
+        : maxRequests >= 1_000_000 ? '本任务按时间预算收尾，不设固定请求轮数；时间或预算耗尽时保存已提交成果和剩余工作。' : `本任务最多${maxRequests}次实际模型请求，修正与网络重发均计入同一总预算，最后一次只能调用submit_result。`
+      const repairRule = p2Kind === 'profile'
+        ? '工具错误按返回原因修正；done=false 保存部分继续，done=true 保存并结束当前人物；不另发结束总结。'
+        : p2Kind === 'relations'
+          ? '工具错误按返回原因修正；done=false 保存部分继续，done=true 保存并结束当前人物；不另发结束总结。'
+          : p2Kind === 'directory' || p2Kind === 'candidate'
+            ? '工具错误按返回原因修正；目录页/疑似组结论必须真实；不另发总结请求。'
+            : '写入结构、领域和最终总结共用一次修正机会，并且必须有剩余额度；未完成工作如实保留，不能为结束任务制造事实。'
+      const finishRule = p2Kind === 'profile'
+        ? '用 submit_profile_review 的 done 结束当前人物；可以提交空 patch 和 done=true；不调用 submit_result。'
+        : p2Kind === 'relations'
+          ? '用 submit_relation_review 的 done 结束当前人物；可以提交空 changes 和 done=true；不调用 submit_result。'
+          : p2Kind === 'directory' || p2Kind === 'candidate'
+            ? 'submit_result 必须独占本批；提交目录页/疑似组结果后程序推进，不重演业务写入。'
+            : 'submit_result必须独占本批。commitIds只列本task已确认的ID；reviewedItems与remainingWorkIds恰好分割分配项。无法完整判断的项留为remaining，合理孤点可记no_change或needs_review并说明依据。'
       const systemPrompt = wrapper.replace(/\{(\w+)\}/g, (_, name: string) => ({
         ...scope,
-        budgetRule: organization
-          ? '人物整理按实际进展记账，不设固定请求次数上限。目录页和疑似组用 submit_result 结束本页/本组；人物资料和关系用 submit_profile_review 或 submit_relation_review，done=true 保存并直接结束当前人物。'
-          : `本任务最多${maxRequests}次实际模型请求，修正与网络重发均计入同一总预算，最后一次只能调用submit_result。`,
+        submitRule, budgetRule, repairRule, finishRule,
         roleInstruction: organization ? '按人物整理流程查询和编辑本书全部资产；可以合并同类资产和增删关系，不能删除或新建资产。' : scope.profile === 'asset_editor' ? '只整理人物地点，不读取故事会话或修改叙事资料。' : '只整理节点、事件线和工作记忆，不合并人物地点。',
         businessPrompt: options.businessPrompt,
         outputDiscipline,
@@ -130,12 +156,20 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       const prior = await repo.transaction(false, store => taskOf(store, scope))
       adapter = createAgentTools(repo, scope, { afterCommit: options.afterCommit, initialReadSet: prior.task.readSet as unknown as ReadSet })
       const tools = adapter
-      heartbeat = setInterval(() => { void repo.transaction(true, async store => {
-        const lease = await store.get('pipelineRuns', `lease:${domainOf(scope)}`)
-        if (lease?.owner !== scope.owner) throw new Error('CONFLICT:执行权已转移。')
-        await store.put('pipelineRuns', { ...lease, expiresAt: Date.now() + 30000 })
-        if (scope.sessionId) { const session = (await store.get('storySessions', scope.sessionId))!; if (session.leaseOwner !== scope.owner) throw new Error('CONFLICT:会话执行权已转移。'); await store.put('storySessions', { ...session, leaseUntil: Date.now() + 30000 }) }
-      }).catch(() => controller.abort()) }, 8000)
+      // P2 由 service 层统一续租；运行层只保留 P3 的心跳，避免同一次运行出现两套执行者。
+      if (!organization) {
+        let failures = 0
+        heartbeat = setInterval(() => { void repo.transaction(true, async store => {
+          const lease = await store.get('pipelineRuns', `lease:${domainOf(scope)}`)
+          if (lease?.owner !== scope.owner) throw new Error('CONFLICT:执行权已转移。')
+          await store.put('pipelineRuns', { ...lease, expiresAt: Date.now() + 30000 })
+          if (scope.sessionId) { const session = (await store.get('storySessions', scope.sessionId))!; if (session.leaseOwner !== scope.owner) throw new Error('CONFLICT:会话执行权已转移。'); await store.put('storySessions', { ...session, leaseUntil: Date.now() + 30000 }) }
+        }).then(() => { failures = 0 }).catch(error => {
+          const message = error instanceof Error ? error.message : '租约续期失败。'
+          if (leaseFailureKind(error) === 'lost') { heartbeatFailure = message; controller.abort() }
+          else if (++failures >= 3) { heartbeatFailure = `连续${failures}次无法确认执行权：${message}`; controller.abort() }
+        }) }, 8000)
+      }
       let persistQueue = Promise.resolve()
       const persistTail = () => persistQueue = persistQueue.then(async () => {
         if (!agent || !scope.sessionId) return
@@ -186,11 +220,21 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
             const left = maxRequests - usedRequests
             const closing = resumable ? (identity ? left <= 3 : usedRequests >= 14) || timeLeft() <= 60000 : left <= 5
             const note = organization
-              ? left <= 2 || timeLeft() <= 60000
-                ? '当前人物材料已由程序提供；需要补查再用工具。判断完成后调用submit_profile_review或submit_relation_review：done=false保存部分继续，done=true保存并直接换下一人。不要调用submit_result或另做结束总结。'
-                : '只处理输入的当前人物。程序已提供默认资料，需要时再查询其他人物或原文。判断完成后用submit_profile_review或submit_relation_review提交；done=true直接结束当前人物。不要查找其他人物，也不要重送已归档历史或做结束总结。'
+              ? p2Kind === 'profile'
+                ? left <= 2 || timeLeft() <= 60000
+                  ? '当前人物材料已由程序提供；需要补查再用工具。判断完成后调用submit_profile_review：done=false保存部分继续，done=true保存并直接换下一人。不要调用submit_result或提交人物关系，也不要另做结束总结。'
+                  : '只处理输入的当前人物。程序已提供默认资料，需要时再查询其他人物或原文。判断完成后用submit_profile_review提交；done=true直接结束当前人物。不要提交人物关系，也不要查找其他人物或重送已归档历史。'
+                : p2Kind === 'relations'
+                  ? left <= 2 || timeLeft() <= 60000
+                    ? '当前人物关系已由程序提供；需要补查再用工具。判断完成后调用submit_relation_review：done=false保存部分继续，done=true保存并直接换下一人。不要调用submit_result或提交人物资料，也不要另做结束总结。'
+                    : '只处理输入的当前人物关系。程序已提供默认关系资料，需要时再查询其他人物或原文。判断完成后用submit_relation_review提交；done=true直接结束当前人物。不要提交人物资料，也不要查找其他人物或重送已归档历史。'
+                  : p2Kind === 'directory' || p2Kind === 'candidate'
+                    ? '处理当前目录页或疑似组。需要补查再用工具，完成后用submit_result提交当前页或疑似组结论；不要提交人物资料或关系，不要另做结束总结。'
+                    : '按当前人物整理工作项处理；需要补查再用工具，完成后提交当前工作项结果。'
               : resumable
-              ? `${identity ? '本资产目标3分钟' : '本组任务目标5分钟'}、最多${maxRequests}次实际请求；现在剩余约${Math.ceil(timeLeft() / 1000)}秒、${left}轮。${closing ? '进入收尾：停止扩展调查，提交证据充分的修改和总结；证据不足的分配项放入remainingWorkIds，使用partial。最后一轮仅提交总结。' : '围绕当前分配项核实，可在同一轮批量调用查询工具；证据充分即可提交总结。'}`
+              ? maxRequests >= 1_000_000
+                ? `${identity ? '本资产目标3分钟' : '本组任务目标5分钟'}，按时间预算收尾，不设固定请求轮数；现在剩余约${Math.ceil(timeLeft() / 1000)}秒。${closing ? '进入收尾：停止扩展调查，提交证据充分的修改和总结；证据不足的分配项放入remainingWorkIds，使用partial。' : '围绕当前分配项核实，可在同一轮批量调用查询工具；证据充分即可提交总结。'}`
+                : `${identity ? '本资产目标3分钟' : '本组任务目标5分钟'}、最多${maxRequests}次实际请求；现在剩余约${Math.ceil(timeLeft() / 1000)}秒、${left}轮。${closing ? '进入收尾：停止扩展调查，提交证据充分的修改和总结；证据不足的分配项放入remainingWorkIds，使用partial。最后一轮仅提交总结。' : '围绕当前分配项核实，可在同一轮批量调用查询工具；证据充分即可提交总结。'}`
               : closing ? `本子任务还可请求模型${left}次。请按已核实的分配项提交结果；最后一次仅调用submit_result，未完成项列入remainingWorkIds并使用partial，交由后续排队批次处理。` : '按需调用工具核实分配项，证据齐全后调用submit_result逐项说明outcome；未核实项列入remainingWorkIds交后续批次。'
 
             return { context: { ...context, messages: [...withPrompt, { role: 'user', content: note, timestamp: Date.now() }] } }
@@ -206,6 +250,8 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         } : undefined,
         beforeRequest: consumeRequest,
         beforeToolCall: async ({ assistantMessage, toolCall }) => {
+          if (options.shouldCancel?.()) return { block: true, terminate: true, reason: 'CANCELLED:运行已取消，工具未执行。' }
+          if (options.shouldPause?.()) return { block: true, terminate: true, reason: 'PAUSED:任务已暂停，工具未执行。' }
           const batch = assistantMessage.content.filter(part => part.type === 'toolCall')
           if (batch.some(call => call.name === 'submit_result') && batch.length !== 1) return { block: true, reason: '最终总结须独占本批调用，混合批全部操作均未执行。' }
           const { task } = await repo.transaction(false, store => taskOf(store, scope))
@@ -215,7 +261,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         afterToolCall: async ({ toolCall, result, isError }) => {
           if (organization && tools.completed) return { terminate: true }
           if (organization) {
-            if (!isError) { failedSignatures = new Set(); return undefined }
+            if (!isError) { failedSignatures = new Set(); if ((organizationWriteTools as readonly string[]).includes(toolCall.name)) organizationConflicts = 0; return undefined }
             const signature = `${toolCall.name}:${canonical(toolCall.arguments)}`
             const message = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n')
             if (failedSignatures.has(signature)) {
@@ -223,6 +269,13 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
               return { terminate: true }
             }
             failedSignatures.add(signature)
+            if (/CONFLICT|IDEMPOTENCY_CONFLICT/.test(message)) {
+              organizationConflicts++
+              if (organizationConflicts >= 3) {
+                outcome.itemFailure = `连续${organizationConflicts}次写入冲突且没有新提交，已保留当前进度并暂停：${message.slice(0, 500)}`
+                return { terminate: true }
+              }
+            } else organizationConflicts = 0
             return undefined
           }
           if (!isError || !['submit_result', 'commit_asset_changes', 'commit_story_changes'].includes(toolCall.name)) return undefined
@@ -233,11 +286,11 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           if (!terminate) agent?.steer({ role: 'user', content: '这是本任务唯一一次结果修正机会。请根据工具错误修正；改变写入内容时使用新的命令键。', timestamp: Date.now() })
           return terminate ? { terminate: true } : undefined
         },
-        finishTurn: () => tools.summary || organization && tools.completed || resumable && (usedRequests >= maxRequests || resumable && timeLeft() === 0) ? { action: 'end' } : undefined,
+        finishTurn: () => options.shouldPause?.() || options.shouldCancel?.() || tools.summary || organization && tools.completed || resumable && (usedRequests >= maxRequests || resumable && timeLeft() === 0) ? { action: 'end' } : undefined,
         validateFinal: () => { if (!tools.completed && !tools.summary && !(resumable && (deferredAfterValidation || usedRequests >= maxRequests || resumable && timeLeft() === 0))) throw new ModelError(usedRequests >= maxRequests ? 'budget' : 'validation', usedRequests >= maxRequests ? 'BUDGET:子任务预算已用完，剩余工作交后续批次。' : '智能体尚未提交包含真实确认的任务总结。') },
-      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(scope.probe ? { temperature: 0 } : {}), ...(organization ? { unboundedRequests: true } : {}), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
+      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
       outcome.summary = adapter.summary
-      if (resumable && outcome.result.error && ['validation', 'context_length', 'content_policy'].includes(outcome.result.error.kind)) outcome.itemFailure = outcome.result.error.message
+      if (resumable && !outcome.itemFailure && outcome.result.error && ['validation', 'context_length', 'content_policy'].includes(outcome.result.error.kind)) outcome.itemFailure = outcome.result.error.message
       if (resumable && !outcome.summary && (outcome.result.ok || outcome.itemFailure || outcome.result.error?.kind === 'budget')) {
         await repo.transaction(true, async store => {
           await checkLease(store, scope, controller.signal)
@@ -249,7 +302,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       }
       outcome.ok = tools.completed || !!outcome.summary && (outcome.result.ok || resumable && (!!outcome.itemFailure || outcome.result.error?.kind === 'budget'))
       if (!outcome.ok) outcome.error = outcome.result.error?.message ?? '任务总结未通过校验。'; else outcome.error = undefined
-    } catch (error) { outcome.error = controller.signal.aborted ? '任务已取消，已提交成果保留。' : error instanceof Error ? error.message : '智能体执行失败。' }
+    } catch (error) { outcome.error = heartbeatFailure ? `任务因执行权异常暂停：${heartbeatFailure}` : controller.signal.aborted ? '任务已取消，已提交成果保留。' : error instanceof Error ? error.message : '智能体执行失败。' }
     finally {
       clearInterval(heartbeat); options.signal?.removeEventListener('abort', abort)
       outcome.readCalls = adapter?.readCalls ?? 0; outcome.writeCalls = adapter?.writeCalls ?? 0
@@ -258,14 +311,14 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         outcome.commitIds = strings(task.appliedCommitIds)
         const lease = await store.get('pipelineRuns', `lease:${domainOf(scope)}`)
         if (lease?.owner !== scope.owner) return
-        const status = outcome.itemFailure ? 'failed' : outcome.ok ? outcome.summary?.status === 'partial' ? 'partial' : 'completed' : controller.signal.aborted ? 'cancelled' : 'partial'
+        const status = outcome.itemFailure ? 'failed' : outcome.ok ? outcome.summary?.status === 'partial' ? 'partial' : 'completed' : controller.signal.aborted ? heartbeatFailure ? 'failed' : 'cancelled' : 'partial'
         const failure = outcome.error ?? outcome.itemFailure
-        await saveTask(store, scope, { status, ...(failure ? { lastError: { code: controller.signal.aborted ? 'cancelled' : outcome.result?.error?.kind === 'budget' ? 'BUDGET' : 'AGENT_FAILED', message: `${failure}${(task.lastError as Row | undefined)?.code === 'TOOL_ERROR' ? `；最近工具反馈：${text((task.lastError as Row).message)}` : ''}` } } : {}) })
+        await saveTask(store, scope, { status, ...(failure ? { lastError: { code: heartbeatFailure ? 'LEASE_LOST' : controller.signal.aborted ? 'cancelled' : outcome.result?.error?.kind === 'budget' ? 'BUDGET' : 'AGENT_FAILED', message: `${failure}${(task.lastError as Row | undefined)?.code === 'TOOL_ERROR' ? `；最近工具反馈：${text((task.lastError as Row).message)}` : ''}` } } : {}) })
         if (organization) await appendRequestLedger(store, scope, outcome.result?.attempts ?? [], outcome.result?.snapshot as Row | undefined, 'work')
         const updated = (await store.get('pipelineRuns', scope.runId))!
         const usage = outcome.result?.usage
         const previous = run.usage as Row | undefined
-        await store.put('pipelineRuns', { ...updated, status: organization && !controller.signal.aborted && !outcome.error && !outcome.itemFailure ? 'running' : outcome.ok && outcome.summary?.status === 'completed' ? 'completed' : controller.signal.aborted ? 'cancelled' : 'paused', ...(organization ? {} : { finishedAt: timestamp() }), ...(usage ? { usage: { input: Number(previous?.input ?? 0) + usage.input, output: Number(previous?.output ?? 0) + usage.output, totalTokens: Number(previous?.totalTokens ?? 0) + usage.totalTokens, cost: Number(previous?.cost ?? 0) + (usage.cost ?? 0), costStatus: usage.costStatus }, cost: Number(previous?.cost ?? 0) + (usage.cost ?? 0) } : {}) })
+        await store.put('pipelineRuns', { ...updated, status: organization && !controller.signal.aborted && !outcome.error && !outcome.itemFailure ? 'running' : outcome.ok && outcome.summary?.status === 'completed' ? 'completed' : heartbeatFailure ? 'paused' : controller.signal.aborted ? 'cancelled' : 'paused', ...(organization ? {} : { finishedAt: timestamp() }), ...(usage ? { usage: { input: Number(previous?.input ?? 0) + usage.input, output: Number(previous?.output ?? 0) + usage.output, totalTokens: Number(previous?.totalTokens ?? 0) + usage.totalTokens, cost: Number(previous?.cost ?? 0) + (usage.cost ?? 0), costStatus: usage.costStatus }, cost: Number(previous?.cost ?? 0) + (usage.cost ?? 0) } : {}) })
         if (!options.retainLease) await store.remove('pipelineRuns', `lease:${domainOf(scope)}`)
         if (scope.sessionId && !options.retainLease) { const session = await store.get('storySessions', scope.sessionId); if (session?.leaseOwner === scope.owner) { const { leaseOwner: _owner, leaseUntil: _until, ...saved } = session; await store.put('storySessions', saved) } }
       }).catch(error => { outcome.ok = false; outcome.error = error instanceof Error ? error.message : '保存任务状态失败。' })

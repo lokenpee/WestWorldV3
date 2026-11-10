@@ -70,7 +70,7 @@ direct模式由pi-ai执行，无pi-agent-core循环。有Schema时可注册唯�
 
 返回usage每次尝试均累计。stopReason为error/aborted时按AI-05处理；没有Schema时把text块换行拼接返回。否则找首个submit_result调用，递归normalize可选null，TypeBox验证，再调用共用validateData业务引用/原文等校验。通过后由调用方调用共用命令服务直接提交当前实体；本模式不执行Agent查询或写工具。
 
-提交缺失、结构错或业务校验错默认最多修正一次，P1提取最多修正两次。direct首次、网络重发和修正共用最多3次实际请求预算。修正带回完整assistant原始响应、每个工具调用的配对错误反馈及修正指令。P1失败隔离、主动续期和单项补提取以[逐章提取决策](../decisions/extraction-queue.md)为准。
+提交缺失、结构错或业务校验错默认最多修正一次，P1提取最多修正两次。direct默认不设固定实际请求轮数，保留超时、可选配置预算和修正次数。修正带回完整assistant原始响应、每个工具调用的配对错误反馈及修正指令。P1失败隔离、主动续期和单项补提取以[逐章提取决策](../decisions/extraction-queue.md)为准。
 
 实际请求预算见[逐章提取](../../openspec/specs/extraction/spec.md)及[模型配置与调用](../../openspec/specs/model-access/spec.md)。可选字段null仅在非必填且原属性不允许null时移除；递归数组、对象和union分支，不改原响应、不强制类型、不删除必填。
 
@@ -95,6 +95,8 @@ P2身份核实按[世界资产整理决策](../decisions/world-organization.md)�
 
 P3取得会话租约，加载应用保存的原始消息投影/摘要，通过Pi恢复运行上下文；每个message_end追加原始Pi消息，写服务原子保存业务commit确认，工具反馈再以Pi toolResult进入会话。事务已成功而toolResult未持久化时，下次同operationKey返回原确认，不重写；finally释放自己的租约。P2临时Pi运行不伪造故事消息链。
 
+当前版本同一本书同一时间只允许一个P1/P2/P3后台任务运行；P1内部世界/叙事两条lane仍可并行，不同书籍互不影响。运行入口必须在service/租约事务内检查目标书全部活跃租约，不能只靠UI禁用。周期租约P1一个、P2一个、P3一个；P2/P3运行层不再额外启动第二套心跳。续租只更新`expiresAt`或`leaseUntil`；快照比较忽略续期时间但保留owner/runId等身份，业务提交事务内仍重新确认租约、会话所有权和有效期。快照短暂变化按暂时失败重试；连续三次仍无法确认执行权时保留activeWork并转为可继续的暂停。owner/runId、会话所有权变化或租约过期属于真正丢失执行权，旧执行者立即停止写入。用户主动取消与异常暂停分别记录，不能把租约异常当成用户取消。
+
 无持久会话仍用其预算策略；P3持久会话按AI-08压缩。统一模型/校验/错误层不要求两种模式拥有相同记忆与上下文预算。
 
 ## AI-05 错误分类、退避与用量
@@ -105,9 +107,9 @@ direct和agent共用同一错误归一器。signal取消或Pi stopReason=aborted
 |---|---|---|
 | network / server | 3 | base1000ms，指数与抖动 |
 | rate_limit | 3 | 解析Retry-After整数秒优先，否则指数 |
-| auth/content_policy/context_length/validation/cancelled/unsupported_provider/unsupported_capability/unknown | 1 | 普通服务重试禁用；结构修正至多一次且消耗剩余总请求预算 |
+| auth/content_policy/context_length/validation/cancelled/unsupported_provider/unsupported_capability/unknown | 1 | 普通服务重试禁用；结构修正至多一次，消耗普通调用预算 |
 
-delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅按字符串正则提取整数，不增加HTTP日期支持。direct每逻辑调用最多3次实际Provider请求，P2身份核实按世界资产整理决策收尾；P3按叙事整理的排队与恢复决策执行预算，章节层不另套重试。两模式由同一服务重试策略处理可重试错误/Retry-After，不在Pi Agent外再叠加一套独立网络重试循环。退避等待必须响应signal；取消在下一事件循环结束等待并阻止下一请求，清理timer/listener；已提交确认保留。
+delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅按字符串正则提取整数，不增加HTTP日期支持。direct默认不设固定请求轮数，P2身份核实按世界资产整理决策收尾；P3按叙事整理的排队与恢复决策执行预算，章节层不另套重试。两模式由同一服务重试策略处理可重试错误/Retry-After，不在Pi Agent外再叠加一套独立网络重试循环。退避等待必须响应signal；取消在下一事件循环结束等待并阻止下一请求，清理timer/listener；已提交确认保留。
 
 有session的Agent遇context_length可额外强制压缩恢复一次，再按服务策略；不能无限压缩。模型调用失败对象统一含ok=false、原Pi stopReason、errorKind/errorMessage、attempts/attemptsUsage、mode/modelRole/bookId/runId；保留无凭据的Provider诊断。工具业务错误独立记录，写成功后末轮失败/取消不得回滚已提交实体、记忆和确认，状态与报告必须列出已应用commitIds。费用为每次返回usage.cost.input+output的总和，摘要费用也计入；不按UI货币符号自行换算。
 
@@ -138,7 +140,7 @@ delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅
 
 工作记忆结构和字段见DATA。校验要求非空trim摘要和statement/key、批内key唯一、至少一个node/line/evidence依据，节点线引用有效；新增临时节点允许在本批先声明。evidence.quote必须在指定章逐字存在；错误时回查所有章给实际所在章提示。resolved不能用于此前不存在的事项，同主题kind不能变。
 
-2.2不再把全库assetFingerprint作为P3批提交或检查点失效条件。叙事事实指纹包含节点/线事实、相关章原文与策略版本；节点actorIds与targetCharacterIds属于持久人物关联并参与依赖比较，事件线characterIds由成员节点派生。世界依赖按实际查询返回的kind/id/resolvedId/revision及查询页参数/结果指纹记录；提交前重读这些依赖。可另计算全库统计指纹作诊断，但不得用于阻断无关P2/P3并行。
+2.2不再把全库assetFingerprint作为P3批提交或检查点失效条件。叙事事实指纹包含节点/线事实、相关章原文与策略版本；节点actorIds与targetCharacterIds属于持久人物关联并参与依赖比较，事件线characterIds由成员节点派生。世界依赖按实际查询返回的kind/id/resolvedId/revision及查询页参数/结果指纹记录；提交前重读这些依赖。可另计算全库统计指纹作诊断，但不得用于阻断当前任务中与全库统计无关的提交；当前版本同书P2/P3不并行。
 
 笔记依据指纹含实际世界依赖列表（kind/id/revision或resolvedId）、引用节点/线事实、原文章段指纹与evidence/present布尔；不再纳入全库assetFingerprint。与当前计算不等则validity=stale；不直接写坏原笔记状态。dataChanged比较本会话已记录的实际依赖和叙事事实指纹；pendingCount只计kind review/status active，和staleCount独立。
 
@@ -192,7 +194,7 @@ window_link只接受confidence>=0.85且引用有效的event_line_ops，附reason
 
 P2身份核实按世界资产整理决策分配预算；P3子任务按叙事整理决策分配预算；Agent可自由选择本书工具，未完成时拆分/续同会话处理下一页。步数预算仅限制单次调用，不能截断整书覆盖。任务上下文标明已看范围、未看游标和当前阶段，不得将压缩摘要当作新原文证据。
 
-世界详情工具返回revision/当前redirect目标，代码记录实际读集。P2并行更新命中读集时，本批拒绝并同会话重查；不命中则正常提交。任务结束前再核全书覆盖清单和依赖有效性，未覆盖不能标completed。
+世界详情工具返回revision/当前redirect目标，代码记录实际读集。P2跨域依赖更新命中读集时，本批拒绝并同会话重查；不命中则正常提交。任务结束前再核全书覆盖清单和依赖有效性，未覆盖不能标completed。
 
 ## 精简资产遍历的稳定游标
 
@@ -321,7 +323,7 @@ TaskRecord.input保存首次创建任务的不可变快照。每次实际请求�
 
 P2身份核实的时间、请求次数与提前收尾方式以[世界资产整理决策](../decisions/world-organization.md)为准。每次请求前提示剩余时间和次数，已提交修改与未完成项分开保存。累计使用量只计一次。
 
-P3每个子任务的5分钟、20次请求收尾规则以[叙事整理决策](../decisions/story-organization.md)为准；stepsUsed在发请求前持久递增，刷新恢复不清零。maxTokens=`min(model.maxTokens或8192,reserve)`，P2/P3同式；reserve按AI-08。恢复发现已用完本任务预算则task=partial，剩余工作按新task处理。P3本轮未完成项让后续任务继续；本轮结束保存剩余清单，由用户继续。
+P3每个子任务的5分钟时间预算收尾规则以[叙事整理决策](../decisions/story-organization.md)为准；stepsUsed在发请求前持久递增，刷新恢复不清零。maxTokens=`min(model.maxTokens或8192,reserve)`，P2/P3同式；reserve按AI-08。恢复发现已用完本任务预算则task=partial，剩余工作按新task处理。P3本轮未完成项让后续任务继续；本轮结束保存剩余清单，由用户继续。
 
 网络/服务重试仍按AI-05；每次实际Provider请求消耗stepsUsed并计usage，不存在免费重试轮。tool CONFLICT不算网络失败：追加conflict.txt，保留工具权限供重读，消耗正常余下轮数；预算不足则partial。任务attempt统计实际Provider请求次数，与stepsUsed同时递增；启动/恢复本身不加1。P2在响应结束后收尾；其他任务到期中断时保留已提交确认。
 
@@ -330,7 +332,7 @@ P3每个子任务的5分钟、20次请求收尾规则以[叙事整理决策](../
 | direct输出结构/语义错误 | 原assistant与每个toolCall配对错误结果入上下文，再repair_direct.txt；最多一次 | 仍仅submit_result；第二次错返回validation |
 | Agent写参数/领域错误 | 错误toolResult后追加repair_write.txt；repairCount从0变1；修改payload必须新key | 保留本角色工具；按本任务剩余预算修正，未完成项保存为partial |
 | Agent最终总结错误 | 追加repair_final.txt；若repairCount仍0可变1，并额外允许第7轮仅修最终总结 | 第7轮只允许submit_result；已用过修正机会或再次失败就partial/validation |
-| CONFLICT | 不消耗repairCount；必须重读相关依据；新判断用新key | 只消耗普通请求预算；不能无限续轮 |
+| CONFLICT | 不消耗repairCount；必须重读相关依据；新判断用新key | 只消耗普通调用预算；按时间预算收尾 |
 
 write修正与final修正共享一次机会，不能各自多给一次。运行器不得因最终总结错误重新执行已经成功的写命令。代码生成错误诊断与配对toolResult，不接受模型自己声称“验证通过”。模板变量error来自无凭据的校验诊断；operationKey/nextOperationKey/commitIds都来自当前任务状态。
 

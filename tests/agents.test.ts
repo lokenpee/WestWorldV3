@@ -314,6 +314,10 @@ it('同书P2与P3使用不同实例，P2请求不携带P3私有历史和工作�
   const storyInput = { bookId, runId: storyRun, taskId: storyTask, planVersion: '2.2', remainingCount: 1, resume: { reason: 'initial', appliedCommitIds: [], nextOperationKey: storyOperation, remainingWorkIds: [nodeWork.workItemId] }, stage: 'P3', phase: 'window_link', sessionId: session.id, queue: 'window_nodes', window: { start: 0, end: 1, chapterIndices: ['1'] }, workItems: [nodeWork], existingLines: [], memory: { id: session.id, bookId, sessionId: session.id, revision: 0, workingSummary: '', dataFingerprint: '', updatedAt: '' }, afterWorkItemId: null }
   const story = await runtime.run(repo, { profile: 'story_editor', phase: 'window_link', runId: storyRun, taskId: storyTask, sessionId: session.id, input: storyInput, workItems: [nodeWork], businessPrompt: '叙事任务', prompt: JSON.stringify({ operationKey: storyOperation, workItemId: nodeWork.workItemId, privateHistory: 'STORY_ONLY_PRIVATE' }) })
   expect(story.ok, story.error).toBe(true)
+  const storyPayload = JSON.stringify(JSON.parse(fetcher.mock.calls[0]![1]!.body as string))
+  expect(storyPayload).toContain('不设固定请求轮数')
+  expect(storyPayload).not.toContain('本工作项按实际进展处理')
+  expect(storyPayload).toContain('"submit_result"')
   const originalEntries = await db.table('storySessionEntries').count()
   const originalMemory = await db.table('storyEditorMemory').get(session.id)
   const previousRequests = fetcher.mock.calls.length

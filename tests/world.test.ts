@@ -560,27 +560,6 @@ it('提交合并后其余批次继续，不重复合并同一组', async () => {
   expect(await db.table('characters').count()).toBe(3)
 })
 
-it('单资产第六轮开始收尾，第八轮返回后保存待办，不重复启动该资产', async () => {
-  const notes: string[] = []
-  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
-    const body = JSON.parse(init?.body as string), input = taskInput(body)
-    notes.push(JSON.stringify(body.messages.at(-1)))
-    return agentStream([{ name: 'get_character_detail', args: { ids: input.workItems.map((row: { id: string }) => row.id) } }])
-  })
-  const { service, models, db } = await setup(fetcher)
-  await db.table('characters').clear(); await db.table('locations').clear()
-  await db.table('characters').put(person('one', '单个人物'))
-  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://world-fixture.invalid/v1' }, 'fake-key')
-  await service.start('a')
-  expect(fetcher).toHaveBeenCalledTimes(8)
-  expect(notes[5]).toContain('进入收尾')
-  const report = (await service.reports('a'))[0]
-  expect(report.status).toBe('paused')
-  expect(report.coverage).toMatchObject({ checked: 0, pendingIds: ['ai_identity:fullBook:character:one'] })
-  expect(report.tasks).toHaveLength(1)
-  expect(report.report.failed).toEqual([])
-})
-
 it('剩余一分钟提醒收尾，跨过目标时间的在途请求正常返回并保存待办', async () => {
   const realNow = Date.now.bind(Date); let elapsed = 0
   const notes: string[] = [], aborted: boolean[] = []
@@ -600,6 +579,7 @@ it('剩余一分钟提醒收尾，跨过目标时间的在途请求正常返回�
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed)
   try { await fixture.service.start('a') } finally { clock.mockRestore() }
   expect(fetcher).toHaveBeenCalledTimes(2)
+  expect(notes[0]).toContain('按时间预算')
   expect(notes[1]).toContain('进入收尾')
   expect(aborted).toEqual([false, false])
   expect((await fixture.service.reports('a'))[0]).toMatchObject({ status: 'paused', coverage: { checked: 0 } })

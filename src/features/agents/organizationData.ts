@@ -8,7 +8,9 @@ export async function profileWork(character: Character) {
   return { ...content, id: character.id, revision: character.revision, fields: ['name', 'aliases', 'identity', 'profile', 'appearance', 'personality', 'background', 'speechStyleSample', 'mergeFacts', 'sourceChapters'] }
 }
 
-export async function relationWork(store: AgentStore, id: string, pairChecks: Row[] = []) {
+const brief = (value: string | undefined) => (value ?? '').slice(0, 50)
+
+export async function relationWork(store: AgentStore, id: string, pairChecks: Row[] = [], compact = false) {
   const context = await reviewContext(store)
   const person = context.byId.get(id)
   if (!person) return null
@@ -18,15 +20,26 @@ export async function relationWork(store: AgentStore, id: string, pairChecks: Ro
     const target = context.byId.get(targetId)
     const view = pairFromPerspective([pair], id, targetId, context.people)
     const checked = checks.get(view.pairKey)
-    return {
-      pairKey: view.pairKey, targetId, targetName: target?.name ?? '', targetIdentity: target?.identity ?? '',
-      forwardLabels: view.forwardLabels, reverseLabels: view.reverseLabels, directionUnclear: view.directionUnclear,
-      state: view.state, fingerprint: view.fingerprint, evidence: view.evidence,
-      checked: checked?.outcome ? { outcome: checked.outcome, reason: checked.reason } : null,
+    const row: Row = {
+      targetId, targetName: target?.name ?? '', identity: compact ? brief(target?.identity) : target?.identity ?? '',
+      forward: view.forwardLabels, reverse: view.reverseLabels,
+      state: view.state, fingerprint: view.fingerprint,
     }
+    if (view.directionUnclear) row.unclear = true
+    if (checked?.outcome) row.checked = { outcome: checked.outcome, reason: compact ? String(checked.reason ?? '').slice(0, 100) : checked.reason }
+    if (!compact) row.evidence = view.evidence
+    return row
   })
   const raw = await store.rows('characterRelations') as unknown as CharacterRelation[]
-  const unresolved = raw.filter(row => row.sourceId === id && !row.targetIds.length || row.targetIds.includes(id) && !row.sourceId)
-    .map(row => ({ id: row.id, sourceName: row.sourceName, targetName: row.targetName, forwardLabel: row.forwardLabel, reverseLabel: row.reverseLabel, direction: row.direction, evidence: row.evidence }))
-  return { id: person.id, name: person.name, identity: person.identity ?? '', revision: person.revision, relations, unresolved }
+  const unlinkedRelations = raw.filter(row => row.sourceId === id && !row.targetIds.length || row.targetIds.includes(id) && !row.sourceId)
+    .map(row => {
+      const item: Row = { sourceName: row.sourceName, targetName: row.targetName, forward: row.forwardLabel, reverse: row.reverseLabel, direction: row.direction }
+      if (!compact) { item.id = row.id; item.evidence = row.evidence }
+      return item
+    })
+  return { id: person.id, name: person.name, identity: compact ? brief(person.identity) : person.identity ?? '', revision: person.revision, relations, unlinkedRelations }
+}
+
+export async function relationOverview(store: AgentStore, id: string, pairChecks: Row[] = []) {
+  return relationWork(store, id, pairChecks, true)
 }

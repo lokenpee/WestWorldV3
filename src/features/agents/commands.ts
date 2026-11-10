@@ -9,10 +9,9 @@ import { pairKeyOf } from '../assets/relations'
 import { bindNodeCharacters } from '../assets/characterLinks'
 import type { Basis, Character, EventNode, RelationEvidence } from '../assets/types'
 import { acceptIdentityMerge } from '../world/queue'
-import { normalizeCharacterNames } from '../assets/characterNames'
 import { rebaseStoryCoverage, saveStoryCoverage } from '../story/coverage'
 import { applyAliasChecks } from './assetAliases'
-import { applyOrganizationTool, assertBasis, hasCharacterDetailRead, organizationTool } from './organizationCommands'
+import { applyOrganizationTool, assertBasis, hasCharacterDetailRead, organizationTool, reconcileOrganizationAfterWrite, replayOrganizationSubmit } from './organizationCommands'
 import { noteOrganizationWrite } from './organizationReview'
 
 export interface QueryRead { tool: string; args: Row; resultFingerprint: string }
@@ -114,7 +113,7 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
     }
     const members = await Promise.all(ids.map(id => store.get(table, id)))
     if (members.some(row => !row || row.bookId !== scope.bookId)) throw new Error('SCOPE:合并成员不存在或不属于当前书籍。')
-    const named: Row[] = (members as Row[]).map(row => kind === 'character' ? normalizeCharacterNames({ ...row, name: text(row.name), aliases: strings(row.aliases), identity: text(row.identity) }) : row)
+    const named: Row[] = members as Row[]
     const manualKeep = named.filter(row => row.manualKeep === true)
     const manualNames = [...new Set(named.filter(row => row.nameSource === 'manual').map(row => text(row.name)))]
     if (manualKeep.length > 1 || manualKeep.length === 1 && manualKeep[0].id !== group.keepId || manualNames.length > 1 || manualNames.length === 1 && manualNames[0] !== group.canonicalName) throw new Error('INVALID_ARGS:合并须保留人工指定的条目与主名。')
@@ -122,12 +121,7 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
     if (!named.flatMap(row => [text(row.name), ...strings(row.aliases)]).includes(text(group.canonicalName))) throw new Error('INVALID_ARGS:合并主名须来自成员的现有称呼。')
     const evidence = records(group.evidence)
     if (evidence.some(item => strings(item.memberIds).some(id => !ids.includes(id)))) throw new Error('INVALID_ARGS:证据引用了分组外成员。')
-    const evidenceIds = new Set(evidence.flatMap(item => strings(item.memberIds)))
-    if (ids.some(id => !evidenceIds.has(id))) throw new Error('INVALID_ARGS:原文证据须覆盖全部合并成员。')
-    for (const item of evidence) {
-      await assertReadEvidence(store, item, originalReads)
-      for (const id of strings(item.memberIds)) { const member = named.find(row => row.id === id)!; if (![text(member.name), ...strings(member.aliases)].some(name => name && text(item.quote).includes(name))) throw new Error('INVALID_ARGS:证据须包含所引用成员的现有称呼。') }
-    }
+    for (const item of evidence) await assertReadEvidence(store, item, originalReads)
     await assertEvidence(store, evidence)
     const timestamp = new Date().toISOString()
     const kept = named.find(row => row.id === group.keepId)!
@@ -231,8 +225,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
   if (!readSet.records.some(read => read.table === 'storyEditorMemory' && read.id === memoryId)) throw new Error('INVALID_ARGS:更新工作摘要前须读取当前工作记忆。')
   await store.put('storyEditorMemory', { id: memoryId, bookId: scope.bookId, ...(scope.sessionId ? { sessionId: scope.sessionId } : {}), workingSummary: memoryUpdate.workingSummary, revision: Number(previous?.revision ?? 0) + 1, dataFingerprint: await store.wait(hash(await store.rows('nodes'))), updatedAt: timestamp })
   for (const note of records(memoryUpdate.notes)) {
-    await assertEvidence(store, records(note.evidence))
-    if (!strings(note.nodeIds).length && !strings(note.lineIds).length && !records(note.evidence).length) throw new Error('INVALID_ARGS:工作事项须有节点、事件线或逐字引文依据。')
+    if (!strings(note.nodeIds).length && !strings(note.lineIds).length && !records(note.evidence).length) throw new Error('INVALID_ARGS:工作事项须有节点、事件线或引文依据。')
     for (const id of strings(note.nodeIds)) if (!await store.get('nodes', resolveId(id))) throw new Error('INVALID_ARGS:事项节点不存在。')
     for (const id of strings(note.lineIds)) if (!await store.get('eventLines', id)) throw new Error('INVALID_ARGS:事项事件线不存在。')
     const old = (await store.rows('storyEditorNotes')).find(row => row.sessionId === scope.sessionId && row.key === note.key)
@@ -291,15 +284,19 @@ async function assertRelationReviewItem(store: AgentStore, scope: Scope, args: R
 async function applyAgentAssetTool(store: AgentStore, scope: Scope, name: string, args: Row, readSet: ReadSet, commitId: string, timestamp: string) {
   const evidence = records(args.evidence)
   const basis = records(args.basis)
-  if (scope.phase === 'character_organization') await assertBasis(store, scope, basis, readSet)
-  else await assertToolEvidence(store, scope, evidence, readSet)
+  if (name === 'delete_character_relation') {
+    if (scope.phase === 'character_organization') {
+      if (basis.length) await assertBasis(store, scope, basis, readSet)
+      else await assertToolEvidence(store, scope, evidence, readSet)
+    } else await assertToolEvidence(store, scope, evidence, readSet)
+  }
   if ((relationTools as readonly string[]).includes(name)) {
     const fromId = text(args.fromId), toId = text(args.toId)
     requireRecordRead(readSet, 'characters', fromId, 'get_character_detail')
     requireRecordRead(readSet, 'characters', toId, 'get_character_detail')
     if (!readSet.queries.some(query => query.tool === 'get_character_relation' && text((query.args as Row).fromId) === fromId && text((query.args as Row).toId) === toId)) throw new Error('INVALID_ARGS:修改人物对前须调用get_character_relation读取当前结果和指纹。')
     if (scope.reviewScope === 'relations') await assertRelationReviewItem(store, scope, args, fromId, toId, readSet)
-    if (scope.phase === 'character_organization' && !basis.some(value => ['relation', 'asset', 'chapter'].includes(String((value.source as Row)?.kind)))) throw new Error('INVALID_ARGS:关系修改须有可追溯依据。')
+    if (scope.phase === 'character_organization' && name === 'delete_character_relation' && !basis.some(value => ['relation', 'asset', 'chapter'].includes(String((value.source as Row)?.kind))) && !evidence.length) throw new Error('INVALID_ARGS:删除关系须有逐字原文或可追溯依据。')
     const write = {
       bookId: scope.bookId, fromId, toId, forwardLabels: strings(args.forwardLabels), reverseLabels: strings(args.reverseLabels),
       directionUnclear: args.directionUnclear === true, evidence: evidence as unknown as RelationEvidence[], basis: basis as unknown as Basis[], reason: text(args.reason), expectedFingerprint: text(args.expectedFingerprint),
@@ -350,15 +347,18 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
   const payloadFingerprint = await hash({ tool: name, payload }); const timestamp = new Date().toISOString()
   const previous = await repo.transaction(true, async store => {
     const { run } = await taskOf(store, scope)
+    if (organization && run.status === 'cancelled') throw new Error('CANCELLED:运行已取消，不能继续写入。')
     const applied = records(run.appliedCommands).find(row => row.operationKey === operationKey)
     if (applied) {
-      if (applied.taskId !== scope.taskId || applied.payloadFingerprint !== payloadFingerprint) throw new Error('IDEMPOTENCY_CONFLICT:命令键已经用于其他任务或内容。')
+      if (applied.payloadFingerprint !== payloadFingerprint || !organization && applied.taskId !== scope.taskId) throw new Error('IDEMPOTENCY_CONFLICT:命令键已经用于其他任务或内容。')
+      if (organization && (name === 'submit_profile_review' || name === 'submit_relation_review') && (records([applied.result])[0] as Row | undefined)?.complete === true) await replayOrganizationSubmit(store, scope, name, args, readSet, text(applied.commitId)).catch(() => undefined)
       return { ...(records([applied.result])[0] as Row ?? {}), ok: true as const, commitId: text(applied.commitId), operationKey, alreadyApplied: true, summary: text(applied.resultSummary) } as CommitAck
     }
     await checkLease(store, scope, signal)
     const intent = records(run.commandIntents).find(row => row.operationKey === operationKey)
-    if (intent && (intent.taskId !== scope.taskId || intent.payloadFingerprint !== payloadFingerprint || intent.state === 'rejected')) throw new Error('IDEMPOTENCY_CONFLICT:命令内容或状态已变化，请使用新的命令键。')
+    if (intent && (intent.payloadFingerprint !== payloadFingerprint || !organization && intent.taskId !== scope.taskId || intent.state === 'rejected' && !organization)) throw new Error('IDEMPOTENCY_CONFLICT:命令内容或状态已变化，请使用新的命令键。')
     if (!intent) await store.put('pipelineRuns', { ...run, commandIntents: [...records(run.commandIntents), { operationKey, taskId: scope.taskId, toolCallId, toolName: name, state: 'prepared', payload, payloadFingerprint, expectedReadSet: readSet, createdAt: timestamp, updatedAt: timestamp }] })
+    else if (organization && (intent.state === 'rejected' || intent.taskId !== scope.taskId)) await store.put('pipelineRuns', { ...run, commandIntents: records(run.commandIntents).map(row => row.operationKey === operationKey ? { ...row, taskId: scope.taskId, toolCallId, state: 'prepared', error: undefined, updatedAt: timestamp } : row) })
     return undefined
   })
   if (previous) return previous
@@ -367,15 +367,18 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
     const acknowledgement = await repo.transaction(true, async store => {
       await checkLease(store, scope, signal)
       const { run, task } = await taskOf(store, scope)
+      if (organization && run.status === 'cancelled') throw new Error('CANCELLED:运行已取消，不能继续写入。')
       const applied = records(run.appliedCommands).find(row => row.operationKey === operationKey)
       if (applied) {
-        if (applied.taskId !== scope.taskId || applied.payloadFingerprint !== payloadFingerprint) throw new Error('IDEMPOTENCY_CONFLICT:命令内容不一致。')
+        if (applied.payloadFingerprint !== payloadFingerprint || !organization && applied.taskId !== scope.taskId) throw new Error('IDEMPOTENCY_CONFLICT:命令内容不一致。')
+        if (organization && (name === 'submit_profile_review' || name === 'submit_relation_review') && (records([applied.result])[0] as Row | undefined)?.complete === true) await replayOrganizationSubmit(store, scope, name, args, readSet, text(applied.commitId)).catch(() => undefined)
         return { ...(records([applied.result])[0] as Row ?? {}), ok: true as const, commitId: text(applied.commitId), operationKey, alreadyApplied: true, summary: text(applied.resultSummary) } as CommitAck
       }
       const intent = records(run.commandIntents).find(row => row.operationKey === operationKey && row.taskId === scope.taskId && row.state === 'prepared')
       if (!intent) throw new Error('CONFLICT:命令意图未就绪。')
       const expected = intent.expectedReadSet as unknown as ReadSet
-      const queryResults = organization && name === 'record_organization_progress' ? new Map<QueryRead, Row>() : await validateReadSet(store, scope, expected)
+      const dedicated = organization && (name === 'submit_profile_review' || name === 'submit_relation_review')
+      const queryResults = organization && name === 'record_organization_progress' ? new Map<QueryRead, Row>() : dedicated ? new Map<QueryRead, Row>() : await validateReadSet(store, scope, expected)
       const previousStory = new Map<string, Row>()
       if (name === 'commit_story_changes') for (const table of ['nodes', 'eventLines', 'storyEditorNotes']) for (const row of await store.rows(table)) previousStory.set(`${table}:${row.id}`, row)
       const workTables: Record<string, string> = { character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' }
@@ -448,6 +451,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
         }
         assetReview = { ...(assetReview ?? { version: 1 }), items: reviewItems, updatedAt: timestamp }
       }
+      if (organization) await reconcileOrganizationAfterWrite(store, scope, latest, name, args, toolResult as Row | undefined)
       await store.put('pipelineRuns', { ...latest, ...(assetReview ? { assetReview } : {}), appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { ...toolResult } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
       await appendEntry(store, scope, { type: 'commit', summary: `${commitId}：${summary}` })
       updatedReads = structuredClone(readSet)

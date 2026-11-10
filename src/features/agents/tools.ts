@@ -14,8 +14,18 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
   let completedWork = false
   const relationOnly = scope.phase === 'asset_review' && scope.reviewScope === 'relations'
   const organization = scope.phase === 'character_organization'
+  const workKind = scope.workKind
+  const organizationAllows = (name: string) => {
+    if (!organization) return true
+    if (name === 'commit_asset_changes') return false
+    if (name === 'record_organization_progress') return !workKind || ((workKind === 'directory' || workKind === 'candidate') && (!scope.organizationStep || ['scan', 'resolve'].includes(scope.organizationStep)))
+    if (name === 'clear_candidate_groups') return !workKind || (workKind === 'candidate' && scope.organizationStep === 'resolve')
+    if (name === 'submit_profile_review') return !workKind || workKind === 'profile'
+    if (name === 'submit_relation_review') return !workKind || workKind === 'relations'
+    return true
+  }
   const contracts = toolContracts[scope.profile].filter(contract => organization
-    ? contract.name !== 'commit_asset_changes'
+    ? organizationAllows(contract.name)
     : scope.phase === 'asset_review'
       ? contract.name !== 'commit_asset_changes'
       : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
@@ -29,7 +39,8 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       const args = parameters as Row
       if (organization && (contract.name === 'submit_profile_review' || contract.name === 'submit_relation_review')) {
         const { operationKey: _key, ...payload } = args
-        args.operationKey = await hash({ taskId: scope.taskId, unitId: scope.unitId, tool: contract.name, payload })
+        // 同一运行、人物工作项和内容使用稳定命令键，恢复或丢失回执后不会重复写库。
+        args.operationKey = await hash({ runId: scope.runId, unitId: scope.unitId, tool: contract.name, payload })
       }
       if (scope.probe && !(scope.profile === 'asset_editor' ? ['get_character_detail', 'read_original', 'commit_asset_changes'] : ['get_editor_memory', 'commit_story_changes']).includes(contract.name)) throw new Error('INVALID_ARGS:探针仅允许指定调用。')
       let value: Row
@@ -91,7 +102,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue }
     },
   }))
-  tools.push({ name: 'submit_result', label: '提交任务总结', description: '汇总当前任务的真实提交确认和待处理项。', parameters: summarySchema,
+  if (!organization || !workKind || workKind === 'directory' || workKind === 'candidate') tools.push({ name: 'submit_result', label: '提交任务总结', description: '汇总当前任务的真实提交确认和待处理项。', parameters: summarySchema,
     outputSchema: { type: 'object', properties: { accepted: { const: true }, status: { enum: ['completed', 'partial'] }, commitIds: { type: 'array', items: { type: 'string' }, uniqueItems: true } }, required: ['accepted', 'status', 'commitIds'], additionalProperties: false },
     async execute(_id, parameters, signal) {
       signal?.throwIfAborted(); validate(summarySchema, parameters)

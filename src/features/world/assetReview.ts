@@ -4,7 +4,6 @@ import { records, text } from '../agents/contracts'
 import { coverageFingerprint } from './queue'
 import type { AssetReviewItem, ReviewMode, ReviewScope, WorldRun } from './types'
 import { effectivePairs, pairKeyOf, syncRelations } from '../assets/relations'
-import { normalizeCharacterNames } from '../assets/characterNames'
 import type { Character, CharacterRelation, CharacterRelationEdit, EventLine, EventNode, LegacyRelationRecord, Lifecycle } from '../assets/types'
 import prompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-asset-review.md?raw'
 import relationPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-relation-review.md?raw'
@@ -19,7 +18,7 @@ async function buildItems(store: { get(table: string, id: string): Promise<Row |
   const lifecycle = (await store.rows('assetLifecycle')) as unknown as Lifecycle[]
   const relations = (await store.rows('characterRelations')) as unknown as CharacterRelation[]
   const edits = (await store.rows('characterRelationEdits')) as unknown as CharacterRelationEdit[]
-  const normalized = characters.map(normalizeCharacterNames)
+  const normalized = characters
   const pairs = effectivePairs(syncRelations(relations, normalized, lifecycle).relations, edits, normalized).filter(pair => pair.state === 'active')
   const items: AssetReviewItem[] = []
   const now = new Date().toISOString()

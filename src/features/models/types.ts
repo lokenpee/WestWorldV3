@@ -32,7 +32,7 @@ export interface ResolvedModel { snapshot: ModelSnapshot; model: Model<ModelApi>
 export interface ModelFailure { kind: ErrorKind; message: string; stopReason?: string; status?: number }
 export interface Attempt {
   ordinal: number; turn: number; elapsedMs: number; status?: number; errorKind?: ErrorKind; usage?: Usage
-  estimatedInput?: number; outputReserve?: number; requestId?: string; attemptId?: string
+  estimatedInput?: number; outputReserve?: number; requestId?: string; attemptId?: string; startedAt?: string; finishedAt?: string
 }
 export interface UsageSummary { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; costStatus: 'estimated' | 'unknown'; cost?: number; currency?: 'USD' }
 export interface CallResult {

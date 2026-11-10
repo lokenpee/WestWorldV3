@@ -135,6 +135,8 @@ P2只不保存长对话，并非不保存任务：恢复时使用冻结输入、
 
 prepared恢复失败不无限自动重试：租约/版本冲突转明确待重查；磁盘不可写停止并展示错误。跨浏览器导入按03清除在途意图执行权，禁止把备份当作自动续写授权。
 
+同书运行准入由service/租约事务判断，同一本书的P1/P2/P3不并行；P1内部两类lane保持并行，不同书籍独立。P2周期心跳只在service层，P3只在service层；续租只改续期时间。快照比较忽略续期时间但保留owner/runId，写入事务仍核租约、会话所有权和有效期。快照短暂变化按暂时失败重试，连续三次无法确认执行权时保留activeWork并暂停为可继续；身份变化或真实过期停止旧执行者。具体分类见[AI与会话](05-Spec-AI与会话.md#ai-04-pi-agent执行读写工具与最终结果)。
+
 ### ALG-12.4 覆盖项身份、派发与排序
 
 T20.coverageItems是完成证明的权威清单。workItemId=`phase + ':' + scopeKey + ':' + kind + ':' + id`，各自由标识用encodeURIComponent编码后拼接；scopeKey：P1为substep，P2为`fullBook`，P3窗口为`start-end`零基半开范围，全局为队列名。kind用于避免人物/地点/事件线ID相同造成碰撞。
@@ -177,7 +179,7 @@ WorkRef的ID/revision/hash用于任务定位。P2人物、地点通过本任务�
 
 finalizer只校验/收集总结；结束钩子由Coordinator在短事务重核依赖后保存TaskRecord.reviewedItems和coverageItems。没有合法最终总结时，已写业务仍有效，分配项不能凭commitId自动全部checked；下次从原确认和当前事实继续检查。completed summary要求remaining为空，partial要求仍有剩余；预算耗尽的代码partial可以没有模型summary。
 
-删除项标skipped/outcome=deleted并写原因；合并旧ID标skipped/redirected，解析目标若已存在对应清单不重复建项，未存在则新建pending目标。新建/新改项在终态前再次枚举加入，覆盖统计是派生值。最终同事务核有效清单、依赖和状态：无pending/assigned/stale、无未处理prepared意图、相关task已结束才可completed。P2/P3并行只比较自身清单和实际读取的跨域依赖；合理孤点和needs_review可保留。无法检查完时明确partial/paused/degraded，禁止用“最后一页/模型说完成/孤点为0”替代覆盖证明。
+删除项标skipped/outcome=deleted并写原因；合并旧ID标skipped/redirected，解析目标若已存在对应清单不重复建项，未存在则新建pending目标。新建/新改项在终态前再次枚举加入，覆盖统计是派生值。最终同事务核有效清单、依赖和状态：无pending/assigned/stale、无未处理prepared意图、相关task已结束才可completed。当前版本同书P2/P3不并行，P1内部两类lane仍可并行；覆盖只比较本任务自身清单和实际读取的跨域依赖。合理孤点和needs_review可保留。无法检查完时明确partial/paused/degraded，禁止用“最后一页/模型说完成/孤点为0”替代覆盖证明。
 
 ## 2026-10-23 · 字段与工具契约对接
 

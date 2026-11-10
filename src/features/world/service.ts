@@ -4,28 +4,28 @@ import type { AssetService } from '../assets/service'
 import type { Character, LocationAsset } from '../assets/types'
 import type { MergeRequest, WorldKind } from '../assets/merge'
 import { findCandidates, type Candidate } from './candidates'
-import { emptyReport, type WorldReport, type WorldRun, type ReviewMode, type ReviewScope } from './types'
+import { emptyReport, type WorldReport, type WorldRun, type ReviewMode, type ReviewScope, type OrganizationRunStep } from './types'
 import { coverage, type Receipt } from '../extraction/recovery'
 import { createBookAgentRepository, type Row } from '../agents/repository'
 import { records, text } from '../agents/contracts'
 import { coverageFingerprint, identityBatchSize, identityDependencies, saveIdentityQueue } from './queue'
 import { createFrequencyCounter } from '../assets/derive'
-import { normalizeCharacterNames } from '../assets/characterNames'
 import { createMechanicalQueue } from './mechanical'
 import { repairAutomaticProtection } from './protection'
 import { runAssetReview } from './assetReview'
-import { createOrganizationState, runCharacterOrganization } from './organization'
+import { createLeaseHeartbeat, leaseFailureKind } from './leaseHeartbeat'
+import { createCharacterOrganizationState, createOrganizationState, createOrganizationStepState, finalizeStatistics, runCharacterOrganization } from './organization'
 import { resolveSession } from '../agents/sessions'
 import { renewOrganizationLease } from '../agents/organizationLease'
 import { buildProfileReview, organizationReviewVersion, refreshReview } from '../agents/organizationReview'
-import { readBookTrace } from '../agents/trace'
+import { readBookTrace, readExecutionChain, readOrganizationRequests, readOrganizationStepIndex } from '../agents/trace'
 import prompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-identity.md?raw'
 
 type Workspace = ReturnType<typeof createWorkspace>
 type Entity = Character | LocationAsset
-interface WorldState { running: boolean; phase: string; processed: number; total: number; error?: string; reportId?: string; reportType?: 'code' | 'ai'; mode?: 'ai' | 'mechanical' }
+interface WorldState { running: boolean; phase: string; processed: number; total: number; error?: string; reportId?: string; reportType?: 'code' | 'ai'; mode?: 'ai' | 'mechanical' | 'targeted'; runId?: string; targetKind?: 'profile' | 'relations'; organizationStep?: OrganizationRunStep; paused?: boolean }
 export function createWorldService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'generate' | 'settings'>, assets: AssetService, options: { assetReview?: boolean } = {}) {
-  const states = new Map<string, WorldState>(); const controllers = new Map<string, AbortController>(); const listeners = new Set<() => void>()
+  const states = new Map<string, WorldState>(); const controllers = new Map<string, AbortController>(); const activeRuns = new Map<string, string>(); const pauseRequests = new Set<string>(); const hardCancelled = new Set<string>(); const listeners = new Set<() => void>()
   const set = (bookId: string, change: Partial<WorldState>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, phase: '', processed: 0, total: 0 }), ...change }); listeners.forEach(listener => listener()) }
   const mechanical = createMechanicalQueue(workspace, assets, (bookId, state) => set(bookId, { ...state, mode: 'mechanical' }), bookId => controllers.has(bookId))
   async function eligibility(bookId: string) {
@@ -33,18 +33,18 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     const db = workspace.openBook(bookId)
     return db.transaction('r', db.chapters, db.table('extractionReceipts'), db.table('pipelineRuns'), db.table('compileProgress'), async () => {
       const allCovered = coverage(await db.chapters.toArray(), await db.table<Receipt>('extractionReceipts').toArray()).allCovered
-      const locks = (await db.table('pipelineRuns').where('recordType').equals('lease').toArray()).filter(row => ['world', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
+      const locks = (await db.table('pipelineRuns').where('recordType').equals('lease').toArray()).filter(row => ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
       const locked = locks.length > 0
       const progress = await db.table('compileProgress').get('P2')
       return { ready: allCovered && !locked, covered: allCovered, locked, resumable: !!progress && ['running', 'paused', 'cancelled', 'failed'].includes(progress.status), leaseExpiry: locks.filter(row => typeof row.expiresAt === 'number').reduce<number | undefined>((at, row) => Math.min(at ?? Infinity, row.expiresAt), undefined) }
     })
   }
-  async function assertReady(bookId: string) { const state = await eligibility(bookId); if (!state.covered) throw new Error('请先完成全书逐章提取。'); if (state.locked) throw new Error('本书世界资产或提取任务正在运行。') }
+  async function assertReady(bookId: string) { const state = await eligibility(bookId); if (!state.covered) throw new Error('请先完成全书逐章提取。'); if (state.locked) throw new Error('本书已有世界、叙事或提取任务正在运行。') }
   const counts = async (bookId: string) => { const db = workspace.openBook(bookId); return { characters: await db.table('characters').count(), locations: await db.table('locations').count() } }
   async function worldRows(bookId: string) {
     if (!await workspace.settings.books.get(bookId)) throw new Error('书籍不存在。')
     const db = workspace.openBook(bookId)
-    return db.transaction('r', db.table('characters'), db.table('locations'), async () => ({ characters: (await db.table<Character>('characters').toArray()).map(normalizeCharacterNames), locations: await db.table<LocationAsset>('locations').toArray() }))
+    return db.transaction('r', db.table('characters'), db.table('locations'), async () => ({ characters: await db.table<Character>('characters').toArray(), locations: await db.table<LocationAsset>('locations').toArray() }))
   }
   async function scan(bookId: string, saveReport = true) {
     await assertReady(bookId)
@@ -98,7 +98,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
       const resolved = await resolveModel(settings.config, settings.apiKey, 'aggregation')
       await db.transaction('rw', db.tables, async () => {
         const leases = await db.table('pipelineRuns').toArray()
-        if (leases.some(row => row.recordType === 'lease' && ['world', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务。')
+        if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务。')
         if (!coverage(await db.chapters.toArray(), await db.table<Receipt>('extractionReceipts').toArray()).allCovered) throw new Error('请先完成全书逐章提取。')
         const now = new Date().toISOString()
         const previous = await db.table('compileProgress').get('P2')
@@ -115,7 +115,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId, expiresAt: Date.now() + 30000 })
         await db.table('compileProgress').put({ bookId, stage: 'P2', status: 'running', runId, totalChapters: (await db.chapters.count()), completedChapters: [], failedChapters: [], updatedAt: now, scope: 'fullBook', planVersion: '2.2', unit: 'item', validity: 'current' })
       }); acquired = true
-      timer = setInterval(() => { void db.transaction('rw', db.table('pipelineRuns'), async () => { const lease = await db.table('pipelineRuns').get('lease:world'); if (lease?.owner !== owner) throw new Error('执行权已变化'); await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 }) }).catch(() => controller.abort()) }, 8000)
+      timer = setInterval(() => { void db.transaction('rw', db.table('pipelineRuns'), async () => { const lease = await db.table('pipelineRuns').get('lease:world'); if (lease?.owner !== owner) throw new Error('执行权已变化'); await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 }) }).catch(error => { if (leaseFailureKind(error) === 'lost') controller.abort() }) }, 8000)
       const repo = createBookAgentRepository(workspace, bookId); const runtime = createAgentRuntime(models.agent)
       if (reviewScope === 'relations') {
         set(bookId, { phase: reviewMode === 'sample' ? '按原文核对人物关系（先10项）' : '按原文核对人物关系（全书）', processed: 0, total: 0 })
@@ -256,12 +256,307 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
       controllers.delete(bookId); set(bookId, { running: false })
     }
   }
+  async function startCharacterOrganization(bookId: string, characterId: string, kind: 'profile' | 'relations'): Promise<string> {
+    if (controllers.has(bookId) || mechanical.isRunning(bookId)) throw new Error('本书已有处理任务。')
+    const db = workspace.openBook(bookId)
+    await assertReady(bookId)
+    const target = await db.table<Character>('characters').get(characterId)
+    if (!target || target.bookId !== bookId) throw new Error('人物不存在或不属于本书。')
+    const settings = await models.settings.load()
+    if (!settings.apiKey || !settings.config.aggregationModel) throw new Error('请先在设置页保存整理模型与密钥。')
+    const repo = createBookAgentRepository(workspace, bookId)
+    const organization = await repo.transaction(false, store => createCharacterOrganizationState(store, characterId, kind))
+    const runId = crypto.randomUUID(), owner = crypto.randomUUID(), now = new Date().toISOString()
+    let sessionId = ''
+    let heartbeatFailure = ''
+    const controller = new AbortController()
+    controllers.set(bookId, controller)
+    set(bookId, { running: true, phase: kind === 'profile' ? '整理人物资料' : '整理人物关系', processed: 0, total: 1, error: undefined, reportId: undefined, mode: 'targeted', runId, targetKind: kind })
+    try {
+      await db.transaction('rw', db.tables, async () => {
+        const leases = await db.table('pipelineRuns').toArray()
+        if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务。')
+        await db.table('pipelineRuns').put({
+          id: runId, bookId, recordType: 'run', stage: 'P2', phase: 'character_organization', workflow: 'character_organization_v1',
+          scope: 'character', organization, status: 'running', startedAt: now, planVersion: '2.2', report: emptyReport(await counts(bookId)),
+          tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent',
+        })
+        await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId, expiresAt: Date.now() + 30000 })
+      })
+      sessionId = await repo.transaction(true, async store => {
+        await renewOrganizationLease(store, { bookId, runId, owner })
+        const session = await resolveSession(store, bookId, undefined, 'asset_editor', 'character_organization_v1', runId)
+        await store.put('storySessions', { ...session, leaseOwner: owner, leaseUntil: Date.now() + 30000 })
+        return text(session.id)
+      })
+      await db.table('pipelineRuns').update(runId, { sessionId })
+      const heartbeat = createLeaseHeartbeat(
+        () => repo.transaction(true, store => renewOrganizationLease(store, { bookId, runId, owner, sessionId })),
+        (error, consecutive) => {
+          const message = error instanceof Error ? error.message : '人物整理执行权续租失败。'
+          if (leaseFailureKind(error) === 'lost' || consecutive >= 3) { heartbeatFailure = message; controller.abort() }
+        },
+      )
+      void (async () => {
+        try {
+          await runCharacterOrganization(workspace, bookId, {
+            runId, owner, signal: controller.signal, models, shouldPause: () => pauseRequests.has(runId),
+            onPhase: phase => set(bookId, { phase }),
+            onProgress: (processed, total) => set(bookId, { processed, total }),
+          })
+        } catch (error) {
+          set(bookId, { error: heartbeatFailure ? `单人物整理已暂停：${heartbeatFailure}` : controller.signal.aborted ? '单人物整理已取消，已提交成果保留。' : error instanceof Error ? error.message : '单人物整理失败。' })
+        } finally {
+          heartbeat.close()
+          await db.transaction('rw', db.tables, async () => {
+            const lease = await db.table('pipelineRuns').get('lease:world')
+            if (lease?.owner !== owner || lease.runId !== runId) return
+            const run = (await db.table<WorldRun>('pipelineRuns').get(runId))!
+            const organization = run.organization
+            const error = states.get(bookId)?.error
+            const status = heartbeatFailure ? 'paused' : controller.signal.aborted ? 'cancelled' : error ? 'failed' : organization?.step === 'done' ? 'completed' : 'paused'
+            const usage = (run as WorldRun & { usage?: WorldReport['usage'] }).usage
+            const report = { ...run.report, afterCounts: await counts(bookId), ...(usage ? { usage: { input: usage.input, output: usage.output, totalTokens: usage.totalTokens, cost: usage.cost, costStatus: usage.costStatus ?? 'estimated' as const }, cost: usage.cost } : {}), status }
+            await db.table('pipelineRuns').put({ ...run, status, finishedAt: new Date().toISOString(), report })
+            await db.table('pipelineRuns').delete('lease:world')
+            const session = sessionId ? await db.table('storySessions').get(sessionId) : undefined
+            if (session?.leaseOwner === owner) {
+              const { leaseOwner: _owner, leaseUntil: _until, ...saved } = session
+              await db.table('storySessions').put(saved)
+            }
+          }).catch(() => set(bookId, { error: '单人物整理结果保存失败，请检查本地存储。' }))
+          controllers.delete(bookId)
+          set(bookId, { running: false, runId: undefined, targetKind: undefined })
+        }
+      })()
+      return runId
+    } catch (error) {
+      controllers.delete(bookId)
+      set(bookId, { running: false, error: error instanceof Error ? error.message : '单人物整理启动失败。', runId: undefined, targetKind: undefined })
+      throw error
+    }
+  }
+
+  async function latestOrganizationRun(bookId: string, statuses?: string[]) {
+    const rows = await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()
+    return rows.filter(row => row.workflow === 'character_organization_v1' && (!statuses || statuses.includes(text(row.status))))
+      .sort((a, b) => text(b.startedAt).localeCompare(text(a.startedAt)))[0]
+  }
+
+  async function finalizeStepRun(bookId: string, runId: string, owner: string, controller: AbortController, sessionId: string, error?: string) {
+    const db = workspace.openBook(bookId)
+    const run = await db.table<WorldRun>('pipelineRuns').get(runId)
+    if (!run) return
+    const organization = run.organization
+    const cancelled = hardCancelled.has(runId)
+    const abortedWithoutCancel = controller.signal.aborted && !cancelled
+    const paused = pauseRequests.has(runId) && !cancelled && !abortedWithoutCancel
+    const failure = error || (abortedWithoutCancel ? '执行器被中止，可能是会话执行权或运行租约变化。' : '')
+    const status = cancelled ? 'cancelled' : paused || abortedWithoutCancel ? 'paused' : failure ? 'failed' : organization?.step === 'done' ? 'completed' : 'paused'
+    const usage = (run as WorldRun & { usage?: WorldReport['usage'] }).usage
+    const report = { ...run.report, afterCounts: await counts(bookId), ...(usage ? { usage: { input: usage.input, output: usage.output, totalTokens: usage.totalTokens, cost: usage.cost, costStatus: usage.costStatus ?? 'estimated' as const }, cost: usage.cost } : {}), status }
+    await db.transaction('rw', db.tables, async () => {
+      const latest = await db.table<WorldRun>('pipelineRuns').get(runId)
+      if (!latest) return
+      await db.table('pipelineRuns').put({ ...latest, status, finishedAt: new Date().toISOString(), report })
+      await db.table('compileProgress').update('P2', { status, validity: status === 'completed' ? 'current' : 'stale', updatedAt: new Date().toISOString() })
+      await db.table('pipelineRuns').delete('lease:world')
+      const session = sessionId ? await db.table('storySessions').get(sessionId) : undefined
+      if (session?.leaseOwner === owner) {
+        const { leaseOwner: _owner, leaseUntil: _until, ...saved } = session
+        await db.table('storySessions').put(saved)
+      }
+    }).catch(() => set(bookId, { error: '人物整理结果保存失败，请检查本地存储。' }))
+    pauseRequests.delete(runId); hardCancelled.delete(runId)
+    if (activeRuns.get(bookId) === runId) activeRuns.delete(bookId)
+    controllers.delete(bookId)
+    set(bookId, { running: false, paused: status === 'paused', organizationStep: status === 'paused' ? organization?.runStep : undefined, runId: status === 'paused' ? runId : undefined, phase: status === 'paused' ? '已暂停' : '', ...(failure ? { error: failure } : {}) })
+  }
+
+  async function executeStep(bookId: string, runId: string, owner: string, controller: AbortController, sessionId: string) {
+    const repo = createBookAgentRepository(workspace, bookId)
+    let failure = ''
+    let consecutive = 0
+    const timer = setInterval(() => { void repo.transaction(true, store => renewOrganizationLease(store, { bookId, runId, owner, sessionId })).then(() => { consecutive = 0 }).catch(error => {
+      const message = error instanceof Error ? error.message : '人物整理执行权续租失败。'
+      if (leaseFailureKind(error) === 'lost' || ++consecutive >= 3) { failure = message; controller.abort() }
+    }) }, 8000)
+    try {
+      await runCharacterOrganization(workspace, bookId, {
+        runId, owner, signal: controller.signal, models, shouldPause: () => pauseRequests.has(runId),
+        onPhase: phase => set(bookId, { phase }),
+        onProgress: (processed, total) => set(bookId, { processed, total }),
+      })
+    } catch (error) {
+      if (!hardCancelled.has(runId) && !controller.signal.aborted && !pauseRequests.has(runId)) failure = error instanceof Error ? error.message : '人物整理失败。'
+    } finally {
+      clearInterval(timer)
+      await finalizeStepRun(bookId, runId, owner, controller, sessionId, failure || undefined)
+    }
+  }
+
+  async function recoverOrganization(bookId: string) {
+    if (controllers.has(bookId)) return
+    const run = await latestOrganizationRun(bookId, ['running'])
+    if (!run) return
+    const db = workspace.openBook(bookId)
+    const lease = await db.table('pipelineRuns').get('lease:world')
+    if (lease && lease.runId === run.id && Number(lease.expiresAt) > Date.now()) return
+    await db.transaction('rw', db.tables, async () => {
+      const current = await db.table<WorldRun>('pipelineRuns').get(run.id)
+      if (!current) return
+      await db.table('pipelineRuns').put({ ...current, status: 'paused', report: { ...current.report, status: 'paused' } })
+      await db.table('compileProgress').update('P2', { status: 'paused', validity: 'stale', updatedAt: new Date().toISOString() })
+      await db.table('pipelineRuns').delete('lease:world')
+    })
+    const legacyStep = !run.organization?.runStep ? (['scan', 'resolve'].includes(String(run.organization?.step)) ? 'scan' : run.organization?.step === 'profiles' ? 'profiles' : run.organization?.step === 'relations' ? 'relations' : undefined) : run.organization?.runStep
+    set(bookId, { running: false, paused: true, runId: run.id, organizationStep: legacyStep, phase: '已中断，可继续' })
+  }
+
+  async function startOrganizationStep(bookId: string, step: OrganizationRunStep): Promise<string> {
+    if (controllers.has(bookId) || mechanical.isRunning(bookId)) throw new Error('本书已有处理任务。')
+    const active = await latestOrganizationRun(bookId, ['running', 'paused'])
+    if (active) throw new Error('本书已有运行中或已暂停的人物整理任务，请先继续或取消。')
+    await assertReady(bookId)
+    const settings = await models.settings.load()
+    if (!settings.apiKey || !settings.config.aggregationModel) throw new Error('请先在设置页保存整理模型与密钥。')
+    const repo = createBookAgentRepository(workspace, bookId)
+    const organization = await repo.transaction(false, store => createOrganizationStepState(store, step))
+    const runId = crypto.randomUUID(), owner = crypto.randomUUID(), now = new Date().toISOString()
+    const controller = new AbortController()
+    controllers.set(bookId, controller); activeRuns.set(bookId, runId)
+    set(bookId, { running: true, phase: `准备第${step === 'scan' ? '一' : step === 'profiles' ? '二' : '三'}步`, processed: 0, total: 0, error: undefined, reportId: undefined, mode: 'ai', organizationStep: step, paused: false })
+    try {
+      const db = workspace.openBook(bookId)
+      await db.transaction('rw', db.tables, async () => {
+        const leases = await db.table('pipelineRuns').toArray()
+        if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务。')
+        await db.table('pipelineRuns').put({ id: runId, recordType: 'run', bookId, stage: 'P2', phase: 'character_organization', workflow: 'character_organization_v1', scope: 'fullBook', organization, status: 'running', startedAt: now, planVersion: '2.2', report: emptyReport(await counts(bookId)), tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent' })
+        await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId, expiresAt: Date.now() + 30000 })
+        await db.table('compileProgress').put({ bookId, stage: 'P2', status: 'running', runId, totalChapters: await db.chapters.count(), completedChapters: [], failedChapters: [], updatedAt: now, scope: 'fullBook', planVersion: '2.2', unit: 'item', validity: 'current' })
+      })
+      const sessionId = await repo.transaction(true, async store => {
+        await renewOrganizationLease(store, { bookId, runId, owner })
+        const session = await resolveSession(store, bookId, undefined, 'asset_editor', 'character_organization_v1', runId)
+        await store.put('storySessions', { ...session, leaseOwner: owner, leaseUntil: Date.now() + 30000 })
+        return text(session.id)
+      })
+      await workspace.openBook(bookId).table('pipelineRuns').update(runId, { sessionId })
+      void executeStep(bookId, runId, owner, controller, sessionId)
+      return runId
+    } catch (error) {
+      controllers.delete(bookId); activeRuns.delete(bookId)
+      set(bookId, { running: false, error: error instanceof Error ? error.message : '人物整理启动失败。', organizationStep: step })
+      throw error
+    }
+  }
+
+  async function pauseOrganization(bookId: string) {
+    const runId = activeRuns.get(bookId) || states.get(bookId)?.runId
+    if (!runId || !controllers.has(bookId)) throw new Error('当前没有运行中的人物整理任务。')
+    pauseRequests.add(runId)
+    set(bookId, { phase: '暂停中，等待当前操作结束' })
+  }
+
+  async function continueOrganization(bookId: string, requestedRunId?: string): Promise<string> {
+    if (controllers.has(bookId) || mechanical.isRunning(bookId)) throw new Error('本书已有处理任务。')
+    const db = workspace.openBook(bookId)
+    const run = requestedRunId ? await db.table<WorldRun>('pipelineRuns').get(requestedRunId) : await latestOrganizationRun(bookId, ['paused'])
+    if (!run || run.status !== 'paused') throw new Error('没有可继续的暂停任务。')
+    const currentLease = await db.table('pipelineRuns').get('lease:world')
+    if (currentLease && currentLease.runId === run.id && Number(currentLease.expiresAt ?? 0) > Date.now()) throw new Error('人物整理正在其他窗口运行或暂停，请先关闭其他窗口。')
+    const controller = new AbortController(), owner = crypto.randomUUID()
+    pauseRequests.delete(run.id); hardCancelled.delete(run.id)
+    controllers.set(bookId, controller); activeRuns.set(bookId, run.id)
+    await db.transaction('rw', db.tables, async () => {
+      const leases = await db.table('pipelineRuns').toArray()
+      if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()) && row.runId !== run.id)) throw new Error('本书已有处理任务。')
+      const current = (await db.table<WorldRun>('pipelineRuns').get(run.id))!
+      const organization = current.organization as (Record<string, unknown> & { pauseRequested?: boolean }) | undefined
+      if (organization) organization.pauseRequested = false
+      await db.table('pipelineRuns').put({ ...current, ...(organization ? { organization } : {}), status: 'running', finishedAt: undefined })
+      await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId: run.id, expiresAt: Date.now() + 30000 })
+      await db.table('compileProgress').update('P2', { status: 'running', validity: 'current', updatedAt: new Date().toISOString() })
+    })
+    const sessionId = text(run.sessionId)
+    if (sessionId) await db.transaction('rw', db.table('storySessions'), async () => {
+      const session = await db.table('storySessions').get(sessionId)
+      if (session) await db.table('storySessions').put({ ...session, leaseOwner: owner, leaseUntil: Date.now() + 30000 })
+    })
+    set(bookId, { running: true, paused: false, phase: '继续人物整理', error: undefined, runId: run.id, organizationStep: run.organization?.runStep })
+    void executeStep(bookId, run.id, owner, controller, sessionId)
+    return run.id
+  }
+
+  async function characterOrganizationRun(bookId: string, characterId: string) {
+    const runs = await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()
+    return runs.filter(row => row.workflow === 'character_organization_v1' && row.scope === 'character' && row.status === 'paused' && row.organization?.targetCharacterId === characterId)
+      .sort((a, b) => text(b.startedAt).localeCompare(text(a.startedAt)))[0]
+  }
+
+  async function characterResume(bookId: string): Promise<string | undefined> {
+    const runs = await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()
+    return runs.filter(row => row.workflow === 'character_organization_v1' && row.scope === 'character' && row.status === 'paused' && row.organization?.targetCharacterId)
+      .sort((a, b) => text(b.startedAt).localeCompare(text(a.startedAt)))[0]?.organization?.targetCharacterId
+  }
+
+  async function continueCharacterOrganization(bookId: string, characterId: string): Promise<string> {
+    const run = await characterOrganizationRun(bookId, characterId)
+    if (!run) throw new Error('这个人物没有可继续的 AI 整理任务，请重新开始。')
+    return continueOrganization(bookId, run.id)
+  }
+
+  async function cancelOrganization(bookId: string) {
+    const runId = activeRuns.get(bookId) || (await latestOrganizationRun(bookId, ['running', 'paused']))?.id
+    if (!runId) throw new Error('当前没有可取消的人物整理任务。')
+    hardCancelled.add(runId); pauseRequests.delete(runId)
+    const db = workspace.openBook(bookId)
+    await db.transaction('rw', db.tables, async () => {
+      const run = await db.table<WorldRun>('pipelineRuns').get(runId)
+      if (run) await db.table('pipelineRuns').put({ ...run, status: 'cancelled', finishedAt: new Date().toISOString(), report: { ...run.report, status: 'cancelled' } })
+      await db.table('pipelineRuns').delete('lease:world')
+      await db.table('compileProgress').update('P2', { status: 'cancelled', validity: 'stale', updatedAt: new Date().toISOString() })
+      const runSession = run?.sessionId
+      if (runSession) {
+        const session = await db.table('storySessions').get(runSession)
+        if (session) { const { leaseOwner: _owner, leaseUntil: _until, ...saved } = session; await db.table('storySessions').put(saved) }
+      }
+    })
+    controllers.get(bookId)?.abort(); controllers.delete(bookId); activeRuns.delete(bookId)
+    set(bookId, { running: false, paused: false, phase: '已取消', runId: undefined, organizationStep: undefined })
+  }
+
+  async function updateOrganizationStatistics(bookId: string) {
+    if (controllers.has(bookId) || mechanical.isRunning(bookId)) throw new Error('本书已有处理任务。')
+    const run = await latestOrganizationRun(bookId)
+    if (!run?.organization || !run.sessionId) throw new Error('没有可更新统计的人物整理运行。')
+    const owner = crypto.randomUUID(), controller = new AbortController(), repo = createBookAgentRepository(workspace, bookId), db = workspace.openBook(bookId)
+    controllers.set(bookId, controller)
+    set(bookId, { running: true, phase: '更新出场统计', error: undefined })
+    try {
+      await db.transaction('rw', db.tables, async () => {
+        const leases = await db.table('pipelineRuns').toArray()
+        if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()) && row.runId !== run.id)) throw new Error('本书已有处理任务。')
+        await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId: run.id, expiresAt: Date.now() + 30000 })
+      })
+      await finalizeStatistics(repo, run.id, owner, run.sessionId, controller.signal, new Date().toISOString())
+      await db.table('pipelineRuns').delete('lease:world')
+    } catch (error) {
+      set(bookId, { error: controller.signal.aborted ? '统计更新已取消。' : error instanceof Error ? error.message : '出场统计更新失败。' })
+      await db.table('pipelineRuns').delete('lease:world').catch(() => undefined)
+    } finally {
+      controllers.delete(bookId)
+      set(bookId, { running: false, phase: '' })
+    }
+  }
+
   async function startOrganization(bookId: string) {
     if (controllers.has(bookId) || mechanical.isRunning(bookId)) return
     const controller = new AbortController(); controllers.set(bookId, controller)
     const db = workspace.openBook(bookId)
     let runId: string = crypto.randomUUID(), sessionId: string | undefined, owner = crypto.randomUUID()
     let acquired = false, timer: ReturnType<typeof setInterval> | undefined
+    let heartbeatFailure = ''
     set(bookId, { running: true, phase: '准备人物整理', processed: 0, total: 0, error: undefined, reportId: undefined, mode: 'ai' })
     try {
       await assertReady(bookId)
@@ -269,7 +564,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
       if (!settings.apiKey || !settings.config.aggregationModel) throw new Error('请先在设置页保存整理模型与密钥。')
       await db.transaction('rw', db.tables, async () => {
         const leases = await db.table('pipelineRuns').toArray()
-        if (leases.some(row => row.recordType === 'lease' && ['world', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务。')
+        if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务。')
         if (!coverage(await db.chapters.toArray(), await db.table<Receipt>('extractionReceipts').toArray()).allCovered) throw new Error('请先完成全书逐章提取。')
         const previous = await db.table<WorldRun>('compileProgress').get('P2') as unknown as { runId?: string; status?: string }
         const existing = previous?.runId ? await db.table<WorldRun>('pipelineRuns').get(previous.runId) : undefined
@@ -289,6 +584,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
       acquired = true
       const repo = createBookAgentRepository(workspace, bookId)
       await repo.transaction(true, async store => {
+        await renewOrganizationLease(store, { bookId, runId, owner })
         const run = (await store.get('pipelineRuns', runId))!, organization = run.organization as Row
         if (Number(organization.reviewVersion) !== organizationReviewVersion) {
           if (!['scan', 'resolve'].includes(text(organization.step))) {
@@ -301,24 +597,28 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         for (const field of ['profileItems', 'relationItems'] as const) for (const item of records(organization[field])) if (item.status === 'pending') delete item.lastError
         for (const group of records(organization.candidateGroups)) delete group.lastError
         for (const page of records(organization.scanPages)) delete page.lastError
-        if (organization.activeWork && (organization.activeWork as Row).status === 'error') organization.activeWork = null
         delete organization.pauseNotice
         await store.put('pipelineRuns', { ...run, organization })
       })
       sessionId = await repo.transaction(true, async store => {
+        await renewOrganizationLease(store, { bookId, runId, owner })
         const session = await resolveSession(store, bookId, sessionId, 'asset_editor', 'character_organization_v1', runId)
         await store.put('storySessions', { ...session, leaseOwner: owner, leaseUntil: Date.now() + 30000 })
         return text(session.id)
       })
       await db.table('pipelineRuns').update(runId, { sessionId })
-      timer = setInterval(() => { void repo.transaction(true, store => renewOrganizationLease(store, { bookId, runId, owner, sessionId })).catch(() => controller.abort()) }, 8000)
+      let heartbeatFailures = 0
+      timer = setInterval(() => { void repo.transaction(true, store => renewOrganizationLease(store, { bookId, runId, owner, sessionId })).then(() => { heartbeatFailures = 0 }).catch(error => {
+        const message = error instanceof Error ? error.message : '人物整理执行权续租失败。'
+        if (leaseFailureKind(error) === 'lost' || ++heartbeatFailures >= 3) { heartbeatFailure = message; controller.abort() }
+      }) }, 8000)
       await runCharacterOrganization(workspace, bookId, {
         runId, owner, signal: controller.signal, models,
         onPhase: phase => set(bookId, { phase }),
         onProgress: (processed, total) => set(bookId, { processed, total }),
       })
     } catch (error) {
-      set(bookId, { error: controller.signal.aborted ? '人物整理已取消，已提交成果保留。' : error instanceof Error ? error.message : '人物整理失败。' })
+      set(bookId, { error: heartbeatFailure ? `人物整理已暂停：${heartbeatFailure}` : controller.signal.aborted ? '人物整理已取消，已提交成果保留。' : error instanceof Error ? error.message : '人物整理失败。' })
     } finally {
       clearInterval(timer)
       if (acquired) await db.transaction('rw', db.tables, async () => {
@@ -327,7 +627,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
         const run = (await db.table<WorldRun>('pipelineRuns').get(runId))!
         const organization = run.organization
         const error = states.get(bookId)?.error
-        const status = controller.signal.aborted ? 'cancelled' : error ? 'paused' : organization?.step === 'done' ? 'completed' : 'paused'
+        const status = heartbeatFailure ? 'paused' : controller.signal.aborted ? 'cancelled' : error ? 'paused' : organization?.step === 'done' ? 'completed' : 'paused'
         const usage = (run as WorldRun & { usage?: WorldReport['usage'] }).usage
         const report = { ...run.report, afterCounts: await counts(bookId), ...(usage ? { usage: { input: usage.input, output: usage.output, totalTokens: usage.totalTokens, cost: usage.cost, costStatus: usage.costStatus ?? 'estimated' as const }, cost: usage.cost } : {}), status, organizationSummary: organization ? { scannedPages: organization.scanPages.filter(row => row.status === 'checked').length, candidateGroups: organization.candidateGroups.length + organization.candidateDecisions.length, merged: organization.candidateDecisions.filter(row => row.outcome === 'merged' || row.outcome === 'partial').length, uncertain: organization.candidateDecisions.filter(row => row.outcome === 'uncertain').length, profilesChecked: organization.profileItems.filter(row => row.status === 'checked').length, relationsChecked: organization.relationItems.filter(row => row.status === 'checked').length, statistics: organization.step === 'done' && !organization.statisticsPending ? 'completed' as const : 'pending' as const } : undefined, candidateDecisions: organization?.candidateDecisions }
         await db.table('pipelineRuns').put({ ...run, status, finishedAt: new Date().toISOString(), report })
@@ -346,7 +646,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     }
   }
 
-  return { scan, organize, confirm, start, startOrganization, continueRelations: (bookId: string) => start(bookId, { reviewScope: 'relations', reviewMode: 'full' }), mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
+  return { scan, organize, confirm, start, startOrganization, startOrganizationStep, recoverOrganization, updateOrganizationStatistics, pauseOrganization, continueOrganization, continueCharacterOrganization, characterResume, cancelOrganization, startCharacterOrganization, continueRelations: (bookId: string) => start(bookId, { reviewScope: 'relations', reviewMode: 'full' }), mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), organizationIndex: (bookId: string, step: 'scan' | 'profiles' | 'relations') => readOrganizationStepIndex(workspace, bookId, step), organizationRequests: (bookId: string, query: { runId: string; step: 'scan' | 'profiles' | 'relations'; objectKey: string; before?: { startedAt: string; requestId: string }; limit?: number }) => readOrganizationRequests(workspace, bookId, query), execution: (bookId: string, runId: string, options?: { unitId?: string; contextId?: string; sessionId?: string }) => readExecutionChain(workspace, bookId, runId, options), async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
 }
 export type WorldService = ReturnType<typeof createWorldService>
 export type { Candidate }

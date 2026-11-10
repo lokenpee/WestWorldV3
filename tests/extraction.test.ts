@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createWorkspace } from '../src/lib/storage/workspace'
 import { createModelService } from '../src/features/models/service'
 import { createExtractionService } from '../src/features/extraction/service'
-import { validateExtraction } from '../src/features/extraction/contracts'
+import { validateExtraction, promptOf } from '../src/features/extraction/contracts'
 import { defaultConfig } from '../src/features/models/types'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
 import { createAssetService } from '../src/features/assets/service'
@@ -17,13 +17,15 @@ function stream(value: unknown) {
   const frames = [frame({ role: 'assistant', tool_calls: [{ index: 0, id: 'submit', type: 'function', function: { name: 'submit_result', arguments: JSON.stringify(value) } }] }, null), frame({}, 'tool_calls')]
   return new Response(frames.map(row => `data: ${JSON.stringify(row)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } })
 }
-async function setup(fetcher: typeof fetch, count = 1) {
+async function setup(fetcher: typeof fetch, count = 1, texts?: string[]) {
   const id = crypto.randomUUID(); const workspace = createWorkspace({ settingsName: `extract-${id}`, bookPrefix: `extract-${id}-book-` }); workspaces.push(workspace)
   const book = { id: 'a', title: '提取样本', sourceFileName: '样本.txt', createdAt: new Date().toISOString() }
   await workspace.settings.books.add(book)
-  const db = workspace.openBook('a'); const text = '沈青送信。沈青说：“你好”。青石镇。'
-  await db.chapters.bulkPut(Array.from({ length: count }, (_, order) => ({ bookId: 'a', chapterIndex: String(order + 1), chapterName: `第${order + 1}章`, order, charCount: text.length })))
-  await db.table('chapterTexts').bulkPut(Array.from({ length: count }, (_, order) => ({ bookId: 'a', chapterIndex: String(order + 1), text })))
+  const db = workspace.openBook('a')
+  const fallback = '沈青送信。沈青说：“你好”。青石镇。'
+  const textOf = (order: number) => texts?.[order] ?? fallback
+  await db.chapters.bulkPut(Array.from({ length: count }, (_, order) => ({ bookId: 'a', chapterIndex: String(order + 1), chapterName: `第${order + 1}章`, order, charCount: textOf(order).length })))
+  await db.table('chapterTexts').bulkPut(Array.from({ length: count }, (_, order) => ({ bookId: 'a', chapterIndex: String(order + 1), text: textOf(order) })))
   await db.table('compileProgress').add({ bookId: 'a', stage: 'P1', status: 'idle', totalChapters: count, completedChapters: [], failedChapters: [], updatedAt: book.createdAt })
   const models = createModelService(workspace, { fetch: fetcher, wait: async (_ms, signal) => signal.throwIfAborted() })
   await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://extraction.invalid/v1', extractionModel: 'test' }, 'extraction-fake-key')
@@ -34,11 +36,12 @@ afterEach(async () => { for (const workspace of workspaces.splice(0)) { workspac
 const extractionMessage = (value: unknown) => ({ content: [{ type: 'toolCall', name: 'submit_result', arguments: value }] }) as unknown as Parameters<typeof validateExtraction>[1]
 const relationWorld = (quote: string) => ({ characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'friend', relation_label: '朋友', reverse_label: '朋友', direction: 'bidirectional', quote }] }], locations: [] })
 
-it('人物关系依据只要求有简明内容，不要求逐字匹配本章原文', () => {
+it('人物关系依据只要求有内容，不要求长度或逐字匹配本章原文', () => {
   expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('二人是多年朋友，这是模型概括的依据。')))).not.toThrow()
   expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('朋友')))).not.toThrow()
-  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('朋')))).toThrow('长度2–500字')
-  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('依'.repeat(501))))).toThrow('长度2–500字')
+  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('朋')))).not.toThrow()
+  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('依'.repeat(501))))).not.toThrow()
+  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('')))).toThrow('字段、类型或置信度不符合要求')
 })
 
 it('整书重提世界资产先清空再提取，保留叙事节点并清除P2', async () => {
@@ -207,6 +210,73 @@ it('取消全部提取后不写入Schema外字段，备份校验通过', async (
   expect(await validateBookData({ book, tables })).toEqual([])
 })
 
+const sceneNode = { nodes: [{ name: '本章场景', summary: '本章人物在场景中活动', actors: ['沈青'], quote: '沈青', confidence: 1 }] }
+
+it('P1-A 只写入有依据的关系，保留未知和临时关系，普通互动不建关系', async () => {
+  const samples = [
+    { text: '沈青与顾衡是多年好友，镇上人都知道。', world: { characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'friend', relation_label: '朋友', reverse_label: '朋友', direction: 'bidirectional', quote: '沈青与顾衡是多年好友' }] }, { name: '顾衡', confidence: 1 }], locations: [] } },
+    { text: '沈青在渡口遇见顾衡，两人寒暄几句便各自离开。', world: { characters: [{ name: '沈青', confidence: 1 }, { name: '顾衡', confidence: 1 }], locations: [] } },
+    { text: '沈青与顾衡临时结盟，约定共同查案。', world: { characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'ally', relation_label: '同盟', reverse_label: '同盟', direction: 'bidirectional', quote: '沈青与顾衡临时结盟' }] }, { name: '顾衡', confidence: 1 }], locations: [] } },
+    { text: '沈青听说顾衡与自己有旧，但两人究竟是什么关系，无人说得清。', world: { characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'unknown', relation_label: '未知', reverse_label: '未知', direction: 'unspecified', quote: '沈青听说顾衡与自己有旧，但具体关系不明' }] }, { name: '顾衡', confidence: 1 }], locations: [] } },
+  ]
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = init?.body as string
+    const isWorld = !!JSON.parse(body).tools[0].function.parameters.properties.characters
+    const sample = samples.find(item => body.includes(item.text))
+    return stream(isWorld ? sample!.world : sceneNode)
+  })
+  const { service, db } = await setup(fetcher, samples.length, samples.map(item => item.text))
+  await service.start('a')
+  const relations = await db.table('characterRelations').toArray()
+  expect(relations).toHaveLength(3)
+  expect(relations.map(row => `${row.forwardLabel}/${row.reverseLabel}`)).toEqual(expect.arrayContaining(['朋友/朋友', '同盟/同盟', '未知/未知']))
+  expect(relations.some(row => row.evidence[0]?.chapterIndex === '2')).toBe(false)
+  expect(relations.find(row => row.forwardLabel === '未知')?.relationType).toBe('unknown')
+})
+
+it('P1-A 未具名关系目标保留原文称谓，不猜测姓名', async () => {
+  const text = '王夫人的父亲当日也在荣国府。'
+  const world = { characters: [
+    { name: '王夫人', confidence: 1, relations: [{ target: '王夫人的父亲', relation_type: 'parent_child', relation_label: '女儿', reverse_label: '父亲', direction: 'directed', quote: '王夫人的父亲当日也在荣国府' }] },
+    { name: '王夫人的父亲', confidence: 0.6, identity: '王夫人的父亲' },
+  ], locations: [] }
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : sceneNode))
+  const { service, db } = await setup(fetcher, 1, [text])
+  await service.start('a')
+  const people = await db.table('characters').toArray()
+  expect(people.some(row => row.name === '王夫人的父亲')).toBe(true)
+  expect(people.some(row => row.name === '王老爷')).toBe(false)
+  const relations = await db.table('characterRelations').toArray()
+  const unnamed = people.find(row => row.name === '王夫人的父亲')!
+  expect(relations[0]).toMatchObject({ targetName: '王夫人的父亲', targetIds: [unnamed.id] })
+})
+
+it('P1-B 传闻和猜测保留来源与不确定性，不写成已确认事实', async () => {
+  const text = '镇上传说顾衡杀了人，但无人证实。'
+  const world = { characters: [{ name: '顾衡', confidence: 1 }, { name: '沈青', confidence: 1 }], locations: [] }
+  const narrativeNode = { nodes: [{ name: '顾衡杀人的传闻', summary: '镇上传说顾衡杀人，但无人证实', process: '镇上流传顾衡杀人的说法，来源和真假均未确认。', actors: ['镇上的人'], new_facts: ['据传顾衡杀过人，尚未证实'], quote: text, confidence: 0.6 }] }
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrativeNode))
+  const { service, db } = await setup(fetcher, 1, [text])
+  await service.start('a')
+  const node = (await db.table('nodes').toArray())[0]
+  expect(node).toMatchObject({ name: '顾衡杀人的传闻', summary: '镇上传说顾衡杀人，但无人证实', new_facts: ['据传顾衡杀过人，尚未证实'] })
+  expect(node.process).toContain('未确认')
+  expect(node.world_delta ?? []).toEqual([])
+})
+
+it('P1提示词包含关系存在性、未具名指向和传闻不确定性规则', () => {
+  const worldPrompt = promptOf('worldAssets')
+  expect(worldPrompt).toContain('普通交谈、偶遇、共同出现、单方面思念、一次性互动')
+  expect(worldPrompt).toContain('临时同盟')
+  expect(worldPrompt).toContain('不猜测具体人物')
+  expect(worldPrompt).toContain('泛称（如“有人”“众人”）不能作为具体关系对象')
+  expect(worldPrompt).toContain('同场出现、看见、听见、一次对话、心里想起、打算让某人办事')
+  expect(worldPrompt).toContain('不要用本章之外的背景知识补全关系')
+  expect(worldPrompt).toContain('`relations` 可以为空，不要用“未知”代替')
+  expect(worldPrompt).toContain('不要为同一人建立两套关系')
+  expect(promptOf('narrativeAssets')).toContain('猜测、传闻、谎言、未经证实的指控')
+})
+
 it('续期延迟超过有效期时，同一执行者保存回复并继续所有章节', async () => {
   const fetcher = vi.fn<typeof fetch>()
   const { service, db } = await setup(fetcher, 2)
@@ -291,15 +361,15 @@ it('续期到期后其他阶段已取得资源时，旧提取停止写入', asyn
   expect(service.state('a')?.error).toContain('其他处理任务')
 })
 
-it('P1把通用称谓归入身份说明，保留稳定别名与只有称谓的人物', async () => {
+it('P1保留原始别名，不移动通用称谓', async () => {
   const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream({ characters: [
     { name: '林如海', confidence: 1, aliases_mentioned: ['爸爸', '姑父', '林姑父'], identity: '官员' },
     { name: '太后', confidence: 1, aliases_mentioned: ['娘娘', '哀家'] },
   ], locations: [] })).mockResolvedValueOnce(stream({ nodes: [{ name: '问候', summary: '问候', actors: ['爸爸', '太后'], quote: '', confidence: 1 }] }))
   const { service, db, book } = await setup(fetcher)
   await service.start('a')
-  expect(await db.table('characters').get('C1-P001')).toMatchObject({ aliases: ['林姑父'], identity: '官员；原文称谓：爸爸、姑父' })
-  expect(await db.table('characters').get('C1-P002')).toMatchObject({ name: '太后', aliases: [], identity: '原文称谓：娘娘、哀家' })
+  expect(await db.table('characters').get('C1-P001')).toMatchObject({ aliases: ['爸爸', '姑父', '林姑父'], identity: '官员' })
+  expect(await db.table('characters').get('C1-P002')).toMatchObject({ name: '太后', aliases: ['娘娘', '哀家'] })
   expect(await db.table('nodes').get('C1-N001')).toMatchObject({ actors: ['太后', '爸爸'], actorIds: ['C1-P002'] })
   const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
   expect(await validateBookData({ book, tables })).toEqual([])

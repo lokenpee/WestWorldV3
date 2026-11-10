@@ -2743,14 +2743,65 @@
       {
         "name": "query_relation_work",
         "kind": "read",
-        "description": "读取当前或指定人物的完整当前关系列表、必要对象介绍和未解析资料；程序开始处理关系时已预装同样内容，需要补查或刷新时使用。",
+        "description": "读取人物当前关系概览，或按目标/字段查询。默认先用 work.data 的完整精简概览，不要无目的全量查询。证据查询必须传 targetIds 指定疑问人物对，并把 evidence 放进 fields 数组（例如 fields:[\"targetId\",\"evidence\"]）；不存在 evidence:true 这种参数。省略 fields 返回精简概览字段。",
         "parameters": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "characterId": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "人物编号；省略时使用当前关系工作项的人物。"
+            },
+            "targetIds": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "只查询这些目标人物编号对应的人物对（当前人物+targetId）。查询 evidence 时必须指定，不能全量查证据。"
+            },
+            "fields": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "targetId",
+                  "targetName",
+                  "identity",
+                  "forward",
+                  "reverse",
+                  "state",
+                  "unclear",
+                  "fingerprint",
+                  "checked",
+                  "evidence",
+                  "evidence.quote",
+                  "evidence.chapterIndex"
+                ]
+              },
+              "description": "要返回的字段。查证据写 [\"targetId\",\"evidence\"]，不是 evidence:true。省略时返回精简概览字段。"
+            },
+            "cursor": {
+              "type": "string",
+              "description": "上一页返回的 nextCursor；首页省略。"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "本页关系条数，默认 50。"
+            },
+            "evidenceLimit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "description": "每条关系本次最多返回的证据条数，默认 5。"
+            },
+            "evidenceCursor": {
+              "type": "string",
+              "description": "上一页返回的 nextEvidenceCursor；证据续页时使用。多对关系共用同一偏移。"
             }
           }
         }
@@ -2973,7 +3024,7 @@
       {
         "name": "submit_relation_review",
         "kind": "write",
-        "description": "整体保存当前人物的关系修改并声明是否完成。changes可一次修改多条，方向相对当前人物；done=false保存部分并继续，done=true保存并换下一人。编号、版本和操作键由程序绑定。",
+        "description": "保存当前人物关系修改并声明是否完成。普通去重/同义规范化无需 evidence；实质修改可提供 evidence，缺失或无法逐字核验时会保存为未核实并进入待核对；删除整组关系仍须逐字原文或可追溯冲突 basis。done=false 保存后继续，done=true 保存并换下一人。",
         "parameters": {
           "type": "object",
           "additionalProperties": false,
@@ -3010,19 +3061,164 @@
                     "type": "array",
                     "items": {
                       "type": "string"
-                    }
+                    },
+                    "description": "人物自身在该方向的关系身份；称呼、互动不能作标签；不确定填“未知”；新增实质关系须提供 evidence。"
                   },
                   "reverseLabels": {
                     "type": "array",
                     "items": {
                       "type": "string"
-                    }
+                    },
+                    "description": "人物自身在该方向的关系身份；称呼、互动不能作标签；不确定填“未知”；新增实质关系须提供 evidence。"
                   },
                   "directionUnclear": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "省略时保持当前方向存疑状态；true 标记存疑；只有明确确认方向时才传 false。"
                   },
                   "reason": {
                     "type": "string"
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "description": "可选。实质修改提供 chapterIndex + 引文；缺失或无法逐字核验时会保存为未核实并待核对，不阻塞其他修改。",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "chapterIndex",
+                        "quote"
+                      ],
+                      "properties": {
+                        "chapterIndex": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "quote": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  },
+                  "basis": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "summary",
+                        "source"
+                      ],
+                      "properties": {
+                        "summary": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "source": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "kind",
+                                "assetKind",
+                                "id"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "asset"
+                                },
+                                "assetKind": {
+                                  "enum": [
+                                    "character",
+                                    "location",
+                                    "node",
+                                    "eventLine"
+                                  ]
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "fields": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "kind",
+                                "chapterIndex"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "chapter"
+                                },
+                                "chapterIndex": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "offset": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "length": {
+                                  "type": "integer",
+                                  "minimum": 1
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "kind",
+                                "fromId",
+                                "toId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "relation"
+                                },
+                                "fromId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "toId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "kind",
+                                "id"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "legacy_relation"
+                                },
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "description": "删除该人物对或无法提供原文时的可追溯冲突/识别错误依据。"
                   }
                 }
               }
@@ -3150,9 +3346,10 @@
                     ]
                   }
                 }
-              }
+              },
+              "description": "删除关系或无法提供原文时使用的可追溯冲突/识别错误依据；必须引用已读取的原始关系、人物对或资产。"
             },
-            "unresolved": {
+            "uncertainPairs": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -3167,8 +3364,13 @@
                   "reason": {
                     "type": "string"
                   }
-                }
-              }
+                },
+                "required": [
+                  "targetId",
+                  "reason"
+                ]
+              },
+              "description": "表示已有人物对关系待核对，写入 pairChecks.outcome=uncertain；每一项须有 targetId 和 reason。"
             }
           }
         }
@@ -4530,7 +4732,6 @@
                           },
                           "confidence": {
                             "type": "number",
-                            "minimum": 0.85,
                             "maximum": 1
                           },
                           "reason": {
@@ -4605,7 +4806,6 @@
                           },
                           "confidence": {
                             "type": "number",
-                            "minimum": 0.85,
                             "maximum": 1
                           },
                           "reason": {
@@ -4675,7 +4875,6 @@
                           },
                           "confidence": {
                             "type": "number",
-                            "minimum": 0.85,
                             "maximum": 1
                           },
                           "reason": {
@@ -4753,7 +4952,6 @@
                           },
                           "confidence": {
                             "type": "number",
-                            "minimum": 0.85,
                             "maximum": 1
                           },
                           "reason": {

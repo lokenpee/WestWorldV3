@@ -174,6 +174,8 @@
 | B32-12 请求账本与代码报告 | 成功、失败、压缩、修正、缓存、usage缺失及重复回调混合 | 按人物查请求用途/工具/输入/输出/费用；attemptId去重，未知不记0，旧累计单列；修改前后和统计由代码生成，无隐藏模型总结调用 | 通过：requestLedger逐请求记录用途、估算输入、缓存/未缓存/输出/费用，unknown标缺失；请求与用量界面开发/生产通过 |
 | B32-13 备份 | 新格式10及旧4–9副本、失败摘要、当前人物错误与用量日志 | 新书独立暂停可续做，实际成果/费用保持；无额度或覆盖门槛复活，坏引用预检说明；P3不受P2切项策略影响 | 通过：格式10导出恢复、格式4-9读取测试保留；预算/覆盖门槛不再阻止继续 |
 | B32-14 真实质量与用量 | 用户授权后先单人物再原始8人副本，第三步另用多人多关系样本 | 核对下述质量/过程要求，无固定请求数/token达标门槛；异常先定位，不自动跑整书 | [单人](evidence/bug-32-single-jiazheng.md)与[8人修复后](evidence/bug-32-eight-characters.md)已跑：8人12次请求、未缓存输入157645/缓存71552/输出3314/总232511，usage全部报告，费用未知不计0；7人changed、贾瑞uncertain，8/8完成，无关系请求。牛继宗任职收窄、瑞珠字段附注、贾瑞无据补写已修复；剩余贾政背景纯标点被计修改 |
+| B32-15 关系概览与按需查询 | 贾珩69组关系、15条未解析；模型先看概览，再按人物对或字段查询，疑点才请求证据 | 初始数据包含全部关系目标、姓名、50字以内身份、双向标签、状态和指纹，不含pairKey、空证据和来源编号；查询可指定人物对、字段、分页、证据条数和证据续页；只查小字段时不返回整组完整JSON | 程序/写库通过，关系质量未通过。初始概览22,089字节/8,044估算token（原完整89,694/34,423，较旧概览31,805/10,821再降）；69/69完成，工具调用22次（旧36次），逐对`get_character_relation` 32→0次，`query_relation_work` 4次；无证据/pairKey，身份最长50字。但鸳鸯、赖家方向、林黛玉/探春/迎春、宋源、贾母、evidence 为空等问题使质量不通过；模型分18批提交导致22次API、694,817总token。详见 BUG-35。 |
+| B32-16 批量关系提交事务 | 一次提交44组已确认关系修改；另测一组目标不存在 | 44组在同一事务内全部写入；任意一组真实失败时整批回滚，不保留前43组 | 通过：44组写入后关系编辑记录为44条；不存在的目标使整批回滚为0条，当前人物工作项保留。修复了写事务未按pairKey区分关系编辑记录的问题 |
 
 ### 真实模型的检查方法
 
@@ -189,3 +191,115 @@
 - 本次未调用用户模型、未修改业务源码/书库/源备份、未提交Git。
 - 本次OpenSpec严格校验通过；索引Git差异及变更Markdown空白检查通过。治理检查未通过，原因是本次未修改的运行资源storage.schema.json与p2-character-organization.md内容和归属哈希不一致；由实施Agent核对这些工作区改动，不自动改哈希掩盖。未出现本次文档链接/结构问题。
 - 功能回归、真实模型质量/用量和用户验收：待实施后验证；历史测试通过数不作为本次证据。
+
+### 关系概览与批量提交第一阶段记录
+
+| 日期 | 工作 | 结果 | 证据及限制 |
+|---|---|---|---|
+| 2026-11-08 | 关系初始概览 | 第三步初始工作数据只含全部关系的精简字段；身份截断50字，删除pairKey、空证据、来源编号和非必要空字段。真实备份贾珩69组关系由31,805降至23,901字节（再降24.9%），按项目网关规则估算10,821→8,549 token | 全部69组关系保留；`tests/relation-query.test.ts`；未调用真实模型，估算值不是账单token |
+| 2026-11-08 | 按需查询 | `query_relation_work` 支持人物对、字段、关系分页、证据条数和证据续页；默认69组24,052字节，单对单字段156字节 | 只返回请求字段；证据超过预算标 `evidenceOmitted`，`evidenceCursor`/`nextEvidenceCursor` 可续页；不再因完整结果直接TOO_LARGE；真实模型查询次数待测 |
+| 2026-11-08 | 批量提交 | 修复写事务中关系编辑记录未按 `pairKey` 区分的问题；44组修改同一事务全部写入，错误目标整批回滚 | 写入44条 edits；失败回滚0条并保留工作项；真实外部并发冲突仍由现有指纹与事务校验处理 |
+| 2026-11-08 | 真实贾珩关系 | 在导入副本上跑单人物关系：69/69完成，outcome changed，46条修改记录覆盖41对，4对被重复修改，18个提交；清理未知占位、重复标签并校正方向 | 真实模型deepseek-flash；工具调用22次（submit18、query4、逐对查询0）；22次API、输入33,965/缓存653,824/输出7,028、总694,817 token，报告费用$0.0186；旧取消运行8次API、36次工具、276,281 token。API轮次和累计缓存读取反而增加，见任务11.7 |
+| 2026-11-08 | 自动检查 | `npm run typecheck`、`npm run lint`（仅既有警告）、`npm run test`（512通过/5跳过；新增真实贾珩测试无密钥时跳过）、`npm run build`、`npm run governance:check`、`npm run openspec -- validate --all --strict`（27项）通过 | 未修改原书/源备份、未提交Git；真实模型只修改隔离副本 |
+
+## BUG-35 关系质量边界与报告口径
+
+关联 [任务12](tasks.md#12-bug-35-关系质量边界与报告口径)、[缺陷池](../../缺陷池.md)。本验收先修“不乱改关系”和报告口径，不先压缩提交批次，不调用真实模型，不改正式书库。
+
+### 验收表
+
+| 编号 | 场景 | 通过标准 | 当前证据 |
+|---|---|---|---|
+| B35-01 关系维度删除 | 蔡权 `上官/上司/朋友/兄弟相称` 只保留 `朋友` | 允许保存，但标记未核实/待核对；不硬拒绝 | 已实现：`tests/relation-quality.test.ts` |
+| B35-02 同义/包含去重 | `上官/上司` 保留一个；`族中晚辈/晚辈` 保留一个 | 无证据通过；不误删独立维度 | 已实现 |
+| B35-03 新增实质关系 | 鸳鸯、宋源、林黛玉、探春、迎春从未知改具体族亲/主仆，无证据 | 允许保存但标记未核实/待核对；不硬拒绝 | 已实现 |
+| B35-04 方向交换 | 谢再义授艺/学射方向互换，无证据 | 允许保存为未核实；带证据保存为 verified | 已实现 |
+| B35-05 删除关系 | 无证据、无冲突依据删除 | 拒绝；带 evidence 或可追溯冲突 basis 通过，删除也保存证据 | 已实现 |
+| B35-06 证据真实性 | 章节不存在、原文缺失、引文不逐字、本次未读取 | 普通修改保存为 unverified/待核对；删除无有效依据拒绝 | 已实现 |
+| B35-07 未关联与待核对分离 | 原始未关联关系、已有人物对疑点 | 原始关系进 `unlinkedRelations`；已有人物对写 `uncertainPairs`/`pairChecks.outcome='uncertain'` | 已实现 |
+| B35-08 批量错误汇总 | 一批合法修改 + 删除无依据 + 不存在目标 | 预校验一次返回全部结构性错误；原子事务不写入任何修改 | 已实现 |
+| B35-09 费用口径 | 报告费用与逐请求账本 | 优先使用 `cost.total`，缺失才分项；不再漏缓存费用或重复相加 | 已实现：`tests/usage.test.ts` |
+| B35-10 账本时间与顺序 | 同一任务多次请求 | 每请求保留真实起止时间；账本有 `ordinal/turn/traceEntryId`；`finishedAt` 不再全部相同 | 已实现：`tests/ledger.test.ts` |
+| B35-11 写入顺序 | 多组关系连续写入 | `AssetEditRecord.writeSeq` 持久化单调；最终值来自副本数据库，不用 `toolCalls` 顺序 | 已实现：`tests/relation-query.test.ts` |
+| B35-12 真实质量复测 | 用户授权后在副本跑贾珩 | 程序、写库、质量三段分别通过；known-answer 覆盖鸳鸯、赖家、林黛玉/探春/迎春、宋源、贾母、蔡权 | 2026-11-09严格策略版复测：程序/写库/质量门通过，但49次提交中32次失败（18证据逐字、14缺证据）；完整链路见 `test-results/live-jiaheng-execution-chain.html`。当前已放宽证据硬拦截，待用户再次授权按新策略复测 |
+| B35-13 戴权小样本复测 | 用户授权后用戴权（6个关联目标）验证新策略 | 普通去重不失败；未核实修改保存并标记；无重复失败循环 | 2026-11-09通过：3次API（2次查询、1次提交）、41,635 token、$0.00566；6对关系，2条修改（1 verified、1 unverified），程序/写库/质量门通过。链路见 `test-results/live-daiquan-execution-chain.html` |
+| B35-18 贾赦小样本复测 | 用户要求用贾赦（22个关联目标）复测 | 程序/写库/质量通过；普通修改不被阻塞；提交失败次数和未核实数量可核对 | 2026-11-09通过：3次API（3次逐对查询、2次提交，共3请求）、46,404 token、$0.00594；22对关系，2条修改均verified，0次提交失败；链路 `test-results/live-jiashe-execution-chain.html` |
+| B35-14 首次输入拆分 | 戴权首次 API | 工具 Schema、业务 Prompt、work.data、其他上下文的占比可核对 | 首次实际输入12,953 token；估算工具Schema 68%、业务Prompt 16%、系统wrapper 6.5%、work.data 5.7%、其他3.2%。工具Schema最大，见 `test-results/daiquan-first-request-breakdown.md`；本轮不裁剪工具 |
+| B35-15 逐条证据核验 | 一组关系包含一条真实引文和一条非法引文 | 真实引文标记 verified，非法引文标记 unverified，整组为 partial，不误报整组 | 已实现：`tests/relation-quality.test.ts` 多证据用例 |
+| B35-16 提交幂等 | 相同 operationKey 和相同 payload 重试 | tools.ts 将 operationKey 转成 payload 哈希；commitCommand 返回 alreadyApplied，关系编辑 revision 不增加 | 已实现：`tests/relation-quality.test.ts` 幂等用例 |
+| B35-17 证据查询参数 | 传 evidence:true 或无 targetIds 查 evidence | schema/服务端拒绝，提示用 fields:["evidence"] + targetIds；不再默认全量证据查询 | 已实现：工具契约、`tests/relation-query.test.ts` |
+
+### 当前结论
+
+- 已经确认：程序 `completed`、69/69 checked、52 条修改记录和 46 条变化属于“程序/写库成功”，不是质量合格。
+- 真实运行的结论摘要保留在 [交接记录与运行摘要](evidence/handoff-relations-2026-11-09.md)；原始 `test-results` JSON/HTML 于 2026-11-09 被 Playwright 运行清空，需用户授权后重新运行生成，不能按历史 `toolCalls` 顺序复盘；最终值应以副本 `characterRelationEdits`/`effectivePairs` 为准。
+- 本次修复后，旧运行不会自动回填证据，也不改正式书库；需要用户授权后再跑副本质量验收。
+
+### pairChecks 口径与状态语义（2026-11-09）
+
+三个数字来自不同数据集，不是逻辑冲突：
+
+| 数字 | 来源 | 含义 |
+|---|---|---|
+| 282 | 贾赦运行（修复前代码） | 全库人物对全部写入 `pairChecks`；其中 260 条属于其他人物且 `outcome=null`，只有 22 条与贾赦相关。修复后单人物运行只同步当前人物的关系对。 |
+| 22 | 贾赦本人的关联人物对 | 2 changed（嫣红、翠云）、9 uncertain、11 no_change。 |
+| 14 | `tests/relation-quality.test.ts` fixture | 测试样本中贾珩的关联人物对总数；样本关系数少于贾赦，不是同一数据。 |
+
+状态必须分开看：
+
+| 维度 | 字段 | 含义 |
+|---|---|---|
+| 流程检查 | `relationItems[].status`、`pairChecks[].outcome` 非空 | 工作项是否走完；不代表每对关系正确。 |
+| 修改状态 | `pairChecks[].outcome` | `changed` 本次写入；`uncertain` 待核对；`no_change` 本次未提交修改。 |
+| 证据核实 | `pairChecks[].evidenceStatus` | `verified`/`partial`/`unverified`，只对发生修改的人物对有意义。 |
+
+`no_change` 只表示本次没有提交修改。当前提交参数没有“明确判断保持不变”的单独信号，因此报告写“本次未修改（不代表已逐对确认）”，不声称逐对确认正确。
+
+逐对记录规则：`changed` 保存该人物对实际修改记录的理由、`commitId` 和证据核实状态；`uncertain` 保存 `uncertainPairs` 中该 `targetId` 的具体原因；`no_change` 不复制最后一批的 `reason`/`commitIds`。单人物报告只展示当前人物的关系对，其他人物历史保留在数据库中，不参与当前人物的报告和完成判断。
+
+
+| 日期 | 工作 | 结果 | 证据及限制 |
+|---|---|---|---|
+| 2026-11-09 | 关系质量边界 | 按关系维度判断：同义/包含去重可无证据；删除独立维度、新增具体关系、方向互换、具体改全未知、删除 active 关系必须有逐条 evidence 或可追溯冲突 basis；删除也保留 evidence | `src/features/assets/relationLabels.ts`、`organizationCommands.ts`、`relationEdits.ts`；13项关系质量测试通过 |
+| 2026-11-09 | 待核对语义 | 提交参数改为 `uncertainPairs`，只标记已有人物对并写入 `pairChecks.outcome=uncertain`；原始未关联关系改为 `unlinkedRelations` | 提示词、工具契约、查询输出和测试同步 |
+| 2026-11-09 | 报告口径 | 费用优先使用 `cost.total`，缺失才分项；`Attempt` 记录真实起止时间；账本写 `ordinal/turn/traceEntryId`；`AssetEditRecord.writeSeq` 持久化 | `tests/usage.test.ts`、`ledger.test.ts`、`relation-query.test.ts` 通过 |
+| 2026-11-09 | 真实测试质量门 | live 测试保存最终 `characterRelationEdits`/`effectivePairs`、`writeSeq` 历史、请求顺序和 program/write/quality 三段；增加鸳鸯、赖家、林黛玉/探春/迎春、宋源、贾母、蔡权 known-answer 检查 | 无密钥时跳过；当前真实运行质量仍不通过，待用户授权后复测 |
+| 2026-11-09 | 自动检查 | `npm run typecheck`、`npm run lint`（仅6个既有警告）、`npm run test`（512通过/5跳过）、`npm run build`、`npm run governance:check`、`npm run openspec -- validate --all --strict`（27项）通过 | 未调用真实模型、未改正式书库、未提交Git |
+| 2026-11-09 | 逐对报告与取证策略 | `pairChecks` 逐对写入真实理由、确认号和证据状态；`no_change` 不再复制整批理由；单人物报告只展示当前人物关系对，历史保留；完成判断按当前人物范围；关系提示词增加“无存疑默认保持”和“多疑点批量查询 `query_relation_work`” | `tests/relation-quality.test.ts` 新增5项、`tests/organization.test.ts` 提示词断言；typecheck、525项单元测试、lint、治理检查通过；未调用真实模型、未改正式书库 |
+
+### BUG-35 复测记录
+
+| 日期 | 工作 | 结果 | 证据及限制 |
+|---|---|---|---|
+| 2026-11-09 | 贾珩真实复测 | 程序 completed、写库 19 条报告修改/27 条最终编辑行、质量门通过；鸳鸯/宋源/林黛玉/探春/迎春/赖家保留未知，蔡权多维，贾母去重 | 67 次 API、49 次 submit、8 次 read_original、2 次 get_character_relation；总 token 6,035,916，费用 $0.1135；`reportUsage.cost` 与账本差额 0。完整 API 链路见 `test-results/live-jiaheng-execution-chain.html`，原始链路 53MB JSON；成本异常和具体语义待用户查看链路 |
+
+### BUG-35 放宽证据硬拦截记录
+
+| 日期 | 工作 | 结果 | 证据及限制 |
+|---|---|---|---|
+| 2026-11-09 | 失败归因 | 32次失败=18次逐字校验+14次缺证据；其中12次缺证据由 directionUnclear 省略被当 false 误判，2次为真实实质变更；query evidence 本身不保证逐字，错误只报第一条并整批回滚，导致模型缩小到逐个提交 | 执行链 API #5–#67 逐条解析 |
+| 2026-11-09 | 修复策略 | 省略 directionUnclear 保持原值；普通去重/同义/称谓清理无证据；实质修改无有效证据保存为 unverified + pairChecks uncertain；只有删除整组关系要求逐字原文或可追溯冲突依据；批量预校验一次返回全部结构性错误；相同失败原样重复止损 | `tests/relation-quality.test.ts` 13项；真实版本冲突仍拒绝 |
+| 2026-11-09 | 检查 | typecheck、lint、514项测试、构建、治理和 OpenSpec 通过 | 待最终统计更新；未调用真实模型、未改正式书库 |
+
+### BUG-35 戴权小样本记录
+
+| 日期 | 工作 | 结果 | 证据及限制 |
+|---|---|---|---|
+| 2026-11-09 | 戴权新策略复测 | 3次API、2次查询、1次提交、41,635 token、$0.00566；6对关系，2条修改（1 verified、1 unverified），程序/写库/质量门通过 | 隔离副本；完整链路 `test-results/live-daiquan-execution-chain.html`；没有贾珩大样本的32次失败循环 |
+
+### BUG-35 贾赦小样本记录
+
+| 日期 | 工作 | 结果 | 证据及限制 |
+|---|---|---|---|
+| 2026-11-09 | 贾赦新策略复测 | 3次API、46,404 token、$0.00594；22对关系，2条修改均verified，0次提交失败；程序/写库/质量通过 | 隔离副本；`test-results/live-jiashe-execution-chain.html`；戴权小样本同时通过 |
+
+### 运行稳定性与恢复修复记录
+
+| 日期 | 工作 | 结果 | 证据及限制 |
+|---|---|---|---|
+| 2026-11-10 | 租约续期假冲突 | 快照忽略 `expiresAt`/`leaseUntil`，保留 owner/runId；业务写入事务增加租约守卫 | `tests/concurrency.test.ts` 通过；真实过期/身份变化仍拒绝写入 |
+| 2026-11-10 | P2 心跳与暂停 | P2 只保留 service 一套 8 秒心跳；连续三次暂时无法确认执行权时保留 `activeWork`、目标人物和已提交确认，进入可继续暂停；真实丢失执行权停止旧执行者 | `tests/organization.test.ts` 心跳暂停、单人物冲突继续、窗口关闭恢复用例通过 |
+| 2026-11-10 | 同书单任务准入 | P1/P2/P3 入口在 service/租约事务内互斥；P1 两类 lane 保持并行；不同书籍任务互不影响 | `tests/concurrency.test.ts` 跨阶段准入、不同书籍任务用例通过 |
+| 2026-11-10 | P3 会话租约写入保护 | 忽略续期时间的快照比较不放宽业务写入前的会话所有权和有效期校验 | `tests/concurrency.test.ts` owner/expired 两种写入拒绝用例通过 |
+| 2026-11-10 | 回执丢失与单人物继续 | 稳定 operationKey + `appliedCommands` 去重；单人物继续入口复用原 run/workItem | `tests/organization.test.ts` 回执丢失、提交前冲突继续用例通过 |
+| 2026-11-10 | 检查 | typecheck、非 live 单元测试、构建、lint、治理和 OpenSpec 校验通过 | 未调用真实模型、未修改正式书库与备份、未 push；正式书库端到端真实运行未验收 |

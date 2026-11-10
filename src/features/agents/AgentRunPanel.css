@@ -203,3 +203,135 @@
 .run-change pre {
   margin: 0.2rem 0 0.6rem;
 }
+
+.p2-object-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.p2-object-list button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: min(240px, 100%);
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+  text-align: left;
+}
+
+.p2-object-list button.selected {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.p2-object-list span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.run-selected-object {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.execution-events {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.execution-event {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.execution-event-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.execution-event-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.execution-system,
+.execution-user {
+  background: color-mix(in srgb, var(--border) 12%, #fff);
+}
+
+.execution-assistant {
+  border-left: 3px solid var(--ink);
+}
+
+.execution-tool-result {
+  border-left: 3px solid #4a7c59;
+}
+
+.execution-compaction {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.execution-tool-call {
+  margin: 0.35rem 0;
+}
+
+.execution-tool-call summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.execution-message-text {
+  margin: 0.3rem 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.execution-event pre {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.execution-raw {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+.p2-object-list {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 4px;
+}
+
+.p2-object-list button {
+  width: 100%;
+  min-width: 0;
+}
+
+.execution-event summary {
+  cursor: pointer;
+}
+
+.execution-event summary > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: normal;
+}

@@ -29,9 +29,9 @@ export interface ExtractedRelationInput {
 /** 新提取关系：归属实际落库的人物编号，目标按当前人物表全部命中。 */
 export function extractedRelation(person: Character, input: ExtractedRelationInput, characters: Character[], lifecycle: Lifecycle[], timestamp = new Date().toISOString()): CharacterRelation {
   const targetName = input.target.trim()
-  const relationType = normalizeRelationType(input.relationType) || 'unknown'
-  const forwardLabel = input.forwardLabel.trim() || relationType
-  const reverseLabel = input.reverseLabel.trim() || forwardLabel
+  const relationType = normalizeRelationType(input.relationType)
+  const forwardLabel = input.forwardLabel.trim()
+  const reverseLabel = input.reverseLabel.trim()
   const direction = normalizeDirection(input.direction)
   const id = relationId({ bookId: person.bookId, originCharacterId: person.id, targetName, relationType, forwardLabel, reverseLabel, direction, chapterIndex: input.chapterIndex })
   return {

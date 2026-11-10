@@ -2,9 +2,14 @@ import type { AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core'
 import type { AssistantMessageEvent, Usage } from '@earendil-works/pi-ai'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import type { ModelTraceEnd, ModelTraceHooks, ModelTraceStart, TracePurpose } from '../models/types'
-import { canonical } from './contracts'
+import { canonical, records, strings } from './contracts'
 import { estimateMessageTokens, observationTypes } from './context'
 import type { AgentRepository, Row } from './repository'
+import type { OrganizationMode, OrganizationState } from '../world/types'
+
+export interface OrganizationStepIndexEntry { runId: string; runStartedAt: string; runStatus: string; mode: OrganizationMode; scope: 'fullBook' | 'character'; step: 'scan' | 'profiles' | 'relations'; kind: 'directory' | 'candidate' | 'profile' | 'relations'; objectKey: string; label: string; status?: string; outcome?: string | null; characterId?: string; requestCount: number; hasTrace: boolean }
+export interface OrganizationRequestBefore { startedAt: string; requestId: string }
+export interface OrganizationRequestPage { requests: Row[]; snapshots: Map<string, Row>; total: number; hasEarlier: boolean; nextBefore?: OrganizationRequestBefore }
 
 export interface TraceIdentity {
   bookId: string; runId: string; executionId: string; taskId?: string; sessionId?: string
@@ -322,6 +327,130 @@ export async function withTraceBarrier<T>(work: () => Promise<T>): Promise<T> {
   tracePaused++
   try { await flushTraceWriters(); return await work() } finally { tracePaused = Math.max(0, tracePaused - 1); if (!tracePaused) void flushTraceWriters() }
 }
+const traceUnit = (row: Row) => text(row.unitId) || text(row.workId)
+const traceRequestId = (row: Row) => text(row.requestId) || text(row.id)
+
+function originOf(group: Row, decision: Row | undefined, mode: OrganizationMode) {
+  const origin = text(group.originStep) || text(decision?.originStep)
+  if (origin === 'scan' || origin === 'resolve' || origin === 'profiles' || origin === 'relations') return origin
+  return mode === 'full' ? 'scan' : mode
+}
+
+export async function readOrganizationStepIndex(workspace: ReturnType<typeof createWorkspace>, bookId: string, step: 'scan' | 'profiles' | 'relations'): Promise<OrganizationStepIndexEntry[]> {
+  const db = workspace.openBook(bookId)
+  const runs = (await db.table('pipelineRuns').toArray()).filter(row => row.bookId === bookId && row.workflow === 'character_organization_v1' && row.organization)
+  if (!runs.length) return []
+  const runIds = new Set(runs.map(row => text(row.id)))
+  const traces = (await db.table('storySessionEntries').toArray()).filter(row => row.type === 'request_trace' && runIds.has(text(row.runId)))
+  const counts = new Map<string, number>()
+  for (const row of traces) {
+    const key = `${text(row.runId)}|${traceUnit(row)}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  const entries: OrganizationStepIndexEntry[] = []
+  for (const run of runs.sort((a, b) => text(b.startedAt).localeCompare(text(a.startedAt)))) {
+    const organization = run.organization as unknown as OrganizationState
+    const mode = (organization.mode ?? 'full') as OrganizationMode
+    const scope: 'fullBook' | 'character' = run.scope === 'character' ? 'character' : 'fullBook'
+    const base = { runId: text(run.id), runStartedAt: text(run.startedAt), runStatus: text(run.status), mode, scope }
+    const push = (entry: Omit<OrganizationStepIndexEntry, 'runId' | 'runStartedAt' | 'runStatus' | 'mode' | 'scope' | 'requestCount' | 'hasTrace'>) => {
+      const count = counts.get(`${base.runId}|${entry.objectKey}`) ?? (scope === 'character' ? [...counts.entries()].filter(([key]) => key.startsWith(`${base.runId}|`)).reduce((sum, [, value]) => sum + value, 0) : 0)
+      entries.push({ ...base, ...entry, requestCount: count, hasTrace: count > 0 })
+    }
+    if (step === 'scan') {
+      for (const page of records(organization.scanPages)) push({ step, kind: 'directory', objectKey: `directory:${text(page.pageId)}`, label: `目录页 ${text(page.pageId)}`, status: text(page.status) })
+      const decisions = records(organization.candidateDecisions)
+      const groups = records(organization.candidateGroups)
+      const ids = new Set([...groups.map(group => text(group.id)), ...decisions.map(decision => text(decision.groupId))])
+      for (const id of ids) {
+        const group = groups.find(row => text(row.id) === id) ?? {}
+        const decision = decisions.find(row => text(row.groupId) === id)
+        if (scope === 'character') continue
+        const origin = originOf(group, decision, mode)
+        if (origin !== 'scan' && origin !== 'resolve') continue
+        const names = strings(group.memberNames).length ? strings(group.memberNames) : strings(decision?.memberNames)
+        push({ step, kind: 'candidate', objectKey: `candidate:${id}`, label: `疑似组 ${names.join('、') || id}`, status: decision ? 'resolved' : text(group.status), outcome: decision ? text(decision.outcome) : null })
+      }
+    } else {
+      const items = step === 'profiles' ? records(organization.profileItems) : records(organization.relationItems)
+      for (const item of items) {
+        const id = text(item.id)
+        push({ step, kind: step === 'profiles' ? 'profile' : 'relations', objectKey: `${step === 'profiles' ? 'profile' : 'relations'}:${id}`, label: `${text(item.name) || id}（${id}）`, status: text(item.status), ...(text(item.outcome) ? { outcome: text(item.outcome) } : {}), characterId: id })
+      }
+      if (scope === 'fullBook') {
+        const decisions = records(organization.candidateDecisions)
+        const groups = records(organization.candidateGroups)
+        const ids = new Set([...groups.map(group => text(group.id)), ...decisions.map(decision => text(decision.groupId))])
+        for (const id of ids) {
+          const group = groups.find(row => text(row.id) === id) ?? {}
+          const decision = decisions.find(row => text(row.groupId) === id)
+          if (originOf(group, decision, mode) !== step) continue
+          const names = strings(group.memberNames).length ? strings(group.memberNames) : strings(decision?.memberNames)
+          push({ step, kind: 'candidate', objectKey: `candidate:${id}`, label: `疑似组 ${names.join('、') || id}`, status: decision ? 'resolved' : text(group.status), outcome: decision ? text(decision.outcome) : null })
+        }
+      }
+    }
+  }
+  return entries
+}
+
+export async function readOrganizationRequests(workspace: ReturnType<typeof createWorkspace>, bookId: string, query: { runId: string; step: 'scan' | 'profiles' | 'relations'; objectKey: string; before?: OrganizationRequestBefore; limit?: number }): Promise<OrganizationRequestPage> {
+  const db = workspace.openBook(bookId)
+  const run = await db.table('pipelineRuns').get(query.runId)
+  const organization = run?.organization as unknown as OrganizationState | undefined
+  if (!run?.organization || !organization) return { requests: [], snapshots: new Map(), total: 0, hasEarlier: false }
+  const mode = (organization.mode ?? 'full') as OrganizationMode
+  const scope: 'fullBook' | 'character' = run.scope === 'character' ? 'character' : 'fullBook'
+  const rows = (await db.table('storySessionEntries').toArray()).filter(row => row.type === 'request_trace' && row.runId === query.runId)
+  const selected = rows.filter(row => {
+    const unit = traceUnit(row)
+    if (scope === 'character') return mode === 'profile' ? query.step === 'profiles' : query.step === 'relations'
+    return unit === query.objectKey
+  }).sort((a, b) => text(a.startedAt).localeCompare(text(b.startedAt)) || traceRequestId(a).localeCompare(traceRequestId(b)))
+  const older = query.before ? selected.filter(row => {
+    const at = text(row.startedAt), id = traceRequestId(row)
+    return at < query.before!.startedAt || at === query.before!.startedAt && id < query.before!.requestId
+  }) : selected
+  const limit = Math.max(1, query.limit ?? 50)
+  const requests = older.slice(-limit)
+  const referenced = new Set<string>()
+  for (const row of requests) {
+    const input = row.input && typeof row.input === 'object' ? row.input as Row : {}
+    for (const key of ['systemPromptSnapshotId', 'businessPromptSnapshotId', 'toolSchemaSnapshotId']) if (typeof input[key] === 'string') referenced.add(input[key] as string)
+  }
+  const snapshots = (await db.table('storySessionEntries').toArray()).filter(row => row.type !== 'request_trace' && referenced.has(String(row.snapshotId ?? row.id)))
+  const first = requests[0]
+  return { requests, snapshots: new Map(snapshots.map(row => [String(row.snapshotId ?? row.id), row])), total: selected.length, hasEarlier: older.length > requests.length, ...(first ? { nextBefore: { startedAt: text(first.startedAt), requestId: traceRequestId(first) } } : {}) }
+}
+
+export interface ExecutionChain { entries: Row[]; requests: Row[]; snapshots: Map<string, Row>; runStatus?: string }
+
+export async function readExecutionChain(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string, options: { unitId?: string; contextId?: string; sessionId?: string } = {}): Promise<ExecutionChain> {
+  const db = workspace.openBook(bookId)
+  const run = await db.table('pipelineRuns').get(runId)
+  if (!run) return { entries: [], requests: [], snapshots: new Map() }
+  const sessionId = text(options.sessionId) || text(run.sessionId)
+  const all = await db.table('storySessionEntries').toArray()
+  const unitId = text(options.unitId)
+  const targeted = run.scope === 'character'
+  const entries = all.filter(row => {
+    if (row.type !== 'message' && row.type !== 'compaction') return false
+    if (sessionId && row.sessionId !== sessionId) return false
+    if (unitId && !targeted && row.unitId !== unitId) return false
+    if (!unitId && options.contextId && row.contextId && row.contextId !== options.contextId) return false
+    return true
+  }).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
+  const requests = all.filter(row => row.type === 'request_trace' && row.runId === runId && (!unitId || targeted || (text(row.unitId) || text(row.workId)) === unitId))
+    .sort((a, b) => Number(a.requestOrdinal) - Number(b.requestOrdinal))
+  const referenced = new Set<string>()
+  for (const row of requests) {
+    const input = row.input && typeof row.input === 'object' ? row.input as Row : {}
+    for (const key of ['systemPromptSnapshotId', 'businessPromptSnapshotId', 'toolSchemaSnapshotId']) if (typeof input[key] === 'string') referenced.add(input[key] as string)
+  }
+  const snapshots = all.filter(row => row.type !== 'request_trace' && referenced.has(String(row.snapshotId ?? row.id)))
+  return { entries, requests, snapshots: new Map(snapshots.map(row => [String(row.snapshotId ?? row.id), row])), runStatus: text(run.status) }
+}
+
 export async function readBookTrace(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId?: string, options: { limit?: number; offset?: number } = {}) {
   const db = workspace.openBook(bookId)
   const rows = (await db.table('storySessionEntries').toArray()).filter(row => row.bookId === bookId && typeof row.type === 'string' && observationTypes.has(row.type))

@@ -2,14 +2,13 @@ import type { AgentStore, Row } from './repository'
 import { hash, records, strings, text, type AgentProfile } from './contracts'
 import { characterCandidates } from '../assets/characterLinks'
 import { edgesFor, effectivePairs, pairFromPerspective, pairView, projectRelations, relationView, resolveLifecycleId, syncRelations } from '../assets/relations'
-import { normalizeCharacterNames } from '../assets/characterNames'
 import { storyContent } from '../story/coverage'
 import { searchStoryContext } from '../story/retrieval'
 import type { Character, CharacterRelation, CharacterRelationEdit, Lifecycle } from '../assets/types'
 import { refreshReview } from './organizationReview'
 import { profileWork, relationWork } from './organizationData'
 
-export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; contextId?: string; unitId?: string }
+export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; contextId?: string; unitId?: string; workKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
 const canonicalCursor = (value: unknown) => JSON.stringify(Array.isArray(value) ? value.map(String) : [])
@@ -236,8 +235,65 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     const active = organization.activeWork as Row | undefined
     const id = text(args.characterId) || text(active?.characterId)
     if (!id) throw new Error('INVALID_ARGS:请提供人物编号。')
-    const data = await relationWork(store, id, records(organization.pairChecks))
-    if (!data) throw new Error('NOT_FOUND:人物不存在或不属于本书。')
+    const targetIds = [...new Set(strings(args.targetIds))]
+    const fields = [...new Set(strings(args.fields))]
+    if (targetIds.length > 50) throw new Error('INVALID_ARGS:targetIds单次最多50个。')
+    const allowedFields = new Set(['targetId', 'targetName', 'identity', 'forward', 'reverse', 'state', 'unclear', 'fingerprint', 'checked', 'evidence', 'evidence.quote', 'evidence.chapterIndex'])
+    const invalidField = fields.find(field => !allowedFields.has(field))
+    if (invalidField) throw new Error(`INVALID_ARGS:不支持的字段：${invalidField}。`)
+    const includeEvidence = fields.some(field => field === 'evidence' || field.startsWith('evidence.'))
+    if (includeEvidence && !targetIds.length) throw new Error('INVALID_ARGS:查询证据请用targetIds指定疑问人物对，不要全量查询；证据字段写在fields数组里，不使用evidence:true。')
+    const overview = await relationWork(store, id, records(organization.pairChecks), !includeEvidence)
+    if (!overview) throw new Error('NOT_FOUND:人物不存在或不属于本书。')
+    const selected = overview.relations.filter((row: Row) => !targetIds.length || targetIds.includes(text(row.targetId)))
+    const offset = Math.max(0, Number(args.cursor ?? 0) || 0)
+    const limit = Math.min(100, Math.max(1, Number(args.limit ?? 50) || 50))
+    const page = selected.slice(offset, offset + limit)
+    const evidenceCursor = Math.max(0, Number(args.evidenceCursor ?? 0) || 0)
+    const evidenceLimit = Math.min(10, Math.max(1, Number(args.evidenceLimit ?? 5) || 5))
+    const full = includeEvidence ? overview : undefined
+    const defaultFields = ['targetId', 'targetName', 'identity', 'forward', 'reverse', 'state', 'unclear', 'fingerprint', 'checked']
+    const knownTargets = new Set(overview.relations.map((row: Row) => text(row.targetId)))
+    const clip = (value: string) => value.length > 400 ? value.slice(0, 400) : value
+    let evidenceBudget = 24000
+    let evidenceMore = false
+    const pick = (row: Row) => {
+      const requested = fields.length ? fields : defaultFields
+      const output: Row = {}
+      for (const field of requested) {
+        if (field === 'evidence' || field.startsWith('evidence.')) {
+          if (evidenceBudget <= 0) { output.evidence = []; output.evidenceOmitted = true; continue }
+          const source = full?.relations.find((item: Row) => text(item.targetId) === text(row.targetId))
+          const evidence = (source?.evidence as Row[] | undefined) ?? []
+          const slice = evidence.slice(evidenceCursor, evidenceCursor + evidenceLimit)
+          if (evidence.length > evidenceCursor + evidenceLimit) { output.evidenceTruncated = true; evidenceMore = true }
+          const items = slice.map(item => {
+            const quote = text(item.quote)
+            const value: Row = field === 'evidence.quote' ? { quote: clip(quote) } : field === 'evidence.chapterIndex' ? { chapterIndex: text(item.chapterIndex) } : { ...item, quote: clip(quote) }
+            if (quote.length > 400) value.quoteTruncated = true
+            return value
+          }).filter(item => {
+            const size = bytes(item)
+            if (size > evidenceBudget) return false
+            evidenceBudget -= size
+            return true
+          })
+          output.evidence = items
+          if (items.length < slice.length) output.evidenceOmitted = true
+        } else if (field === 'identity') output.identity = text(row.identity).slice(0, 50)
+        else if (field in row) output[field] = row[field]
+      }
+      return output
+    }
+    const unlinkedRelations = (overview.unlinkedRelations as Row[]).map(row => ({ sourceName: row.sourceName, targetName: row.targetName, forward: row.forward, reverse: row.reverse, direction: row.direction }))
+    const data = {
+      id: overview.id, name: overview.name, identity: text(overview.identity).slice(0, 50), revision: overview.revision,
+      relations: page.map(pick), unlinkedRelations,
+      total: selected.length, nextCursor: offset + limit < selected.length ? String(offset + limit) : null,
+      fields: fields.length ? fields : defaultFields,
+      ...(includeEvidence ? { nextEvidenceCursor: evidenceMore ? String(evidenceCursor + evidenceLimit) : null } : {}),
+      ...(targetIds.length ? { missingTargetIds: targetIds.filter(targetId => !knownTargets.has(targetId)) } : {}),
+    }
     if (active?.kind === 'relations' && text(active.characterId) === id) { active.dataVersion = Number(data.revision); await store.put('pipelineRuns', { ...run, organization }) }
     return { data }
   }
@@ -249,7 +305,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     const lifecycle = (await scopedRows(store, scope, 'assetLifecycle')) as unknown as Lifecycle[]
     const relations = (await scopedRows(store, scope, 'characterRelations')) as unknown as CharacterRelation[]
     const edits = (await scopedRows(store, scope, 'characterRelationEdits')) as unknown as CharacterRelationEdit[]
-    const normalized = people.map(normalizeCharacterNames)
+    const normalized = people
     const pairs = effectivePairs(syncRelations(relations, normalized, lifecycle).relations, edits, normalized)
     return { data: pairFromPerspective(pairs, fromId, toId, normalized) }
   }
@@ -318,7 +374,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
       const lifecycle = (await scopedRows(store, scope, 'assetLifecycle')) as unknown as Lifecycle[]
       const rows = (await scopedRows(store, scope, 'characterRelations')) as unknown as CharacterRelation[]
       const edits = (await scopedRows(store, scope, 'characterRelationEdits')) as unknown as CharacterRelationEdit[]
-      const normalized = people.map(normalizeCharacterNames)
+      const normalized = people
       const synced = syncRelations(rows, normalized, lifecycle).relations
       const pairs = effectivePairs(synced, edits, normalized)
       const types = new Map(synced.map(relation => [relation.id, relation.relationType]))
@@ -330,7 +386,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     for (const id of strings(args.ids)) {
       const found = await resolveAsset(store, scope, table, id)
       if (!found) { missing.push(id); continue }
-      const row: Row = table === 'characters' ? normalizeCharacterNames({ ...found, name: text(found.name), aliases: strings(found.aliases), identity: text(found.identity) }) : { ...found }
+      const row: Row = { ...found }
       if (!args.include_facts) for (const key of ['mergeFacts', 'optimizedFactIds', 'optimizationFingerprint']) delete row[key]
       if (characterRelations && characterRelations.people.some(person => person.id === row.id)) {
         const projection = projectRelations(characterRelations.view.edges, characterRelations.rows, characterRelations.unresolved, text(row.id), characterRelations.people)
@@ -354,7 +410,6 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
   }
   if (args.after_id !== undefined && args.offset !== undefined) throw new Error('INVALID_ARGS:稳定游标与页偏移请选用一种。')
   let rows = (await scopedRows(store, scope, table)).sort((a, b) => compare(text(a.id), text(b.id)))
-  if (table === 'characters') rows = rows.map(row => normalizeCharacterNames({ ...row, name: text(row.name), aliases: strings(row.aliases), identity: text(row.identity) }))
   const nameLike = text(args.name_like).toLowerCase()
   rows = rows.filter(row => (!nameLike || [row.name, row.title, ...strings(row.aliases)].some(value => text(value).toLowerCase().includes(nameLike))) && (!args.after_id || compare(text(row.id), text(args.after_id)) > 0) && (!args.status || row.lineStatus === args.status))
   if (args.chapter_range) rows = rows.filter(row => [text(row.chapterIndex), ...strings(row.sourceChapters), ...strings(row.chapters)].some(index => within(index, strings(args.chapter_range))))

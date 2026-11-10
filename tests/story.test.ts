@@ -304,22 +304,6 @@ it('事件线已提交但总结失败时保存真实覆盖，继续不会重建�
   expect(fetcher).toHaveBeenCalledTimes(calls)
 })
 
-it('第15次提醒收尾，第20次响应后保留待办并正常结束本轮', async () => {
-  const notes: string[] = []
-  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
-    const body = JSON.parse(init?.body as string), { input } = storyTask(body)
-    notes.push(JSON.stringify(body.messages.at(-1)))
-    return agentStream([{ name: 'get_node_detail', args: { ids: input.workItems.map((item: { id: string }) => item.id) } }])
-  })
-  const { service } = await setup(1, [1], fetcher)
-  await service.start('a')
-  expect(fetcher).toHaveBeenCalledTimes(20)
-  expect(notes[14]).toContain('进入收尾')
-  expect(notes[0]).toContain('目标5分钟')
-  expect(service.state('a')?.error).toBeUndefined()
-  expect((await service.read('a')).completed).toBe(0)
-}, 30000)
-
 it('后窗为重叠节点创建新线，前窗保持完成，继续不重复串联', async () => {
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string), { input } = storyTask(body)
@@ -365,6 +349,7 @@ it('五分钟目标前提醒收尾，越过目标的在途响应仍正常结束'
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed)
   try { await fixture.service.start('a') } finally { clock.mockRestore() }
   expect(fetcher).toHaveBeenCalledTimes(2)
+  expect(notes[0]).toContain('按时间预算')
   expect(notes[1]).toContain('进入收尾')
   expect(aborted).toEqual([false, false])
   expect(fixture.service.state('a')?.error).toBeUndefined()

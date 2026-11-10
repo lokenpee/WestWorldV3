@@ -47,7 +47,7 @@ export interface EventLine extends BaseAsset {
 /** 节点里的称呼绑定：一个原始称呼连同它命中的全部人物编号。 */
 export interface CharacterBinding { mention: string; ids: string[] }
 export type RelationDirection = 'directed' | 'bidirectional' | 'unspecified'
-export interface RelationEvidence { chapterIndex: string; quote: string }
+export interface RelationEvidence { chapterIndex: string; quote: string; verified?: boolean; reason?: string }
 /** 一条人物关系事实：归属原始提取人物，目标为目标称呼的全部命中。 */
 export interface CharacterRelation {
   id: string; bookId: string
@@ -80,7 +80,7 @@ export interface CharacterRelationEdit {
   sourceRelationIds: string[]
   legacyRecordIds?: string[]
   basis?: Basis[]
-  revision: number; updatedAt: string; updatedBy: 'manual' | 'agent' | 'migration'; commitId: string
+  revision: number; updatedAt: string; updatedBy: 'manual' | 'agent' | 'migration'; commitId: string; evidenceStatus?: 'verified' | 'unverified' | 'partial'
 }
 /** 人物对的当前有效结果，由原始事实叠加编辑结果生成。 */
 export interface CharacterPairResult {
@@ -109,7 +109,7 @@ export interface AssetEditRecord {
   commitId: string; tool: string; kind: AssetKind | 'relation'; id: string
   fieldChanges: AssetFieldChange[]; reason: string; evidence: RelationEvidence[]
   basis?: Basis[]
-  timestamp: string; actor: 'manual' | 'agent'
+  timestamp: string; actor: 'manual' | 'agent'; writeSeq?: number; evidenceStatus?: 'verified' | 'unverified' | 'partial'
 }
 export interface AssetByKind { character: Character; location: LocationAsset; node: EventNode; eventLine: EventLine }
 export type Asset = AssetByKind[AssetKind]

@@ -3,7 +3,7 @@ import type { AssetService, RelationPairInput } from './service'
 import { searchCharacters } from './search'
 import { pairFromPerspective } from './relations'
 import type { AssetSnapshot, Character, CharacterPairResult, LegacyRelationRecord, RelationEvidence } from './types'
-import { relationLines, relationRoleLabel } from './relationLabels'
+import { relationLines } from './relationLabels'
 
 interface LabelEditorProps { labels: string[]; onChange: (labels: string[]) => void; placeholder: string }
 function LabelEditor({ labels, onChange, placeholder }: LabelEditorProps) {
@@ -53,7 +53,7 @@ export const RelationEditor = forwardRef<RelationEditorHandle, {
     try {
       const pair = await service.getRelationPair(bookId, character.id, otherId)
       if (request !== generation.current) return
-      const next = { otherId, forward: pair.forwardLabels.length ? pair.forwardLabels.map(relationRoleLabel) : ['未知'], reverse: pair.reverseLabels.length ? pair.reverseLabels.map(relationRoleLabel) : ['未知'], unclear: pair.directionUnclear, evidence: pair.evidence, fingerprint: pair.fingerprint, state: pair.state }
+      const next = { otherId, forward: pair.forwardLabels.length ? pair.forwardLabels : ['未知'], reverse: pair.reverseLabels.length ? pair.reverseLabels : ['未知'], unclear: pair.directionUnclear, evidence: pair.evidence, fingerprint: pair.fingerprint, state: pair.state }
       setDialog(next)
       setInitialDialog(JSON.stringify([next.otherId, next.forward, next.reverse, next.unclear, next.evidence]))
     } catch (error) {
@@ -104,7 +104,7 @@ export const RelationEditor = forwardRef<RelationEditorHandle, {
         return <li key={pair.pairKey} className="relation-pair">
           <div className="relation-pair-title"><strong>{person?.name ?? pair.toId}</strong><small>{person?.identity ? `${person.identity} · ` : ''}{pair.toId}</small></div>
           <div className="relation-pair-labels">{relationLines(character.name, person?.name ?? pair.toId, pair.forwardLabels, pair.reverseLabels).map((line, index) => <p key={index}>{line}</p>)}{pair.directionUnclear && <span>关系身份待核对</span>}{pair.legacyRecordIds.length > 0 && <span>由旧资料迁移 · {pair.legacyRecordIds.length} 条依据</span>}</div>
-          {(pair.evidence.length > 0 || [...pair.forwardLabels, ...pair.reverseLabels].some(label => relationRoleLabel(label) !== label)) && <details className="relation-evidence"><summary>查看相关原文与原标签</summary>{[...pair.forwardLabels, ...pair.reverseLabels].some(label => relationRoleLabel(label) === '未知') && <p className="field-help">相关原文尚不能确认关系身份，保留供核对。</p>}<p>原正向标签：{pair.forwardLabels.join('、') || '未知'}；原反向标签：{pair.reverseLabels.join('、') || '未知'}</p>{pair.evidence.map((item, index) => <p key={index}>第{item.chapterIndex}章：{item.quote}</p>)}</details>}
+          {(pair.evidence.length > 0) && <details className="relation-evidence"><summary>查看相关原文与原标签</summary><p>原正向标签：{pair.forwardLabels.join('、') || '未知'}；原反向标签：{pair.reverseLabels.join('、') || '未知'}</p>{pair.evidence.map((item, index) => <p key={index}>第{item.chapterIndex}章：{item.quote}</p>)}</details>}
           <div className="relation-pair-actions"><button type="button" className="text-button" disabled={locked || busy} onClick={() => void begin(pair.toId)}>编辑</button>{pair.legacyRecordIds.length > 0 && <button type="button" className="text-button" onClick={() => void showLegacy(pair)}>旧关系依据（{pair.legacyRecordIds.length}）</button>}<button type="button" className="text-button" disabled={locked || busy} onClick={() => setDeletePair(pair)}>删除</button></div>
         </li>
       })}

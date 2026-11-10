@@ -1,5 +1,15 @@
 import { ModelError, type Attempt, type ErrorKind, type ModelFailure, type UsageSummary, type ModelSnapshot } from './types'
 
+export function usageCost(usage: Attempt['usage']) {
+  const cost = usage?.cost as unknown as Record<string, number | undefined> | undefined
+  if (!cost) return null
+  const total = Number(cost.total)
+  if (Number.isFinite(total) && total > 0) return total
+  const parts = [cost.input, cost.output, cost.cacheRead, cost.cacheWrite].map(value => Number(value ?? 0))
+  if (parts.every(value => Number.isFinite(value) && value >= 0)) return parts.reduce((sum, value) => sum + value, 0)
+  return null
+}
+
 export function redact(text: string, secrets: string[] = []) {
   let value = text
   for (const secret of secrets.filter(Boolean)) for (const version of new Set([secret, encodeURIComponent(secret)])) value = value.split(version).join('[已隐藏]')
@@ -48,12 +58,13 @@ export function awaitWithSignal<T>(pending: Promise<T>, signal?: AbortSignal): P
 export function summarizeUsage(attempts: Attempt[], snapshot?: ModelSnapshot): UsageSummary {
   const sum: UsageSummary = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, costStatus: snapshot?.pricingStatus ?? 'unknown' }
   const valid = (value: number) => Number.isFinite(value) && value >= 0 ? value : 0
-  let cost = 0
+  let cost = 0, hasCost = false
   for (const attempt of attempts) if (attempt.usage) {
     for (const field of ['input', 'output', 'cacheRead', 'cacheWrite', 'totalTokens'] as const) sum[field] += valid(attempt.usage[field])
-    cost += valid(attempt.usage.cost.input) + valid(attempt.usage.cost.output)
+    const value = usageCost(attempt.usage)
+    if (value !== null) { cost += value; hasCost = true }
   }
-  if (snapshot?.pricingStatus === 'estimated' && sum.totalTokens > 0) { sum.cost = cost; sum.currency = snapshot.pricingCurrency }
+  if (snapshot?.pricingStatus === 'estimated' && (hasCost || sum.totalTokens === 0)) { sum.cost = cost; sum.currency = snapshot.pricingCurrency }
   else sum.costStatus = 'unknown'
   return sum
 }

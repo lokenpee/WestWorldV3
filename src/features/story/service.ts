@@ -11,22 +11,25 @@ import { recoverStoryCoverage, saveStoryCoverage, storyFingerprint, validStoryCo
 import { hash } from '../agents/contracts'
 import { buildStoryContext, lineDigest, selectStoryBatch, storyBatchBudget } from './retrieval'
 import type { SessionStatus } from '../agents/compaction'
-import { readBookTrace } from '../agents/trace'
+import { readBookTrace, readExecutionChain } from '../agents/trace'
 import { isObservationEntry } from '../agents/context'
 import storyPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-story.md?raw'
 import taskTemplate from '../../../docs/v2/resources/v2.2/prompts/active/story.txt?raw'
+import { leaseFailureKind } from '../world/leaseHeartbeat'
 
 type Workspace = ReturnType<typeof createWorkspace>
 interface StoryState { running: boolean; window: number; total: number; processed: number; nodeTotal: number; error?: string; message?: string; phase?: string; queue?: string; sessionStatus?: SessionStatus }
 export function createStoryService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'settings' | 'generate'>) {
   const states = new Map<string, StoryState>(), controllers = new Map<string, AbortController>(), listeners = new Set<() => void>()
+  const cancelled = new Set<string>()
   const set = (bookId: string, changes: Partial<StoryState>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, window: 0, total: 0, processed: 0, nodeTotal: 0 }), ...changes }); listeners.forEach(listener => listener()) }
   async function start(bookId: string, phase: 'window_link' | 'global_review' = 'window_link') {
     if (controllers.has(bookId)) return
-    const controller = new AbortController(); controllers.set(bookId, controller)
+    const controller = new AbortController(); controllers.set(bookId, controller); cancelled.delete(bookId)
     const db = workspace.openBook(bookId), repo = createBookAgentRepository(workspace, bookId)
     let runId: string = crypto.randomUUID(), sessionId = '', planKey = ''
     const owner = crypto.randomUUID(); let acquired = false; let recheck = false; let timer: ReturnType<typeof setInterval> | undefined
+    let heartbeatFailure = ''
     let chapters: Chapter[] = [], windows: StoryWindow[] = [], activeWindow: StoryWindow | undefined
     set(bookId, { running: true, phase, window: 0, total: 0, processed: 0, nodeTotal: 0, error: undefined, message: undefined, sessionStatus: undefined })
     const check = async () => {
@@ -47,7 +50,7 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
       const runtime = createAgentRuntime(models.agent, { generate: models.generate, onStatus: sessionStatus => set(bookId, { sessionStatus }) })
       await repo.transaction(true, async store => {
         const leases = await store.rows('pipelineRuns')
-        if (leases.some(row => row.recordType === 'lease' && ['extraction', 'extraction:worldAssets', 'extraction:narrativeAssets', 'narrative'].includes(text(row.lockKey)) && Number(row.expiresAt ?? Infinity) > Date.now())) throw new Error('本书已有叙事或提取任务，请等待其结束。')
+        if (leases.some(row => row.recordType === 'lease' && ['extraction', 'extraction:worldAssets', 'extraction:narrativeAssets', 'narrative', 'world'].includes(text(row.lockKey)) && Number(row.expiresAt ?? Infinity) > Date.now())) throw new Error('本书已有叙事、世界或提取任务，请等待其结束。')
         if (!coverage(chapters, await store.rows('extractionReceipts') as unknown as Receipt[]).allCovered) throw new Error('请先完成全书逐章提取。')
         const session = await resolveSession(store, bookId)
         if (session.leaseOwner && Number(session.leaseUntil) > Date.now()) throw new Error('本书会话正在其他窗口运行。')
@@ -69,11 +72,15 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
         await store.put('storySessions', { ...session, leaseOwner: owner, leaseUntil: Date.now() + 30000 })
         await store.put('compileProgress', { bookId, stage: 'P3', status: 'running', phase, runId, editorSessionId: sessionId, planKey, totalChapters: chapters.length, completedChapters: [], failedChapters: [], updatedAt: now, scope: 'fullBook', planVersion: '2.2', unit: phase === 'global_review' ? 'item' : 'window', validity: 'current' })
       }); acquired = true
+      let heartbeatFailures = 0
       timer = setInterval(() => { void repo.transaction(true, async store => {
         const lease = await store.get('pipelineRuns', 'lease:narrative'); const session = await store.get('storySessions', sessionId)
         if (lease?.owner !== owner || session?.leaseOwner !== owner) throw new Error('叙事执行权已变化。')
         await store.put('pipelineRuns', { ...lease, expiresAt: Date.now() + 30000 }); await store.put('storySessions', { ...session, leaseUntil: Date.now() + 30000 })
-      }).catch(() => controller.abort()) }, 8000)
+      }).then(() => { heartbeatFailures = 0 }).catch(error => {
+        const message = error instanceof Error ? error.message : '叙事执行权续租失败。'
+        if (leaseFailureKind(error) === 'lost' || ++heartbeatFailures >= 3) { heartbeatFailure = message; controller.abort() }
+      }) }, 8000)
       await repo.transaction(true, store => recoverStoryCoverage(store, runId))
       if (phase === 'global_review') {
         const completed = await runGlobalReview(repo, runtime, { runId, sessionId, owner, signal: controller.signal, check, contextWindow: settings.config.aggregationContextWindow, onProgress: (processed, nodeTotal, queue) => set(bookId, { processed, nodeTotal, queue }) })
@@ -174,12 +181,14 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
       set(bookId, { message: completedWindows === windows.length ? '窗口串联完成。' : '本轮串联已保存，剩余项可继续。', processed: states.get(bookId)?.processed ?? 0 })
 
     } catch (error) {
-      const message = controller.signal.aborted ? '整理已取消，已提交的资料和依据保留。' : error instanceof Error ? error.message : '叙事整理失败。'
+      const detail = error instanceof Error ? error.message : '叙事整理失败。'
+      if (!heartbeatFailure && /执行权|租约|会话/.test(detail) && !cancelled.has(bookId)) heartbeatFailure = detail
+      const message = heartbeatFailure ? `整理已暂停：${heartbeatFailure}` : cancelled.has(bookId) ? '整理已取消，已提交的资料和依据保留。' : detail
       set(bookId, { error: message })
       if (acquired) await db.transaction('rw', db.tables, async () => {
         if ((await db.table('pipelineRuns').get('lease:narrative'))?.owner !== owner) return
-        const status = controller.signal.aborted ? 'cancelled' : 'paused'
-        if (activeWindow) { const previous = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(checkpointId(sessionId, planKey, activeWindow)); if (previous?.status !== 'completed') await db.table('storyEditorCheckpoints').put({ id: checkpointId(sessionId, planKey, activeWindow), bookId, sessionId, stage: 'P3', phase: 'window_link', scopeIds: (await nodesFor(activeWindow)).map(row => row.id), sourceFingerprint: '', status: controller.signal.aborted ? 'cancelled' : 'failed', memberships: membershipsOf(await nodesFor(activeWindow)), updatedAt: new Date().toISOString(), window: { start: activeWindow.start, end: activeWindow.end } } satisfies StoryCheckpoint) }
+        const status = cancelled.has(bookId) ? 'cancelled' : 'paused'
+        if (activeWindow) { const previous = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(checkpointId(sessionId, planKey, activeWindow)); if (previous?.status !== 'completed') await db.table('storyEditorCheckpoints').put({ id: checkpointId(sessionId, planKey, activeWindow), bookId, sessionId, stage: 'P3', phase: 'window_link', scopeIds: (await nodesFor(activeWindow)).map(row => row.id), sourceFingerprint: '', status: status === 'cancelled' ? 'cancelled' : 'failed', memberships: membershipsOf(await nodesFor(activeWindow)), updatedAt: new Date().toISOString(), window: { start: activeWindow.start, end: activeWindow.end } } satisfies StoryCheckpoint) }
         await db.table('compileProgress').update('P3', { status, phase, validity: 'stale', updatedAt: new Date().toISOString() })
         await db.table('pipelineRuns').update(runId, { status, phase, finishedAt: new Date().toISOString() })
       }).catch(() => set(bookId, { error: `${message} 进度保存失败，请检查本地存储。` }))
@@ -205,11 +214,11 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
         const current = windowNodes(window, chapters, nodes as unknown as EventNode[])
         if (checkpoint.status === 'completed' && ![await store.wait(windowFingerprint(window, current)), await store.wait(hash({ window, nodes: current }))].includes(checkpoint.sourceFingerprint)) checkpoint.status = 'failed'
       }
-      const leaseIds = ['lease:narrative', 'lease:extraction', 'lease:extraction:worldAssets', 'lease:extraction:narrativeAssets']
+      const leaseIds = ['lease:narrative', 'lease:world', 'lease:extraction', 'lease:extraction:worldAssets', 'lease:extraction:narrativeAssets']
       const leases = (await Promise.all(leaseIds.map(id => store.get('pipelineRuns', id)))).filter((row): row is Row => !!row)
       const covered = coverage(chapters, await store.rows('extractionReceipts') as unknown as Receipt[]).allCovered
-      const locked = leases.some(row => row.recordType === 'lease' && ['narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(String(row.lockKey)) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
-      const leaseExpiry = leases.filter(row => row.recordType === 'lease' && ['narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(String(row.lockKey)) && typeof row.expiresAt === 'number' && row.expiresAt > Date.now()).reduce<number | undefined>((expiry, row) => Math.min(expiry ?? Infinity, Number(row.expiresAt)), undefined)
+      const locked = leases.some(row => row.recordType === 'lease' && ['narrative', 'world', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(String(row.lockKey)) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))
+      const leaseExpiry = leases.filter(row => row.recordType === 'lease' && ['narrative', 'world', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(String(row.lockKey)) && typeof row.expiresAt === 'number' && row.expiresAt > Date.now()).reduce<number | undefined>((expiry, row) => Math.min(expiry ?? Infinity, Number(row.expiresAt)), undefined)
       const entries = progress?.editorSessionId ? (await store.rows('storySessionEntries')).filter(row => row.sessionId === progress.editorSessionId).sort((a, b) => Number(a.ordinal) - Number(b.ordinal)) : []
       const compact = entries.findLast(row => row.type === 'compaction')
       const review = run ? await reviewQueue(store, progress!.runId, progress!.editorSessionId) : undefined
@@ -224,6 +233,6 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
     const entries = session ? await db.table<Row>('storySessionEntries').where('sessionId').equals(session.id).sortBy('ordinal').then(rows => rows.filter(row => !isObservationEntry(row))) : []
     return { sessionId: session?.id as string | undefined, total: entries.length, entries: entries.slice(offset, offset + 20) }
   }
-  return { start: (bookId: string) => start(bookId), review: (bookId: string) => start(bookId, 'global_review'), read, history, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => controllers.get(bookId)?.abort(), subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } } }
+  return { start: (bookId: string) => start(bookId), review: (bookId: string) => start(bookId, 'global_review'), read, history, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), execution: (bookId: string, runId: string, options?: { unitId?: string; contextId?: string; sessionId?: string }) => readExecutionChain(workspace, bookId, runId, options), state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { cancelled.add(bookId); controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } } }
 }
 export type StoryService = ReturnType<typeof createStoryService>

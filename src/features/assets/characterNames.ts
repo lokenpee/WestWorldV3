@@ -15,22 +15,3 @@ type Names = { name: string; aliases?: string[]; identity?: string; mergeFacts?:
 export function characterMatchNames(person: Names) {
   return [...new Set([person.name, ...(person.aliases ?? [])].map(name => name.trim()).filter(name => name && !isContextualName(name)))]
 }
-export function normalizeCharacterNames<T extends Names>(person: T): T {
-  const aliases = [...new Set((person.aliases ?? []).map(name => name.trim()).filter(Boolean))]
-  const contextual = aliases.filter(isContextualName)
-  if (!contextual.length) return person
-  const identity = person.identity ?? ''
-  const additions = contextual.filter(name => !identity.includes(name))
-  const facts = person.mergeFacts ? [...person.mergeFacts] : undefined
-  if (facts) for (const name of additions) {
-    const text = `原文称谓：${name}`
-    if (facts.some(fact => fact.field === 'identity' && fact.text === text)) continue
-    const base = `context-name:${name}`
-    let id = base
-    for (let suffix = 1; facts.some(fact => fact.id === id); suffix++) id = `${base}:${suffix}`
-    facts.push({ id, field: 'identity', text, chapters: person.sourceChapters ?? (person.chapterIndex ? [person.chapterIndex] : []) })
-  }
-  return { ...person, aliases: aliases.filter(name => !isContextualName(name) && name !== person.name),
-    ...(facts ? { mergeFacts: facts } : {}),
-    ...(additions.length ? { identity: [identity, `原文称谓：${additions.join('、')}`].filter(Boolean).join('；') } : {}) }
-}

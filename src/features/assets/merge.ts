@@ -1,6 +1,5 @@
 import { AssetError, type AssetByKind, type Character, type Fact } from './types'
 import { factId } from './derive'
-import { normalizeCharacterNames } from './characterNames'
 
 export type WorldKind = 'character' | 'location'
 export interface MergeOptions { memberIds: string[]; keepId: string; canonicalName: string }
@@ -57,7 +56,6 @@ function combinedFacts(rows: AssetByKind[WorldKind][], fields: string[]) {
 
 export function fuseWorldAssets<K extends WorldKind>(kind: K, members: AssetByKind[K][], keepId: string, canonicalName: string, timestamp = new Date().toISOString()): { result: AssetByKind[K]; conflicts: string[] } {
   validateMergeOptions(kind, { memberIds: members.map(row => row.id), keepId, canonicalName })
-  if (kind === 'character') members = members.map(row => normalizeCharacterNames(row))
   const keep = members.find(row => row.id === keepId)!
   const rows = [keep, ...members.filter(row => row.id !== keepId)]
   const name = canonicalName.trim()
@@ -98,7 +96,6 @@ export function fuseWorldAssets<K extends WorldKind>(kind: K, members: AssetByKi
     delete character.relations
   }
   result.mergeFacts = combinedFacts(rows, fields)
-  if (kind === 'character') Object.assign(result, normalizeCharacterNames(result))
   result.verifiedAliases = uniqueStrings(rows.flatMap(row => [row.name, ...(row.verifiedAliases ?? [])])).filter(alias => alias !== name && result.aliases.includes(alias))
   result.mergeNotes = uniqueStrings([...rows.flatMap(row => row.mergeNotes ?? []), ...conflicts])
   return { result: result as AssetByKind[K], conflicts }

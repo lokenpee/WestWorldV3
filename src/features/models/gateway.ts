@@ -76,16 +76,16 @@ class CallSession {
     await this.options.beforeRequest?.()
     await this.environment.beforeRequest?.()
     this.ensureActive()
-    const attempt: Attempt = { ordinal: this.attempts.length + 1, turn: this.turn, elapsedMs: 0, requestId: this.requestId, attemptId: crypto.randomUUID() }
-    this.attempts.push(attempt)
     const start = this.now()
+    const attempt: Attempt = { ordinal: this.attempts.length + 1, turn: this.turn, elapsedMs: 0, requestId: this.requestId, attemptId: crypto.randomUUID(), startedAt: new Date(start).toISOString() }
+    this.attempts.push(attempt)
     this.options.onProgress?.({ state: 'requesting', attempts: this.attempts.length })
     try {
       const response = await (this.environment.fetch ?? globalThis.fetch)(input, init)
       this.status = response.status; attempt.status = response.status
       this.retryAfter = response.headers.get('retry-after') ?? undefined
       return response
-    } finally { attempt.elapsedMs = this.now() - start }
+    } finally { attempt.elapsedMs = this.now() - start; attempt.finishedAt = attempt.finishedAt ?? new Date(this.now()).toISOString() }
   }
   async runTurn(context: Context, traceOptions: { parentRequestId?: string; purpose?: 'work' | 'compaction' | 'repair' } = {}): Promise<{ message: AssistantMessage; events: AssistantMessageEvent[]; requestId: string }> {
     this.turn++
@@ -108,7 +108,7 @@ class CallSession {
         for await (const event of stream) { events.push(event); try { trace?.delta?.({ requestId, event }) } catch { /* 观测失败不影响模型调用 */ } }
         const raw = await stream.result()
         const attempt = this.attempts.length > before ? this.attempts.at(-1) : undefined
-        if (attempt) { attempt.usage = raw.usage; attempt.elapsedMs = this.now() - started; attempt.estimatedInput = estimateTokens(JSON.stringify(context)); attempt.outputReserve = Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens) }
+        if (attempt) { attempt.usage = raw.usage; attempt.elapsedMs = this.now() - started; attempt.finishedAt = new Date(this.now()).toISOString(); attempt.estimatedInput = estimateTokens(JSON.stringify(context)); attempt.outputReserve = Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens) }
         if (raw.stopReason !== 'error' && raw.stopReason !== 'aborted') { traceEnd({ message: raw, usage: raw.usage, status: 'succeeded' }); return { message: raw, events, requestId } }
         const failure = this.failure(this.transportFailure ?? (this.controller.signal.aborted ? this.controller.signal.reason : raw.errorMessage ?? ''), raw.stopReason)
         if (attempt) attempt.errorKind = failure.kind
@@ -155,8 +155,9 @@ export async function executeDirect<T>(resolved: ResolvedModel, request: DirectR
         return { ...session.result(last), ...(value === undefined ? {} : { value }) }
       } catch (error) {
         if (repair >= Math.min(2, request.repairAttempts ?? 1) || !request.repairPrompt) throw error instanceof ModelError ? error : new ModelError('validation', '模型回复未通过结果校验。')
-        const results = last.content.flatMap(part => part.type === 'toolCall' ? [{ role: 'toolResult' as const, toolCallId: part.id, toolName: part.name, content: [{ type: 'text' as const, text: '结果校验未通过，请按要求修正。' }], isError: true, timestamp: Date.now() }] : [])
-        context = { ...context, messages: [...context.messages, last, ...results, { role: 'user', content: request.repairPrompt, timestamp: Date.now() }] }
+        const detail = error instanceof Error ? error.message : '结果校验未通过。'
+        const results = last.content.flatMap(part => part.type === 'toolCall' ? [{ role: 'toolResult' as const, toolCallId: part.id, toolName: part.name, content: [{ type: 'text' as const, text: `结果校验未通过：${detail}` }], isError: true, timestamp: Date.now() }] : [])
+        context = { ...context, messages: [...context.messages, last, ...results, { role: 'user', content: `${request.repairPrompt}\n实际错误：${detail}`, timestamp: Date.now() }] }
       }
     }
   } catch (error) { return session.result(last, error) }

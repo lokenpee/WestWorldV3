@@ -89,6 +89,7 @@ export function ExtractionPanel({ bookId, service }: { bookId: string; service: 
     <p role="status">{saved ? `${statuses[saved.status] ?? saved.status} · 成功 ${saved.completedChapters.length}/${saved.totalChapters} 章 / 块 · 失败 ${saved.failedChapters.length} 章 / 块` : '读取提取进度…'}</p>
     <p className="muted">世界资产与叙事资产并行提取，各自按章节顺序保存。暂停可继续，取消后可补齐未完成章节。</p>
     {saved && <p className="muted">已保存 {saved.completedSteps}/{saved.totalChapters * 2} 个子步骤 · 待处理 {saved.totalChapters * 2 - saved.completedSteps} 个</p>}
+    {saved?.externalBusy && <p className="muted">本书已有世界或叙事任务，提取按钮暂不可用。</p>}
     {checking && <p role="status">正在确认本书任务状态。运行中的标签页继续处理；中断任务在执行权到期后开放继续。</p>}
     {running && <p role="status">正在提取 · {state?.chapter} · {state?.step && stepLabels[state.step]}{state?.progress ? ` · 已请求 ${state.progress.attempts} 次${state.progress.state === 'waiting' ? '，等待重试' : ''}` : ' · 正在准备'}</p>}
     {progress.status === 'error' && <p role="alert">{progress.message}</p>}

@@ -19,9 +19,10 @@ export async function renewOrganizationLease(store: AgentStore, scope: Organizat
 
 // 只用于新P2；写操作把续约和业务变更一起提交，读操作先续约再读快照。
 export function withOrganizationLease(repo: AgentRepository, scope: OrganizationLeaseScope): AgentRepository {
+  const lease = { lockKey: 'world', owner: scope.owner, runId: scope.runId }
   return { bookId: repo.bookId, tracePut: rows => repo.tracePut(rows), traceRows: () => repo.traceRows(), async transaction(write, work) {
-    if (write) return repo.transaction(true, async store => { await renewOrganizationLease(store, scope); return work(store) })
-    await repo.transaction(true, store => renewOrganizationLease(store, scope))
+    if (write) return repo.transaction(true, async store => { await renewOrganizationLease(store, scope); return work(store) }, lease)
+    await repo.transaction(true, store => renewOrganizationLease(store, scope), lease)
     return repo.transaction(false, work)
   } }
 }

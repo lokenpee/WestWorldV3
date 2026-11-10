@@ -17,12 +17,16 @@ export interface AssetEditorHandle { isDirty: () => boolean; save: () => Promise
 export const AssetEditor = forwardRef<AssetEditorHandle, {
   kind: AssetKind; asset?: Asset; creating: boolean; snapshot: AssetSnapshot; chapters: Chapter[]; service: AssetService; repository: BookRepository; bookId: string
   onClose: () => void; onSaved: (row: Asset) => void; onSelect: (id: string) => void
-}>(function AssetEditor({ kind, asset, creating, snapshot, chapters, service, repository, bookId, onClose, onSaved, onSelect }, ref) {
+  onOrganizeDisabled?: boolean
+  onOrganizeProfile?: (id: string) => Promise<void> | void; onOrganizeRelations?: (id: string) => Promise<void> | void
+  canContinue?: boolean; onContinueOrganization?: (id: string) => Promise<void> | void
+}>(function AssetEditor({ kind, asset, creating, snapshot, chapters, service, repository, bookId, onClose, onSaved, onSelect, onOrganizeDisabled, onOrganizeProfile, onOrganizeRelations, canContinue, onContinueOrganization }, ref) {
   const [baseline, setBaseline] = useState(asset)
   const [initialValues, setInitialValues] = useState(() => formValues(asset, snapshot.characters))
   const [values, setValues] = useState(initialValues)
   const [fieldError, setFieldError] = useState<{ field?: keyof AssetInput; message: string }>()
   const [busy, setBusy] = useState(false)
+  const [organizing, setOrganizing] = useState<'profile' | 'relations' | 'resume' | ''>('')
   const [relationDirty, setRelationDirty] = useState(false)
   const relationRef = useRef<RelationEditorHandle>(null)
   const [deleteTarget, setDeleteTarget] = useState<Asset>()
@@ -101,6 +105,16 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
     finally { setBusy(false); submitting.current = false }
   }
 
+  async function organize(mode: 'profile' | 'relations' | 'resume') {
+    if (disabled || conflict || dirty || relationDirty || creating || !baseline) return
+    const action = mode === 'profile' ? onOrganizeProfile : mode === 'relations' ? onOrganizeRelations : onContinueOrganization
+    if (!action) return
+    setOrganizing(mode); setFieldError(undefined); setSavedMessage('')
+    try { await action(baseline.id) }
+    catch (failure) { error(failure) }
+    finally { setOrganizing('') }
+  }
+
   async function remove() {
     if (disabled || submitting.current || !deleteTarget) return
     submitting.current = true; setBusy(true); setFieldError(undefined)
@@ -162,7 +176,7 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
       {baseline && kind === 'character' && <p className="field-help">基础资料：年龄 {(baseline as Character).profile?.age ?? '未记录'}；性别 {(baseline as Character).profile?.gender || '未记录'}</p>}
       {baseline && kind === 'eventLine' && <p className="field-help">当前可确定人物：{(snapshot.lineCharacterIds[baseline.id] ?? []).map(id => snapshot.characters.find(row => row.id === id)?.name ?? id).join('、') || '无'}；来源章节：{'chapters' in baseline ? baseline.chapters.join('、') : ''}</p>}
       </div>
-      <footer className="editor-actions"><button className="primary-button" type="submit" disabled={disabled || conflict}>{busy ? '正在保存…' : '保存'}</button><button type="button" className="secondary-button" onClick={onClose}>取消编辑</button>{!creating && !missing && <button type="button" className="danger-button" disabled={disabled || conflict} onClick={() => setDeleteTarget(baseline)}>删除条目</button>}<span role="status">{savedMessage}</span></footer>
+      <footer className="editor-actions"><button className="primary-button" type="submit" disabled={disabled || conflict}>{busy ? '正在保存…' : '保存'}</button><button type="button" className="secondary-button" onClick={onClose}>取消编辑</button>{!creating && !missing && kind === 'character' && <>{canContinue && onContinueOrganization && <button type="button" className="primary-button" disabled={disabled || conflict || dirty || relationDirty || !!organizing || !!onOrganizeDisabled} onClick={() => void organize('resume')}>{organizing === 'resume' ? '继续整理…' : '继续上次 AI 整理'}</button>}<button type="button" className="secondary-button" disabled={disabled || conflict || dirty || relationDirty || !!organizing || !!onOrganizeDisabled} onClick={() => void organize('profile')}>{organizing === 'profile' ? '启动人物资料整理…' : 'AI 整理人物资料'}</button><button type="button" className="secondary-button" disabled={disabled || conflict || dirty || relationDirty || !!organizing || !!onOrganizeDisabled} onClick={() => void organize('relations')}>{organizing === 'relations' ? '启动人物关系整理…' : 'AI 整理人物关系'}</button></>}{!creating && !missing && <button type="button" className="danger-button" disabled={disabled || conflict} onClick={() => setDeleteTarget(baseline)}>删除条目</button>}<span role="status">{savedMessage}</span></footer>
     </form>
     {deleteTarget && <DeleteDialog name={assetName(deleteTarget)} busy={busy} onClose={() => setDeleteTarget(undefined)} onConfirm={() => void remove()} />}
     {reader && <ChapterTextDialog title={reader.title} text={reader.text} onClose={() => setReader(undefined)} />}

@@ -1,6 +1,7 @@
 import type { Attempt } from '../models/types'
 import type { AgentStore, Row } from './repository'
 import type { Scope } from './queries'
+import { usageCost } from '../models/policy'
 import { records, text } from './contracts'
 
 export async function appendRequestLedger(store: AgentStore, scope: Scope, attempts: Attempt[], snapshot: Row | undefined, purpose: 'work' | 'compaction' | 'compaction_repair' | 'repair' = 'work') {
@@ -18,13 +19,13 @@ export async function appendRequestLedger(store: AgentStore, scope: Scope, attem
     const reportedCacheRead = usage ? Number(usage.cacheRead ?? 0) : null
     const derivedCacheRead = total !== null && inputValue !== null && outputValue !== null && cacheWriteValue !== null ? Math.max(0, total - inputValue - outputValue - cacheWriteValue) : 0
     const cacheReadValue = reportedCacheRead === null ? null : Math.max(reportedCacheRead, derivedCacheRead)
-    const costValue = usage ? Number(((usage.cost as Row | undefined)?.total ?? NaN)) : NaN
+    const costValue = usageCost(attempt.usage)
     const pricing = text(snapshot?.pricingStatus)
     return {
-      attemptId: attempt.attemptId ?? crypto.randomUUID(), ...(attempt.requestId ? { requestId: attempt.requestId } : {}), executionId: scope.executionId ?? scope.runId, stage: 'P2', ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}), ...(scope.contextId ? { contextId: scope.contextId } : {}),
+      attemptId: attempt.attemptId ?? crypto.randomUUID(), ...(attempt.requestId ? { requestId: attempt.requestId } : {}), executionId: scope.executionId ?? scope.runId, stage: 'P2', ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}), ...(scope.contextId ? { contextId: scope.contextId } : {}), ordinal: attempt.ordinal, turn: attempt.turn, ...(attempt.requestId ? { traceEntryId: `trace:${attempt.requestId}` } : {}),
       purpose,
       status: attempt.errorKind ? 'failed' as const : 'succeeded' as const,
-      startedAt: new Date(now - Number(attempt.elapsedMs ?? 0)).toISOString(), finishedAt: new Date(now).toISOString(),
+      startedAt: attempt.startedAt ?? new Date(now - Number(attempt.elapsedMs ?? 0)).toISOString(), finishedAt: attempt.finishedAt ?? new Date(now).toISOString(),
       estimatedInput: typeof attempt.estimatedInput === 'number' ? attempt.estimatedInput : null,
       outputReserve: typeof attempt.outputReserve === 'number' ? attempt.outputReserve : null,
       input: inputValue,
@@ -33,9 +34,9 @@ export async function appendRequestLedger(store: AgentStore, scope: Scope, attem
       output: outputValue,
       totalTokens: total,
       usageStatus: usage && total ? 'reported' as const : 'missing' as const,
-      cost: pricing === 'estimated' && Number.isFinite(costValue) ? costValue : null,
+      cost: pricing === 'estimated' && costValue !== null ? costValue : null,
       ...(snapshot?.pricingCurrency ? { currency: snapshot.pricingCurrency as 'USD' } : {}),
-      costStatus: pricing === 'estimated' && Number.isFinite(costValue) ? 'estimated' as const : 'unknown' as const,
+      costStatus: pricing === 'estimated' && costValue !== null ? 'estimated' as const : 'unknown' as const,
       ...(snapshot ? { modelSnapshot: `${text(snapshot.providerId)}/${text(snapshot.modelId)}` } : {}),
       ...(attempt.errorKind ? { errorCode: attempt.errorKind } : {}),
     }

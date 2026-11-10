@@ -1,7 +1,6 @@
 import type { AssetEditRecord, Basis, Character, CharacterPairResult, CharacterRelationEdit, RelationEvidence } from './types'
 import { effectivePairs, pairEndpointIds, pairFingerprint, pairFromPerspective, pairKeyOf } from './relations'
 import type { MergeStore, Row } from './mergeCore'
-import { isNonRoleLabel, relationRoleLabel } from './relationLabels'
 
 export interface PairWriteInput {
   bookId: string
@@ -17,6 +16,8 @@ export interface PairWriteInput {
   tool: string
   operationKey?: string
   runId?: string
+  allowUnverifiedEvidence?: boolean
+  evidenceStatus?: 'verified' | 'unverified' | 'partial'
 }
 export interface PairWriteResult {
   changed: boolean
@@ -29,11 +30,8 @@ const cleaned = (values: string[]) => [...new Set(values.map(value => value.trim
 
 export function validatePairLabels(forward: string[], reverse: string[], state: 'active' | 'deleted' = 'active') {
   const a = cleaned(forward), b = cleaned(reverse)
-  if (a.length > 20 || b.length > 20) throw new Error('INVALID_ARGS:每个方向的标签最多20项。')
-  if ([...a, ...b].some(label => label.length > 100)) throw new Error('INVALID_ARGS:单项关系标签最多100字。')
-  if ([...a, ...b].some(isNonRoleLabel)) throw new Error('INVALID_ARGS:请填写人物自身的关系身份，如妹妹、兄长、朋友；宝二哥、林妹妹等称呼及打趣等互动不能作为关系标签。不确定请填未知并保留相关原文。')
   if (state === 'active' && !a.length && !b.length) throw new Error('INVALID_ARGS:有效人物对至少一个方向要有标签；双向清空请使用删除工具。')
-  return { forward: a.map(relationRoleLabel), reverse: b.map(relationRoleLabel) }
+  return { forward: a, reverse: b }
 }
 
 async function loadPair(store: MergeStore, bookId: string, fromId: string, toId: string) {
@@ -47,14 +45,24 @@ async function loadPair(store: MergeStore, bookId: string, fromId: string, toId:
   return { characters, relations, edits, pairs, current: pairFromPerspective(pairs, fromId, toId, characters) }
 }
 
-async function validateEvidence(store: MergeStore, bookId: string, evidence: RelationEvidence[]) {
-  for (const item of evidence) {
-    if (!item.chapterIndex || !item.quote.trim()) throw new Error('INVALID_ARGS:关系依据须包含章节和原文片段。')
-    const chapter = await store.get('chapters', item.chapterIndex)
-    if (!chapter || chapter.bookId !== bookId) throw new Error('INVALID_ARGS:关系依据章节不存在。')
-    const text = await store.get('chapterTexts', item.chapterIndex)
-    if (text && !String(text.text ?? '').includes(item.quote)) throw new Error('INVALID_ARGS:关系依据须逐字存在于对应章节。')
+export interface EvidenceProblem { index: number; chapterIndex: string; quote: string; reason: string }
+
+export async function evidenceProblems(store: MergeStore, bookId: string, evidence: RelationEvidence[]): Promise<EvidenceProblem[]> {
+  const problems: EvidenceProblem[] = []
+  for (const [index, item] of evidence.entries()) {
+    const chapterIndex = String(item.chapterIndex ?? ''), quote = String(item.quote ?? '')
+    if (!chapterIndex || !quote.trim()) { problems.push({ index, chapterIndex, quote, reason: '缺少章节编号或原文片段' }); continue }
+    const chapter = await store.get('chapters', chapterIndex)
+    if (!chapter || chapter.bookId !== bookId) { problems.push({ index, chapterIndex, quote, reason: '章节不存在或不属于本书' }); continue }
+    const text = await store.get('chapterTexts', chapterIndex)
+    if (!text || !String(text.text ?? '').includes(quote)) problems.push({ index, chapterIndex, quote, reason: '引文未在章节原文中逐字出现' })
   }
+  return problems
+}
+
+async function validateEvidence(store: MergeStore, bookId: string, evidence: RelationEvidence[]) {
+  const problems = await evidenceProblems(store, bookId, evidence)
+  if (problems.length) throw new Error(`INVALID_ARGS:${problems.map(problem => `第${problem.chapterIndex}章：${problem.reason}`).join('；')}`)
 }
 
 async function appendRecord(store: MergeStore, bookId: string, actors: PairWriteInput, record: AssetEditRecord) {
@@ -62,7 +70,8 @@ async function appendRecord(store: MergeStore, bookId: string, actors: PairWrite
     const run = await store.get('pipelineRuns', actors.runId)
     if (run) {
       const report = (run.report ?? {}) as Row
-      await store.put('pipelineRuns', { ...run, report: { ...report, assetEdits: [...((report.assetEdits as Row[] | undefined) ?? []), record] } })
+      const existing = (report.assetEdits as Row[] | undefined) ?? []
+      await store.put('pipelineRuns', { ...run, report: { ...report, assetEdits: [...existing, { ...record, writeSeq: existing.length + 1 }] } })
       return
     }
   }
@@ -81,8 +90,18 @@ async function writePair(store: MergeStore, input: PairWriteInput, state: 'activ
   const { characters, relations, edits, current } = await loadPair(store, bookId, fromId, toId)
   if (input.expectedFingerprint && input.expectedFingerprint !== current.fingerprint) throw new Error('CONFLICT:人物对已被更新，请重新读取后提交。')
   const labels = state === 'active' ? validatePairLabels(input.forwardLabels, input.reverseLabels) : { forward: [], reverse: [] }
-  const evidence = state === 'active' ? (input.evidence ?? []) : []
-  await validateEvidence(store, bookId, evidence)
+  const evidence = input.evidence ?? []
+  const problems = state === 'active' && evidence.length ? await evidenceProblems(store, bookId, evidence) : []
+  if (state === 'deleted' && !input.allowUnverifiedEvidence) await validateEvidence(store, bookId, evidence)
+  const annotated = state === 'active'
+    ? evidence.map((item, index) => {
+      const problem = problems.find(problem => problem.index === index)
+      return problem ? { ...item, verified: false, reason: problem.reason } : { ...item, verified: true }
+    })
+    : evidence
+  const evidenceStatus = input.evidenceStatus ?? (state === 'active'
+    ? (evidence.length ? (problems.length === 0 ? 'verified' : problems.length === evidence.length ? 'unverified' : 'partial') : undefined)
+    : (evidence.length ? (input.allowUnverifiedEvidence ? 'unverified' : 'verified') : undefined))
   const pairKey = pairKeyOf(fromId, toId)
   const [aId, bId] = pairEndpointIds(pairKey)
   const aToB = aId === fromId ? labels.forward : labels.reverse
@@ -99,7 +118,7 @@ async function writePair(store: MergeStore, input: PairWriteInput, state: 'activ
       { field: 'forwardLabels', before: current.forwardLabels, after: labels.forward },
       { field: 'reverseLabels', before: current.reverseLabels, after: labels.reverse },
     ],
-    reason: input.reason, evidence, basis: input.basis ?? [], timestamp, actor: input.actor,
+    reason: input.reason, evidence: annotated, ...(evidenceStatus ? { evidenceStatus } : {}), basis: input.basis ?? [], timestamp, actor: input.actor,
   }
   if (unchanged) {
     await appendRecord(store, bookId, input, record)
@@ -108,10 +127,10 @@ async function writePair(store: MergeStore, input: PairWriteInput, state: 'activ
   const previous = edits.find(row => row.pairKey === pairKey)
   const edit: CharacterRelationEdit = {
     pairKey, bookId, aId, bId, state,
-    aToBLabels: aToB, bToALabels: bToA, directionUnclear, evidence,
+    aToBLabels: aToB, bToALabels: bToA, directionUnclear, evidence: annotated,
     sourceRelationIds: state === 'active' ? [...current.sourceRelationIds] : (previous?.sourceRelationIds ?? []),
     legacyRecordIds: [...new Set([...(previous?.legacyRecordIds ?? []), ...(current.legacyRecordIds ?? [])])].sort(),
-    basis: input.basis ?? [],
+    basis: input.basis ?? [], ...(evidenceStatus ? { evidenceStatus } : {}),
     revision: Number(previous?.revision ?? 0) + 1, updatedAt: timestamp, updatedBy: input.actor, commitId: input.commitId,
   }
   await store.put('characterRelationEdits', edit as unknown as Row)

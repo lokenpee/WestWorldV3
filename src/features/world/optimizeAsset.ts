@@ -7,7 +7,6 @@ import type { WorldKind } from '../assets/merge'
 import type { Row } from '../agents/repository'
 import { canonical, records } from '../agents/contracts'
 import { estimateTextTokens } from '../agents/context'
-import { normalizeCharacterNames } from '../assets/characterNames'
 import { coverageFingerprint } from './queue'
 import { needsOptimization, optimizationBudget, optimizationRequest } from './optimization'
 import { qualityRequest } from './quality'
@@ -42,7 +41,7 @@ export async function optimizeAsset(workspace: Workspace, models: Pick<ModelServ
         if (draft.status === 'applied') signal.throwIfAborted()
         const verifiedAliases = [...new Set([...(current.verifiedAliases ?? []), ...(draft.proposedName !== current.name ? [current.name] : [])])].filter(alias => draft!.afterAliases.includes(alias) && alias !== draft!.proposedName)
         const next = { ...current, ...draft.after, name: draft.proposedName, aliases: draft.afterAliases, verifiedAliases, mergeFacts: request.facts, mergeNotes: draft.notes, optimizedFactIds: request.facts.map(fact => fact.id), revision: current.revision + 1, updatedAt: new Date().toISOString() }
-        const normalized = kind === 'character' ? normalizeCharacterNames(next) : next
+        const normalized = next
         const nextRequest = await Dexie.waitFor(optimizationRequest(kind, normalized))
         const optimized = { ...normalized, optimizationFingerprint: nextRequest.fingerprint }
         await db.table(table).put(optimized)
@@ -69,13 +68,13 @@ export async function optimizeAsset(workspace: Workspace, models: Pick<ModelServ
     const budget = optimizationBudget({ ...request, estimatedTokens: request.estimatedTokens + (feedback ? estimateTextTokens(JSON.stringify(feedback)) + 64 : 0) }, model)
     if (!budget.fits) { await save(undefined, undefined, `${row.name}：整编输入估算${budget.inputTokens} token，输出预留${budget.outputTokens} token，超出整理模型上下文${budget.contextWindow} token。`); return }
     phase(`整编资料 · ${row.name}`)
-    const result = await models.generate({ role: 'aggregation', context: { systemPrompt: request.prompt, messages: [{ role: 'user', content: JSON.stringify(request.input), timestamp: Date.now() }, ...(feedback ? [{ role: 'user' as const, content: `上次独立复核的问题：${JSON.stringify(feedback)}。请据此重新整编。`, timestamp: Date.now() }] : [])], tools: [{ name: 'submit_result', description: '提交完整事实覆盖的整编资料', parameters: request.schema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] }, validate: request.validate, repairPrompt: '请完整保留全部事实编号及既有称呼，补齐有事实的字段。', signal, beforeRequest, cooperativeTimeout: true, timeoutMs: 180000, requestTimeoutMs: 60000, maxRequests: 3, maxTokens: budget.outputTokens, temperature: 0 })
+    const result = await models.generate({ role: 'aggregation', context: { systemPrompt: request.prompt, messages: [{ role: 'user', content: JSON.stringify(request.input), timestamp: Date.now() }, ...(feedback ? [{ role: 'user' as const, content: `上次独立复核的问题：${JSON.stringify(feedback)}。请据此重新整编。`, timestamp: Date.now() }] : [])], tools: [{ name: 'submit_result', description: '提交完整事实覆盖的整编资料', parameters: request.schema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] }, validate: request.validate, repairPrompt: '请完整保留全部事实编号及既有称呼，补齐有事实的字段。', signal, beforeRequest, cooperativeTimeout: true, timeoutMs: 180000, requestTimeoutMs: 60000, unboundedRequests: true, maxTokens: budget.outputTokens, temperature: 0 })
     if (!result.ok || !result.value) { await save(undefined, result.usage, `${row.name}：${result.error?.message ?? '整编失败'}`); signal.throwIfAborted(); return }
     const output = result.value, proposedName = 'name' in output ? output.name! : row.name
     if (row.nameSource === 'manual' && proposedName !== row.name) { await save(undefined, result.usage, `${row.name}：整编须保留人工指定的主名。`); return }
     const fields = kind === 'character' ? ['identity', 'appearance', 'personality', 'background'] : ['description']
     const before = Object.fromEntries(fields.map(field => [field, String((row as unknown as Row)[field] ?? '')]))
-    const names = kind === 'character' ? normalizeCharacterNames(row) : row
+    const names = row
     const after = { ...before, ...output.fields }, afterAliases = [...new Set([row.name, ...(names.aliases ?? []), ...('aliases' in output ? output.aliases ?? [] : [])])].filter(name => name !== proposedName)
     const notes = [...new Set([...(row.mergeNotes ?? []), ...(output.notes ?? [])])]
     const changed = canonical(before) !== canonical(after) || proposedName !== row.name || canonical([...(row.aliases ?? [])].sort()) !== canonical([...afterAliases].sort()) || canonical(row.mergeNotes ?? []) !== canonical(notes)
@@ -88,7 +87,7 @@ export async function optimizeAsset(workspace: Workspace, models: Pick<ModelServ
   const review = qualityRequest(draft, request.facts), budget = optimizationBudget(review, model), remaining = 180000 - (Date.now() - started)
   if (!budget.fits || remaining < 1000) { await save({ ...draft, reviewError: budget.fits ? '本轮已收尾，继续时复核已保存的稿件。' : '复核资料超出当前模型上下文容量。' }, undefined, `${row.name}：稿件已保存，待继续复核。`); return }
   phase(`复核整编稿 · ${row.name}`)
-  const result = await models.generate({ role: 'aggregation', context: { systemPrompt: review.prompt, messages: [{ role: 'user', content: JSON.stringify(review.input), timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交独立语义复核结论', parameters: review.schema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] }, validate: review.validate, signal, beforeRequest, cooperativeTimeout: true, timeoutMs: remaining, requestTimeoutMs: 60000, maxRequests: 1, maxTokens: budget.outputTokens, temperature: 0 })
+  const result = await models.generate({ role: 'aggregation', context: { systemPrompt: review.prompt, messages: [{ role: 'user', content: JSON.stringify(review.input), timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交独立语义复核结论', parameters: review.schema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] }, validate: review.validate, signal, beforeRequest, cooperativeTimeout: true, timeoutMs: remaining, requestTimeoutMs: 60000, unboundedRequests: true, maxTokens: budget.outputTokens, temperature: 0 })
   if (!result.ok || !result.value) { await save({ ...draft, reviewError: result.error?.message ?? '复核失败' }, result.usage, `${row.name}：稿件待复核，${result.error?.message ?? '复核失败'}`); signal.throwIfAborted(); return }
   if (signal.aborted) { await save(draft, result.usage); signal.throwIfAborted() }
   const { reviewError: _error, ...clean } = draft

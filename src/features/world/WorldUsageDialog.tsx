@@ -9,7 +9,7 @@ const status = (value: string) => ({ succeeded: '成功', failed: '失败', canc
 export function WorldUsageDialog({ run, onClose }: { run: WorldRun; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => { const dialog = ref.current; dialog?.showModal(); return () => dialog?.close() }, [])
-  const entries = useMemo(() => [...(run.requestLedger ?? [])].sort((a, b) => a.startedAt.localeCompare(b.startedAt)), [run])
+  const entries = useMemo(() => [...(run.requestLedger ?? [])].sort((a, b) => a.startedAt.localeCompare(b.startedAt) || Number(a.ordinal ?? 0) - Number(b.ordinal ?? 0)), [run])
   const total = useMemo(() => entries.reduce((sum, row) => ({
     input: sum.input + (row.input ?? 0), cacheRead: sum.cacheRead + (row.cacheRead ?? 0), output: sum.output + (row.output ?? 0),
     knownCost: sum.knownCost + (row.cost ?? 0), missing: sum.missing + (row.usageStatus === 'missing' ? 1 : 0), unknownCost: sum.unknownCost + (row.costStatus === 'unknown' ? 1 : 0),

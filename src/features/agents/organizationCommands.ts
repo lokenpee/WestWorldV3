@@ -1,13 +1,17 @@
 import type { AgentStore, Row } from './repository'
 import { canonical, hash, records, strings, text } from './contracts'
 import type { ReadSet } from './commands'
-import type { Basis, Character, EventLine, EventNode, LocationAsset } from '../assets/types'
+import type { Basis, Character, EventLine, EventNode, LocationAsset, RelationEvidence } from '../assets/types'
 import { mergeWorldAssets } from '../assets/mergeCore'
 import { applyAssetPatch } from '../assets/assetPatch'
 import { pairFromPerspective, resolveLifecycleId } from '../assets/relations'
-import { deleteCharacterPair, saveCharacterPair } from '../assets/relationEdits'
+import { deleteCharacterPair, evidenceProblems, saveCharacterPair } from '../assets/relationEdits'
+
+const relationFailureSignatures = new Map<string, { signature: string; count: number }>()
+type RelationFailure = { targetId: string; code: string; message: string; recoverable: boolean; repeated: boolean; action: string }
+const relationErrorSignatures = new Map<string, { signature: string; count: number; targetId: string; fingerprint: string; code: string; message: string }>()
 import { readTool, type Scope } from './queries'
-import { actualReviewEdits, buildProfileReview, buildRelationReview, hasProfileRead, profileContent, profileFields, refreshReview, reviewContext } from './organizationReview'
+import { actualReviewEdits, buildProfileReview, buildRelationReview, hasProfileRead, pendingPairChecks, profileContent, profileFields, refreshReview, reviewContext } from './organizationReview'
 
 async function organizationOf(store: AgentStore, scope: Scope) {
   const run = await store.get('pipelineRuns', scope.runId)
@@ -72,7 +76,13 @@ export async function assertBasis(store: AgentStore, scope: Scope, values: Row[]
       })
       if (!read) throw new Error('INVALID_ARGS:章节依据须在实际读取范围内。')
     } else if (source.kind === 'relation') {
-      const read = readSet.queries.some(query => query.tool === 'get_character_relation' && text((query.args as Row).fromId) === text(source.fromId) && text((query.args as Row).toId) === text(source.toId))
+      const read = readSet.queries.some(query => {
+        const args = query.args as Row
+        if (query.tool === 'get_character_relation') return text(args.fromId) === text(source.fromId) && text(args.toId) === text(source.toId)
+        if (query.tool !== 'query_relation_work') return false
+        const targets = strings(args.targetIds)
+        return !targets.length || targets.includes(text(source.fromId)) || targets.includes(text(source.toId))
+      })
       if (!read) throw new Error('INVALID_ARGS:关系依据须实际读取该人物对。')
     } else if (source.kind === 'legacy_relation') {
       const read = readSet.queries.some(query => query.tool === 'get_legacy_relation_records' && strings((query.args as Row).ids).includes(text(source.id)))
@@ -226,71 +236,370 @@ async function submitProfileReview(store: AgentStore, scope: Scope, args: Row, c
   return { changed: changed > 0, done, complete: done, summary: done ? '人物资料已保存并完成。' : '人物资料已保存，继续处理当前人物。', commitId, outcome }
 }
 
-async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, commitId: string) {
-  const { run, organization } = await organizationOf(store, scope)
+type PreparedRelationChange = {
+  targetId: string
+  pair: ReturnType<typeof pairFromPerspective>
+  action: 'set' | 'delete'
+  forward: string[]
+  reverse: string[]
+  directionUnclear: boolean
+  evidence: RelationEvidence[]
+  basis: Basis[]
+  reason: string
+  review: boolean
+  allowUnverified: boolean
+  evidenceStatus?: 'verified' | 'unverified' | 'partial'
+}
+
+async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, readSet: ReadSet, commitId: string) {
+  const { organization } = await organizationOf(store, scope)
   const active = organization.activeWork as Row | null | undefined
   if (!active || active.kind !== 'relations' || !text(active.characterId)) throw new Error('INVALID_ARGS:当前没有待提交的人物关系工作项。')
   const id = text(active.characterId), item = records(organization.relationItems).find(row => row.id === id)
   if (!item) throw new Error('NOT_FOUND:人物关系工作项不存在。')
   const current = await store.get('characters', id) as unknown as Character | undefined
   if (!current || current.bookId !== scope.bookId) throw new Error('NOT_FOUND:人物不存在或不属于本书。')
-  const context = await reviewContext(store), changes = records(args.changes), unresolved = records(args.unresolved), done = args.done === true
+  const context = await reviewContext(store)
+  const changes = records(args.changes), uncertainPairs = records(args.uncertainPairs), done = args.done === true
+  const failureKey = `${scope.runId}:${id}`
+  const signature = await store.wait(hash({ changes, uncertainPairs, done }))
+  const earlier = relationFailureSignatures.get(failureKey)
+  if (earlier?.signature === signature) throw new Error('REPEATED_FAILURE:同一提交已失败且没有新依据或实质修正；请保留问题项待核对，继续其他工作，不要原样重试。')
+  const rereadTargets = new Set<string>()
+  for (const query of readSet.queries) {
+    const queryArgs = query.args as Row
+    if (query.tool === 'get_character_relation') { rereadTargets.add(text(queryArgs.fromId)); rereadTargets.add(text(queryArgs.toId)) }
+    if (query.tool === 'get_character_detail') for (const target of strings(queryArgs.ids)) rereadTargets.add(target)
+    if (query.tool === 'query_relation_work') for (const target of strings(queryArgs.targetIds)) rereadTargets.add(target)
+  }
+  for (const [key, record] of relationErrorSignatures) {
+    if (!key.startsWith(`${failureKey}:error:`)) continue
+    const currentPair = pairFromPerspective(context.pairs, id, record.targetId, context.people)
+    if (rereadTargets.has(record.targetId) || currentPair.fingerprint !== record.fingerprint) relationErrorSignatures.delete(key)
+  }
+
+  const errors: string[] = []
+  const failures: RelationFailure[] = []
+  const prepared: PreparedRelationChange[] = []
   const seen = new Set<string>()
-  for (const change of changes) { const target = text(change.targetId); if (!target) throw new Error('INVALID_ARGS:每条关系修改须提供targetId。'); if (target === id) throw new Error('INVALID_ARGS:不能把人物关系指向自己。'); if (seen.has(target)) throw new Error(`INVALID_ARGS:同一提交重复targetId：${target}；请合并为一条。`); seen.add(target) }
-  if (!done && !changes.length && !unresolved.length) throw new Error('INVALID_ARGS:done=false时请提交部分修改或未解决项。')
+  const fail = (targetId: string, code: string, message: string) => {
+    const fingerprint = targetId ? pairFromPerspective(context.pairs, id, targetId, context.people).fingerprint : ''
+    const errorKey = `${failureKey}:error:${targetId}:${code}:${message}`
+    const previous = relationErrorSignatures.get(errorKey)
+    relationErrorSignatures.set(errorKey, { signature: `${code}:${message}`, count: (previous?.count ?? 0) + 1, targetId, fingerprint, code, message })
+    failures.push({ targetId, code, message, recoverable: code === 'CONFLICT' || code === 'NOT_FOUND', repeated: !!previous, action: code === 'CONFLICT' ? '重新读取该人物对后重试' : code === 'NOT_FOUND' ? '刷新人物或关系目标后重试' : '修正字段后重试' })
+  }
+  if (!done && !changes.length && !uncertainPairs.length) errors.push('done=false时请提交部分修改或待核对人物对。')
   const basis = records(args.basis).length ? records(args.basis) as unknown as Basis[] : [{ summary: text(args.reason) || '根据程序提供的当前人物关系整理', source: { kind: 'asset', assetKind: 'character', id } } as unknown as Basis]
-  const changedTargets = new Set<string>()
+
   for (const change of changes) {
-    const targetId = text(change.targetId), target = await store.get('characters', targetId) as unknown as Character | undefined
-    if (!target || target.bookId !== scope.bookId) throw new Error(`NOT_FOUND:关系目标不存在或不属于本书：${targetId}；请检查编号。`)
+    const targetId = text(change.targetId)
+    if (!targetId) { fail('', 'INVALID_ARGS', '某条关系修改缺少targetId'); continue }
+    if (targetId === id) { fail(targetId, 'INVALID_ARGS', `关系${targetId}不能指向自己`); continue }
+    if (seen.has(targetId)) { fail(targetId, 'INVALID_ARGS', `同一提交重复targetId：${targetId}`); continue }
+    seen.add(targetId)
+    const target = await store.get('characters', targetId) as unknown as Character | undefined
+    if (!target || target.bookId !== scope.bookId) { fail(targetId, 'NOT_FOUND', `关系目标不存在或不属于本书：${targetId}`); continue }
     const pair = pairFromPerspective(context.pairs, id, targetId, context.people)
     const action = text(change.action)
+    if (action !== 'set' && action !== 'delete') { fail(targetId, 'INVALID_ARGS', `关系${targetId}的action无效；只能是set或delete`); continue }
     const reason = text(change.reason) || text(args.reason) || '整理人物关系'
+    const evidence = records(change.evidence) as unknown as RelationEvidence[]
+    const changeBasis = records(change.basis).length ? records(change.basis) as unknown as Basis[] : basis
+    const forward = strings(change.forwardLabels), reverse = strings(change.reverseLabels)
+    const directionUnclear = change.directionUnclear === undefined ? pair.directionUnclear : change.directionUnclear === true
+
     if (action === 'set') {
-      const forward = strings(change.forwardLabels), reverse = strings(change.reverseLabels)
-      if (!forward.length && !reverse.length) throw new Error(`INVALID_ARGS:关系${targetId}至少要有一个方向的标签；不确定的一向可以留空。`)
-      const result = await saveCharacterPair(store, { bookId: scope.bookId, fromId: id, toId: targetId, forwardLabels: forward, reverseLabels: reverse, directionUnclear: change.directionUnclear === true, evidence: [], basis, reason, expectedFingerprint: pair.fingerprint, actor: 'agent', commitId, tool: 'submit_relation_review', operationKey: `${text(args.operationKey)}:${targetId}`, runId: scope.runId })
-      if (result.changed) changedTargets.add(targetId)
-    } else if (action === 'delete') {
-      const result = await deleteCharacterPair(store, { bookId: scope.bookId, fromId: id, toId: targetId, forwardLabels: [], reverseLabels: [], directionUnclear: false, evidence: [], basis, reason, expectedFingerprint: pair.fingerprint, actor: 'agent', commitId, tool: 'submit_relation_review', operationKey: `${text(args.operationKey)}:${targetId}`, runId: scope.runId })
-      if (result.changed) changedTargets.add(targetId)
-    } else throw new Error(`INVALID_ARGS:关系${targetId}的action无效；只能是set或delete。`)
+      if (!forward.length && !reverse.length) { fail(targetId, 'INVALID_ARGS', `关系${targetId}至少要有一个方向的标签；不确定的一向可以留空`); continue }
+      const problems = evidence.length ? await evidenceProblems(store, scope.bookId, evidence) : []
+      const annotatedEvidence = evidence.map((item, index) => {
+        const problem = problems.find(problem => problem.index === index)
+        return problem ? { ...item, verified: false, reason: problem.reason } : { ...item, verified: true }
+      })
+      const verifiedCount = annotatedEvidence.filter(item => item.verified).length
+      const evidenceStatus: 'verified' | 'unverified' | 'partial' | undefined = evidence.length ? (verifiedCount === evidence.length ? 'verified' : verifiedCount > 0 ? 'partial' : 'unverified') : undefined
+      const review = evidence.length > 0 && evidenceStatus !== 'verified'
+      prepared.push({
+        targetId, pair, action, forward, reverse, directionUnclear,
+        evidence: annotatedEvidence, basis: changeBasis, reason, review, allowUnverified: true,
+        ...(evidenceStatus ? { evidenceStatus } : {}),
+      })
+      continue
+    }
+
+    // 删除整组关系属于高风险：必须有逐字原文，或有可追溯的冲突/识别错误依据。
+    if (pair.state !== 'active') {
+      prepared.push({ targetId, pair, action, forward: [], reverse: [], directionUnclear: false, evidence: [], basis: changeBasis, reason, review: false, allowUnverified: false })
+      continue
+    }
+    const problems = evidence.length ? await evidenceProblems(store, scope.bookId, evidence) : []
+    const annotatedEvidence = evidence.map((item, index) => {
+      const problem = problems.find(problem => problem.index === index)
+      return problem ? { ...item, verified: false, reason: problem.reason } : { ...item, verified: true }
+    })
+    const verifiedCount = annotatedEvidence.filter(item => item.verified).length
+    const evidenceOk = verifiedCount > 0
+    const conflict = records(change.basis).length ? records(change.basis) as unknown as Basis[] : records(args.basis).length ? basis : []
+    let conflictOk = false, conflictError = ''
+    if (!evidenceOk && conflict.length) {
+      try { await assertBasis(store, scope, conflict as unknown as Row[], readSet); conflictOk = true }
+      catch (error) { conflictError = `；${error instanceof Error ? error.message : '无法核对'}` }
+    }
+    if (!evidenceOk && !conflictOk) {
+      const detail = problems.length ? `；${problems.map(problem => `第${problem.chapterIndex}章${problem.reason}`).join('；')}` : ''
+      fail(targetId, 'INVALID_ARGS', `关系${targetId}删除关系需要逐字原文或可追溯的冲突/识别错误依据${conflictError || detail}`)
+      continue
+    }
+    prepared.push({
+      targetId, pair, action, forward: [], reverse: [], directionUnclear: false,
+      evidence: evidenceOk ? annotatedEvidence : [], basis: conflictOk ? conflict : changeBasis,
+      reason, review: false, allowUnverified: evidenceOk && problems.length > 0,
+      ...(evidenceOk ? { evidenceStatus: problems.length ? 'partial' as const : 'verified' as const } : {}),
+    })
   }
-  const priorCommits: string[] = []
-  for (const pair of context.pairs.filter(row => row.fromId === id || row.toId === id)) {
-    const edits = actualReviewEdits(run, 'relation', pair.pairKey)
+
+  const uncertainSeen = new Set<string>()
+  const uncertainReasons = new Map<string, string>()
+  for (const row of uncertainPairs) {
+    const targetId = text(row.targetId)
+    if (!targetId) { fail('', 'INVALID_ARGS', '待核对人物对缺少targetId'); continue }
+    if (targetId === id) { fail(targetId, 'INVALID_ARGS', `待核对人物对不能指向自己：${targetId}`); continue }
+    if (uncertainSeen.has(targetId)) continue
+    uncertainSeen.add(targetId)
+    uncertainReasons.set(targetId, text(row.reason))
+    const target = await store.get('characters', targetId)
+    if (!target || target.bookId !== scope.bookId) { fail(targetId, 'NOT_FOUND', `待核对人物对不存在或不属于本书：${targetId}`); continue }
+    if (pairFromPerspective(context.pairs, id, targetId, context.people).state === 'absent') fail(targetId, 'INVALID_ARGS', `待核对人物对尚未建立：${targetId}`)
+  }
+  for (const row of records((active.draft as Row | null)?.uncertainPairs)) {
+    const targetId = text(row.targetId)
+    if (targetId && !uncertainReasons.has(targetId)) uncertainReasons.set(targetId, text(row.reason))
+  }
+
+  if (errors.length) {
+    relationFailureSignatures.set(failureKey, { signature, count: 1 })
+    throw new Error(`INVALID_ARGS:批量校验失败（${errors.length}项）：${errors.join('；')}`)
+  }
+  if (!prepared.length && failures.length) {
+    relationFailureSignatures.set(failureKey, { signature, count: 1 })
+    item.reason = `未提交任何修改：${failures.map(failure => `${failure.targetId || '未知目标'}（${failure.code}）`).join('、')}`
+    active.draft = { ...((active.draft as Row | null) ?? {}), failed: failures }
+    await saveOrganization(store, (await store.get('pipelineRuns', scope.runId))!, organization)
+    return {
+      changed: false, done: false, complete: false,
+      summary: `未提交任何修改：${failures.map(failure => `${failure.targetId || '未知目标'}：${failure.message}`).join('；')}`,
+      commitId, outcome: 'uncertain' as const, applied: [], cumulativeApplied: [], unverified: [], uncertain: failures.map(failure => failure.targetId).filter(Boolean), failed: failures,
+    }
+  }
+
+  const appliedNow = new Set<string>()
+  const changedTargets = new Set<string>()
+  let applyContext = context
+  for (const change of prepared) {
+    // 同一人物的 revision 会随前一条关系写入变化；每条写入前刷新指纹，避免同批合法修改互相判冲突。
+    if (changedTargets.size) applyContext = await reviewContext(store)
+    const livePair = pairFromPerspective(applyContext.pairs, id, change.targetId, applyContext.people)
+    const knownFailure = [...relationErrorSignatures.entries()].find(([key, record]) => key.startsWith(`${failureKey}:error:${change.targetId}:`) && record.fingerprint === livePair.fingerprint && record.count >= 2)
+    if (knownFailure) {
+      const record = knownFailure[1]
+      failures.push({ targetId: change.targetId, code: record.code, message: record.message, recoverable: record.code === 'CONFLICT' || record.code === 'NOT_FOUND', repeated: true, action: record.code === 'CONFLICT' ? '重新读取该人物对后重试' : record.code === 'NOT_FOUND' ? '刷新人物或关系目标后重试' : '修正字段后重试' })
+      continue
+    }
+    let changed = false
+    try {
+      const result = change.action === 'set'
+        ? await saveCharacterPair(store, {
+            bookId: scope.bookId, fromId: id, toId: change.targetId, forwardLabels: change.forward, reverseLabels: change.reverse,
+            directionUnclear: change.directionUnclear, evidence: change.evidence, basis: change.basis, reason: change.reason,
+            allowUnverifiedEvidence: change.allowUnverified, evidenceStatus: change.evidenceStatus,
+            expectedFingerprint: livePair.fingerprint, actor: 'agent', commitId, tool: 'submit_relation_review',
+            operationKey: `${text(args.operationKey)}:${change.targetId}`, runId: scope.runId,
+          })
+        : await deleteCharacterPair(store, {
+            bookId: scope.bookId, fromId: id, toId: change.targetId, forwardLabels: [], reverseLabels: [], directionUnclear: false,
+            evidence: change.evidence, basis: change.basis, reason: change.reason, allowUnverifiedEvidence: false, evidenceStatus: change.evidenceStatus,
+            expectedFingerprint: livePair.fingerprint, actor: 'agent', commitId, tool: 'submit_relation_review',
+            operationKey: `${text(args.operationKey)}:${change.targetId}`, runId: scope.runId,
+          })
+      changed = result.changed
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '提交失败。'
+      const code = /^([A-Z_]+):/.exec(message)?.[1] ?? 'INVALID_ARGS'
+      if (!['CONFLICT', 'NOT_FOUND', 'INVALID_ARGS'].includes(code)) throw error
+      const errorKey = `${failureKey}:error:${change.targetId}:${code}:${message}`
+      const previous = relationErrorSignatures.get(errorKey)
+      relationErrorSignatures.set(errorKey, { signature: `${code}:${message}`, count: (previous?.count ?? 0) + 1, targetId: change.targetId, fingerprint: livePair.fingerprint, code, message })
+      failures.push({
+        targetId: change.targetId, code, message, repeated: !!previous,
+        recoverable: code === 'CONFLICT' || code === 'NOT_FOUND',
+        action: code === 'CONFLICT' ? '重新读取该人物对后重试' : code === 'NOT_FOUND' ? '刷新人物或关系目标后重试' : '修正字段后重试',
+      })
+      continue
+    }
+    if (changed) {
+      appliedNow.add(change.targetId); changedTargets.add(change.targetId)
+      for (const key of relationErrorSignatures.keys()) if (key.startsWith(`${failureKey}:error:${change.targetId}:`)) relationErrorSignatures.delete(key)
+    }
+  }
+
+  const after = await reviewContext(store)
+  const latestRun = (await store.get('pipelineRuns', scope.runId))!
+  const changeByTarget = new Map(prepared.map(change => [change.targetId, change]))
+  const relevantPairs = after.pairs.filter(row => row.fromId === id || row.toId === id)
+  const editsByPair = new Map<string, Row[]>()
+  for (const pair of relevantPairs) {
+    const edits = actualReviewEdits(latestRun, 'relation', pair.pairKey)
+    editsByPair.set(pair.pairKey, edits)
     if (edits.length) changedTargets.add(pair.fromId === id ? pair.toId : pair.fromId)
-    priorCommits.push(...edits.map(edit => text(edit.commitId)))
   }
-  const commitIds = [...new Set([...strings(active.commitIds), ...priorCommits, ...(changedTargets.size ? [commitId] : [])])]
-  const unresolvedTargets = new Set(unresolved.map(row => text(row.targetId)).filter(Boolean))
-  const outcome = changedTargets.size ? 'changed' : unresolved.length ? 'uncertain' : 'no_change'
-  const description = text(args.reason) || (changedTargets.size ? '已提交人物关系修改' : unresolved.length ? '部分关系待确认' : '关系无需修改')
-  if (done) {
+  const reviewTargets = new Set(prepared.filter(change => change.review && appliedNow.has(change.targetId)).map(change => change.targetId))
+  const commitIds = [...new Set([...editsByPair.values()].flat().map(edit => text(edit.commitId)).filter(Boolean))]
+  const currentPairs = records(organization.pairChecks)
+  const failedTargets = new Set(failures.map(failure => failure.targetId).filter(Boolean))
+  const pairOutcomes = new Map<string, 'changed' | 'no_change' | 'uncertain'>()
+  const nextPairChecks = new Map<string, Row>()
+  for (const pair of relevantPairs) {
+    const targetId = pair.fromId === id ? pair.toId : pair.fromId
+    const edits = editsByPair.get(pair.pairKey) ?? []
+    const latest = edits.at(-1)
+    const existing = currentPairs.find(row => text(row.pairKey) === pair.pairKey)
+    const explicitUncertain = uncertainReasons.get(targetId)
+    const latestStatus = text(latest?.evidenceStatus)
+    const unverified = latestStatus === 'unverified' || latestStatus === 'partial'
+    const retainedUncertain = !edits.length && text(existing?.outcome) === 'uncertain'
+    const explicitNoChange = !edits.length && explicitUncertain === undefined && text(existing?.outcome) === 'no_change' && records(existing?.basis).length > 0
+    const failure = failures.find(item => item.targetId === targetId)
+    const pairOutcome = failure ? 'uncertain' : explicitUncertain !== undefined || unverified || retainedUncertain
+      ? 'uncertain'
+      : edits.length ? 'changed' : 'no_change'
+    pairOutcomes.set(pair.pairKey, pairOutcome)
+    const reason = failure?.message ?? explicitUncertain
+      ?? (edits.length ? text(latest?.reason) || changeByTarget.get(targetId)?.reason || '' : retainedUncertain || explicitNoChange ? text(existing?.reason) : '本次未提交修改，未逐对确认。')
+    const pairCommitIds = failure ? [] : edits.length
+      ? [...new Set(edits.map(edit => text(edit.commitId)).filter(Boolean))]
+      : retainedUncertain || explicitNoChange ? strings(existing?.commitIds) : []
+    const pairBasis = (failure ? [] : edits.length ? records(latest?.basis) : retainedUncertain || explicitNoChange ? records(existing?.basis) : []) as unknown as Basis[]
+    const retainedStatus = retainedUncertain || explicitNoChange ? text(existing?.evidenceStatus) : ''
+    const evidenceStatus = (latestStatus || retainedStatus) as 'verified' | 'unverified' | 'partial' | ''
+    nextPairChecks.set(pair.pairKey, {
+      ...(existing ?? {}), pairKey: pair.pairKey, fingerprint: pair.fingerprint,
+      outcome: pairOutcome, reason, basis: pairBasis, commitIds: pairCommitIds,
+      ...(evidenceStatus ? { evidenceStatus } : {}),
+    })
+  }
+  const outcome = failures.length ? 'uncertain' : [...pairOutcomes.values()].includes('uncertain') ? 'uncertain' : [...pairOutcomes.values()].includes('changed') ? 'changed' : 'no_change'
+  const description = failures.length
+    ? `部分关系未提交：${failures.map(failure => `${failure.targetId || '未知目标'}（${failure.code}）`).join('、')}`
+    : text(args.reason) || (outcome === 'uncertain' ? '部分关系待核对' : outcome === 'changed' ? '已提交人物关系修改' : '本次未提交修改，未逐对确认。')
+  const uncertainTargets = new Set([...uncertainSeen, ...reviewTargets, ...failedTargets])
+  for (const pair of relevantPairs) {
+    if (pairOutcomes.get(pair.pairKey) !== 'uncertain') continue
+    uncertainTargets.add(pair.fromId === id ? pair.toId : pair.fromId)
+  }
+  const completed = done && failures.length === 0
+  if (completed) {
     item.status = 'checked'; item.outcome = outcome; item.reason = description; item.commitIds = commitIds
     delete item.lastError
     organization.activeWork = null
     const pairs = records(organization.pairChecks)
-    for (const pair of context.pairs.filter(row => row.fromId === id || row.toId === id)) {
-      const targetId = pair.fromId === id ? pair.toId : pair.fromId
-      const existing = pairs.find(row => row.pairKey === pair.pairKey)
-      const next = { ...(existing ?? {}), pairKey: pair.pairKey, fingerprint: pair.fingerprint, outcome: changedTargets.has(targetId) ? 'changed' : unresolvedTargets.has(targetId) ? 'uncertain' : 'no_change', reason: description, basis, commitIds }
-      const at = pairs.findIndex(row => row.pairKey === pair.pairKey)
+    for (const [pairKey, next] of nextPairChecks) {
+      const at = pairs.findIndex(row => text(row.pairKey) === pairKey)
       if (at < 0) pairs.push(next); else pairs[at] = next
     }
     organization.pairChecks = pairs
   } else {
     active.commitIds = commitIds
-    active.draft = { changes, reason: text(args.reason), unresolved }
+    active.draft = { changes, reason: text(args.reason), uncertainPairs, failed: failures }
     item.reason = description; item.commitIds = commitIds
   }
   await saveOrganization(store, (await store.get('pipelineRuns', scope.runId))!, organization)
-  return { changed: changedTargets.size > 0, done, complete: done, summary: done ? '人物关系已保存并完成。' : '人物关系已保存，继续处理当前人物。', commitId, outcome }
+  const summary = completed ? '人物关系已保存并完成。' : failures.length ? `人物关系已保存，${appliedNow.size}项本次写入；${failures.length}项未提交。` : '人物关系已保存，继续处理当前人物。'
+  if (failures.length) relationFailureSignatures.set(failureKey, { signature, count: 1 })
+  else relationFailureSignatures.delete(failureKey)
+  return {
+    changed: appliedNow.size > 0, done: completed, complete: completed, summary, commitId, outcome,
+    applied: [...appliedNow], cumulativeApplied: [...changedTargets], unverified: [...reviewTargets], uncertain: [...uncertainTargets], failed: failures,
+  }
+}
+
+export async function replayOrganizationSubmit(store: AgentStore, scope: Scope, name: string, args: Row, readSet: ReadSet, commitId: string) {
+  if (name === 'submit_profile_review') return submitProfileReview(store, scope, { patch: {}, done: true, reason: text(args.reason), uncertainFields: strings(args.uncertainFields) }, commitId, new Date().toISOString())
+  if (name === 'submit_relation_review') return submitRelationReview(store, scope, { changes: [], uncertainPairs: [], done: true, reason: text(args.reason), basis: args.basis }, readSet, commitId)
+}
+
+export async function reconcileOrganizationAfterWrite(store: AgentStore, _scope: Scope, run: Row, name: string, args: Row, result: Row | undefined) {
+  if (!run.organization || !result) return
+  const organization = run.organization as Row
+  const active = organization.activeWork as Row | null | undefined
+  if (!active) return
+  const affected = records(result.affected)
+  const memberIds = strings(args.memberIds)
+  const keepId = text(args.keepId)
+  const activeId = text(active.characterId)
+  let changed = false
+  const invalidateProfile = (id: string) => {
+    if (!id || id === text(active.characterId)) return
+    const item = records(organization.profileItems).find(row => text(row.id) === id)
+    if (item && item.status === 'checked') { item.status = 'pending'; item.outcome = null; item.reason = '受跨步骤修改影响，需要重新核对。'; item.lastError = null; changed = true }
+  }
+  const invalidateRelations = (ids: string[]) => {
+    for (const item of records(organization.relationItems)) {
+      if (!ids.includes(text(item.id))) continue
+      if (text(item.id) === text(active.characterId) && active.kind === 'relations') continue
+      if (item.status === 'checked') { item.status = 'pending'; item.outcome = null; item.reason = '受跨步骤修改影响，需要重新核对。'; item.lastError = null; changed = true }
+    }
+    for (const pair of records(organization.pairChecks)) {
+      let members: string[] = []
+      try { members = (JSON.parse(text(pair.pairKey)) as string[]) ?? [] } catch { members = [] }
+      if (members.some(id => ids.includes(id))) { pair.outcome = null; pair.reason = '受跨步骤修改影响，需要重新核对。'; changed = true }
+    }
+  }
+  const updateActive = async (nextId: string) => {
+    const row = await store.get('characters', nextId)
+    if (!row) return false
+    if (nextId !== activeId) {
+      active.id = `${active.kind === 'profile' ? 'profile' : 'relations'}:${nextId}`
+      active.characterId = nextId; active.targetIds = [nextId]; active.targetId = nextId
+      const field = active.kind === 'profile' ? 'profileItems' : active.kind === 'relations' ? 'relationItems' : null
+      const items = field ? records(organization[field]) : []
+      const item = items.find(row => text(row.id) === activeId)
+      if (item) {
+        const target = items.find(row => text(row.id) === nextId)
+        if (target) {
+          target.status = 'pending'; target.outcome = null; target.reason = '人物已合并到当前条目，需要重新核对。'; target.lastError = null
+          organization[field!] = items.filter(row => text(row.id) !== activeId)
+        } else {
+          item.id = nextId; item.name = text(row.name)
+        }
+        changed = true
+      }
+    }
+    active.dataVersion = Number(row.revision ?? active.dataVersion ?? 0)
+    changed = true
+    return true
+  }
+  if (activeId) {
+    const direct = affected.find(row => text(row.kind) === 'character' && text(row.id) === activeId)
+    if (direct) await updateActive(activeId)
+    if (name === 'merge_assets' && text(args.kind) === 'character' && memberIds.includes(activeId) && keepId) await updateActive(keepId)
+  }
+  if (name === 'merge_assets' && text(args.kind) === 'character') {
+    for (const id of [...memberIds, keepId]) { invalidateProfile(id); invalidateRelations([id]) }
+  } else if (name === 'edit_character') {
+    for (const row of affected) if (text(row.kind) === 'character') invalidateProfile(text(row.id))
+  } else if (name === 'set_character_relation' || name === 'delete_character_relation') {
+    const pairKey = text((result.pair as Row | undefined)?.pairKey)
+    if (pairKey) {
+      const pair = records(organization.pairChecks).find(row => text(row.pairKey) === pairKey)
+      if (pair) { pair.outcome = null; pair.reason = '受跨步骤修改影响，需要重新核对。'; changed = true }
+    }
+  }
+  if (changed) { organization.revision = Number(organization.revision ?? 1) + 1; run.organization = organization }
 }
 
 export async function applyOrganizationTool(store: AgentStore, scope: Scope, name: string, args: Row, readSet: ReadSet, commitId: string, timestamp: string) {
   if (name === 'submit_profile_review') return submitProfileReview(store, scope, args, commitId, timestamp)
-  if (name === 'submit_relation_review') return submitRelationReview(store, scope, args, commitId)
+  if (name === 'submit_relation_review') return submitRelationReview(store, scope, args, readSet, commitId)
   const { run, organization } = await organizationOf(store, scope)
   if (name === 'save_candidate_group') {
     const memberIds = [...new Set(strings(args.memberIds))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
@@ -306,8 +615,9 @@ export async function applyOrganizationTool(store: AgentStore, scope: Scope, nam
     if (text(args.groupId) && !existing) throw new Error('NOT_FOUND:疑似组不存在。')
     if (existing && args.expectedRevision !== undefined && Number(existing.revision) !== Number(args.expectedRevision)) throw new Error('CONFLICT:疑似组已更新，请重新读取。')
     const names = await memberNames(store, memberIds)
+    const originStep = text(existing?.originStep) || text(scope.organizationStep) || text(organization.step)
     const group: Row = existing ?? { id: crypto.randomUUID(), memberIds, memberNames: names, reason: '', status: 'pending' as const, revision: 0, createdAt: timestamp, updatedAt: timestamp }
-    const next: Row = { ...group, memberIds, memberNames: names, reason: text(args.reason), revision: Number(group.revision) + 1, updatedAt: timestamp }
+    const next: Row = { ...group, memberIds, memberNames: names, reason: text(args.reason), originStep, revision: Number(group.revision) + 1, updatedAt: timestamp }
     organization.candidateGroups = existing ? groups.map(row => row.id === group.id ? next : row) : [...groups, next]
     await saveOrganization(store, run, organization)
     return { changed: true, summary: '疑似组已保存。', groupId: next.id, revision: next.revision, reused: !!existing }
@@ -331,7 +641,8 @@ export async function applyOrganizationTool(store: AgentStore, scope: Scope, nam
     const next = { ...group, status: 'resolved' as const, revision: Number(group.revision) + 1, updatedAt: timestamp }
     const names = strings(group.memberNames).length ? strings(group.memberNames) : await memberNames(store, strings(group.memberIds))
     const decisions = records(organization.candidateDecisions).filter(row => row.groupId !== group.id)
-    decisions.push({ groupId: group.id, memberIds: strings(group.memberIds), memberNames: names, outcome, reason: text(args.reason), basis, commitIds, createdAt: timestamp })
+    const originStep = text(group.originStep) || text(scope.organizationStep) || text(organization.step)
+    decisions.push({ groupId: group.id, memberIds: strings(group.memberIds), memberNames: names, outcome, reason: text(args.reason), basis, commitIds, createdAt: timestamp, originStep })
     organization.candidateGroups = groups.map(row => row.id === group.id ? next : row)
     organization.candidateDecisions = decisions
     await saveOrganization(store, run, organization)
@@ -407,7 +718,7 @@ export async function applyOrganizationTool(store: AgentStore, scope: Scope, nam
         if (records(organization.profileItems).some(row => row.status !== 'checked')) throw new Error('INVALID_ARGS:仍有未检查的人物资料。')
         await buildRelationReview(store, organization)
       } else if (organization.step === 'relations') {
-        if (records(organization.profileItems).some(row => row.status !== 'checked') || records(organization.relationItems).some(row => row.status !== 'checked') || records(organization.pairChecks).some(row => !row.outcome)) throw new Error('INVALID_ARGS:仍有未完成或依据变化的资料/关系项，请重新读取进度。')
+        if (records(organization.profileItems).some(row => row.status !== 'checked') || records(organization.relationItems).some(row => row.status !== 'checked') || pendingPairChecks(organization).length) throw new Error('INVALID_ARGS:仍有未完成或依据变化的资料/关系项，请重新读取进度。')
         organization.step = 'finalize'; organization.statisticsPending = true
       } else if (organization.step === 'finalize') {
         if (organization.statisticsPending) throw new Error('INVALID_ARGS:出场统计尚未完成。')

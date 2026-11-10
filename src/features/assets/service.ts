@@ -2,7 +2,6 @@ import type { createWorkspace } from '../../lib/storage/workspace'
 import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterPairResult, type CharacterRelation, type CharacterRelationEdit, type EventLine, type EventNode, type LegacyRelationRecord, type Lifecycle, type LocationAsset, type RelationEvidence } from './types'
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
-import { normalizeCharacterNames } from './characterNames'
 import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRun, type MergeOptions, type MergePreview, type MergeRequest, type WorldKind, type MechanicalMergeContext } from './merge'
 import { dexieMergeStore, mergeWorldAssets } from './mergeCore'
 import { invalidateAssetProgress } from './invalidate'
@@ -210,7 +209,6 @@ export function createAssetService(workspace: Workspace) {
       }
       if (kind === 'character') {
         const character = row as Character
-        Object.assign(character, normalizeCharacterNames(character))
         if (character.identity !== (previous as Character | undefined)?.identity && character.identity !== undefined) facts.identity = character.identity
         if (input.ageText !== undefined) character.profile = { ...(previous as Character | undefined)?.profile, ageText: input.ageText }
         if (input.roleWeight !== undefined) { character.roleWeight = input.roleWeight; character.roleWeightSource = 'manual' }
@@ -220,7 +218,7 @@ export function createAssetService(workspace: Workspace) {
         row.optimizedFactIds = (row.optimizedFactIds ?? []).filter(factId => row.mergeFacts!.some(fact => fact.id === factId))
         delete row.optimizationFingerprint
       }
-      const previousAliases = previous ? (kind === 'character' ? normalizeCharacterNames(previous).aliases : previous.aliases) ?? [] : []
+      const previousAliases = previous ? previous.aliases ?? [] : []
       const aliasesChanged = input.aliases !== undefined && (!previous || JSON.stringify([...(row.aliases ?? [])].sort()) !== JSON.stringify([...previousAliases].sort()))
       row.verifiedAliases = (aliasesChanged ? row.aliases ?? [] : row.verifiedAliases ?? []).filter(alias => (row.aliases ?? []).includes(alias) && alias !== row.name)
       return row
@@ -362,7 +360,7 @@ export function createAssetService(workspace: Workspace) {
       const [storedCharacters, locations, storedNodes, eventLines, lifecycle, relationRows, editRows] = await Promise.all([
         db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<CharacterRelation>('characterRelations').toArray(), db.table<CharacterRelationEdit>('characterRelationEdits').toArray(),
       ])
-      const characters = storedCharacters.map(normalizeCharacterNames)
+      const characters = storedCharacters
       const relations = relationRows
       const pairs = effectivePairs(relations, editRows, characters)
       const view = pairView(pairs, characters)

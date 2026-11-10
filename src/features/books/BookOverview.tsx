@@ -2,7 +2,7 @@ import { StoryPanel } from '../story/StoryPanel'
 import type { StoryService } from '../story/service'
 import { WorldPanel } from '../world/WorldPanel'
 import type { WorldService } from '../world/service'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useLiveResult } from '../../hooks/useLiveResult'
 import type { Book, BookRepository } from '../../lib/storage/workspace'
 import { formatImportDate } from './formatImportDate'
@@ -16,6 +16,22 @@ import type { ExtractionService } from '../extraction/service'
 
 export function BookOverview({ book, repository, assets, extraction, world, story, assetKind, onAssetKindChange }: { book: Book; repository: BookRepository; assets: AssetService; extraction?: ExtractionService; world?: WorldService; story?: StoryService; assetKind: AssetKind; onAssetKindChange: (kind: AssetKind) => void }) {
   const [attempt, setAttempt] = useState(0)
+  const [focusRunId, setFocusRunId] = useState<string>()
+  const [worldRunning, setWorldRunning] = useState(false)
+  const [otherAiRunning, setOtherAiRunning] = useState(false)
+  const [resumeCharacterId, setResumeCharacterId] = useState<string>()
+  useEffect(() => {
+    if (!world) { setWorldRunning(false); return }
+    const update = () => {
+      const busy = !!world.state(book.id)?.running
+      setWorldRunning(busy)
+      setOtherAiRunning(!!story?.state(book.id)?.running || !!extraction?.state(book.id)?.running)
+      void world.characterResume(book.id).then(setResumeCharacterId).catch(() => setResumeCharacterId(undefined))
+    }
+    update()
+    const unsubscribers = [world.subscribe(update), story?.subscribe(update), extraction?.subscribe(update)].filter((value): value is () => void => !!value)
+    return () => { for (const unsubscribe of unsubscribers) unsubscribe() }
+  }, [world, story, extraction, book.id])
   const query = useCallback(() => repository.getBookSummary(book.id), [repository, book.id])
   const summary = useLiveResult(query, attempt)
   const metrics = [['characters', '人物'], ['locations', '地点'], ['nodes', '事件节点'], ['eventLines', '事件线']] as const
@@ -29,10 +45,10 @@ export function BookOverview({ book, repository, assets, extraction, world, stor
           <ChapterBrowser bookId={book.id} repository={repository} extraction={extraction} />
         </section>
         {extraction && <ExtractionPanel bookId={book.id} service={extraction} />}
-        {world && <WorldPanel key={`world:${book.id}`} bookId={book.id} service={world} assets={assets} />}
+        {world && <WorldPanel key={`world:${book.id}`} bookId={book.id} service={world} assets={assets} focusRunId={focusRunId} />}
         {story && <StoryPanel key={`story:${book.id}`} bookId={book.id} service={story} />}
         <div className="asset-metrics">{metrics.map(([key, label]) => <div className="metric-card" key={key}><span>{label}</span><strong>{summary.value.counts[key]}</strong><small>当前记录</small></div>)}</div>
-        <AssetsPanel bookId={book.id} repository={repository} service={assets} kind={assetKind} onKindChange={onAssetKindChange} />
+        <AssetsPanel bookId={book.id} repository={repository} service={assets} kind={assetKind} onKindChange={onAssetKindChange} organizeDisabled={worldRunning || otherAiRunning} organizeDisabledReason={worldRunning ? '人物整理正在运行' : otherAiRunning ? '本书已有其他 AI 任务运行' : undefined} resumeCharacterId={resumeCharacterId} onOrganizeCharacter={world ? async (id, mode) => { setFocusRunId(await world.startCharacterOrganization(book.id, id, mode)) } : undefined} onContinueCharacter={world ? async id => { await world.continueCharacterOrganization(book.id, id) } : undefined} />
         <div className="next-stage-note"><span aria-hidden="true">○</span><div><strong>原文与资产保存在本地</strong><p>选择资产查看或编辑，点击章节名称查看完整原文。</p></div></div>
       </>}
     </section>

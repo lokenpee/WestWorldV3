@@ -1,6 +1,5 @@
 import { AssetError, assetTables, roleWeights, type AssetEditRecord, type AssetFieldChange, type AssetKind, type Basis, type Character, type EventLine, type EventNode, type LocationAsset, type RelationEvidence, type RoleWeight } from './types'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
-import { normalizeCharacterNames } from './characterNames'
 import { rebuildFacts } from './derive'
 import { syncRelations } from './relations'
 
@@ -97,7 +96,6 @@ async function patchCharacter(store: PatchStore, input: AssetPatchInput, before:
   if (patch.gender !== undefined) { changes.push({ field: 'profile.gender', before: before.profile?.gender, after: String(patch.gender) }); if (String(patch.gender)) profile.gender = String(patch.gender); else delete profile.gender }
   row.profile = profile
   if (patch.roleWeight !== undefined) { record('roleWeight', patch.roleWeight); row.roleWeight = patch.roleWeight as RoleWeight; row.roleWeightSource = 'agent' }
-  Object.assign(row, normalizeCharacterNames(row))
   const facts: Record<string, string> = {}
   for (const field of ['identity', 'appearance', 'personality', 'background'] as const) if (patch[field] !== undefined) facts[field] = String(patch[field])
   if (Object.keys(facts).length) {

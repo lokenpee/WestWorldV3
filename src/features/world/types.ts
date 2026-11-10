@@ -35,11 +35,13 @@ export interface WorldReport {
   cost: number; usage: { input: number; output: number; totalTokens: number; cost: number; costStatus?: 'estimated' | 'unknown' }; externalChanges: string[]
 }
 export type OrganizationStep = 'scan' | 'resolve' | 'profiles' | 'relations' | 'finalize' | 'done'
+export type OrganizationMode = 'full' | 'profile' | 'relations'
+export type OrganizationRunStep = 'scan' | 'profiles' | 'relations'
 export interface ScanPage { pageId: string; ids: string[]; nextCursor: string | null; status: 'issued' | 'checked'; lastError?: { code: string; message: string; action: 'retry' | 'reload' | 'defer' | 'pause'; tool?: string } }
-export interface CandidateGroup { id: string; memberIds: string[]; memberNames?: string[]; reason: string; status: 'pending' | 'resolved'; revision: number; createdAt: string; updatedAt: string; lastError?: { code: string; message: string; action: 'retry' | 'reload' | 'defer' | 'pause'; tool?: string } }
-export interface CandidateDecision { groupId: string; memberIds: string[]; memberNames: string[]; outcome: 'merged' | 'not_same' | 'uncertain' | 'partial'; reason: string; basis: Basis[]; commitIds: string[]; createdAt: string }
+export interface CandidateGroup { id: string; memberIds: string[]; memberNames?: string[]; reason: string; status: 'pending' | 'resolved'; revision: number; createdAt: string; updatedAt: string; originStep?: OrganizationStep; lastError?: { code: string; message: string; action: 'retry' | 'reload' | 'defer' | 'pause'; tool?: string } }
+export interface CandidateDecision { groupId: string; memberIds: string[]; memberNames: string[]; outcome: 'merged' | 'not_same' | 'uncertain' | 'partial'; reason: string; basis: Basis[]; commitIds: string[]; createdAt: string; originStep?: OrganizationStep }
 export interface OrganizationItem { id: string; name?: string; status: 'pending' | 'checked'; outcome: 'changed' | 'no_change' | 'uncertain' | 'unavailable' | null; reason: string; contentFingerprint: string; readRefs: string[]; commitIds: string[]; uncertainFields?: string[]; lastError?: { code: string; message: string; action: 'retry' | 'reload' | 'defer' | 'pause'; tool?: string } }
-export interface PairCheck { pairKey: string; fingerprint: string; readFingerprint?: string; outcome: 'changed' | 'no_change' | 'uncertain' | null; reason: string; basis: Basis[]; commitIds: string[] }
+export interface PairCheck { pairKey: string; fingerprint: string; readFingerprint?: string; outcome: 'changed' | 'no_change' | 'uncertain' | null; reason: string; basis: Basis[]; commitIds: string[]; evidenceStatus?: 'verified' | 'unverified' | 'partial' }
 export interface OrganizationContext { id: string; status: 'pending' | 'active' | 'completed'; pendingWorkId: string | null; pendingUnitId?: string | null }
 export interface OrganizationContexts { identity: OrganizationContext; profiles: OrganizationContext; relations: OrganizationContext }
 export type WorkKind = 'directory' | 'candidate' | 'profile' | 'relations'
@@ -56,7 +58,7 @@ export interface WorkSnapshot {
   ranges: { id: string; from: number; to: number }[]; contentFingerprint: string; deliveredAttemptIds: string[]
 }
 export interface OrganizationState {
-  version: 1; step: OrganizationStep; revision: number
+  version: 1; step: OrganizationStep; revision: number; mode?: OrganizationMode; targetCharacterId?: string; runStep?: OrganizationRunStep; pauseRequested?: boolean
   scanIds: string[]; scanPages: ScanPage[]; candidateGroups: CandidateGroup[]; candidateDecisions: CandidateDecision[]
   profileItems: OrganizationItem[]; relationItems: OrganizationItem[]; pairChecks: PairCheck[]
   statisticsPending: boolean
@@ -67,6 +69,7 @@ export interface RequestLedgerEntry {
   attemptId: string; requestId?: string; executionId?: string; stage: string; workId?: string; characterId?: string; contextId?: string
   purpose: "work" | "retry" | "compaction" | "compaction_repair" | "repair"
   status: "succeeded" | "failed" | "cancelled"
+  ordinal?: number; turn?: number
   startedAt: string; finishedAt: string
   estimatedInput: number | null; outputReserve: number | null
   input: number | null; cacheRead: number | null; cacheWrite: number | null; output: number | null; totalTokens: number | null
@@ -86,7 +89,7 @@ export interface AssetReviewItem {
 export type ReviewScope = 'all_assets' | 'relations'
 export type ReviewMode = 'sample' | 'full'
 export interface WorldRun {
-  id: string; bookId: string; recordType: 'run'; stage: 'P2'; phase: string; status: WorldReport['status']; startedAt: string; finishedAt?: string; report: WorldReport
+  id: string; bookId: string; recordType: 'run'; stage: 'P2'; phase: string; scope?: 'fullBook' | 'character'; status: WorldReport['status']; startedAt: string; finishedAt?: string; report: WorldReport
   commandIntents?: Row[]; tasks?: Row[]; coverage?: { total: number; checked: number; pendingIds: string[] }; mechanicalQueue?: MechanicalQueue
   assetReview?: { version: 1; items: AssetReviewItem[]; updatedAt: string }
   reviewScope?: ReviewScope; reviewMode?: ReviewMode; relationReviewVersion?: 1 | 2

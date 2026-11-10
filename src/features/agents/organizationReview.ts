@@ -2,7 +2,6 @@ import type { AgentStore, Row } from './repository'
 import type { Scope } from './queries'
 import { canonical, hash, records, strings, text } from './contracts'
 import { effectivePairs, pairFromPerspective, pairKeyOf, syncRelations } from '../assets/relations'
-import { normalizeCharacterNames } from '../assets/characterNames'
 import type { Character, CharacterRelation, CharacterRelationEdit, Lifecycle } from '../assets/types'
 
 export const organizationReviewVersion = 2
@@ -18,7 +17,7 @@ export function profileContent(row: Row) {
 }
 
 export async function reviewContext(store: AgentStore) {
-  const people = (await store.rows('characters') as unknown as Character[]).map(normalizeCharacterNames)
+  const people = await store.rows('characters') as unknown as Character[]
   const byId = new Map(people.map(row => [row.id, row]))
   const raw = await store.rows('characterRelations') as unknown as CharacterRelation[]
   const lifecycle = await store.rows('assetLifecycle') as unknown as Lifecycle[]
@@ -60,8 +59,15 @@ export async function buildProfileReview(store: AgentStore, organization: Row) {
 }
 
 async function synchronizePairs(context: ReviewContext, organization: Row) {
-  const previous = records(organization.pairChecks)
-  const keys = new Set([...context.pairs.map(row => row.pairKey), ...previous.map(row => text(row.pairKey))])
+  const targetId = text(organization.targetCharacterId)
+  const scoped = organization.mode && organization.mode !== 'full' && targetId
+    ? context.pairs.filter(row => row.fromId === targetId || row.toId === targetId)
+    : context.pairs
+  const scopedKeys = new Set(scoped.map(row => row.pairKey))
+  const allPrevious = records(organization.pairChecks)
+  const previous = allPrevious.filter(row => scopedKeys.has(text(row.pairKey)))
+  const retained = organization.mode && organization.mode !== 'full' ? allPrevious.filter(row => !scopedKeys.has(text(row.pairKey))) : []
+  const keys = new Set([...scopedKeys, ...previous.map(row => text(row.pairKey))])
   const next: Row[] = []
   for (const key of keys) {
     const ids = JSON.parse(key) as string[]
@@ -69,7 +75,7 @@ async function synchronizePairs(context: ReviewContext, organization: Row) {
     const fingerprint = await context.pair(key), old = previous.find(row => row.pairKey === key)
     next.push(old?.fingerprint === fingerprint ? old : { pairKey: key, fingerprint, outcome: null, reason: '', basis: [], commitIds: [] })
   }
-  organization.pairChecks = next
+  organization.pairChecks = [...retained, ...next]
 }
 
 export async function buildRelationReview(store: AgentStore, organization: Row) {
@@ -94,7 +100,17 @@ export async function refreshReview(store: AgentStore, organization: Row, contex
   }
   if (records(organization.relationItems).length) await synchronizePairs(current, organization)
   if (['relations', 'finalize', 'done'].includes(text(organization.step)) && records(organization.profileItems).some(item => item.status === 'pending')) organization.step = 'profiles'
-  else if (['finalize', 'done'].includes(text(organization.step)) && (records(organization.relationItems).some(item => item.status === 'pending') || records(organization.pairChecks).some(item => !item.outcome))) organization.step = 'relations'
+  else if (['finalize', 'done'].includes(text(organization.step)) && (records(organization.relationItems).some(item => item.status === 'pending') || pendingPairChecks(organization).length)) organization.step = 'relations'
+}
+
+export function pendingPairChecks(organization: Row) {
+  const targetId = text(organization.targetCharacterId)
+  const scoped = organization.mode && organization.mode !== 'full' && targetId
+    ? records(organization.pairChecks).filter(pair => {
+      try { return (JSON.parse(text(pair.pairKey)) as string[]).includes(targetId) } catch { return false }
+    })
+    : records(organization.pairChecks)
+  return scoped.filter(pair => !pair.outcome)
 }
 
 function noteRead(item: Row, fingerprint: string, fragment?: Row) {

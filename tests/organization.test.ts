@@ -6,14 +6,16 @@ import { createAssetService } from '../src/features/assets/service'
 import { createModelService } from '../src/features/models/service'
 import { createWorldService } from '../src/features/world/service'
 import { defaultConfig } from '../src/features/models/types'
-import { createOrganizationState } from '../src/features/world/organization'
+import { createOrganizationState, nextUnit } from '../src/features/world/organization'
 import { createBackupService } from '../src/features/backup/service'
 import { createImportService } from '../src/lib/storage/importService'
 import type { Character } from '../src/features/assets/types'
 import { agentStream } from './support/agent-protocol'
 import { organizationResponse } from './support/organization-streams'
 import { appendEntry } from '../src/features/agents/commands'
-import { createBookAgentRepository } from '../src/features/agents/repository'
+import { reconcileOrganizationAfterWrite } from '../src/features/agents/organizationCommands'
+import { createBookAgentRepository, createMemoryAgentRepository } from '../src/features/agents/repository'
+import { createAgentTools } from '../src/features/agents/tools'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
 const person = (id: string, name: string, extra = {}): Character => ({ id, bookId: 'a', name, aliases: [], confidence: 1, revision: 1, createdBy: 'P1', chapterIndex: '1', chapterName: '第1章', ...extra })
@@ -256,7 +258,7 @@ it('相同工具参数重复失败且没有进展时留待该人物，继续处�
     const body = JSON.parse(init!.body as string) as { messages: { role: string; content: unknown }[] }
     const input = parse([...body.messages].reverse().find(isInput)?.content)
     const work = input.work as Record<string, unknown> | undefined
-    if (work?.kind === 'profile') return agentStream([{ name: 'submit_relation_review', args: { changes: [{ targetId: 'C1-P004', action: 'delete' }], done: true, reason: '错误阶段调用' } }])
+    if (work?.kind === 'profile') return agentStream([{ name: 'submit_profile_review', args: { patch: {}, done: false, reason: '无修改反复提交' } }])
     return respond(init)
   })
   const { service } = await setup(fetcher)
@@ -270,11 +272,11 @@ it('相同工具参数重复失败且没有进展时留待该人物，继续处�
 
 
 it('每个工作项使用独立上下文，切换不压缩且旧历史不重送', async () => {
-  const requests: { unitId: string; contextId: string; messages: { role: string; content: unknown }[] }[] = []
+  const requests: { unitId: string; contextId: string; messages: { role: string; content: unknown }[]; tools: string[]; system: string }[] = []
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init!.body as string) as { messages: { role: string; content: unknown }[] }
     const input = parse([...body.messages].reverse().find(isInput)?.content)
-    if (typeof input.unitId === 'string') requests.push({ unitId: input.unitId, contextId: String(input.contextId), messages: body.messages })
+    if (typeof input.unitId === 'string') requests.push({ unitId: input.unitId, contextId: String(input.contextId), messages: body.messages, tools: (body as { tools?: { function?: { name?: string } }[] }).tools?.map(tool => tool.function?.name).filter((name): name is string => !!name) ?? [], system: contentOf(body.messages.find(message => message.role === 'system')?.content) })
     return respond(init)
   })
   const { service, db, workspace } = await setup(fetcher)
@@ -294,6 +296,16 @@ it('每个工作项使用独立上下文，切换不压缩且旧历史不重送'
   expect(relationUnits.length).toBeGreaterThan(0)
   for (const unit of profileUnits) {
     const body = requests.filter(request => request.unitId === unit)
+    expect(body[0].tools).not.toContain('submit_result')
+    expect(body[0].tools).not.toContain('submit_relation_review')
+    expect(body[0].tools).toContain('merge_assets')
+    expect(body[0].tools).toContain('edit_character')
+    expect(body[0].tools).toContain('set_character_relation')
+    expect(body[0].tools).toContain('delete_character_relation')
+    expect(body[0].system).not.toContain('第一步：目录页')
+    expect(body[0].system).not.toContain('第三步：整理人物关系')
+    expect(body[0].system).not.toContain('submit_relation_review')
+    expect(body[0].system).toContain('submit_profile_review')
     expect(body).toHaveLength(1)
     const prompt = contentOf(body[0].messages.find(isInput)!.content)
     expect(prompt).toContain('"kind":"profile"')
@@ -302,6 +314,18 @@ it('每个工作项使用独立上下文，切换不压缩且旧历史不重送'
   }
   for (const unit of relationUnits) {
     const body = requests.filter(request => request.unitId === unit)
+    expect(body[0].tools).not.toContain('submit_result')
+    expect(body[0].tools).not.toContain('submit_profile_review')
+    expect(body[0].tools).toContain('merge_assets')
+    expect(body[0].tools).toContain('edit_character')
+    expect(body[0].tools).toContain('set_character_relation')
+    expect(body[0].tools).toContain('delete_character_relation')
+    expect(body[0].system).not.toContain('第一步：目录页')
+    expect(body[0].system).not.toContain('第二步：优化人物资料')
+    expect(body[0].system).not.toContain('submit_profile_review')
+    expect(body[0].system).toContain('submit_relation_review')
+    expect(body[0].system).toContain('默认直接视为保持')
+    expect(body[0].system).toContain('多个 `targetIds` 批量查询')
     expect(body).toHaveLength(1)
     const prompt = contentOf(body[0].messages.find(isInput)!.content)
     expect(prompt).toContain('"kind":"relations"')
@@ -355,3 +379,451 @@ it.each(['done', 'relations'] as const)('旧规则%s轮保留合并和会话，�
   expect(inputs.filter((input: Record<string, unknown>) => input.step === 'scan')).toHaveLength(0)
 }, 120000)
 
+it('第二步/第三步的 pending 候选优先作为 candidate 工作项，完成后恢复原资料项', async () => {
+  const store = { get: async (table: string, id: string) => table === 'characters' && id === 'C1-P001' ? person('C1-P001', '甲') : undefined } as never
+  const organization = createOrganizationState(['C1-P001'])
+  organization.step = 'profiles'
+  organization.profileItems = [{ id: 'C1-P001', name: '甲', status: 'pending', outcome: null, reason: '', contentFingerprint: '', readRefs: [], commitIds: [] }]
+  organization.candidateGroups = [{ id: 'g1', memberIds: ['C1-P001', 'C1-P002'], memberNames: ['甲', '乙'], reason: '疑似同人', status: 'pending', revision: 1, createdAt: 'x', updatedAt: 'x' }]
+  organization.activeWork = null
+  const candidate = await nextUnit(store, organization)
+  expect(candidate).toMatchObject({ kind: 'candidate', data: { group: { id: 'g1' } } })
+  organization.candidateGroups[0]!.status = 'resolved'
+  const profile = await nextUnit(store, organization)
+  expect(profile?.kind).toBe('profile')
+  expect(profile?.id).toBe('profile:C1-P001')
+})
+
+it('写后只更新当前工作项版本并只失效受影响的资料/关系项', async () => {
+  const store = { get: async (table: string, id: string) => table === 'characters' && id === 'C1-P001' ? { ...person('C1-P001', '甲'), revision: 4 } : table === 'characters' && id === 'C1-P002' ? { ...person('C1-P002', '乙'), revision: 2 } : undefined } as never
+  const run: Record<string, unknown> = { bookId: 'a', organization: {
+    revision: 1, step: 'profiles', activeWork: { kind: 'profile', characterId: 'C1-P001', dataVersion: 1, targetIds: ['C1-P001'] },
+    profileItems: [{ id: 'C1-P001', status: 'checked' }, { id: 'C1-P002', status: 'checked' }],
+    relationItems: [{ id: 'C1-P002', status: 'checked' }],
+    pairChecks: [{ pairKey: '["C1-P001","C1-P002"]', outcome: 'no_change' }, { pairKey: '["C1-P002","C1-P003"]', outcome: 'no_change' }],
+  } }
+  await reconcileOrganizationAfterWrite(store, { phase: 'character_organization' } as never, run, 'edit_character', { id: 'C1-P001' }, { affected: [{ kind: 'character', id: 'C1-P001', revision: 4 }] })
+  const organization = run.organization as { activeWork: { dataVersion: number }; profileItems: Array<{ id: string; status: string }>; relationItems: Array<{ id: string; status: string }>; pairChecks: Array<{ pairKey: string; outcome: string | null }> }
+  expect(organization.activeWork.dataVersion).toBe(4)
+  expect(organization.profileItems.find((item: { id: string }) => item.id === 'C1-P001')!.status).toBe('checked')
+  await reconcileOrganizationAfterWrite(store, { phase: 'character_organization' } as never, run, 'merge_assets', { kind: 'character', keepId: 'C1-P001', memberIds: ['C1-P001', 'C1-P002'] }, { affected: [{ kind: 'character', id: 'C1-P001', revision: 5 }] })
+  expect(organization.profileItems.find((item: { id: string }) => item.id === 'C1-P001')!.status).toBe('checked')
+  expect(organization.profileItems.find((item: { id: string }) => item.id === 'C1-P002')!.status).toBe('pending')
+  expect(organization.relationItems.find((item: { id: string }) => item.id === 'C1-P002')!.status).toBe('pending')
+  expect(organization.pairChecks.find((pair: { pairKey: string }) => pair.pairKey === '["C1-P001","C1-P002"]')!.outcome).toBeNull()
+  expect(organization.pairChecks.find((pair: { pairKey: string }) => pair.pairKey === '["C1-P002","C1-P003"]')!.outcome).toBeNull()
+})
+
+it('关系编辑只失效对应人物对，不重置无关资料和关系项', async () => {
+  const run: Record<string, unknown> = { bookId: 'a', organization: {
+    revision: 1, step: 'relations', activeWork: { kind: 'relations', characterId: 'C1-P002', dataVersion: 1, targetIds: ['C1-P002'] },
+    profileItems: [{ id: 'C1-P001', status: 'checked' }, { id: 'C1-P002', status: 'checked' }],
+    relationItems: [{ id: 'C1-P002', status: 'pending' }, { id: 'C1-P003', status: 'checked' }],
+    pairChecks: [{ pairKey: '["C1-P002","C1-P003"]', outcome: 'no_change' }, { pairKey: '["C1-P001","C1-P003"]', outcome: 'no_change' }],
+  } }
+  await reconcileOrganizationAfterWrite({ get: async () => undefined } as never, { phase: 'character_organization' } as never, run, 'set_character_relation', {}, { pair: { pairKey: '["C1-P002","C1-P003"]' } })
+  const organization = run.organization as { profileItems: Array<{ id: string; status: string }>; relationItems: Array<{ id: string; status: string }>; pairChecks: Array<{ pairKey: string; outcome: string | null }> }
+  expect(organization.profileItems.map(item => item.status)).toEqual(['checked', 'checked'])
+  expect(organization.relationItems.map(item => item.status)).toEqual(['pending', 'checked'])
+  expect(organization.pairChecks.find(pair => pair.pairKey === '["C1-P002","C1-P003"]')!.outcome).toBeNull()
+  expect(organization.pairChecks.find(pair => pair.pairKey === '["C1-P001","C1-P003"]')!.outcome).toBe('no_change')
+})
+
+it('当前人物合并到已有条目时改指保留编号并重查该条目', async () => {
+  const store = { get: async (table: string, id: string) => table === 'characters' && id === 'C1-P002' ? { ...person('C1-P002', '乙'), revision: 2 } : undefined } as never
+  const run: Record<string, unknown> = { bookId: 'a', organization: {
+    revision: 1, step: 'profiles', activeWork: { id: 'profile:C1-P001', kind: 'profile', characterId: 'C1-P001', dataVersion: 1, targetIds: ['C1-P001'], targetId: 'C1-P001' },
+    profileItems: [{ id: 'C1-P001', name: '甲', status: 'pending' }, { id: 'C1-P002', name: '乙', status: 'checked' }],
+    relationItems: [], pairChecks: [],
+  } }
+  await reconcileOrganizationAfterWrite(store, { phase: 'character_organization' } as never, run, 'merge_assets', { kind: 'character', keepId: 'C1-P002', memberIds: ['C1-P001', 'C1-P002'] }, { affected: [{ kind: 'character', id: 'C1-P002', revision: 2 }] })
+  const organization = run.organization as { activeWork: { id: string; characterId: string; targetId: string; dataVersion: number }; profileItems: Array<{ id: string; status: string }> }
+  expect(organization.activeWork).toMatchObject({ id: 'profile:C1-P002', characterId: 'C1-P002', targetId: 'C1-P002', dataVersion: 2 })
+  expect(organization.profileItems).toEqual([{ id: 'C1-P002', name: '乙', status: 'pending', outcome: null, reason: '人物已合并到当前条目，需要重新核对。', lastError: null }])
+})
+
+it('单人物资料整理创建独立运行并复用 P2 profile 工作项', async () => {
+  const fetcher = organizationFetcher()
+  const { db, service } = await setup(fetcher)
+  const beforeProgress = await db.table('compileProgress').get('P2')
+  let started = false
+  const finished = new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('单人物整理超时。')), 120000)
+    const unsubscribe = service.subscribe(() => {
+      const state = service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  const runId = await service.startCharacterOrganization('a', 'C1-P001', 'profile')
+  await finished
+  const run = await db.table('pipelineRuns').get(runId)
+  expect(run.scope).toBe('character')
+  expect(run.organization.mode).toBe('profile')
+  expect(run.organization.targetCharacterId).toBe('C1-P001')
+  expect(run.organization.profileItems).toHaveLength(1)
+  expect(run.organization.profileItems[0]).toMatchObject({ id: 'C1-P001', status: 'checked' })
+  expect(run.organization.relationItems).toHaveLength(0)
+  expect(run.organization.step).toBe('done')
+  expect(await db.table('compileProgress').get('P2')).toEqual(beforeProgress)
+}, 120000)
+
+it('单人物关系整理创建独立运行并归入 relations 工作项', async () => {
+  const fetcher = organizationFetcher()
+  const { db, service } = await setup(fetcher)
+  let started = false
+  const finished = new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('单人物关系整理超时。')), 120000)
+    const unsubscribe = service.subscribe(() => {
+      const state = service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  const runId = await service.startCharacterOrganization('a', 'C1-P001', 'relations')
+  await finished
+  const run = await db.table('pipelineRuns').get(runId)
+  expect(run.scope).toBe('character')
+  expect(run.organization.mode).toBe('relations')
+  expect(run.organization.targetCharacterId).toBe('C1-P001')
+  expect(run.organization.profileItems).toHaveLength(0)
+  expect(run.organization.relationItems).toHaveLength(1)
+  expect(run.organization.relationItems[0]).toMatchObject({ id: 'C1-P001', status: 'checked' })
+  expect(run.organization.step).toBe('done')
+}, 120000)
+
+it('单人物整理不改变完整三步统计和 compileProgress', async () => {
+  const { db, service } = await setup()
+  await service.startOrganization('a')
+  const full = (await service.reports('a')).find(row => row.workflow === 'character_organization_v1' && row.scope !== 'character')!
+  const summary = full.report.organizationSummary
+  const progress = await db.table('compileProgress').get('P2')
+  let started = false
+  const finished = new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('单人物整理超时。')), 120000)
+    const unsubscribe = service.subscribe(() => {
+      const state = service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  await service.startCharacterOrganization('a', 'C1-P001', 'profile')
+  await finished
+  const after = (await service.reports('a')).find(row => row.id === full.id)!
+  expect(after.report.organizationSummary).toEqual(summary)
+  expect(await db.table('compileProgress').get('P2')).toEqual(progress)
+  expect((await service.reports('a')).filter(row => row.scope === 'character')).toHaveLength(1)
+}, 120000)
+
+it('三个步骤可以独立启动且不会自动串到下一步', async () => {
+  const { db, service } = await setup()
+  const wait = () => new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('步骤运行超时。')), 120000)
+    const unsubscribe = service.subscribe(() => {
+      const state = service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  const scan = wait(); const scanId = await service.startOrganizationStep('a', 'scan'); await scan
+  const scanRun = await db.table('pipelineRuns').get(scanId)
+  expect(scanRun.organization.runStep).toBe('scan')
+  expect(scanRun.organization.step).toBe('done')
+  expect(scanRun.organization.profileItems).toHaveLength(0)
+  expect(scanRun.organization.relationItems).toHaveLength(0)
+
+  const profiles = wait(); const profileId = await service.startOrganizationStep('a', 'profiles'); await profiles
+  const profileRun = await db.table('pipelineRuns').get(profileId)
+  expect(profileRun.organization.runStep).toBe('profiles')
+  expect(profileRun.organization.profileItems.length).toBeGreaterThan(0)
+  expect(profileRun.organization.relationItems).toHaveLength(0)
+  expect(profileRun.organization.step).toBe('done')
+
+  const relations = wait(); const relationId = await service.startOrganizationStep('a', 'relations'); await relations
+  const relationRun = await db.table('pipelineRuns').get(relationId)
+  expect(relationRun.organization.runStep).toBe('relations')
+  expect(relationRun.organization.profileItems).toHaveLength(0)
+  expect(relationRun.organization.relationItems.length).toBeGreaterThan(0)
+  expect(relationRun.organization.step).toBe('done')
+  expect(relationRun.organization.statisticsPending).toBe(false)
+}, 120000)
+
+it('暂停保留同一运行，继续后不新建任务', async () => {
+  let held = false, release: () => void = () => undefined
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string) as { messages: { role: string; content: unknown }[] }
+    const input = parse([...body.messages].reverse().find(isInput)?.content)
+    const work = input.work as Record<string, unknown> | undefined
+    if (!held && work?.kind === 'relations') { held = true; await gate }
+    return respond(init)!
+  })
+  const { db, service } = await setup(fetcher)
+  const wait = () => new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('步骤运行超时。')), 120000)
+    const unsubscribe = service.subscribe(() => {
+      const state = service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  const first = wait(); const runId = await service.startOrganizationStep('a', 'relations')
+  await expect.poll(() => held, { timeout: 10000 }).toBe(true)
+  await service.pauseOrganization('a')
+  release()
+  await first
+  const paused = await db.table('pipelineRuns').get(runId)
+  expect(paused.status).toBe('paused')
+  expect(service.state('a')?.paused).toBe(true)
+  const second = wait(); const continued = await service.continueOrganization('a'); await second
+  expect(continued).toBe(runId)
+  expect((await db.table('pipelineRuns').get(runId)).status).toBe('completed')
+}, 120000)
+
+it('取消废弃旧队列，下一次开始创建新 runId', async () => {
+  let held = false, release: () => void = () => undefined
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string) as { messages: { role: string; content: unknown }[] }
+    const input = parse([...body.messages].reverse().find(isInput)?.content)
+    const work = input.work as Record<string, unknown> | undefined
+    if (!held && work?.kind === 'relations') { held = true; await gate }
+    return respond(init)!
+  })
+  const { db, service } = await setup(fetcher)
+  const wait = () => new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('步骤运行超时。')), 120000)
+    const unsubscribe = service.subscribe(() => {
+      const state = service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  const first = wait(); const oldId = await service.startOrganizationStep('a', 'relations')
+  await expect.poll(() => held, { timeout: 10000 }).toBe(true)
+  await service.cancelOrganization('a')
+  release()
+  await first
+  expect((await db.table('pipelineRuns').get(oldId)).status).toBe('cancelled')
+  const second = wait(); const newId = await service.startOrganizationStep('a', 'relations'); await second
+  expect(newId).not.toBe(oldId)
+  expect((await db.table('pipelineRuns').get(newId)).status).toBe('completed')
+}, 120000)
+
+it('窗口关闭后租约过期，恢复为可继续并保留当前人物', async () => {
+  const { db, service } = await setup()
+  const organization = createOrganizationState(['C1-P001'])
+  organization.mode = 'profile'
+  organization.targetCharacterId = 'C1-P001'
+  organization.step = 'profiles'
+  organization.scanPages = []
+  organization.profileItems = [{ id: 'C1-P001', name: '沈青', status: 'pending', outcome: null, reason: '', contentFingerprint: '', readRefs: [], commitIds: [] }]
+  organization.activeWork = { id: 'profile:C1-P001', kind: 'profile', characterId: 'C1-P001', contextId: 'profiles', status: 'running', requestCount: 0, draft: null, commitIds: [], dataVersion: 1 }
+  const runId = 'crashed-run'
+  await db.table('pipelineRuns').put({
+    id: runId, recordType: 'run', bookId: 'a', stage: 'P2', phase: 'character_organization', workflow: 'character_organization_v1', scope: 'character',
+    organization, status: 'running', startedAt: new Date().toISOString(), planVersion: '2.2', tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent',
+    report: { status: 'running', failed: [], conflicted: [], groups: [], optimizedIds: [], skipped: [], beforeCounts: { characters: 4, locations: 0 }, afterCounts: { characters: 4, locations: 0 }, cost: 0, usage: { input: 0, output: 0, totalTokens: 0, cost: 0 }, externalChanges: [] },
+  })
+  await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId: 'a', lockKey: 'world', owner: 'old', runId, expiresAt: Date.now() - 1 })
+  await service.recoverOrganization('a')
+  const recovered = await db.table('pipelineRuns').get(runId)
+  expect(recovered.status).toBe('paused')
+  expect(recovered.organization.activeWork).toMatchObject({ kind: 'profile', characterId: 'C1-P001' })
+  expect(await db.table('pipelineRuns').get('lease:world')).toBeUndefined()
+  const finished = new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('恢复人物整理超时。')), 120000)
+    const unsubscribe = service.subscribe(() => {
+      const state = service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  expect(await service.continueCharacterOrganization('a', 'C1-P001')).toBe(runId)
+  await finished
+  const completed = await db.table('pipelineRuns').get(runId)
+  expect(completed.status).toBe('completed')
+  expect(completed.organization.profileItems[0]).toMatchObject({ id: 'C1-P001', status: 'checked' })
+}, 120000)
+
+it('P2 全书、按步骤和单人物入口都只有一套周期心跳', async () => {
+  const original = globalThis.setInterval
+  const intervals: number[] = []
+  const spy = vi.spyOn(globalThis, 'setInterval').mockImplementation(((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+    if (timeout === 8000) intervals.push(timeout)
+    return original(handler, timeout, ...args)
+  }) as typeof setInterval)
+  const wait = (service: ReturnType<typeof createWorldService>) => new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('人物整理超时。')), 120000)
+    const unsubscribe = service.subscribe(() => {
+      const state = service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  try {
+    for (const mode of ['full', 'step', 'character'] as const) {
+      intervals.length = 0
+      const { service } = await setup()
+      const finished = wait(service)
+      if (mode === 'full') await service.startOrganization('a')
+      else if (mode === 'step') await service.startOrganizationStep('a', 'profiles')
+      else await service.startCharacterOrganization('a', 'C1-P001', 'profile')
+      await finished
+      expect(intervals, mode).toHaveLength(1)
+    }
+  } finally { spy.mockRestore() }
+}, 180000)
+
+it('连续三次心跳只暂时无法确认执行权时，保留当前人物并暂停而不是取消', async () => {
+  let failing = false
+  let first = true
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init!.body as string) as { messages: { role: string; content: unknown }[] }
+    const input = parse([...body.messages].reverse().find(isInput)?.content)
+    const work = input.work as Record<string, unknown> | undefined
+    if (first && work?.kind === 'profile') {
+      first = false
+      failing = true
+      await new Promise<void>((_, reject) => init!.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true }))
+    }
+    return respond(init)!
+  })
+  const fixture = await setup(fetcher)
+  const table = fixture.db.table('pipelineRuns') as unknown as { hook(name: string, fn?: (...args: unknown[]) => void): { unsubscribe(fn: unknown): void } }
+  const hook = (...args: unknown[]) => {
+    const mods = args[0] as Record<string, unknown>
+    if (failing && mods.expiresAt !== undefined) throw new Error('CONFLICT:资料在提交前持续变化，请重新读取后继续。')
+  }
+  table.hook('updating', hook)
+  const original = globalThis.setInterval
+  const spy = vi.spyOn(globalThis, 'setInterval').mockImplementation(((handler: TimerHandler, timeout?: number, ...args: unknown[]) => original(handler, timeout === 8000 ? 20 : timeout, ...args)) as typeof setInterval)
+  const finished = new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('心跳暂停超时。')), 120000)
+    const unsubscribe = fixture.service.subscribe(() => {
+      const state = fixture.service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  const runId = await fixture.service.startCharacterOrganization('a', 'C1-P001', 'profile')
+  await finished
+  spy.mockRestore(); table.hook('updating').unsubscribe(hook)
+  const paused = await fixture.db.table('pipelineRuns').get(runId)
+  expect(paused.status).toBe('paused')
+  expect(fixture.service.state('a')?.error).toContain('暂停')
+  expect(fixture.service.state('a')?.error).not.toContain('取消')
+  expect(paused.organization.activeWork).toMatchObject({ kind: 'profile', characterId: 'C1-P001' })
+  expect(paused.organization.profileItems[0].status).toBe('pending')
+  failing = false
+  const resumed = new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('心跳暂停继续超时。')), 120000)
+    const unsubscribe = fixture.service.subscribe(() => {
+      const state = fixture.service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  expect(await fixture.service.continueCharacterOrganization('a', 'C1-P001')).toBe(runId)
+  await resumed
+  const completed = await fixture.db.table('pipelineRuns').get(runId)
+  expect(completed.status).toBe('completed')
+  expect(completed.organization.profileItems[0]).toMatchObject({ id: 'C1-P001', status: 'checked' })
+}, 180000)
+
+it('提交成功但回执丢失时，恢复入口不会重复写库', async () => {
+  const character = { ...person('C1-P001', '沈青'), personality: '旧资料' }
+  const activeWork = { id: 'profile:C1-P001', kind: 'profile', characterId: 'C1-P001', contextId: 'profiles', status: 'running', requestCount: 0, draft: null, commitIds: [], dataVersion: 1 }
+  const organization = {
+    version: 1, step: 'profiles', revision: 1, mode: 'profile', targetCharacterId: 'C1-P001', scanIds: [], scanPages: [], candidateGroups: [], candidateDecisions: [],
+    profileItems: [{ id: 'C1-P001', name: '沈青', status: 'pending', outcome: null, reason: '', contentFingerprint: '', readRefs: [], commitIds: [] }],
+    relationItems: [], pairChecks: [], statisticsPending: false, activeWork,
+    contexts: { identity: { id: 'identity', status: 'completed', pendingWorkId: null }, profiles: { id: 'profiles', status: 'active', pendingWorkId: 'profile:C1-P001' }, relations: { id: 'relations', status: 'pending', pendingWorkId: null } },
+    executionVersion: 4,
+  }
+  const task = (taskId: string) => ({ taskId, ordinal: 0, callId: crypto.randomUUID(), phase: 'character_organization', status: 'running', workItemIds: ['organization:profile:C1-P001'], input: { workItems: [] }, inputFingerprint: '', promptHash: '', attempt: 0, repairCount: 0, stepsUsed: 0, appliedCommitIds: [], reviewedItems: [], readSet: { records: [], queries: [] }, createdAt: '', updatedAt: '' })
+  const run = { id: 'run', bookId: 'a', recordType: 'run', stage: 'P2', phase: 'character_organization', workflow: 'character_organization_v1', status: 'running', startedAt: '', report: {}, organization, tasks: [task('task-1'), task('task-2')], commandIntents: [], appliedCommands: [] }
+  const repo = createMemoryAgentRepository('a', {
+    characters: [character],
+    pipelineRuns: [run, { id: 'lease:world', bookId: 'a', recordType: 'lease', lockKey: 'world', owner: 'owner', runId: 'run', expiresAt: Date.now() + 30000 }],
+    storySessions: [{ id: 'session', bookId: 'a', profile: 'asset_editor', workflow: 'character_organization_v1', runId: 'run', leaseOwner: 'owner', leaseUntil: Date.now() + 30000, nextOrdinal: 0, leafId: null }],
+  })
+  const scope = (taskId: string) => ({ bookId: 'a', profile: 'asset_editor' as const, phase: 'character_organization', workflow: 'character_organization_v1' as const, runId: 'run', taskId, owner: 'owner', sessionId: 'session', workItemIds: ['organization:profile:C1-P001'], contextId: 'profiles', unitId: 'profile:C1-P001', organizationWorkKind: 'profile' as const })
+  const args = { patch: { personality: '新资料' }, done: true, reason: '整理人物资料' }
+  const first = createAgentTools(repo, scope('task-1')).tools.find(tool => tool.name === 'submit_profile_review')!
+  await first.execute('call-1', args)
+  const afterFirst = await repo.transaction(false, store => store.get('characters', 'C1-P001'))
+  expect(afterFirst).toMatchObject({ personality: '新资料', revision: 2 })
+  const second = createAgentTools(repo, scope('task-2')).tools.find(tool => tool.name === 'submit_profile_review')!
+  const result = await second.execute('call-2', args) as { content: { type: string; text: string }[] }
+  const ack = JSON.parse(result.content[0]!.text) as { alreadyApplied?: boolean }
+  expect(ack.alreadyApplied).toBe(true)
+  expect(await repo.transaction(false, store => store.get('characters', 'C1-P001'))).toMatchObject({ personality: '新资料', revision: 2 })
+  const saved = await repo.transaction(false, store => store.get('pipelineRuns', 'run'))
+  expect(saved?.appliedCommands).toHaveLength(1)
+}, 120000)
+
+it('人物资料提交前发生快照冲突时保留当前人物，继续后仍处理同一人物', async () => {
+  let block = true
+  let failures = 0
+  const requests: string[] = []
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init!.body as string) as { messages: { role: string; content: unknown }[] }
+    const input = parse([...body.messages].reverse().find(isInput)?.content)
+    const work = input.work as Record<string, unknown> | undefined
+    if (work?.kind === 'profile') requests.push(String((work.data as Record<string, unknown>).id))
+    return respond(init)!
+  })
+  const fixture = await setup(fetcher)
+  const hook = (...args: unknown[]) => {
+    const mods = args[0] as Record<string, unknown>
+    const current = args[2] as Record<string, unknown>
+    const before = Array.isArray(current?.appliedCommands) ? current.appliedCommands.length : 0
+    const after = Array.isArray(mods.appliedCommands) ? mods.appliedCommands.length : before
+    if (!block || after <= before) return
+    if (++failures > 3) return
+    throw new Error('CONFLICT:资料在提交前持续变化，请重新读取后继续。')
+  }
+  const table = fixture.db.table('pipelineRuns') as unknown as { hook(name: string, fn?: (...args: unknown[]) => void): { unsubscribe(fn: unknown): void } }
+  table.hook('updating', hook)
+  const finished = new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('单人物整理超时。')), 120000)
+    const unsubscribe = fixture.service.subscribe(() => {
+      const state = fixture.service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  const runId = await fixture.service.startCharacterOrganization('a', 'C1-P001', 'profile')
+  await finished
+  block = false
+  const paused = await fixture.db.table('pipelineRuns').get(runId)
+  expect(paused.status).toBe('paused')
+  expect(paused.organization.activeWork).toMatchObject({ kind: 'profile', characterId: 'C1-P001' })
+  expect(paused.organization.profileItems[0].status).toBe('pending')
+  const before = requests.filter(id => id === 'C1-P001').length
+  const resumedFinished = new Promise<void>((resolve, reject) => {
+    let started = false
+    const timeout = setTimeout(() => reject(new Error('继续整理超时。')), 120000)
+    const unsubscribe = fixture.service.subscribe(() => {
+      const state = fixture.service.state('a')
+      if (state?.running) started = true
+      if (started && !state?.running) { clearTimeout(timeout); unsubscribe(); resolve() }
+    })
+  })
+  expect(await fixture.service.continueCharacterOrganization('a', 'C1-P001')).toBe(runId)
+  await resumedFinished
+  expect(requests.filter(id => id === 'C1-P001').length).toBeGreaterThan(before)
+  const completed = await fixture.db.table('pipelineRuns').get(runId)
+  expect(completed.status).toBe('completed')
+  expect(completed.organization.profileItems[0]).toMatchObject({ id: 'C1-P001', status: 'checked' })
+  table.hook('updating').unsubscribe(hook)
+}, 120000)

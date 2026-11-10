@@ -1,5 +1,8 @@
 # 实施设计
 
+> 2026-11-08 后续变更：P2 提示词与默认工具按工作项拆分见 [BUG-34](../step-specific-organization-prompts/proposal.md)。本文件中“提示词/工具集不随步骤变化”的旧条款由该变更替代；跨步骤查询、候选、合并、资料/关系纠错仍保留。
+
+
 REQ-019；确认依据和修改范围见[提案](proposal.md)，验证见[验收](acceptance.md)。采用现有Pi运行器、资产服务和事务，在本书内完成统一后台整理。BUG-32改为分步骤、逐工作项输入；历史存档、工作上下文、进度分别维护，具体字段与执行规则见文末BUG-32设计。模型配置、P1启动门槛和代码整理入口保留。
 
 ## 流程与模块
@@ -296,3 +299,12 @@ summary压缩仍须修复：同一动态约束生成提示词、工具Schema和�
 报告“请求与用量”按步骤→人物→请求展示，关系涉及哪些目标编号作为请求/修改详情。用户可查或导出普通、失败、压缩和修正过程；费用未知明确标识。无需开发聊天输入或额外模型总结。
 
 任务10及[B32验收](acceptance.md#bug-32-修复验收计划)按本v3执行。先固定响应验证路径，再经用户授权用单人物和8人副本观察质量、每次实际输入与费用；不再用固定请求数或token额度代替真实质量验收。
+
+## 运行稳定性修复（2026-11-10）
+
+- **租约快照。** `pipelineRuns` 的租约行和 `storySessions` 的会话租约在快照比较中忽略 `expiresAt`/`leaseUntil`，owner/runId/lockKey 仍参与比较。业务写入事务增加租约守卫：真实过期、owner/runId 变化或会话所有权变化时拒绝提交，不关闭真实 revision/fingerprint 校验。
+- **心跳职责。** P2 只保留 service 层 8 秒心跳，runtime 不再为人物整理启动第二套心跳；P3 保留 service 与 runtime 既有职责。心跳失败分类为暂时无法确认和真实丢失执行权：暂时失败最多重试三拍，仍失败则保留 `activeWork` 并暂停为可继续；真实丢失立即停止旧执行者。用户主动取消仍记为取消。
+- **同书单任务。** 同一本书的 P1/P2/P3 启动入口在 service/租约事务内互相检查，不能只靠 UI 禁用；不同书籍使用不同数据库，可各自运行。P1 世界/叙事两条 lane 仍是同一 P1 任务内的并行执行，不作为跨阶段并行。
+- **单人物恢复。** 可恢复快照冲突、暂时无法确认执行权或用户暂停时，保留当前人物、工作项、已完成提交和会话；继续复用原 run/workItem。`submit_profile_review`/`submit_relation_review` 的稳定 operationKey 不包含 taskId，丢失回执后命中原 `appliedCommands`，不重复写库；启动前缺少会话时补建组织会话。
+
+检查入口：`tests/concurrency.test.ts`、`tests/organization.test.ts`、`tests/lease-heartbeat.test.ts`；运行类型、非 live 测试、构建、治理和 OpenSpec 校验。

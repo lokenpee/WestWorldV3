@@ -17,7 +17,7 @@ afterEach(async () => {
   }
 })
 
-it('P3占用叙事资源时P2暂缓叙事项并保留待继续，已提交世界项不回滚', async () => {
+it('P3占用叙事资源时P2启动被拒绝，已有世界项不回滚', async () => {
   const prefix = `asset-review-conflict-${crypto.randomUUID()}`
   const workspace = createWorkspace({ settingsName: `${prefix}-settings`, bookPrefix: `${prefix}-book-` }); opened.push(workspace)
   await workspace.settings.books.put({ id: 'a', title: '冲突样本', sourceFileName: 'a.txt', createdAt: new Date().toISOString() })
@@ -53,9 +53,8 @@ it('P3占用叙事资源时P2暂缓叙事项并保留待继续，已提交世界
   await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://asset-review-conflict.invalid/v1', aggregationContextWindow: 65536 }, 'fake-key')
   const world = createWorldService(workspace, models, assets)
   await world.start('a')
-  const report = (await world.reports('a'))[0]
-  expect(report.status).toBe('paused')
-  expect(report.assetReview?.items.find(item => item.id === node.id)?.status).toBe('deferred')
+  expect(world.state('a')?.error).toContain('已有')
+  expect(await world.reports('a')).toHaveLength(0)
   expect(await db.table('nodes').get(node.id)).toMatchObject({ summary: '沈青收信' })
   expect(await db.table('pipelineRuns').get('lease:narrative')).toMatchObject({ owner: 'p3-owner' })
 }, 30000)

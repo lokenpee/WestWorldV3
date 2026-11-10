@@ -59,8 +59,8 @@ export function createModelService(workspace: ReturnType<typeof createWorkspace>
         const headers: Record<string, string> = config.api === 'anthropic-messages' ? { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' } : { Authorization: `Bearer ${apiKey}` }
         for (let retry = 0; ; retry++) {
           controller.signal.throwIfAborted()
-          const attempt: Attempt = { ordinal: attempts.length + 1, turn: 1, elapsedMs: 0 }; attempts.push(attempt)
           const requestStarted = now()
+          const attempt: Attempt = { ordinal: attempts.length + 1, turn: 1, elapsedMs: 0, startedAt: new Date(requestStarted).toISOString() }; attempts.push(attempt)
           let retryAfter: string | undefined
           options.onProgress?.({ state: 'requesting', attempts: attempts.length })
           try {
@@ -70,11 +70,11 @@ export function createModelService(workspace: ReturnType<typeof createWorkspace>
             let body: unknown
             try { body = await response.json() } catch { throw new ModelError('validation', '模型目录返回了无效的 JSON 数据。') }
             if (!body || typeof body !== 'object' || !('data' in body) || !Array.isArray(body.data) || !body.data.every(row => !!row && typeof row === 'object' && typeof row.id === 'string' && row.id.trim())) throw new ModelError('validation', '模型目录结构不正确。')
-            attempt.elapsedMs = now() - requestStarted
+            attempt.elapsedMs = now() - requestStarted; attempt.finishedAt = new Date(now()).toISOString()
             const modelIds = [...new Set(body.data.map(row => row.id as string))].sort()
             return { ok: true, mode, text: `发现 ${modelIds.length} 个模型。`, modelIds, connection, elapsedMs: now() - started, attempts, usage: summarizeUsage(attempts) }
           } catch (error) {
-            attempt.elapsedMs = now() - requestStarted
+            attempt.elapsedMs = now() - requestStarted; attempt.finishedAt = new Date(now()).toISOString()
             const failure = classifyError(controller.signal.aborted ? controller.signal.reason : error, [key], attempt.status)
             attempt.errorKind = failure.kind
             if (!retryable(failure.kind) || retry >= 2 || controller.signal.aborted) throw new ModelError(failure.kind, failure.message, failure.status)

@@ -14,7 +14,10 @@ const storageSchema = JSON.parse(storageText) as TSchema
 export const inputSchema = (name: string): TSchema => ({ ...storageSchema, $ref: `#/$defs/${name}` })
 export interface Summary { status: 'completed' | 'partial'; commitIds: string[]; summary: string; remainingWorkIds: string[]; reviewedItems: { workItemId: string; outcome: string; reason: string }[] }
 export function validate(schema: TSchema, value: unknown, message = 'INVALID_ARGS:工具参数不符合要求。'): void {
-  if (!Value.Check(schema, value)) throw new Error(message)
+  if (!Value.Check(schema, value)) {
+    const details = [...Value.Errors(schema, value)].slice(0, 5).map(error => `${error.instancePath || error.schemaPath || '/'}：${error.message}`)
+    throw new Error(details.length ? `${message} ${details.join('；')}` : message)
+  }
 }
 export const canonical = (value: unknown): string => Array.isArray(value) ? `[${value.map(canonical).join(',')}]` : value && typeof value === 'object' ? `{${Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(',')}}` : JSON.stringify(value)
 export async function hash(value: unknown) {

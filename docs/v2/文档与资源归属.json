@@ -2185,7 +2185,7 @@
     },
     {
       "source": "docs/v2/10-字段级数据流与状态转移.md",
-      "heading": "DF-03 · 独立P2与P3并行、事件原子提交",
+      "heading": "DF-03 · 同书P2或P3单任务、事件原子提交",
       "anchor": "df-03--独立p2与p3并行事件原子提交",
       "owner": "docs/v2/10-字段级数据流与状态转移.md",
       "status": "技术契约"
@@ -4259,7 +4259,7 @@
       "consumers": [
         "src/features/agents/runtime.ts"
       ],
-      "sha256": "162538298edbd25dde29a5eb4ad59e1683f5993a90b6a89a56f5278746780842"
+      "sha256": "65dccc226e322e8432de4c3a26d92cffa171ff7cb57b3bc9313311d4e291cbe2"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/character-optimize.md",
@@ -4299,7 +4299,7 @@
       "consumers": [
         "src/features/extraction/contracts.ts"
       ],
-      "sha256": "46fbecb56eba356b932c7a995364db7d45742d5ac5d6f894feba56835bffaef0"
+      "sha256": "511c50d53b15d664b29b899b63ec4aa5248f7e6e54ecf2c4947ade254d9919af"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p1-world.md",
@@ -4307,7 +4307,7 @@
       "consumers": [
         "src/features/extraction/contracts.ts"
       ],
-      "sha256": "c656c5b7ae2468e70f386722d8b34f512ab1729fcddac126b06cc1886e211770"
+      "sha256": "3aa290e27b35fb3ed12eab727ecf9df653443b599413d65d5089ba137ad2bd5e"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-identity.md",
@@ -4315,7 +4315,7 @@
       "consumers": [
         "src/features/world/service.ts"
       ],
-      "sha256": "a61388666cb7f6e7e15ebea24b4e238870cadec13ae3067bf9824c05a67ded45"
+      "sha256": "1fa93fbaaef0861f037447e61c4ec6bd1c931becca9f360606856c9cb4f1aa98"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p3-story.md",
@@ -4324,7 +4324,7 @@
         "src/features/story/review.ts",
         "src/features/story/service.ts"
       ],
-      "sha256": "20921fd650201736751983fd0e1ed6cae732d2b6e93e89135fa7e1c7bacebf6a"
+      "sha256": "b50c0c52bdda64583c7ee84927852a81ded88de6ec4b23f91e68e2515ecb614f"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/probe_asset.txt",
@@ -4365,7 +4365,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "1b9eb634590d88aa9d4f48843412df53160b36a7bfbfbd43ecc5a7b72ffb0b50"
+      "sha256": "f90bcebfc01ef41264fd3c43099e07c116e1f675cfcc51c6ea877681c7461e96"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4373,7 +4373,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "2c6f31315ea8600cc4ed678ed0c328c8cba2bef91d9754e7f579273c294f2eff"
+      "sha256": "44f5e18d1b60a9b8829769229e80edba30b7ea3909aff6d7985ce19f5f265d27"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4400,12 +4400,44 @@
       "sha256": "4b3ca7719b9359f620d2eb98c8e145911ffa56e5b48696f9810039be5c5738f4"
     },
     {
-      "path": "docs/v2/resources/v2.2/prompts/active/p2-character-organization.md",
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-base.md",
       "role": "运行时权威资源",
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "1868803217ede17ccca6313c1c73c51e9caac1fa4102d3e66327fbfef8e9fb02"
+      "sha256": "24bc3e1434cb7f78adc8ae21a540c28893b3f9f40814facb228ef71a467cf832"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-directory.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ],
+      "sha256": "8b2c09722cfcc36698b390fa9a7586e2ef3d7777e10a57842f072cd893e87b39"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-candidate.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ],
+      "sha256": "c1f75ac6f50c13a4c3144685cd26f1fac597e7d2c1f5df242d274923e62457b8"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-profiles.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ],
+      "sha256": "b6e90a7bda83f741e5cfa26ab4c002280652cc539deb2071d58d35c6c1cf5fa5"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-relations.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ],
+      "sha256": "58ae58ab412c519f1ad7890d1bda25aca8fd2c35f8bb402fee941fd97600ff8a"
     }
   ],
   "decisions": [

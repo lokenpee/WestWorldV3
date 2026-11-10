@@ -120,17 +120,17 @@
     },
     {
       "id": "DF-03",
-      "title": "独立P2与P3并行、事件原子提交",
+      "title": "同书P2或P3单任务、事件原子提交",
       "trigger": "OP-28",
       "steps": [
         {
           "input": "startP2/startP3",
-          "read": "全书P1凭证、资源lease",
-          "transform": "各取world/narrative，互不获取对方资源",
+          "read": "全书P1凭证、本书全部活动lease",
+          "transform": "同书已有P1/P2/P3活动任务则拒绝；取得world或narrative后不并行另一阶段",
           "write": "各自T12/T20",
           "commit": "资源获取同事务",
-          "failure": "同stage重入拒绝；P1不全阻止",
-          "consumer": "两个阶段卡独立显示"
+          "failure": "同书活动任务拒绝；P1不全阻止",
+          "consumer": "只显示当前阶段卡；其他阶段按钮不可启动"
         },
         {
           "input": "P3窗口/全书单元",

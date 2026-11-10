@@ -702,7 +702,10 @@
           "type": "string"
         },
         "scope": {
-          "const": "fullBook"
+          "enum": [
+            "fullBook",
+            "character"
+          ]
         },
         "inputFingerprint": {
           "type": "string"
@@ -6107,6 +6110,12 @@
               },
               "quote": {
                 "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
               }
             }
           }
@@ -6217,6 +6226,12 @@
               },
               "quote": {
                 "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
               }
             }
           }
@@ -6226,6 +6241,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "evidenceStatus": {
+          "enum": [
+            "verified",
+            "unverified",
+            "partial"
+          ]
         },
         "legacyRecordIds": {
           "type": "array",
@@ -6374,6 +6396,12 @@
               },
               "quote": {
                 "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              },
+              "reason": {
+                "type": "string"
               }
             }
           }
@@ -6385,6 +6413,17 @@
           "enum": [
             "manual",
             "agent"
+          ]
+        },
+        "writeSeq": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidenceStatus": {
+          "enum": [
+            "verified",
+            "unverified",
+            "partial"
           ]
         },
         "basis": {
@@ -6813,6 +6852,14 @@
             "type": "string"
           }
         },
+        "originStep": {
+          "enum": [
+            "scan",
+            "resolve",
+            "profiles",
+            "relations"
+          ]
+        },
         "lastError": {
           "$ref": "#/$defs/OrganizationWorkError"
         }
@@ -6873,6 +6920,14 @@
         },
         "createdAt": {
           "type": "string"
+        },
+        "originStep": {
+          "enum": [
+            "scan",
+            "resolve",
+            "profiles",
+            "relations"
+          ]
         }
       }
     },
@@ -6996,6 +7051,13 @@
         },
         "readFingerprint": {
           "type": "string"
+        },
+        "evidenceStatus": {
+          "enum": [
+            "verified",
+            "unverified",
+            "partial"
+          ]
         }
       }
     },
@@ -7032,6 +7094,27 @@
         "revision": {
           "type": "integer",
           "minimum": 1
+        },
+        "mode": {
+          "enum": [
+            "full",
+            "profile",
+            "relations"
+          ]
+        },
+        "targetCharacterId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runStep": {
+          "enum": [
+            "scan",
+            "profiles",
+            "relations"
+          ]
+        },
+        "pauseRequested": {
+          "type": "boolean"
         },
         "scanIds": {
           "type": "array",
@@ -7643,6 +7726,14 @@
         "attemptId": {
           "type": "string",
           "minLength": 1
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "turn": {
+          "type": "integer",
+          "minimum": 1
         },
         "requestId": {
           "type": "string",

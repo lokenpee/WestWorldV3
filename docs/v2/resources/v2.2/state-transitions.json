@@ -21,9 +21,9 @@
       "object": "P2或P3",
       "from": "idle/stale/failed/paused/cancelled/completed",
       "event": "启动/重跑",
-      "guard": "全书P1 current，同stage可得",
+      "guard": "全书P1 current，同书无其他P1/P2/P3活动任务",
       "to": "running",
-      "effect": "P2/P3可同时running；原会话续用"
+      "effect": "同书P2/P3不可同时running；原会话续用"
     },
     {
       "object": "P2",
