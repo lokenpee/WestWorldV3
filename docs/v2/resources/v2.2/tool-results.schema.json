@@ -5963,7 +5963,44 @@
     {
       "name": "submit_relation_review",
       "success": {
-        "type": "object"
+        "type": "object",
+        "required": ["ok", "status", "operationKey", "alreadyApplied", "summary", "done", "complete", "changed", "outcome", "applied", "cumulativeApplied", "unverified", "uncertain", "failed"],
+        "properties": {
+          "ok": { "type": "boolean" },
+          "status": { "enum": ["succeeded", "partial", "failed"] },
+          "commitId": { "type": "string", "minLength": 1 },
+          "operationKey": { "type": "string", "minLength": 1 },
+          "alreadyApplied": { "type": "boolean" },
+          "summary": { "type": "string" },
+          "done": { "type": "boolean" },
+          "complete": { "type": "boolean" },
+          "changed": { "type": "boolean" },
+          "outcome": { "enum": ["changed", "no_change", "uncertain"] },
+          "applied": { "type": "array", "items": { "type": "string" } },
+          "cumulativeApplied": { "type": "array", "items": { "type": "string" } },
+          "unverified": { "type": "array", "items": { "type": "string" } },
+          "uncertain": { "type": "array", "items": { "type": "string" } },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["targetId", "code", "message", "recoverable", "repeated", "action"],
+              "properties": {
+                "targetId": { "type": "string" },
+                "code": { "type": "string" },
+                "message": { "type": "string" },
+                "recoverable": { "type": "boolean" },
+                "repeated": { "type": "boolean" },
+                "action": { "type": "string" }
+              }
+            }
+          }
+        },
+        "anyOf": [
+          { "properties": { "status": { "const": "succeeded" }, "ok": { "const": true }, "failed": { "maxItems": 0 } }, "required": ["commitId"] },
+          { "properties": { "status": { "const": "partial" }, "ok": { "const": false }, "done": { "const": false }, "complete": { "const": false }, "failed": { "minItems": 1 } }, "required": ["commitId"] },
+          { "properties": { "status": { "const": "failed" }, "ok": { "const": false }, "done": { "const": false }, "complete": { "const": false }, "changed": { "const": false }, "applied": { "maxItems": 0 }, "failed": { "minItems": 1 } }, "not": { "required": ["commitId"] } }
+        ]
       }
     }
   ],

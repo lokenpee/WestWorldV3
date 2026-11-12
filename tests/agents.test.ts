@@ -361,3 +361,75 @@ it('改写的引文反馈章节和逐字核对要求', async () => {
   fixture.args.payload.groups[0].evidence[0].quote = '原文没有这句话。'
   await expect(commitCommand(fixture.repo, fixture.scope, 'commit_asset_changes', 'write', fixture.args, fixture.adapter.reads)).rejects.toThrow('第2章找不到连续逐字引文')
 })
+
+it('按工作项只发送必要工具，get_tools_detail 激活后下一次请求可用', async () => {
+  const repo = createMemoryAgentRepository('book-a', {
+    characters: [{ id: 'C1-P001', bookId: 'book-a', name: '贾珩', revision: 1 }, { id: 'C2-P001', bookId: 'book-a', name: '贾珍', revision: 1 }],
+    pipelineRuns: [{ id: 'run-a', bookId: 'book-a', tasks: [{ taskId: 'task-a', appliedCommitIds: [], readSet: { records: [], queries: [] } }] }, { id: 'lease:world', bookId: 'book-a', recordType: 'lease', lockKey: 'world', owner: 'owner-a', runId: 'run-a', expiresAt: Date.now() + 30000 }],
+  })
+  const scope: Scope = { bookId: 'book-a', profile: 'asset_editor', phase: 'character_organization', workflow: 'character_organization_v1', runId: 'run-a', taskId: 'task-a', owner: 'owner-a', workItemIds: [], workKind: 'relations', unitId: 'relations:C1-P001', contextId: 'relations' }
+  const adapter = createAgentTools(repo, scope)
+  const initial = adapter.currentTools().map(tool => tool.name)
+  expect(initial).toEqual(expect.arrayContaining(['submit_relation_review', 'query_relation_work', 'read_original', 'get_character_relation', 'get_legacy_relation_records', 'get_tools', 'get_tools_detail']))
+  expect(initial).not.toContain('merge_assets')
+  const listed = await adapter.tools.find(tool => tool.name === 'get_tools')!.execute('tools', {}) as { content: { text: string }[] }
+  expect(JSON.parse(listed.content[0]!.text).tools.map((tool: { name: string }) => tool.name)).toContain('merge_assets')
+  const detail = await adapter.tools.find(tool => tool.name === 'get_tools_detail')!.execute('detail', { name: 'merge_assets' }) as { content: { text: string }[] }
+  expect(JSON.parse(detail.content[0]!.text)).toMatchObject({ name: 'merge_assets', activated: true })
+  expect(adapter.currentTools().map(tool => tool.name)).toContain('merge_assets')
+})
+
+it('get_tools_detail 激活的工具进入下一次运行时请求', async () => {
+  let call = 0
+  const seen: string[][] = []
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init?.body as string)
+    seen.push(body.tools.map((tool: { function: { name: string } }) => tool.function.name))
+    call++
+    if (call === 1) return agentStream([{ name: 'get_tools_detail', args: { name: 'list_editor_sessions' } }])
+    if (call === 2) return agentStream([{ name: 'get_node_detail', args: { ids: ['C1-N001'] } }])
+    return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: [], summary: '已核对', remainingWorkIds: [], reviewedItems: [{ workItemId: 'node:first', outcome: 'no_change', reason: '独立节点' }] } }])
+  })
+  const { workspace, models } = await setup(fetcher)
+  await workspace.settings.books.put({ id: 'a', title: 'a', sourceFileName: 'a.txt', createdAt: new Date().toISOString() })
+  const db = workspace.openBook('a')
+  for (const [table, rows] of Object.entries(createAgentFixture('a'))) await db.table(table).bulkPut(rows)
+  await db.table('nodes').put({ id: 'C1-N001', bookId: 'a', name: '节点', summary: '独立事件', actors: [], quote: '', confidence: 1, chapterIndex: '1', chapterName: '第1章', order: 0, revision: 1, createdBy: 'P1' })
+  const repo = createBookAgentRepository(workspace, 'a'), runtime = createAgentRuntime(models.agent)
+  const session = await runtime.openSession(repo)
+  const runId = crypto.randomUUID(), taskId = crypto.randomUUID(), operationKey = crypto.randomUUID()
+  const work = { workItemId: 'node:first', kind: 'node', id: 'C1-N001', revision: 1, factFingerprint: 'fixture-node' }
+  const input = { bookId: 'a', runId, taskId, planVersion: '2.2', remainingCount: 1, resume: { reason: 'initial', appliedCommitIds: [], nextOperationKey: operationKey, remainingWorkIds: [work.workItemId] }, stage: 'P3', phase: 'window_link', sessionId: session.id, queue: 'window_nodes', window: { start: 0, end: 1, chapterIndices: ['1'] }, workItems: [work], existingLines: [], memory: { id: session.id, bookId: 'a', sessionId: session.id, revision: 0, workingSummary: '', dataFingerprint: '', updatedAt: '' }, afterWorkItemId: null }
+  const result = await runtime.run(repo, { profile: 'story_editor', phase: 'window_link', runId, taskId, sessionId: session.id, input, workItems: [work], businessPrompt: '核对节点', prompt: JSON.stringify({ operationKey, workItemId: work.workItemId }) })
+  expect(result.ok, result.error).toBe(true)
+  expect(seen[0]).not.toContain('list_editor_sessions')
+  expect(seen.slice(1).some(tools => tools.includes('list_editor_sessions'))).toBe(true)
+})
+
+
+it('会话范围快照跳过其他会话和观测正文，仍检测并发插入并重读', async () => {
+  const { workspace } = await setup(scriptedAgentFetcher())
+  const bookId = 'scoped'
+  await workspace.settings.books.add({ id: bookId, title: bookId, sourceFileName: 'fixture', createdAt: new Date().toISOString() })
+  const db = workspace.openBook(bookId), table = db.table('storySessionEntries')
+  await table.bulkPut([
+    { id: 'm1', bookId, sessionId: 'current', type: 'message', ordinal: 1, message: { role: 'user', content: '任务' } },
+    { id: 'trace', bookId, sessionId: 'old', type: 'request_trace', ordinal: 1, text: '历史'.repeat(50000) },
+    { id: 'm2', bookId, sessionId: 'old', type: 'message', ordinal: 2, message: { role: 'user', content: '其他任务' } },
+  ])
+  const repo = createBookAgentRepository(workspace, bookId)
+  let calls = 0
+  const seen = await repo.transaction(true, async store => {
+    calls++
+    const entries = await store.sessionEntries!('current')
+    if (calls === 1) await table.put({ id: 'm3', bookId, sessionId: 'current', type: 'message', ordinal: 3, message: { role: 'user', content: '并发消息' } })
+    await store.put('storySessions', { id: 'current', bookId, count: entries.length })
+    return entries
+  })
+  expect(calls).toBe(2)
+  expect(seen.map(row => row.id)).toEqual(['m1', 'm3'])
+  let reads = 0
+  const business = await repo.transaction(false, async store => { reads++; return store.rows('storySessionEntries') })
+  expect(reads).toBe(1)
+  expect(business.map(row => row.id)).toEqual(['m1', 'm2', 'm3'])
+})

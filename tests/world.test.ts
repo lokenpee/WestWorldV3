@@ -562,11 +562,11 @@ it('提交合并后其余批次继续，不重复合并同一组', async () => {
 
 it('剩余一分钟提醒收尾，跨过目标时间的在途请求正常返回并保存待办', async () => {
   const realNow = Date.now.bind(Date); let elapsed = 0
-  const notes: string[] = [], aborted: boolean[] = []
+  const notes: string[] = [], systems: string[] = [], aborted: boolean[] = []
   let db: ReturnType<ReturnType<typeof createWorkspace>['openBook']>
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string), input = taskInput(body)
-    notes.push(JSON.stringify(body.messages.at(-1)))
+    notes.push(JSON.stringify(body.messages.at(-1))); systems.push(JSON.stringify(body.messages[0]))
     elapsed = fetcher.mock.calls.length === 1 ? 130000 : 190000
     await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 })
     aborted.push(!!init?.signal?.aborted)
@@ -579,8 +579,11 @@ it('剩余一分钟提醒收尾，跨过目标时间的在途请求正常返回�
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed)
   try { await fixture.service.start('a') } finally { clock.mockRestore() }
   expect(fetcher).toHaveBeenCalledTimes(2)
-  expect(notes[0]).toContain('按时间预算')
-  expect(notes[1]).toContain('进入收尾')
+  expect(systems[0]).toContain('时间预算')
+  expect(systems[0]).toContain('停止扩展调查')
+  expect(notes[0]).toContain('剩余约')
+  expect(notes[1]).toContain('剩余约')
+  expect(notes[1]).toContain('不设固定请求轮数')
   expect(aborted).toEqual([false, false])
   expect((await fixture.service.reports('a'))[0]).toMatchObject({ status: 'paused', coverage: { checked: 0 } })
 })

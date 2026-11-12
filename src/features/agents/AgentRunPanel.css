@@ -239,78 +239,6 @@
   border-top: 1px solid var(--border);
 }
 
-.execution-events {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin: 0.75rem 0 1rem;
-}
-
-.execution-event {
-  margin: 0;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: #fff;
-}
-
-.execution-event-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
-}
-
-.execution-event-heading span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.execution-system,
-.execution-user {
-  background: color-mix(in srgb, var(--border) 12%, #fff);
-}
-
-.execution-assistant {
-  border-left: 3px solid var(--ink);
-}
-
-.execution-tool-result {
-  border-left: 3px solid #4a7c59;
-}
-
-.execution-compaction {
-  border-style: dashed;
-  color: var(--muted);
-}
-
-.execution-tool-call {
-  margin: 0.35rem 0;
-}
-
-.execution-tool-call summary {
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.execution-message-text {
-  margin: 0.3rem 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.execution-event pre {
-  max-height: 360px;
-  overflow: auto;
-}
-
-.execution-raw {
-  margin-top: 1rem;
-  border-top: 1px solid var(--border);
-  padding-top: 0.75rem;
-}
-
 .p2-object-list {
   display: flex;
   flex-direction: column;
@@ -326,12 +254,41 @@
   min-width: 0;
 }
 
-.execution-event summary {
-  cursor: pointer;
-}
 
-.execution-event summary > span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: normal;
+.execution-api-calls { margin-top: 1rem; }
+.execution-conversation { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; }
+.run-conversation-note { margin: 0 0 0.25rem; }
+.run-conversation-assistant { display: flex; flex-direction: column; gap: 0.45rem; margin: 0.35rem 0 0.5rem; }
+.run-api-boundary { margin: 0.85rem 0 0.25rem; padding-top: 0.55rem; border-top: 1px dashed var(--border); }
+.run-api-boundary > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem; cursor: pointer; color: var(--muted); font-size: 12px; }
+.run-api-boundary > summary strong { color: inherit; letter-spacing: 0.04em; }
+.run-api-boundary > summary span:last-child { margin-left: auto; color: #4a7; }
+.run-api-boundary-body { margin-top: 0.6rem; }
+.run-api-boundary-body .run-api { margin: 0; }
+.run-compaction { color: var(--muted); font-size: 12px; }
+.run-compaction strong { margin-right: 0.6rem; color: inherit; }
+.execution-api-call { padding: 0; overflow: hidden; background: #fff; }
+.execution-api-call > summary { cursor: pointer; padding: 0.85rem 1rem; align-items: center; list-style: none; }
+.execution-api-call > summary::before { content: '▸'; color: var(--muted); }
+.execution-api-call[open] > summary::before { content: '▾'; }
+.execution-api-call > summary strong { margin-right: auto; letter-spacing: 0.04em; }
+.execution-api-call > summary span { color: var(--muted); font-size: 12px; }
+.run-api-content { padding: 0 1rem 1rem; }
+.run-api-content h4 { display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0 0.65rem; font-size: 13px; }
+.run-api-content h4 small { color: var(--muted); font-weight: normal; }
+.run-flow-mark { color: var(--muted); width: 16px; text-align: center; }
+.run-role { padding: 0.6rem 0.75rem; border-radius: 0 5px 5px 0; }
+.run-role > summary { font-size: 12px; overflow-wrap: anywhere; }
+.run-message-number { display: inline-block; min-width: 1.6em; color: var(--muted); font-weight: normal; }
+.run-result-state { float: right; margin-left: 0.5rem; font-weight: normal; }
+.run-tool-definition { margin: 0.65rem 0 0.25rem; }
+.run-tool-definition > summary { cursor: pointer; overflow-wrap: anywhere; }
+.run-api pre { font-size: 12px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.run-reply { padding: 0 0.75rem; border-left: 3px solid #4a78b8; }
+.run-history-note { margin: 0.6rem 0; font-size: 11px; }
+@media (max-width: 600px) {
+  .execution-api-call > summary { gap: 0.45rem; padding: 0.75rem; }
+  .execution-api-call > summary span:last-child { width: 100%; margin-left: 1.25rem; }
+  .run-api-content { padding: 0 0.65rem 0.75rem; }
+  .run-stats { gap: 0.5rem 0.75rem; }
 }

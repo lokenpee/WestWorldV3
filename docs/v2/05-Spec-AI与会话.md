@@ -85,6 +85,8 @@ direct模式由pi-ai执行，无pi-agent-core循环。有Schema时可注册唯�
 
 共有14种读工具、2种受控写工具；两角色分别10/15个业务工具。另注册submit_result作为无写副作用的最终结果收集器，不计入业务工具数。白名单按bookId/profile/phase绑定；模型不能通过参数切换书或绕过阶段约束。
 
+Agent 初始只发送当前工作项必需的工具，并附带 `get_tools` / `get_tools_detail`。`get_tools` 返回当前任务允许但尚未开放的工具名称和简介；`get_tools_detail({name})` 返回完整参数并把该工具加入下一次请求，模型在下一轮才能调用。激活只存在于当前 Agent 任务内存，运行结束失效；不允许激活当前 profile/phase 之外的写工具，也不跨书。P2 关系工作项初始只发 `submit_relation_review`、`query_relation_work`、`read_original`、`get_character_relation`、`get_legacy_relation_records`，其他工具按需发现。
+
 write工具的AgentTool.execute实际调用与direct共用的命令服务，按Schema、引用/引文、事实覆盖、读集revision和租约校验后提交当前实体。事务提交成功才返回commitId确认；模型可以根据工具结果继续查询/思考，不必等整个Agent循环结束才写业务数据。失败返回可解释工具错误，不伪装成功。
 
 Agent设置toolExecution=sequential，写工具也声明executionMode=sequential。submit_result必须独占本批调用，混合写入+最终提交的批在首次副作用前拒绝。最终使用AgentTaskSummarySchema（status/commitIds/summary/remainingWorkIds/reviewedItems）报告当前子任务结果；不再用最终submit_result重复执行已生效的资产增量。completed还须代码核覆盖，不能仅信模型声明。
@@ -96,6 +98,8 @@ P2身份核实按[世界资产整理决策](../decisions/world-organization.md)�
 P3取得会话租约，加载应用保存的原始消息投影/摘要，通过Pi恢复运行上下文；每个message_end追加原始Pi消息，写服务原子保存业务commit确认，工具反馈再以Pi toolResult进入会话。事务已成功而toolResult未持久化时，下次同operationKey返回原确认，不重写；finally释放自己的租约。P2临时Pi运行不伪造故事消息链。
 
 当前版本同一本书同一时间只允许一个P1/P2/P3后台任务运行；P1内部世界/叙事两条lane仍可并行，不同书籍互不影响。运行入口必须在service/租约事务内检查目标书全部活跃租约，不能只靠UI禁用。周期租约P1一个、P2一个、P3一个；P2/P3运行层不再额外启动第二套心跳。续租只更新`expiresAt`或`leaseUntil`；快照比较忽略续期时间但保留owner/runId等身份，业务提交事务内仍重新确认租约、会话所有权和有效期。快照短暂变化按暂时失败重试；连续三次仍无法确认执行权时保留activeWork并转为可继续的暂停。owner/runId、会话所有权变化或租约过期属于真正丢失执行权，旧执行者立即停止写入。用户主动取消与异常暂停分别记录，不能把租约异常当成用户取消。
+
+会话恢复通过既有sessionId索引读取当前会话。AgentRepository的业务快照通过type索引排除观测正文，读取与提交复核使用同一过滤规则；会话范围快照在提交前重新检查消息集合，新增、修改、删除仍触发冲突重读。可选内部读取方法`sessionEntries`不改变模型工具参数或存储格式，旧适配器可沿用`rows`后过滤。
 
 无持久会话仍用其预算策略；P3持久会话按AI-08压缩。统一模型/校验/错误层不要求两种模式拥有相同记忆与上下文预算。
 
@@ -307,15 +311,15 @@ TaskRecord.input保存首次创建任务的不可变快照。每次实际请求�
 | 模式 | 组装顺序 |
 |---|---|
 | direct提取/整编/压缩 | systemPrompt=对应active业务正文；messages仅本次user；tools仅submit_result，参数为当前输出Schema，constrainedSampling={type:json_schema,strict:prefer}。不加载P3消息历史 |
-| P2 Agent | 渲染agent-wrapper.txt：作用域→职责→预算/幂等→业务正文→结束约束；用Pi初始system声明9读+commit_asset_changes+finalizer；user=identity.txt(taskJson)。不携带P3历史 |
-| P3 Agent初次 | 同wrapper，职责只负责叙事；初始system声明14读+commit_story_changes+finalizer；user=story.txt(taskJson) |
-| P3继续/恢复 | 先按AI-08恢复合法配对消息和压缩投影；若有效system或工具集合变化，用Pi系统更新追加替换/撤销声明；追加recovery.txt恢复摘要（仅恢复时）→本次story任务。不把新的system硬插在未配对toolCall和toolResult之间 |
-| 末轮 | system撤回全部业务工具，仅保留submit_result；追加final_only.txt，变量commitIds来自本task账本，remainingIds来自分配清单；同时把可执行白名单收窄。只改Prompt文字而不改执行白名单不合格 |
+| P2 Agent | `runtime.ts` 只组装业务正文和输出纪律；业务规则全部来自独立 prompt md；system=业务正文 + 输出纪律；用Pi初始system声明当前开放的读工具+写工具+finalizer；user=结构化任务简报。完整任务`input`只用于持久化、恢复和幂等，不进入模型消息；简报只含当前对象业务资料和必要对象编号，不含bookId/runId/taskId/phase/operationKey/fingerprint。不携带P3历史 |
+| P3 Agent初次 | 同 `runtime.ts` 的业务正文 + 输出纪律，职责只负责叙事；初始system声明当前开放的读工具+commit_story_changes+finalizer；user=story.txt(taskJson) |
+| P3继续/恢复 | 先按AI-08恢复合法配对消息和压缩投影；若有效system或工具集合变化，用Pi系统更新追加替换/撤销声明；恢复说明由代码生成并追加，仅恢复时使用→本次story任务。不把新的system硬插在未配对toolCall和toolResult之间 |
+| 末轮 | system撤回全部业务工具，仅保留submit_result；结束约束和可执行白名单由代码同时收窄，变量commitIds来自本task账本，remainingIds来自分配清单。只改Prompt文字而不改执行白名单不合格 |
 | 探测 | 使用probe_system及probe_asset/probe_story；完整业务工具声明可发送，但回调接隔离fixture；完成门槛见AI-15 |
 
-所有模式的system提示词都在业务正文之后追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)：direct追加在业务正文之后，Agent追加在业务正文之后、结束约束之前。该文件是这段文字的唯一来源，代码统一读取，业务正文文件不重复保存。
+所有模式的system提示词都在业务正文之后追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)：direct和Agent都追加在业务正文之后。该文件是这段文字的唯一来源，代码统一读取，业务正文文件不重复保存。
 
-角色文字固定：asset_editor“只整理人物地点；不读故事会话/工作记忆，不改叙事实体。”；story_editor“只整理节点、事件线和工作记忆；不合并人物地点，历史摘要不是原文事实。”。bookId/runId/taskId/phase由调用上下文绑定；工具参数永远不能扩展权限。
+角色和阶段约束由各 prompt md 描述；bookId/runId/taskId/phase 由调用上下文和持久化任务记录绑定，不写入 system，也不写入P2人物整理的结构化任务简报，不能由工具参数切换。
 
 字符/地点整编动态Schema均锁定本次事实短号，数量必须恰好相等且唯一；人物还锁定entities键和已知名称枚举。调用方在提交前再核revision及短号映射，成功后将coveredFactIds映射回持久事实ID；模型不能通过抄全ID获得免除语义校验的权利。
 
@@ -325,13 +329,13 @@ P2身份核实的时间、请求次数与提前收尾方式以[世界资产整�
 
 P3每个子任务的5分钟时间预算收尾规则以[叙事整理决策](../decisions/story-organization.md)为准；stepsUsed在发请求前持久递增，刷新恢复不清零。maxTokens=`min(model.maxTokens或8192,reserve)`，P2/P3同式；reserve按AI-08。恢复发现已用完本任务预算则task=partial，剩余工作按新task处理。P3本轮未完成项让后续任务继续；本轮结束保存剩余清单，由用户继续。
 
-网络/服务重试仍按AI-05；每次实际Provider请求消耗stepsUsed并计usage，不存在免费重试轮。tool CONFLICT不算网络失败：追加conflict.txt，保留工具权限供重读，消耗正常余下轮数；预算不足则partial。任务attempt统计实际Provider请求次数，与stepsUsed同时递增；启动/恢复本身不加1。P2在响应结束后收尾；其他任务到期中断时保留已提交确认。
+网络/服务重试仍按AI-05；每次实际Provider请求消耗stepsUsed并计usage，不存在免费重试轮。tool CONFLICT不算网络失败：代码追加冲突说明，保留工具权限供重读，消耗正常余下轮数；预算不足则partial。任务attempt统计实际Provider请求次数，与stepsUsed同时递增；启动/恢复本身不加1。P2在响应结束后收尾；其他任务到期中断时保留已提交确认。
 
 | 错误类型 | 本task唯一修正机会怎么用 | 工具权限与终止 |
 |---|---|---|
-| direct输出结构/语义错误 | 原assistant与每个toolCall配对错误结果入上下文，再repair_direct.txt；最多一次 | 仍仅submit_result；第二次错返回validation |
-| Agent写参数/领域错误 | 错误toolResult后追加repair_write.txt；repairCount从0变1；修改payload必须新key | 保留本角色工具；按本任务剩余预算修正，未完成项保存为partial |
-| Agent最终总结错误 | 追加repair_final.txt；若repairCount仍0可变1，并额外允许第7轮仅修最终总结 | 第7轮只允许submit_result；已用过修正机会或再次失败就partial/validation |
+| direct输出结构/语义错误 | 原assistant与每个toolCall配对错误结果入上下文，代码追加direct修复说明；最多一次 | 仍仅submit_result；第二次错返回validation |
+| Agent写参数/领域错误 | 错误toolResult后由代码追加写修复说明；repairCount从0变1；修改payload必须新key | 保留本角色工具；按本任务剩余预算修正，未完成项保存为partial |
+| Agent最终总结错误 | 代码追加最终总结修复说明；若repairCount仍0可变1，并额外允许第7轮仅修最终总结 | 第7轮只允许submit_result；已用过修正机会或再次失败就partial/validation |
 | CONFLICT | 不消耗repairCount；必须重读相关依据；新判断用新key | 只消耗普通调用预算；按时间预算收尾 |
 
 write修正与final修正共享一次机会，不能各自多给一次。运行器不得因最终总结错误重新执行已经成功的写命令。代码生成错误诊断与配对toolResult，不接受模型自己声称“验证通过”。模板变量error来自无凭据的校验诊断；operationKey/nextOperationKey/commitIds都来自当前任务状态。

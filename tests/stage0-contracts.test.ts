@@ -36,12 +36,12 @@ describe('历史契约样例与当前规格入口', () => {
     expect(operation.guard).toContain('域锁')
   })
 
-  it('direct 的网络重发和修正共用三次上限，章节不再叠加重试', () => {
+  it('direct/agent 默认不设固定请求轮数，保留超时与修正次数', () => {
     expect(runtime.requestBudget).toMatchObject({
-      direct: { maxProviderRequests: 3, maxRepairs: 1, extractionMaxRepairs: 2, repairsConsumeBudget: true },
+      direct: { maxProviderRequests: null, maxRepairs: 1, extractionMaxRepairs: 2, repairsConsumeBudget: true },
       retryableKinds: ['network', 'server', 'rate_limit'],
       chapterRetryWrapper: false,
-      agent: { maxRequestsPerTurn: 3, maxProviderRequests: 6, timeoutMs: 180000 },
+      agent: { maxRequestsPerTurn: null, maxProviderRequests: null, timeoutMs: 180000 },
     })
     expect(pipeline.stages.P1.requestBudgetRef).toBe('ai-runtime-contract.json#/requestBudget')
   })

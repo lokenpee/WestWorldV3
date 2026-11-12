@@ -232,7 +232,7 @@
     "revision": "2026-10-24.stage0",
     "countsInitialRequest": true,
     "direct": {
-      "maxProviderRequests": 3,
+      "maxProviderRequests": null,
       "maxRepairs": 1,
       "extractionMaxRepairs": 2,
       "repairsConsumeBudget": true
@@ -244,8 +244,8 @@
     ],
     "chapterRetryWrapper": false,
     "agent": {
-      "maxRequestsPerTurn": 3,
-      "maxProviderRequests": 6,
+      "maxRequestsPerTurn": null,
+      "maxProviderRequests": null,
       "timeoutMs": 180000,
       "repairsConsumeBudget": true,
       "resumeKeepsRequestCount": true,

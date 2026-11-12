@@ -14,7 +14,7 @@ export interface ModelTraceEnd {
   requestId: string; message?: AssistantMessage; usage?: Usage; attempts: Attempt[]; error?: ModelFailure
   status: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
 }
-export interface ModelTraceHooks { start(value: ModelTraceStart): void; delta?(value: { requestId: string; event: AssistantMessageEvent }): void; modelEnd(value: ModelTraceEnd): void }
+export interface ModelTraceHooks { start(value: ModelTraceStart): void; request?(value: { requestId: string; attemptId: string; body: Record<string, unknown> }): void; delta?(value: { requestId: string; event: AssistantMessageEvent }): void; modelEnd(value: ModelTraceEnd): void }
 export interface ModelConfig {
   providerId: string; api: ModelApi; baseUrl: string; extractionModel: string; aggregationModel: string; aggregationContextWindow?: number
 }

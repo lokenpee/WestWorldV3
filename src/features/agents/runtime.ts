@@ -11,7 +11,6 @@ import { resolveSession } from './sessions'
 import { compactSession, type SessionStatus } from './compaction'
 import { projectSession, entryMessages, repairToolPairs } from './context'
 import type { ModelService } from '../models/service'
-import wrapper from '../../../docs/v2/resources/v2.2/prompts/active/agent-wrapper.txt?raw'
 import { outputDiscipline } from './output-discipline'
 import { storyFingerprint, storyTable } from '../story/coverage'
 import { renewOrganizationLease, withOrganizationLease } from './organizationLease'
@@ -81,9 +80,9 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           if (session?.leaseOwner && Number(session.leaseUntil) > Date.now() && !(options.retainLease && session.leaseOwner === scope.owner)) throw new Error('CONFLICT:会话正在其他窗口运行。')
           scope.sessionId = text(session.id); outcome.sessionId = scope.sessionId
           await store.put('storySessions', { ...session, leaseOwner: scope.owner, leaseUntil: Date.now() + 30000 })
-          const entries = (await store.rows('storySessionEntries')).filter(row => row.sessionId === scope.sessionId)
+          const entries = store.sessionEntries ? await store.sessionEntries(scope.sessionId!) : (await store.rows('storySessionEntries')).filter(row => row.sessionId === scope.sessionId)
           loadedMessages = organization && scope.unitId
-            ? repairToolPairs(entries.filter(row => row.contextId === scope.contextId && row.unitId === scope.unitId).flatMap(entryMessages).filter(message => message.role !== 'system'))
+            ? repairToolPairs(entries.filter(row => row.contextId === scope.contextId && row.unitId === scope.unitId && (!row.taskId || row.taskId === scope.taskId)).flatMap(entryMessages).filter(message => message.role !== 'system'))
             : projectSession(entries, text(session.leafId) || undefined).messages
         }
         let run = await store.get('pipelineRuns', scope.runId)
@@ -118,39 +117,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       if (organization) repo = withOrganizationLease(repo, scope)
       const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
       if (!scope.probe && scope.sessionId) trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.businessPrompt, purpose: 'work' })
-      const workKind = options.organizationWorkKind
-      const p2Kind = organization ? workKind : undefined
-      const submitRule = p2Kind === 'profile'
-        ? '业务修改以 submit_profile_review 返回持久确认并实际写库为准。本工作项不使用 submit_result。'
-        : p2Kind === 'relations'
-          ? '业务修改以 submit_relation_review 返回持久确认并实际写库为准。本工作项不使用 submit_result。'
-          : p2Kind === 'directory' || p2Kind === 'candidate'
-            ? '业务修改以当前合法写入工具返回持久确认并实际写库为准。本工作项用 submit_result 结束当前目录页或疑似组。'
-            : '只有commit_asset_changes或commit_story_changes返回持久commitId才表示业务修改成功。submit_result只提交本任务总结，不重演业务写入。'
-      const budgetRule = p2Kind
-        ? '本工作项按实际进展处理，不设固定请求次数上限；当前工作项可以多轮调用。'
-        : maxRequests >= 1_000_000 ? '本任务按时间预算收尾，不设固定请求轮数；时间或预算耗尽时保存已提交成果和剩余工作。' : `本任务最多${maxRequests}次实际模型请求，修正与网络重发均计入同一总预算，最后一次只能调用submit_result。`
-      const repairRule = p2Kind === 'profile'
-        ? '工具错误按返回原因修正；done=false 保存部分继续，done=true 保存并结束当前人物；不另发结束总结。'
-        : p2Kind === 'relations'
-          ? '工具错误按返回原因修正；done=false 保存部分继续，done=true 保存并结束当前人物；不另发结束总结。'
-          : p2Kind === 'directory' || p2Kind === 'candidate'
-            ? '工具错误按返回原因修正；目录页/疑似组结论必须真实；不另发总结请求。'
-            : '写入结构、领域和最终总结共用一次修正机会，并且必须有剩余额度；未完成工作如实保留，不能为结束任务制造事实。'
-      const finishRule = p2Kind === 'profile'
-        ? '用 submit_profile_review 的 done 结束当前人物；可以提交空 patch 和 done=true；不调用 submit_result。'
-        : p2Kind === 'relations'
-          ? '用 submit_relation_review 的 done 结束当前人物；可以提交空 changes 和 done=true；不调用 submit_result。'
-          : p2Kind === 'directory' || p2Kind === 'candidate'
-            ? 'submit_result 必须独占本批；提交目录页/疑似组结果后程序推进，不重演业务写入。'
-            : 'submit_result必须独占本批。commitIds只列本task已确认的ID；reviewedItems与remainingWorkIds恰好分割分配项。无法完整判断的项留为remaining，合理孤点可记no_change或needs_review并说明依据。'
-      const systemPrompt = wrapper.replace(/\{(\w+)\}/g, (_, name: string) => ({
-        ...scope,
-        submitRule, budgetRule, repairRule, finishRule,
-        roleInstruction: organization ? '按人物整理流程查询和编辑本书全部资产；可以合并同类资产和增删关系，不能删除或新建资产。' : scope.profile === 'asset_editor' ? '只整理人物地点，不读取故事会话或修改叙事资料。' : '只整理节点、事件线和工作记忆，不合并人物地点。',
-        businessPrompt: options.businessPrompt,
-        outputDiscipline,
-      } as Record<string, unknown>)[name]?.toString() ?? `{${name}}`)
+      const systemPrompt = [options.businessPrompt, outputDiscipline].join('\n')
       if (!organization && loadedMessages.length) loadedMessages.push({ role: 'system', content: systemPrompt, timestamp: Date.now() })
       persistedMessages = organization ? loadedMessages.length : loadedMessages.length ? loadedMessages.length - 1 : 0
       const prior = await repo.transaction(false, store => taskOf(store, scope))
@@ -195,7 +162,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       }
       let usedRequests = Number(prior.task.stepsUsed ?? 0)
       const previousAgent = instances.get(key)
-      outcome.result = await runner({ prompt: options.prompt, systemPrompt, tools: tools.tools, ...(loadedMessages.length ? { messages: loadedMessages } : {}), agent: !scope.probe && scope.profile === 'story_editor' && previousAgent?.sessionId === scope.sessionId ? previousAgent : undefined,
+      outcome.result = await runner({ prompt: options.prompt, systemPrompt, tools: tools.currentTools(), getTools: () => tools.currentTools(), ...(loadedMessages.length ? { messages: loadedMessages } : {}), agent: !scope.probe && scope.profile === 'story_editor' && previousAgent?.sessionId === scope.sessionId ? previousAgent : undefined,
         onAgent: value => { agent = value; value.sessionId = scope.sessionId; if (!scope.probe && scope.profile === 'story_editor') instances.set(key, value) },
         onEvent: async event => {
           try { trace?.handleEvent(event) } catch { /* 观测失败不影响 Agent */ }
@@ -215,41 +182,35 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
               return true
             }) : rawBase
             const withPrompt = organization && !base.some(message => message.role === 'user' && contentText(message) === options.prompt)
-              ? [{ role: 'user' as const, content: options.prompt, timestamp: Date.now() }, ...base]
+              ? [...base, { role: 'user' as const, content: options.prompt, timestamp: Date.now() }]
               : base
             const left = maxRequests - usedRequests
-            const closing = resumable ? (identity ? left <= 3 : usedRequests >= 14) || timeLeft() <= 60000 : left <= 5
-            const note = organization
-              ? p2Kind === 'profile'
-                ? left <= 2 || timeLeft() <= 60000
-                  ? '当前人物材料已由程序提供；需要补查再用工具。判断完成后调用submit_profile_review：done=false保存部分继续，done=true保存并直接换下一人。不要调用submit_result或提交人物关系，也不要另做结束总结。'
-                  : '只处理输入的当前人物。程序已提供默认资料，需要时再查询其他人物或原文。判断完成后用submit_profile_review提交；done=true直接结束当前人物。不要提交人物关系，也不要查找其他人物或重送已归档历史。'
-                : p2Kind === 'relations'
-                  ? left <= 2 || timeLeft() <= 60000
-                    ? '当前人物关系已由程序提供；需要补查再用工具。判断完成后调用submit_relation_review：done=false保存部分继续，done=true保存并直接换下一人。不要调用submit_result或提交人物资料，也不要另做结束总结。'
-                    : '只处理输入的当前人物关系。程序已提供默认关系资料，需要时再查询其他人物或原文。判断完成后用submit_relation_review提交；done=true直接结束当前人物。不要提交人物资料，也不要查找其他人物或重送已归档历史。'
-                  : p2Kind === 'directory' || p2Kind === 'candidate'
-                    ? '处理当前目录页或疑似组。需要补查再用工具，完成后用submit_result提交当前页或疑似组结论；不要提交人物资料或关系，不要另做结束总结。'
-                    : '按当前人物整理工作项处理；需要补查再用工具，完成后提交当前工作项结果。'
-              : resumable
+            const note = resumable
               ? maxRequests >= 1_000_000
-                ? `${identity ? '本资产目标3分钟' : '本组任务目标5分钟'}，按时间预算收尾，不设固定请求轮数；现在剩余约${Math.ceil(timeLeft() / 1000)}秒。${closing ? '进入收尾：停止扩展调查，提交证据充分的修改和总结；证据不足的分配项放入remainingWorkIds，使用partial。' : '围绕当前分配项核实，可在同一轮批量调用查询工具；证据充分即可提交总结。'}`
-                : `${identity ? '本资产目标3分钟' : '本组任务目标5分钟'}、最多${maxRequests}次实际请求；现在剩余约${Math.ceil(timeLeft() / 1000)}秒、${left}轮。${closing ? '进入收尾：停止扩展调查，提交证据充分的修改和总结；证据不足的分配项放入remainingWorkIds，使用partial。最后一轮仅提交总结。' : '围绕当前分配项核实，可在同一轮批量调用查询工具；证据充分即可提交总结。'}`
-              : closing ? `本子任务还可请求模型${left}次。请按已核实的分配项提交结果；最后一次仅调用submit_result，未完成项列入remainingWorkIds并使用partial，交由后续排队批次处理。` : '按需调用工具核实分配项，证据齐全后调用submit_result逐项说明outcome；未核实项列入remainingWorkIds交后续批次。'
+                ? `当前运行状态：剩余约${Math.ceil(timeLeft() / 1000)}秒；本任务不设固定请求轮数。`
+                : `当前运行状态：剩余约${Math.ceil(timeLeft() / 1000)}秒；本任务最多${maxRequests}次实际请求，已用${usedRequests}次。`
+              : `当前运行状态：本子任务还可请求${Math.max(0, left)}次。`
 
-            return { context: { ...context, messages: [...withPrompt, { role: 'user', content: note, timestamp: Date.now() }] } }
+            const activeTools = tools.currentTools()
+            if (agent) agent.state.tools = activeTools
+            return { context: { ...context, messages: [...withPrompt, { role: 'user', content: note, timestamp: Date.now() }], tools: activeTools } }
           }
-          return messages ? { context: { ...context, messages } } : undefined
+          const activeTools = tools.currentTools()
+          if (agent) agent.state.tools = activeTools
+          return messages ? { context: { ...context, messages, tools: activeTools } } : undefined
         },
         recoverContext: scope.sessionId && sessionOptions ? async (context, model) => {
-          if (organization) return { ...context, messages: [
+          const activeTools = tools.currentTools()
+          if (agent) agent.state.tools = activeTools
+          if (organization) return { ...context, tools: activeTools, messages: [
             { role: 'user' as const, content: options.prompt, timestamp: Date.now() },
             { role: 'user' as const, content: '上一请求超出模型容量，已重建当前人物的小上下文。程序预装资料重新提供；如已保存过部分修改，用query_character_profile或query_relation_work刷新当前真实资料后继续，不要把旧工具结果当作仍然有效。', timestamp: Date.now() },
           ] }
-          const messages = await prepareContext(context, model.contextWindow, true); return messages ? { ...context, messages } : undefined
+          const messages = await prepareContext(context, model.contextWindow, true); return messages ? { ...context, messages, tools: activeTools } : undefined
         } : undefined,
         beforeRequest: consumeRequest,
         beforeToolCall: async ({ assistantMessage, toolCall }) => {
+          if (toolCall.name === 'get_tools_detail') adapter?.activate(text((toolCall.arguments as Row).name))
           if (options.shouldCancel?.()) return { block: true, terminate: true, reason: 'CANCELLED:运行已取消，工具未执行。' }
           if (options.shouldPause?.()) return { block: true, terminate: true, reason: 'PAUSED:任务已暂停，工具未执行。' }
           const batch = assistantMessage.content.filter(part => part.type === 'toolCall')

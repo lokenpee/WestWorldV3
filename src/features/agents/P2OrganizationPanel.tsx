@@ -43,9 +43,9 @@ export function P2OrganizationPanel({ bookId, loadIndex, loadExecution, runs, in
         .then(rows => { if (live) setIndexes(Object.fromEntries(rows) as Indexes) })
         .catch(failure => { if (live) setError(failure instanceof Error ? failure.message : '整理索引读取失败。') })
         .finally(() => { if (live) setLoadingIndex(false) })
-    }, 350)
+    }, loadingIndex ? 0 : 350)
     return () => { live = false; clearTimeout(timer) }
-  }, [bookId, loadIndex, runKey, tick])
+  }, [bookId, loadIndex, runKey, tick, loadingIndex])
   const load = useCallback(async (entry: OrganizationStepIndexEntry, token: number) => {
     setLoadingObjects(true); setError('')
     try {

@@ -1,13 +1,15 @@
+> 2026-11-11 后续变更：P2 四份工作项提示词已改为各自独立完整文件，删除 `p2-organization-base.md`；`agent-wrapper.txt` 已删除，作用域/预算/结束约束由 `runtime.ts` 直接生成。以下“公共规则 + 工作项规则”和 wrapper 描述为历史实施记录。
+
 # 设计：按工作项拆分 P2 提示词与默认工具
 
 ## 总体结构
 
 ```text
 organization.step
-  ├─ scan      → 公共规则 + 目录规则
-  ├─ resolve   → 公共规则 + 疑似组规则
-  ├─ profiles  → 公共规则 + 人物资料规则
-  ├─ relations → 公共规则 + 人物关系规则
+  ├─ scan      → 目录页独立提示词
+  ├─ resolve   → 疑似组独立提示词
+  ├─ profiles  → 人物资料独立提示词
+  ├─ relations → 人物关系独立提示词
   └─ finalize  → 程序处理，不调用模型
 
 最终模型输入 = 当前工作项提示词 + 当前人物/上下文资料 + 默认工具 Schema + 已有消息
@@ -19,7 +21,6 @@ organization.step
 
 | 文件 | 内容 | 使用时机 |
 |---|---|---|
-| `p2-organization-base.md` | 书籍权限、数据真实性、错误恢复、幂等、工具通则、跨步骤纠错边界 | 所有模型工作项 |
 | `p2-organization-directory.md` | 目录页读取、字段范围、疑似组保存、进度登记、submit_result | `scan` |
 | `p2-organization-candidate.md` | 完整资料、合并、结论、submit_result | `resolve` |
 | `p2-organization-profiles.md` | 当前人物资料、其他资产补查、submit_profile_review/done | `profiles` |
@@ -29,7 +30,7 @@ organization.step
 
 ## 规则清理
 
-`agent-wrapper.txt` 中的通用结束规则不能无条件进入所有 P2 工作项。按工作项注入：
+运行时直接生成的通用结束规则不能无条件进入所有 P2 工作项。按工作项注入：
 
 | 规则 | 目录/疑似组 | 人物资料 | 人物关系 |
 |---|---|---|---|
@@ -69,7 +70,7 @@ organization.step
 
 ## 通用 wrapper 的作用域
 
-- `agent-wrapper.txt` 的 P2 分步字段只在 `workKind` 为 directory/candidate/profile/relations 时注入。
+- 运行时按 `workKind` 为 directory/candidate/profile/relations 注入对应结束规则。
 - P3、P1 和其他 Agent 继续使用原有通用结束规则、工具集和错误恢复；P2 的 `submit_result`/done/候选规则不能外溢。
 - `submitRule`、`repairRule`、`finishRule` 必须按工作项选择，不能把第二步/第三步的 done 规则写回全局 wrapper。
 - 增加非 P2 回归：比较改动前后 P3 请求的 System Prompt、工具 Schema、`submit_result` 行为和恢复路径。

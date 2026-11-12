@@ -334,11 +334,11 @@ it('后窗为重叠节点创建新线，前窗保持完成，继续不重复串�
 
 it('五分钟目标前提醒收尾，越过目标的在途响应仍正常结束', async () => {
   const realNow = Date.now.bind(Date); let elapsed = 0
-  const notes: string[] = [], aborted: boolean[] = []
+  const notes: string[] = [], systems: string[] = [], aborted: boolean[] = []
   let db: ReturnType<ReturnType<typeof createWorkspace>['openBook']>
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string), { input } = storyTask(body)
-    notes.push(JSON.stringify(body.messages.at(-1)))
+    notes.push(JSON.stringify(body.messages.at(-1))); systems.push(JSON.stringify(body.messages[0]))
     elapsed = fetcher.mock.calls.length === 1 ? 245000 : 310000
     await db.table('pipelineRuns').update('lease:narrative', { expiresAt: Date.now() + 30000 })
     await db.table('storySessions').toCollection().modify({ leaseUntil: Date.now() + 30000 })
@@ -349,8 +349,11 @@ it('五分钟目标前提醒收尾，越过目标的在途响应仍正常结束'
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed)
   try { await fixture.service.start('a') } finally { clock.mockRestore() }
   expect(fetcher).toHaveBeenCalledTimes(2)
-  expect(notes[0]).toContain('按时间预算')
-  expect(notes[1]).toContain('进入收尾')
+  expect(systems[0]).toContain('时间预算')
+  expect(systems[0]).toContain('停止扩展调查')
+  expect(notes[0]).toContain('剩余约')
+  expect(notes[1]).toContain('剩余约')
+  expect(notes[1]).toContain('不设固定请求轮数')
   expect(aborted).toEqual([false, false])
   expect(fixture.service.state('a')?.error).toBeUndefined()
   expect((await fixture.service.read('a')).completed).toBe(0)

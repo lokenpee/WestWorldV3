@@ -6,6 +6,8 @@ import { canonical, records, strings } from './contracts'
 import { estimateMessageTokens, observationTypes } from './context'
 import type { AgentRepository, Row } from './repository'
 import type { OrganizationMode, OrganizationState } from '../world/types'
+import { getCurrentTools, toToolDeclaration } from '@earendil-works/pi-ai/utils/transcript'
+import { sentMessages, toolDeclaration } from './requestPresentation'
 
 export interface OrganizationStepIndexEntry { runId: string; runStartedAt: string; runStatus: string; mode: OrganizationMode; scope: 'fullBook' | 'character'; step: 'scan' | 'profiles' | 'relations'; kind: 'directory' | 'candidate' | 'profile' | 'relations'; objectKey: string; label: string; status?: string; outcome?: string | null; characterId?: string; requestCount: number; hasTrace: boolean }
 export interface OrganizationRequestBefore { startedAt: string; requestId: string }
@@ -84,7 +86,7 @@ export class TraceSession {
 
   constructor(repo: AgentRepository, identity: TraceIdentity, options: TraceSessionOptions = {}) {
     this.repo = repo; this.identity = identity; this.options = options; this.now = options.now ?? Date.now
-    this.hooks = { start: value => this.start(value), delta: value => this.delta(value), modelEnd: value => this.modelEnd(value) }
+    this.hooks = { start: value => this.start(value), request: value => this.request(value), delta: value => this.delta(value), modelEnd: value => this.modelEnd(value) }
     writers.add(this)
     const list = hub.get(identity.bookId) ?? []; hub.set(identity.bookId, [...list.filter(row => row !== this), this].slice(-20))
     notifyHub()
@@ -121,7 +123,8 @@ export class TraceSession {
     const business = text(this.options.businessPrompt)
     const promptSystemId = system ? `${this.identity.executionId}:prompt:system:${digest(system).slice(-8)}` : undefined
     const promptBusinessId = business ? `${this.identity.executionId}:prompt:business:${digest(business).slice(-8)}` : undefined
-    const tools = value.context.tools?.length ? value.context.tools : messages.flatMap(message => Array.isArray((message as Row).toolsAdded) ? (message as Row).toolsAdded as typeof value.context.tools ?? [] : [])
+    const declared = getCurrentTools(messages)
+    const tools = (declared.length ? declared : value.context.tools ?? []).map(toToolDeclaration)
     const toolId = tools?.length ? `${this.identity.executionId}:tools:${digest(tools).slice(-8)}` : undefined
     const snapshots: Row[] = []
     if (promptSystemId) snapshots.push(this.snapshotRow(promptSystemId, 'prompt_snapshot', { snapshotId: promptSystemId, promptKind: 'system', content: system, contentHash: digest(system), createdAt: startedAt }))
@@ -131,7 +134,10 @@ export class TraceSession {
     freshSnapshots.forEach(row => this.snapshots.set(text(row.snapshotId), row))
     const input = {
       ...(promptSystemId ? { systemPromptSnapshotId: promptSystemId } : {}), ...(promptBusinessId ? { businessPromptSnapshotId: promptBusinessId } : {}), ...(toolId ? { toolSchemaSnapshotId: toolId } : {}),
-      messageFormat: 'pi-agent-message/v1', messages: clone(messages), messageHashes: messages.map(message => digest(message)),
+      messageFormat: 'pi-agent-message/v1', messages: clone(messages.map(message => {
+        const { toolsAdded: _added, toolsRemoved: _removed, ...content } = message as Row
+        return content
+      })), messageHashes: messages.map(message => digest(message)),
       estimatedContextTokens: messages.reduce((sum, message) => sum + estimateMessageTokens(message), 0), completeness: 'complete' as const,
     }
     const record: Row = {
@@ -145,6 +151,21 @@ export class TraceSession {
     freshSnapshots.forEach(row => this.enqueue(row))
     this.enqueue(record)
     this.notify()
+  }
+
+  private request(value: { requestId: string; attemptId: string; body: Row }) {
+    const record = this.records.get(value.requestId)
+    if (!record) return
+    const { messages: _messages, input: _input, system: _system, instructions: _instructions, tools: _tools, ...parameters } = value.body
+    const messages = sentMessages(value.body)
+    const tools = records(value.body.tools).map(toolDeclaration)
+    const snapshotId = `${this.identity.executionId}:tools:${digest(tools).slice(-8)}`
+    const snapshot = this.snapshotRow(snapshotId, 'tool_snapshot', { snapshotId, toolNames: tools.map(tool => text(tool.name)), schema: tools, schemaHash: digest(tools), createdAt: record.startedAt })
+    if (!this.snapshots.has(snapshotId)) { this.snapshots.set(snapshotId, snapshot); this.enqueue(snapshot) }
+    const prior = record.input as Row
+    record.input = { ...prior, messages: clone(messages), messageHashes: messages.map(message => digest(message)), messageFormat: 'provider-request/v1',
+      toolSchemaSnapshotId: snapshotId, requestParameters: parameters, transportAttemptIds: [...strings(prior.transportAttemptIds), value.attemptId] }
+    this.enqueue(record); this.notify()
   }
 
   private delta(value: { requestId: string; event: AssistantMessageEvent }) {
@@ -289,6 +310,7 @@ export class TraceSession {
       if (row.type === 'request_trace') {
         const input = { ...(row.input as Row) }; input.completeness = 'partial'; input.incompleteReason = '浏览器存储空间不足，仅保存摘要。'
         input.messages = Array.isArray(input.messages) ? input.messages.map(message => ({ role: (message as Row).role, content: [{ type: 'text', text: '[存储空间不足，未保存完整内容]' }], timestamp: (message as Row).timestamp })) : []
+        delete input.requestParameters
         const toolCalls = Array.isArray(row.toolCalls) ? (row.toolCalls as Row[]).map(tool => ({ ...tool, ...(tool.result !== undefined ? { result: undefined, resultPreview: preview(tool.result), resultTruncated: true } : {}) })) : []
         return { ...row, input, toolCalls, complete: false }
       }
@@ -336,17 +358,32 @@ function originOf(group: Row, decision: Row | undefined, mode: OrganizationMode)
   return mode === 'full' ? 'scan' : mode
 }
 
-export async function readOrganizationStepIndex(workspace: ReturnType<typeof createWorkspace>, bookId: string, step: 'scan' | 'profiles' | 'relations'): Promise<OrganizationStepIndexEntry[]> {
+// 三个步骤同时请求索引时共享一次读取；请求完成即释放，后续刷新仍读取新数据。
+const indexReads = new WeakMap<object, Promise<{ runs: Row[]; counts: Map<string, number> }>>()
+async function organizationIndexData(workspace: ReturnType<typeof createWorkspace>, bookId: string) {
   const db = workspace.openBook(bookId)
-  const runs = (await db.table('pipelineRuns').toArray()).filter(row => row.bookId === bookId && row.workflow === 'character_organization_v1' && row.organization)
-  if (!runs.length) return []
-  const runIds = new Set(runs.map(row => text(row.id)))
-  const traces = (await db.table('storySessionEntries').toArray()).filter(row => row.type === 'request_trace' && runIds.has(text(row.runId)))
-  const counts = new Map<string, number>()
-  for (const row of traces) {
-    const key = `${text(row.runId)}|${traceUnit(row)}`
-    counts.set(key, (counts.get(key) ?? 0) + 1)
-  }
+  const pending = indexReads.get(db)
+  if (pending) return pending
+  const read = (async () => {
+    const runs = (await db.table('pipelineRuns').toArray()).filter(row => row.bookId === bookId && row.workflow === 'character_organization_v1' && row.organization)
+    const runIds = new Set(runs.map(row => text(row.id)))
+    const sessionIds = [...new Set(runs.map(row => text(row.sessionId)).filter(Boolean))]
+    const traces = runs.length === 0 ? [] : runs.every(row => text(row.sessionId))
+      ? await db.table('storySessionEntries').where('sessionId').anyOf(sessionIds).toArray()
+      : await db.table('storySessionEntries').where('type').equals('request_trace').toArray()
+    const counts = new Map<string, number>()
+    for (const row of traces) if (row.type === 'request_trace' && runIds.has(text(row.runId))) {
+      const key = `${text(row.runId)}|${traceUnit(row)}`
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return { runs, counts }
+  })()
+  indexReads.set(db, read)
+  try { return await read } finally { indexReads.delete(db) }
+}
+
+export async function readOrganizationStepIndex(workspace: ReturnType<typeof createWorkspace>, bookId: string, step: 'scan' | 'profiles' | 'relations'): Promise<OrganizationStepIndexEntry[]> {
+  const { runs, counts } = await organizationIndexData(workspace, bookId)
   const entries: OrganizationStepIndexEntry[] = []
   for (const run of runs.sort((a, b) => text(b.startedAt).localeCompare(text(a.startedAt)))) {
     const organization = run.organization as unknown as OrganizationState
@@ -430,7 +467,7 @@ export async function readExecutionChain(workspace: ReturnType<typeof createWork
   const run = await db.table('pipelineRuns').get(runId)
   if (!run) return { entries: [], requests: [], snapshots: new Map() }
   const sessionId = text(options.sessionId) || text(run.sessionId)
-  const all = await db.table('storySessionEntries').toArray()
+  const all = sessionId ? await db.table('storySessionEntries').where('sessionId').equals(sessionId).toArray() : await db.table('storySessionEntries').toArray()
   const unitId = text(options.unitId)
   const targeted = run.scope === 'character'
   const entries = all.filter(row => {

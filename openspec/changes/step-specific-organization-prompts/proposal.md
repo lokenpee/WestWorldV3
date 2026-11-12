@@ -1,3 +1,5 @@
+> 2026-11-11 后续变更：P2 四份工作项提示词已改为各自独立完整文件，删除 `p2-organization-base.md`；`agent-wrapper.txt` 已删除，作用域/预算/结束约束由 `runtime.ts` 直接生成。以下“公共规则 + 工作项规则”和 wrapper 描述为历史实施记录。
+
 # P2 提示词与默认工具按工作项拆分
 
 ## 为什么
@@ -45,7 +47,7 @@
 
 拆成公共规则和四个工作项规则：
 
-- `p2-organization-base.md`：书籍权限、数据真实性、错误恢复、幂等、工具调用通则、跨步骤纠错边界。
+- 每个 P2 工作项提示词独立包含书籍权限、数据真实性、错误恢复、幂等、工具调用通则和当前工作项规则，不再保留公共 base。
 - `p2-organization-directory.md`：目录页读取、候选保存、进度登记、submit_result。
 - `p2-organization-candidate.md`：疑似组完整资料、merge_assets、结论、submit_result。
 - `p2-organization-profiles.md`：当前人物资料、其他资产补查、submit_profile_review 的 done 语义。

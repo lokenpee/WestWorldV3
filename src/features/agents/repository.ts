@@ -1,13 +1,14 @@
 import Dexie from 'dexie'
-import type { Transaction } from 'dexie'
+import type { Table, Transaction } from 'dexie'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import { canonical } from './contracts'
-import { isObservationEntry } from './context'
+import { isObservationEntry, observationTypes } from './context'
 
 export type Row = Record<string, unknown>
 export interface LeaseGuard { lockKey: string; owner: string; runId: string }
 export interface AgentStore {
   rows(table: string): Promise<Row[]>
+  sessionEntries?(sessionId: string): Promise<Row[]>
   get(table: string, id: string): Promise<Row | undefined>
   put(table: string, row: Row): Promise<void>
   remove(table: string, id: string): Promise<void>
@@ -37,9 +38,17 @@ async function assertLeaseGuard(transaction: Transaction, changes: Map<string, M
   const current = await transaction.table('pipelineRuns').get(id)
   if (!current || current.owner !== lease.owner || current.runId !== lease.runId || Number(current.expiresAt) <= Date.now()) throw new Error('CONFLICT:本任务的执行权已失效。')
 }
+// IndexedDB返回值已是独立副本；先通过索引排除观测正文，再向调用方复制业务快照。
+async function businessRows(table: Table): Promise<Row[]> {
+  if (table.name !== 'storySessionEntries') return table.toArray()
+  const observations = await table.where('type').anyOf([...observationTypes]).primaryKeys()
+  return observations.length ? table.where(':id').noneOf(observations).toArray() : table.toArray()
+}
+
 async function writeSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace>['openBook']>, bookId: string, work: (store: AgentStore) => Promise<T>, lease?: LeaseGuard): Promise<T> {
   for (let attempt = 0; attempt < 4; attempt++) {
     const full = new Map<string, Row[]>(), points = new Map<string, Map<string, Row | undefined>>(), changes = new Map<string, Map<string, Row | undefined>>()
+    const sessions = new Map<string, Row[]>()
     const fences = new Map<string, Row | undefined>()
     for (const domain of ['world', 'narrative', 'extraction']) fences.set(domain, structuredClone(await db.table('pipelineRuns').get(`lease:${domain}`)))
     const base = async (table: string, id: string) => {
@@ -49,9 +58,18 @@ async function writeSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace
       return points.get(table)!.get(id)
     }
     const store: AgentStore = {
+      async sessionEntries(sessionId) {
+        if (!sessions.has(sessionId)) sessions.set(sessionId, (await db.table('storySessionEntries').where('sessionId').equals(sessionId).toArray()).filter(row => visible('storySessionEntries', row)))
+        const rows = new Map(sessions.get(sessionId)!.map(row => [String(row.id), row]))
+        for (const [id, row] of changes.get('storySessionEntries') ?? []) {
+          if (row?.sessionId === sessionId && visible('storySessionEntries', row)) rows.set(id, row)
+          else rows.delete(id)
+        }
+        return structuredClone([...rows.values()])
+      },
       async get(table, id) { const row = changes.get(table)?.has(id) ? changes.get(table)!.get(id) : await base(table, id); return visible(table, row) ? structuredClone(row) : undefined },
       async rows(table) {
-        if (!full.has(table)) full.set(table, structuredClone(await db.table(table).toArray()).filter(row => visible(table, row)))
+        if (!full.has(table)) full.set(table, await businessRows(db.table(table)))
         const rows = new Map(full.get(table)!.map(row => [keyOf(table, row), row]))
         for (const [id, row] of changes.get(table) ?? []) { if (row && visible(table, row)) rows.set(id, row); else rows.delete(id) }
         return structuredClone([...rows].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([, row]) => row))
@@ -76,10 +94,14 @@ async function writeSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace
       if (changes.has('characters') || changes.has('locations')) domains.add('world')
       if (['nodes', 'eventLines', 'storySessions', 'storySessionEntries', 'storyEditorMemory', 'storyEditorNotes', 'storyEditorCheckpoints'].some(table => changes.has(table))) domains.add('narrative')
     }
-    const tables = [...new Set([...full.keys(), ...points.keys(), ...changes.keys(), 'pipelineRuns'])]
+    const tables = [...new Set([...full.keys(), ...points.keys(), ...changes.keys(), ...(sessions.size ? ['storySessionEntries'] : []), 'pipelineRuns'])]
     try {
       await db.transaction('rw', tables.map(table => db.table(table)), async transaction => {
-        for (const [table, rows] of full) if (canonical(snapshotRows(table, (await transaction.table(table).toArray()).filter(row => visible(table, row)))) !== canonical(snapshotRows(table, rows))) throw new SnapshotConflict()
+        for (const [sessionId, rows] of sessions) {
+          const current = (await transaction.table('storySessionEntries').where('sessionId').equals(sessionId).toArray()).filter(row => visible('storySessionEntries', row))
+          if (canonical(current) !== canonical(rows)) throw new SnapshotConflict()
+        }
+        for (const [table, rows] of full) if (canonical(snapshotRows(table, await businessRows(transaction.table(table)))) !== canonical(snapshotRows(table, rows))) throw new SnapshotConflict()
         for (const [table, rows] of points) for (const [id, row] of rows) if (!sameSnapshot(table, (await transaction.table(table).get(id)) ?? undefined, row)) throw new SnapshotConflict()
         for (const domain of domains) {
           const current = await transaction.table('pipelineRuns').get(`lease:${domain}`)
@@ -101,7 +123,7 @@ async function readSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace>
   for (let attempt = 0; attempt < 5; attempt++) {
     const all = new Map<string, Row[]>(), points = new Map<string, Map<string, Row | undefined>>()
     if (attempt) await db.transaction('r', [...new Set([...tables, ...keys.keys()])].map(name => db.table(name)), async () => {
-      for (const name of tables) all.set(name, structuredClone(await db.table(name).toArray()))
+      for (const name of tables) all.set(name, await businessRows(db.table(name)))
       for (const [name, ids] of keys) {
         const values = all.has(name) ? [...ids].map(id => all.get(name)!.find(row => keyOf(name, row) === id)) : await db.table(name).bulkGet([...ids])
         points.set(name, new Map([...ids].map((id, index) => [id, structuredClone(values[index])])))
@@ -110,7 +132,7 @@ async function readSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace>
     const store: AgentStore = {
       async rows(name) {
         tables.add(name)
-        if (!all.has(name)) { if (attempt) throw new MoreSnapshotData(); all.set(name, structuredClone(await db.table(name).toArray()).filter(row => visible(name, row))) }
+        if (!all.has(name)) { if (attempt) throw new MoreSnapshotData(); all.set(name, await businessRows(db.table(name))) }
         return structuredClone(all.get(name)!.filter(row => visible(name, row)))
       },
       async get(name, id) {
@@ -128,7 +150,7 @@ async function readSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace>
       const names = [...new Set([...tables, ...points.keys()])]
       if (!names.length) return value
       const valid = await db.transaction('r', names.map(name => db.table(name)), async () => {
-        for (const name of tables) if (canonical(snapshotRows(name, await db.table(name).toArray())) !== canonical(snapshotRows(name, all.get(name)!))) return false
+        for (const name of tables) if (canonical(snapshotRows(name, await businessRows(db.table(name)))) !== canonical(snapshotRows(name, all.get(name)!))) return false
         for (const [name, values] of points) for (const [id, row] of values) if (!sameSnapshot(name, await db.table(name).get(id), row)) return false
         return true
       })

@@ -1,6 +1,8 @@
+import { LazyDetails } from './LazyDetails'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Row } from './repository'
 import { subscribeTraceHub, traceSessions } from './trace'
+import { displayContent, messageRows, toolDeclaration, toolResultContent } from './requestPresentation'
 import './AgentRunPanel.css'
 
 export interface TraceData { requests: Row[]; snapshots: Map<string, Row>; warning?: string; leaseActive?: boolean; total?: number }
@@ -10,9 +12,9 @@ interface ContextGroup { key: string; label: string; requests: Row[] }
 interface WindowGroup { key: string; label: string; contexts: ContextGroup[] }
 
 const text = (value: unknown) => typeof value === 'string' ? value : ''
-const num = (value: unknown) => typeof value === 'number' ? String(value) : '未知'
 const record = (value: unknown): Row => value && typeof value === 'object' ? value as Row : {}
 const list = (value: unknown): Row[] => Array.isArray(value) ? value.filter(item => item && typeof item === 'object') as Row[] : []
+const stringList = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter(item => typeof item === 'string') as string[] : []
 const status = (value: unknown) => ({ running: '进行中', succeeded: '成功', failed: '失败', cancelled: '取消', interrupted: '已中断' } as Record<string, string>)[text(value)] ?? text(value)
 const toolStatus = (value: unknown) => ({ pending: '待执行', running: '执行中', succeeded: '成功', failed: '失败' } as Record<string, string>)[text(value)] ?? (text(value) || '待执行')
@@ -23,7 +25,7 @@ const full = (value: unknown) => {
   if (typeof value === 'string') return value
   try { return JSON.stringify(value, null, 2) ?? String(value) } catch { return '无法显示该内容' }
 }
-const roleLabel = (role: unknown) => ({ system: 'SYSTEM', user: 'USER', assistant: 'ASSISTANT', toolResult: 'TOOL RESULT' } as Record<string, string>)[text(role)] ?? (text(role).toUpperCase() || 'MESSAGE')
+const roleLabel = (role: unknown) => ({ system: 'SYSTEM', user: 'USER', assistant: 'ASSISTANT', tool: 'TOOL RESULT', toolResult: 'TOOL RESULT' } as Record<string, string>)[text(role)] ?? (text(role).toUpperCase() || 'MESSAGE')
 const stageLabel = (stage: string) => ({ directory: '目录扫描', scan: '目录扫描', candidate: '疑似同人', profile: '人物资料', relations: '人物关系' } as Record<string, string>)[stage] ?? (stage || '其他工作')
 const duration = (requests: Row[]) => {
   const starts = requests.map(row => Date.parse(text(row.startedAt))).filter(Number.isFinite)
@@ -34,57 +36,50 @@ const duration = (requests: Row[]) => {
 
 function MessageBlock({ message, index }: { message: Row; index: number }) {
   const role = text(message.role)
-  return <details className={`run-role run-role-${role || 'message'}`}>
-    <summary>{roleLabel(role)}{message.toolName ? ` · ${text(message.toolName)}` : ''}{message.toolCallId ? ` · ${text(message.toolCallId)}` : ''} · 消息 {index + 1}</summary>
-    <pre>{full(message.content)}</pre>
-  </details>
+  const calls = list(message.tool_calls)
+  return <LazyDetails className={`run-role run-role-${role || 'message'}`} summary={<> <span className="run-message-number">{index + 1}</span>{roleLabel(role)}{message.toolName ? ` · ${text(message.toolName)}` : ''} </>}>{() => <>
+    {message.reasoning_content != null && <LazyDetails summary={<> 随消息发送的推理内容 </>}>{() => <><pre>{displayContent(message.reasoning_content)}</pre></>}</LazyDetails>}
+    {message.content != null && <pre>{displayContent(message.content)}</pre>}
+    {message.content == null && !calls.length && message.reasoning_content == null && <pre>{displayContent(message)}</pre>}
+    {calls.map((call, callIndex) => <div key={callIndex}><p>TOOL CALL · {text(record(call.function).name)}</p><pre>{displayContent(record(call.function).arguments)}</pre></div>)}
+  </>}</LazyDetails>
 }
 
 export function ApiRequest({ row, index, snapshots }: { row: Row; index: number; snapshots: Map<string, Row> }) {
   const input = record(row.input)
-  const messages = list(input.messages)
-  const snapshot = (id: unknown) => snapshots.get(text(id))
-  const systemSnapshot = snapshot(input.systemPromptSnapshotId)
-  const businessSnapshot = snapshot(input.businessPromptSnapshotId)
-  const toolSnapshot = snapshot(input.toolSchemaSnapshotId)
-  const tools = list(toolSnapshot?.schema)
-  const systemText = text(systemSnapshot?.content)
-  const businessText = text(businessSnapshot?.content)
-  const businessInSystem = !!businessText && systemText.includes(businessText)
+  const messages = messageRows(list(input.messages))
+  const actualRequest = input.messageFormat === 'provider-request/v1'
+  const systemSnapshot = snapshots.get(text(input.systemPromptSnapshotId))
+  const toolSnapshot = snapshots.get(text(input.toolSchemaSnapshotId))
+  const tools = list(toolSnapshot?.schema).map(toolDeclaration)
+  const toolNames = stringList(toolSnapshot?.toolNames)
   const calls = list(row.toolCalls)
-  const toolResultTexts = calls.map(tool => full(tool.result ?? tool.resultPreview).trim())
-  const assistantText = text(row.text)
-  const showAssistantText = !!assistantText && !toolResultTexts.includes(assistantText.trim())
-  const inputMessages = [...messages]
-  if (systemSnapshot && !messages.some(message => text(message.role) === 'system')) inputMessages.unshift({ role: 'system', content: text(systemSnapshot.content) })
-  return <section className="run-api" aria-label={`第 ${index + 1} 次 API 请求`}>
-    <header className="run-api-heading">
-      <strong>第 {index + 1} 次 API 请求</strong>
-      <span>{when(row.startedAt)} · {status(row.status)} · {text(row.model) || '模型未记录'}</span>
-      <span>输入 {num(record(row.usage).input)} · 输出 {num(record(row.usage).output)} · 总 {num(record(row.usage).totalTokens)}</span>
-    </header>
-    <div className="run-api-meta">执行 {text(row.executionId)} · 会话 {text(row.sessionId)} · 本回合耗时 {text(row.modelFinishedAt) ? `${Math.max(0, Math.round((Date.parse(text(row.modelFinishedAt)) - Date.parse(text(row.startedAt))) / 1000))} 秒` : '未记录'}</div>
-    <section className="run-input-messages" aria-label="API 输入消息">
-      <h4>API 输入</h4>
-      {inputMessages.map((message, messageIndex) => <MessageBlock key={messageIndex} message={message} index={messageIndex} />)}
-      {businessSnapshot && !businessInSystem && <details className="run-role run-role-business"><summary>BUSINESS PROMPT · 业务提示词</summary><pre>{businessText}</pre></details>}
-      {tools.length > 0 && <details className="run-role run-role-tools"><summary>TOOLS · 工具定义（{tools.length}）</summary>{tools.map((tool, toolIndex) => <details key={toolIndex}><summary>{text(tool.name) || `工具 ${toolIndex + 1}`}</summary><pre>{full(tool)}</pre></details>)}</details>}
-      {input.completeness === 'partial' && <p role="status">本次输入未完整保存：{text(input.incompleteReason) || '容量或引用限制'}。</p>}
-      {!!input.missingRefs && <p role="status">缺失引用：{strings(input.missingRefs).join('、')}</p>}
-    </section>
-    <section className="run-assistant" aria-label="模型返回">
-      <h4>ASSISTANT · 模型返回</h4>
-      {text(row.thinking) && <details className="run-role run-role-thinking"><summary>THINKING · 推理内容</summary><pre>{text(row.thinking)}</pre></details>}
-      {showAssistantText && <details className="run-role run-role-assistant"><summary>ASSISTANT · 文本回复</summary><pre>{assistantText}</pre></details>}
-      {!showAssistantText && !text(row.thinking) && calls.length > 0 && <p className="field-help">本回合模型返回工具调用，没有额外文本。</p>}
-      {calls.length > 0 ? calls.map(tool => <section className="run-tool-call" key={text(tool.toolCallId)}>
-        <details className="run-role run-role-toolcall"><summary>TOOL CALL · {text(tool.name)} · {toolStatus(tool.state)}</summary><pre>{full(tool.arguments)}</pre></details>
-        <div className="run-tool-execution">TOOL EXECUTION · 程序执行工具</div>
-        <details className="run-role run-role-toolresult"><summary>TOOL RESULT · {text(tool.name)} · {toolStatus(tool.state)}{tool.isError ? ' · 错误' : ''}</summary>{tool.result === undefined && tool.resultPreview === undefined ? <p className="field-help">等待返回或未记录工具结果。</p> : <pre>{full(tool.result ?? tool.resultPreview)}</pre>}</details>
-      </section>) : <p className="field-help">本回合没有工具调用。</p>}
-      {!!row.error && <p role="alert">{full(row.error)}</p>}
-    </section>
-  </section>
+  if (!actualRequest && systemSnapshot && !messages.some(message => message.role === 'system')) messages.unshift({ role: 'system', content: systemSnapshot.content })
+  return <LazyDetails className="run-api execution-api-call" open={index === 0} aria-label={`第 ${index + 1} 次 API 请求`} summaryClassName="run-api-heading" summary={<> <strong>API {String(index + 1).padStart(2, '0')}</strong><span>{status(row.status)} · {when(row.startedAt)}</span><span>{calls.length ? `${calls.length} 次工具调用` : '文本回复'}</span> </>}>{() => <>
+    <div className="run-api-content">
+      {!actualRequest && <p className="field-help run-history-note">历史记录 · 输入来自当时保存的上下文</p>}
+      <section className="run-input-messages" aria-label="API 输入消息">
+        <h4><span className="run-flow-mark">↑</span>发送给 API</h4>
+        {messages.map((message, messageIndex) => <MessageBlock key={messageIndex} message={message} index={messageIndex} />)}
+        <LazyDetails className="run-role run-role-tools" summary={<> TOOLS · 可调用工具（{tools.length || toolNames.length}） </>}>{() => <>{tools.length ? tools.map((tool, toolIndex) => <LazyDetails className="run-tool-definition" key={toolIndex} summary={<> {text(tool.name) || `工具 ${toolIndex + 1}`} </>}>{() => <><pre>{full(tool)}</pre></>}</LazyDetails>) : <p className="field-help">{toolSnapshot ? toolNames.length ? `仅保存工具名称：${toolNames.join('、')}` : '本次没有工具定义。' : '本次未保存工具定义快照。'}</p>}</>}</LazyDetails>
+        {Object.keys(record(input.requestParameters)).length > 0 && <LazyDetails className="run-role run-request-parameters" summary={<> 请求参数 </>}>{() => <><pre>{full(input.requestParameters)}</pre></>}</LazyDetails>}
+        {input.completeness === 'partial' && <p role="status">本次输入未完整保存：{text(input.incompleteReason) || '容量或引用限制'}。</p>}
+        {!!input.missingRefs && <p role="status">缺失引用：{strings(input.missingRefs).join('、')}</p>}
+      </section>
+      <section className="run-assistant" aria-label="API 返回">
+        <h4><span className="run-flow-mark">↓</span>API 返回 <small>ASSISTANT</small></h4>
+        {text(row.thinking) && <LazyDetails className="run-role run-role-thinking" summary={<> 推理内容 </>}>{() => <><pre>{text(row.thinking)}</pre></>}</LazyDetails>}
+        {text(row.text) && <div className="run-reply"><pre>{text(row.text)}</pre></div>}
+        {calls.map((tool, callIndex) => <LazyDetails className="run-role run-role-toolcall" key={text(tool.toolCallId) || callIndex} summary={<> TOOL CALL · {text(tool.name)} </>}>{() => <><pre>{displayContent(tool.arguments)}</pre></>}</LazyDetails>)}
+        {!text(row.text) && !text(row.thinking) && !calls.length && <p className="field-help">{row.status === 'running' ? '等待 API 返回…' : '没有记录到返回内容。'}</p>}
+        {!!row.error && <p role="alert">{full(row.error)}</p>}
+      </section>
+      {calls.length > 0 && <section className="run-tool-results" aria-label="工具执行结果">
+        <h4><span className="run-flow-mark">↳</span>工具执行结果</h4>
+        {calls.map((tool, callIndex) => <LazyDetails className="run-role run-role-toolresult" key={text(tool.toolCallId) || callIndex} summary={<> TOOL RESULT · {text(tool.name)}<span className={tool.isError || tool.state === 'failed' ? 'field-error run-result-state' : 'run-result-state'}>{tool.isError ? '失败' : toolStatus(tool.state)}</span> </>}>{() => <>{tool.result === undefined && tool.resultPreview === undefined ? <p className="field-help">等待返回或未记录工具结果。</p> : <pre>{toolResultContent(tool.result ?? tool.resultPreview)}</pre>}</>}</LazyDetails>)}
+      </section>}
+    </div>
+  </>}</LazyDetails>
 }
 
 export function Changes({ edits, characterNames }: { edits: Row[]; characterNames?: Map<string, string> }) {

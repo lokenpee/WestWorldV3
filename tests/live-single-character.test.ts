@@ -78,6 +78,10 @@ it.skipIf(!key)('真实单人：贾政资料整理只产生一个人物工作项
       const input = row.input && typeof row.input === 'object' ? row.input as Record<string, unknown> : {}
       return { roles: Array.isArray(input.messages) ? (input.messages as Record<string, unknown>[]).map(message => String(message.role ?? '')) : [], users: Array.isArray(input.messages) ? (input.messages as Record<string, unknown>[]).filter(message => message.role === 'user').map(message => contentText(message.content)) : [], systems: Array.isArray(input.messages) ? (input.messages as Record<string, unknown>[]).filter(message => message.role === 'system').map(message => contentText(message.content)) : [] }
     })
+    const toolSnapshots = snapshots.filter(row => row.type === 'tool_snapshot')
+    const toolNames = toolSnapshots.flatMap(row => Array.isArray(row.schema) ? (row.schema as Record<string, unknown>[]).map(tool => String(tool.name)) : [])
+    const toolSchemaBytes = toolSnapshots.reduce((sum, row) => sum + new TextEncoder().encode(JSON.stringify(row.schema ?? [])).length, 0)
+    const systemText = traceBodies.map(body => body.systems.join('\n')).join('\n')
     const evidence = {
       book: book.title, character: { id: target.id, name: target.name, before, after },
       outcome: item?.outcome, reason: item?.reason, commitIds: item?.commitIds,
@@ -85,7 +89,8 @@ it.skipIf(!key)('真实单人：贾政资料整理只产生一个人物工作项
       reportUsage: run.report.usage, cost: run.report.cost, status: run.status, error: service.state(book.id)?.error,
       messageEntries: msgs.length, contexts: run.organization?.contexts,
       traceRequests: traces.map(row => ({ requestId: row.requestId, executionId: row.executionId, purpose: row.purpose, status: row.status, complete: row.complete, final: row.final, model: row.model, text: String(row.text ?? '').slice(0, 120), toolCalls: Array.isArray(row.toolCalls) ? row.toolCalls.map((tool: Record<string, unknown>) => tool.name) : [], usage: row.usage })),
-      traceSnapshots: snapshots.map(row => ({ type: row.type, snapshotId: row.snapshotId, length: String(row.content ?? '').length || (Array.isArray(row.schema) ? row.schema.length : 0) })), traceBodies,
+      traceSnapshots: snapshots.map(row => ({ type: row.type, snapshotId: row.snapshotId, length: String(row.content ?? '').length || (Array.isArray(row.schema) ? row.schema.length : 0), toolNames: row.type === 'tool_snapshot' && Array.isArray(row.schema) ? (row.schema as Record<string, unknown>[]).map(tool => String(tool.name)) : undefined })), traceBodies,
+      toolNames, toolSchemaBytes, systemLength: systemText.length, businessLength: snapshots.filter(row => row.type === 'prompt_snapshot' && String(row.snapshotId).includes(':business:')).reduce((sum, row) => sum + String(row.content ?? '').length, 0),
       note: '单人验证在第一个 profile 工作项完成后主动取消，只用于质量与请求构成检查。',
     }
     mkdirSync('test-results', { recursive: true })
@@ -96,6 +101,12 @@ it.skipIf(!key)('真实单人：贾政资料整理只产生一个人物工作项
     if (!traces.length) throw new Error('没有保存运行详情请求记录。')
     if (traces.some(row => !row.executionId || !row.input || !row.requestId || row.final !== true)) throw new Error('运行详情请求记录缺少执行号、输入或收尾标记。')
     if (!snapshots.length) throw new Error('没有保存提示词或工具快照。')
+    if (!toolNames.length) throw new Error('工具快照没有记录实际工具名。')
+    for (const name of ['submit_result', 'submit_relation_review', 'record_organization_progress']) if (toolNames.includes(name)) throw new Error(`资料工作项仍提供其他步骤工具：${name}`)
+    for (const name of ['submit_profile_review', 'merge_assets', 'edit_character', 'set_character_relation', 'delete_character_relation']) if (!toolNames.includes(name)) throw new Error(`资料工作项缺少跨步骤工具：${name}`)
+    if (systemText.includes('submit_relation_review')) throw new Error('资料工作项系统提示词仍要求提交人物关系。')
+    if (!systemText.includes('# 第二步：优化人物资料')) throw new Error('系统提示词缺少第二步工作项规则。')
+    if (systemText.includes('# 第一步：目录页') || systemText.includes('# 第三步：整理人物关系')) throw new Error('系统提示词混入其他步骤规则。')
     for (const body of traceBodies) {
       const tasks = body.users.filter(value => value.trim().startsWith('{') && value.includes('"workItems"'))
       if (tasks.length !== new Set(tasks).size) throw new Error('最终请求重复注入人物任务。')

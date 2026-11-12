@@ -221,10 +221,11 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     if (!run?.organization) throw new Error('INVALID_ARGS:当前运行不是人物整理任务。')
     const organization = run.organization as Row
     const active = organization.activeWork as Row | undefined
-    const id = text(args.id) || text(active?.characterId)
-    if (!id) throw new Error('INVALID_ARGS:请提供人物编号。')
-    const row = await store.get('characters', id) as unknown as Character | undefined
+    const requestedId = text(args.id) || text(active?.characterId)
+    if (!requestedId) throw new Error('INVALID_ARGS:请提供人物编号。')
+    const row = await resolveAsset(store, scope, 'characters', requestedId) as unknown as Character | undefined
     if (!row || row.bookId !== scope.bookId) throw new Error('NOT_FOUND:人物不存在或不属于本书。')
+    const id = row.id
     if (active?.kind === 'profile' && text(active.characterId) === id) { active.dataVersion = Number(row.revision); await store.put('pipelineRuns', { ...run, organization }) }
     return { data: await profileWork(row) }
   }
@@ -233,8 +234,11 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     if (!run?.organization) throw new Error('INVALID_ARGS:当前运行不是人物整理任务。')
     const organization = run.organization as Row
     const active = organization.activeWork as Row | undefined
-    const id = text(args.characterId) || text(active?.characterId)
-    if (!id) throw new Error('INVALID_ARGS:请提供人物编号。')
+    const requestedId = text(args.characterId) || text(active?.characterId)
+    if (!requestedId) throw new Error('INVALID_ARGS:请提供人物编号。')
+    const person = await resolveAsset(store, scope, 'characters', requestedId)
+    if (!person) throw new Error('NOT_FOUND:人物不存在或不属于本书。')
+    const id = text(person.id)
     const targetIds = [...new Set(strings(args.targetIds))]
     const fields = [...new Set(strings(args.fields))]
     if (targetIds.length > 50) throw new Error('INVALID_ARGS:targetIds单次最多50个。')

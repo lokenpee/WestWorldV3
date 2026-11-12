@@ -660,12 +660,6 @@
       "authority": "2.2-target-see-resource-authority"
     },
     {
-      "path": "resources/v2.2/prompts/active/agent-wrapper.txt",
-      "sha256": "86d738ff71932620c92b36e38757e09f9719afb97090601e125dda3eefe85d08",
-      "bytes": 1135,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
       "path": "resources/v2.2/prompts/active/character-optimize.md",
       "sha256": "3e3163771e4b52ca82b34e3547fe8cd5e67de591deda932a3fbcbc2f8772014e",
       "bytes": 1935,
@@ -675,30 +669,6 @@
       "path": "resources/v2.2/prompts/active/compact.md",
       "sha256": "55f76b7513cf1524d912374b9d244935fa0fb050a72319d69c8609c8f30e38f2",
       "bytes": 1556,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/active/compacted_history.txt",
-      "sha256": "a1b53f64723eabc62eb8c1b83caf5209c11f9dd733eb0551fd57f7fe54d9f628",
-      "bytes": 204,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/active/conflict.txt",
-      "sha256": "1fe07d1fc58e327359d80710816a45693c537fb06025d81ad33c30dcd5184423",
-      "bytes": 196,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/active/final_only.txt",
-      "sha256": "762593696789b213b07de57b29acad46f9ede8fe012330953b2e315bbf8ed3c6",
-      "bytes": 271,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/active/identity.txt",
-      "sha256": "cec7c220abcea2269192581110b08fdb41a5c31782cee6b541a7fdae9e8bcfd1",
-      "bytes": 250,
       "authority": "2.2-target-see-resource-authority"
     },
     {
@@ -756,51 +726,9 @@
       "authority": "2.2-target-see-resource-authority"
     },
     {
-      "path": "resources/v2.2/prompts/active/recovery.txt",
-      "sha256": "57e499aebb2164a947111fc90fd9b5b086acb245f489b9877187a8edde8ded6e",
-      "bytes": 245,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/active/repair_direct.txt",
-      "sha256": "53cded02eec1837780bd30b45c67b9063fe131b4253c5e89f153e83c9a62d20f",
-      "bytes": 182,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/active/repair_final.txt",
-      "sha256": "81aad98eaa46f4424f1147bf2fef796682eea442bb69e3f7abe51cbb2a5e8b81",
-      "bytes": 180,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/active/repair_write.txt",
-      "sha256": "ca380f5a36c488d3a0c30202e4251f3ce3e5ca240b52c2bdfa7fda6da45607b7",
-      "bytes": 267,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
       "path": "resources/v2.2/prompts/active/story.txt",
       "sha256": "d88c4f0f4fc7cabc72107beed95f9159866c8b9e2912e4f192c672c33a6bcdaf",
       "bytes": 282,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/optimize-locations.md",
-      "sha256": "e6bad1b5285911ca4899cb11f0f1757c678213f3caa280b81f24d1b2ccf8a2fb",
-      "bytes": 666,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/p2-asset-editor.md",
-      "sha256": "8a307dc3e9b1e2c584ab32d067590e7e3b2ab1d88ed0ec598706d9d22b4264ef",
-      "bytes": 1994,
-      "authority": "2.2-target-see-resource-authority"
-    },
-    {
-      "path": "resources/v2.2/prompts/p3-story-editor.md",
-      "sha256": "84fff83f13c8b00614ca4e6f56e6afc0ad9309efce26cac2eb7a7c6534ddd489",
-      "bytes": 2997,
       "authority": "2.2-target-see-resource-authority"
     },
     {
@@ -919,8 +847,8 @@
     },
     {
       "path": "resources/v2.2/storage.schema.json",
-      "sha256": "701e87e2ddc536cee73c1f627dda6a0d89aaa3544c6ed7955f2714e19cb26fee",
-      "bytes": 119694,
+      "sha256": "8d96f8a5689a592d66c92c03c3fc31f88ff28ca0d67075cefda1db1a5ae72126",
+      "bytes": 202070,
       "authority": "2.2-target-see-resource-authority"
     },
     {
@@ -1033,8 +961,8 @@
     },
     {
       "path": "resources/v2.2/tool-contracts.json",
-      "sha256": "2631ccd53cd384b2b799dbd98ce5bbd664daa5671b1796a41c09f3e827c9e0c7",
-      "bytes": 81898,
+      "sha256": "19b42cc0af5b75054794779316abb08398e0d154a4183df92fb76a7cf01b6ff3",
+      "bytes": 181110,
       "authority": "2.2-target-see-resource-authority"
     },
     {

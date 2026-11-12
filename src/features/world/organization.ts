@@ -13,7 +13,7 @@ import { buildRelationReview, buildProfileReview, organizationReviewVersion, rev
 import { profileWork, relationOverview } from '../agents/organizationData'
 import { resolveLifecycleId } from '../assets/relations'
 import { visiblePairChecks } from './organizationReport'
-import basePrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-base.md?raw'
+import { organizationPrompt } from './organizationPrompt'
 import directoryPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-directory.md?raw'
 import candidatePrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-candidate.md?raw'
 import profilePrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-profiles.md?raw'
@@ -26,9 +26,7 @@ const pageId = (index: number) => `scan:${index}`
 export const organizationExecutionVersion = 4
 const stageOf = (step: OrganizationState['step']) => step === 'scan' || step === 'resolve' ? 'identity' : step === 'profiles' ? 'profiles' : step === 'relations' ? 'relations' : undefined
 const contextIdOf = (kind: WorkKind) => kind === 'directory' || kind === 'candidate' ? 'identity' : kind === 'profile' ? 'profiles' : 'relations'
-const promptFor = (kind: WorkKind) => `${basePrompt}
-
-${{ directory: directoryPrompt, candidate: candidatePrompt, profile: profilePrompt, relations: relationPrompt }[kind]}`
+const promptFor = (kind: WorkKind) => ({ directory: directoryPrompt, candidate: candidatePrompt, profile: profilePrompt, relations: relationPrompt }[kind])
 
 export function createOrganizationState(characterIds: string[]): OrganizationState {
   const ids = [...new Set(characterIds)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
@@ -311,7 +309,7 @@ export async function runCharacterOrganization(workspace: Workspace, bookId: str
     const result = await runtime.run(repo, {
       profile: 'asset_editor', phase: 'character_organization', workflow: 'character_organization_v1',
       runId: options.runId, taskId, sessionId, leaseOwner: options.owner, retainLease: true,
-      workItems: [workItem], input, businessPrompt: promptFor(unit.kind), prompt: JSON.stringify(input), signal: options.signal,
+      workItems: [workItem], input, businessPrompt: promptFor(unit.kind), prompt: organizationPrompt(unit), signal: options.signal, shouldPause: options.shouldPause,
       contextId, unitId: workId, organizationWorkKind: unit.kind, organizationStep: organization.step,
     })
     const next = await organizationOf(repo, options.runId)

@@ -379,19 +379,8 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
     relationFailureSignatures.set(failureKey, { signature, count: 1 })
     throw new Error(`INVALID_ARGS:批量校验失败（${errors.length}项）：${errors.join('；')}`)
   }
-  if (!prepared.length && failures.length) {
-    relationFailureSignatures.set(failureKey, { signature, count: 1 })
-    item.reason = `未提交任何修改：${failures.map(failure => `${failure.targetId || '未知目标'}（${failure.code}）`).join('、')}`
-    active.draft = { ...((active.draft as Row | null) ?? {}), failed: failures }
-    await saveOrganization(store, (await store.get('pipelineRuns', scope.runId))!, organization)
-    return {
-      changed: false, done: false, complete: false,
-      summary: `未提交任何修改：${failures.map(failure => `${failure.targetId || '未知目标'}：${failure.message}`).join('；')}`,
-      commitId, outcome: 'uncertain' as const, applied: [], cumulativeApplied: [], unverified: [], uncertain: failures.map(failure => failure.targetId).filter(Boolean), failed: failures,
-    }
-  }
-
   const appliedNow = new Set<string>()
+  let acceptedChanges = 0
   const changedTargets = new Set<string>()
   let applyContext = context
   for (const change of prepared) {
@@ -421,6 +410,7 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
             operationKey: `${text(args.operationKey)}:${change.targetId}`, runId: scope.runId,
           })
       changed = result.changed
+      acceptedChanges++
     } catch (error) {
       const message = error instanceof Error ? error.message : '提交失败。'
       const code = /^([A-Z_]+):/.exec(message)?.[1] ?? 'INVALID_ARGS'
@@ -507,15 +497,18 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
     organization.pairChecks = pairs
   } else {
     active.commitIds = commitIds
-    active.draft = { changes, reason: text(args.reason), uncertainPairs, failed: failures }
+    active.draft = { changes, reason: text(args.reason), uncertainPairs: [...uncertainReasons].map(([targetId, reason]) => ({ targetId, reason })), failed: failures }
     item.reason = description; item.commitIds = commitIds
   }
   await saveOrganization(store, (await store.get('pipelineRuns', scope.runId))!, organization)
-  const summary = completed ? '人物关系已保存并完成。' : failures.length ? `人物关系已保存，${appliedNow.size}项本次写入；${failures.length}项未提交。` : '人物关系已保存，继续处理当前人物。'
+  const summary = completed ? '人物关系已保存并完成。' : failures.length
+    ? acceptedChanges ? `人物关系已保存，${appliedNow.size}项本次写入；${failures.length}项未提交。` : `本次未提交任何修改：${failures.map(failure => `${failure.targetId || '未知目标'}：${failure.message}`).join('；')}`
+    : '人物关系已保存，继续处理当前人物。'
   if (failures.length) relationFailureSignatures.set(failureKey, { signature, count: 1 })
   else relationFailureSignatures.delete(failureKey)
   return {
-    changed: appliedNow.size > 0, done: completed, complete: completed, summary, commitId, outcome,
+    ok: failures.length === 0, status: failures.length ? (acceptedChanges > 0 ? 'partial' as const : 'failed' as const) : 'succeeded' as const,
+    changed: appliedNow.size > 0, done: completed, complete: completed, summary, ...(failures.length && !acceptedChanges ? {} : { commitId }), outcome,
     applied: [...appliedNow], cumulativeApplied: [...changedTargets], unverified: [...reviewTargets], uncertain: [...uncertainTargets], failed: failures,
   }
 }
@@ -632,9 +625,17 @@ export async function applyOrganizationTool(store: AgentStore, scope: Scope, nam
     const commitIds = strings(args.commitIds)
     if (outcome === 'merged' || outcome === 'partial') {
       if (!commitIds.length) throw new Error('INVALID_ARGS:合并结论须引用实际合并确认。')
+      const members = strings(group.memberIds)
+      for (const commitId of commitIds) {
+        const applied = records(run.appliedCommands).find(row => row.commitId === commitId)
+        const intent = applied && records(run.commandIntents).find(row => row.operationKey === applied.operationKey)
+        const payload = intent?.payload as Row | undefined
+        if (!applied || intent?.toolName !== 'merge_assets' || payload?.kind !== 'character' || strings(payload.memberIds).filter(id => members.includes(id)).length < 2) throw new Error('INVALID_ARGS:提交确认必须来自本轮对该候选组成员的实际人物合并。')
+      }
       const mappings = await store.rows('assetLifecycle')
-      const resolved = strings(group.memberIds).map(id => resolveLifecycleId(id, mappings as never))
-      if (resolved.some(id => !id) || new Set(resolved).size !== 1) throw new Error('CONFLICT:合并结论与当前生命周期不一致。')
+      const resolved = members.map(id => resolveLifecycleId(id, mappings as never))
+      const remaining = new Set(resolved).size
+      if (resolved.some(id => !id) || (outcome === 'merged' ? remaining !== 1 : remaining <= 1 || remaining >= members.length)) throw new Error('CONFLICT:合并结论与当前生命周期不一致。')
     }
     const next = { ...group, status: 'resolved' as const, revision: Number(group.revision) + 1, updatedAt: timestamp }
     const names = strings(group.memberNames).length ? strings(group.memberNames) : await memberNames(store, strings(group.memberIds))

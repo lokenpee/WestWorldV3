@@ -23,6 +23,20 @@ export async function reviewContext(store: AgentStore) {
   const lifecycle = await store.rows('assetLifecycle') as unknown as Lifecycle[]
   const relations = syncRelations(raw, people, lifecycle).relations
   const pairs = effectivePairs(relations, await store.rows('characterRelationEdits') as unknown as CharacterRelationEdit[], people)
+  const pairByKey = new Map(pairs.map(pair => [pair.pairKey, pair]))
+  const pairsByPerson = new Map<string, typeof pairs>()
+  for (const pair of pairs) for (const id of [pair.fromId, pair.toId]) {
+    if (!pairsByPerson.has(id)) pairsByPerson.set(id, [])
+    pairsByPerson.get(id)!.push(pair)
+  }
+  const unresolvedByPerson = new Map<string, typeof relations>()
+  for (const relation of relations) {
+    const ids = relation.sourceId && !relation.targetIds.length ? [relation.sourceId] : !relation.sourceId ? relation.targetIds : []
+    for (const id of new Set(ids)) {
+      if (!unresolvedByPerson.has(id)) unresolvedByPerson.set(id, [])
+      unresolvedByPerson.get(id)!.push(relation)
+    }
+  }
   const profileCache = new Map<string, Promise<string>>(), pairCache = new Map<string, Promise<string>>()
   const profile = (id: string) => {
     if (!profileCache.has(id)) profileCache.set(id, store.wait(hash(profileContent((byId.get(id) ?? {}) as unknown as Row))))
@@ -31,7 +45,7 @@ export async function reviewContext(store: AgentStore) {
   const pair = (key: string) => {
     if (!pairCache.has(key)) pairCache.set(key, (async () => {
       const [a, b] = JSON.parse(key) as [string, string]
-      const current = pairFromPerspective(pairs, a, b, people)
+      const current = pairFromPerspective(pairByKey.has(key) ? [pairByKey.get(key)!] : [], a, b, people)
       const { fingerprint: _fp, endpointRevisions: _revisions, editRevision: _edit, ...content } = current
       return store.wait(hash({ ...content, endpoints: [await profile(a), await profile(b)] }))
     })())
@@ -39,8 +53,8 @@ export async function reviewContext(store: AgentStore) {
   }
   const scan = async (id: string) => store.wait(hash({
     profile: await profile(id),
-    pairs: await Promise.all(pairs.filter(row => row.fromId === id || row.toId === id).map(async row => [row.pairKey, await pair(row.pairKey)])),
-    unresolved: relations.filter(row => row.sourceId === id && !row.targetIds.length || row.targetIds.includes(id) && !row.sourceId)
+    pairs: await Promise.all((pairsByPerson.get(id) ?? []).map(async row => [row.pairKey, await pair(row.pairKey)])),
+    unresolved: (unresolvedByPerson.get(id) ?? [])
       .map(row => ({ id: row.id, sourceName: row.sourceName, targetName: row.targetName, forwardLabel: row.forwardLabel, reverseLabel: row.reverseLabel, direction: row.direction, evidence: row.evidence })),
   }))
   return { people, byId, pairs, profile, pair, scan }
@@ -49,8 +63,8 @@ type ReviewContext = Awaited<ReturnType<typeof reviewContext>>
 
 const newItem = (row: Character, fingerprint: string) => ({ id: row.id, name: row.name, status: 'pending', outcome: null, reason: '', contentFingerprint: fingerprint, readRefs: [], commitIds: [] })
 export async function buildProfileReview(store: AgentStore, organization: Row) {
-  const context = await reviewContext(store)
-  organization.profileItems = await Promise.all([...context.people].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })).map(async row => newItem(row, await context.profile(row.id))))
+  const people = await store.rows('characters') as unknown as Character[]
+  organization.profileItems = await Promise.all(people.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })).map(async row => newItem(row, await store.wait(hash(profileContent(row as unknown as Row))))))
   organization.relationItems = []; organization.pairChecks = []
   organization.reviewVersion = organizationReviewVersion
   organization.reviewStartedAt = new Date().toISOString()
@@ -68,11 +82,12 @@ async function synchronizePairs(context: ReviewContext, organization: Row) {
   const previous = allPrevious.filter(row => scopedKeys.has(text(row.pairKey)))
   const retained = organization.mode && organization.mode !== 'full' ? allPrevious.filter(row => !scopedKeys.has(text(row.pairKey))) : []
   const keys = new Set([...scopedKeys, ...previous.map(row => text(row.pairKey))])
+  const previousByKey = new Map(previous.map(row => [text(row.pairKey), row]))
   const next: Row[] = []
   for (const key of keys) {
     const ids = JSON.parse(key) as string[]
     if (ids.length !== 2 || ids.some(id => !context.byId.has(id))) continue
-    const fingerprint = await context.pair(key), old = previous.find(row => row.pairKey === key)
+    const fingerprint = await context.pair(key), old = previousByKey.get(key)
     next.push(old?.fingerprint === fingerprint ? old : { pairKey: key, fingerprint, outcome: null, reason: '', basis: [], commitIds: [] })
   }
   organization.pairChecks = [...retained, ...next]

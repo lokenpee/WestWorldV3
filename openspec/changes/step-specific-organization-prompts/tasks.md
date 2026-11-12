@@ -1,15 +1,17 @@
+> 2026-11-11 后续变更：P2 四份工作项提示词已改为各自独立完整文件，删除 `p2-organization-base.md`；`agent-wrapper.txt` 已删除，作用域/预算/结束约束由 `runtime.ts` 直接生成。以下“公共规则 + 工作项规则”和 wrapper 描述为历史实施记录。
+
 # 实施任务
 
 关联 [BUG-34](../../缺陷池.md)、[提案](proposal.md)、[设计](design.md)、[验收](acceptance.md)及两份差异规格。代码实施和自动检查已完成；真实模型与用户验收待进行。
 
 ## 1. 提示词拆分与规则清理
 
-- [x] 1.1 新增 `p2-organization-base.md`（权限、数据真实性、错误恢复、幂等、工具通则、跨步骤纠错边界），保留现有提示词中仍然有效的通用条款。
+- [x] 1.1 四份 P2 工作项提示词各自包含权限、数据真实性、错误恢复、幂等、工具通则和当前工作项规则，不保留公共 base。
 - [x] 1.2 新增 `p2-organization-directory.md`、`p2-organization-candidate.md`、`p2-organization-profiles.md`、`p2-organization-relations.md`，只放对应工作项规则。
-- [x] 1.3 `organization.ts` 按当前 `workKind`（directory/candidate/profile/relations）拼接公共规则和工作项规则；`finalize` 不调用模型；`businessPrompt` 不再传完整三步手册。
-- [x] 1.4 调整 `agent-wrapper.txt`：业务成功判定改为“当前合法写入工具返回持久确认并实际写库”；目录/疑似组保留 `submit_result`；资料/关系使用各自 done；删除 `100000`、“最后一次只能调用 submit_result”、通用“写入结构/领域/总结共用一次修正机会”等旧规则。
+- [x] 1.3 `organization.ts` 按当前 `workKind`（directory/candidate/profile/relations）直接选择独立提示词；`finalize` 不调用模型；`businessPrompt` 不再传完整三步手册。
+- [x] 1.4 运行时的通用规则由 `runtime.ts` 直接生成：业务成功判定为“当前合法写入工具返回持久确认并实际写库”；目录/疑似组保留 `submit_result`；资料/关系使用各自 done。
 - [x] 1.5 更新提示词资源归属和校验哈希；旧 `p2-character-organization.md` 的去留及引用入口在实施时处理，不保留双重权威。
-- [x] 1.6 通用 wrapper 的 `budgetRule`/`submitRule`/`repairRule`/`finishRule` 按 P2 工作项注入；P1/P3 和其他 Agent 保持原规则不变。检查 T13。
+- [x] 1.6 `budgetRule`/`submitRule`/`repairRule`/`finishRule` 按 P2 工作项由运行时注入；P1/P3 和其他 Agent 保持原规则不变。检查 T13。
 
 ## 2. 默认工具集与工作项绑定
 

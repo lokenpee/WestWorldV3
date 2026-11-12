@@ -2743,7 +2743,7 @@
       {
         "name": "query_relation_work",
         "kind": "read",
-        "description": "读取人物当前关系概览，或按目标/字段查询。默认先用 work.data 的完整精简概览，不要无目的全量查询。证据查询必须传 targetIds 指定疑问人物对，并把 evidence 放进 fields 数组（例如 fields:[\"targetId\",\"evidence\"]）；不存在 evidence:true 这种参数。省略 fields 返回精简概览字段。",
+        "description": "读取人物当前关系概览，或按目标/字段查询。默认先用上方已提供的资料中的完整精简概览，不要无目的全量查询。证据查询必须传 targetIds 指定疑问人物对，并把 evidence 放进 fields 数组（例如 fields:[\"targetId\",\"evidence\"]）；不存在 evidence:true 这种参数。省略 fields 返回精简概览字段。",
         "parameters": {
           "type": "object",
           "additionalProperties": false,
@@ -2818,10 +2818,6 @@
             "done"
           ],
           "properties": {
-            "operationKey": {
-              "type": "string",
-              "minLength": 1
-            },
             "patch": {
               "type": "object",
               "additionalProperties": false,
@@ -3017,6 +3013,10 @@
               "items": {
                 "type": "string"
               }
+            },
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
             }
           }
         }
@@ -3024,7 +3024,7 @@
       {
         "name": "submit_relation_review",
         "kind": "write",
-        "description": "保存当前人物关系修改并声明是否完成。普通去重/同义规范化无需 evidence；实质修改可提供 evidence，缺失或无法逐字核验时只标记为未核实，不阻止保存或完成；删除整组关系仍须逐字原文或可追溯冲突 basis。done=false 保存后继续，done=true 保存并换下一人。",
+        "description": "保存当前绑定人物的关系修改；人物编号由程序获取。changes=[]、done=true可直接完成，也可登记uncertainPairs后完成。普通去重无需evidence；缺失或无法逐字核验只标未核实，不阻止保存和完成；删除整组关系仍须逐字原文或可追溯basis。status=succeeded且ok=true表示本次请求全部成功；status=partial且ok=false表示已保存部分，保留真实commitId并按failed处理剩余项；status=failed且ok=false表示本次失败，无commitId。有失败项时done/complete均为false；done=false成功保存也不表示人物已完成。",
         "parameters": {
           "type": "object",
           "additionalProperties": false,
@@ -3033,10 +3033,6 @@
             "done"
           ],
           "properties": {
-            "operationKey": {
-              "type": "string",
-              "minLength": 1
-            },
             "changes": {
               "type": "array",
               "items": {
@@ -3229,6 +3225,33 @@
             "reason": {
               "type": "string"
             },
+            "uncertainPairs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "targetId": {
+                    "type": "string"
+                  },
+                  "legacyId": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "targetId",
+                  "reason"
+                ]
+              },
+              "description": "表示已有人物对关系待核对，写入 pairChecks.outcome=uncertain；每一项须有 targetId 和 reason。"
+            },
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            },
             "basis": {
               "type": "array",
               "minItems": 1,
@@ -3347,30 +3370,7 @@
                   }
                 }
               },
-              "description": "删除关系或无法提供原文时使用的可追溯冲突/识别错误依据；必须引用已读取的原始关系、人物对或资产。"
-            },
-            "uncertainPairs": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "targetId": {
-                    "type": "string"
-                  },
-                  "legacyId": {
-                    "type": "string"
-                  },
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "targetId",
-                  "reason"
-                ]
-              },
-              "description": "表示已有人物对关系待核对，写入 pairChecks.outcome=uncertain；每一项须有 targetId 和 reason。"
+              "description": "删除该人物对或无法提供原文时的可追溯冲突/识别错误依据。"
             }
           }
         }

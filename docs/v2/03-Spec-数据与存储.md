@@ -639,6 +639,7 @@ DB提交成功但工具反馈/最终模型回复未保存时，凭据仍可恢�
 | [type=message]::message.role | "system" 或 "user" 或 "assistant" 或 "toolResult" | 必填；非null；无Schema默认 | — | Pi消息角色system/user/assistant/toolResult |
 | [type=message]::message.content | string 或 JSON值[] | 可省略；非null；无Schema默认 | — | Pi原始文本或内容块数组；不丢工具/推理字段 |
 | [type=message]::message.timestamp | number | 可省略；非null；无Schema默认 | — | Pi时间戳Unix毫秒 |
+| [所有type]::taskId | string | 可省略；非null；无Schema默认 | — | 当前工作项任务ID；程序写入，用于同一会话内按任务隔离恢复上下文；旧记录无此字段时按原会话读取 |
 | [type=compaction]::id | string | 必填；非null；无Schema默认 | — | 记录主键；生成后稳定，更新不重新编号 |
 | [type=compaction]::sessionId | string | 必填；非null；无Schema默认 | — | 同书T16逻辑会话ID；新数据必须写；空串/省略只兼容旧历史 |
 | [type=compaction]::bookId | string | 必填；非null；无Schema默认 | — | 所属书；必须等于数据库命名中的bookId；导入重写 |

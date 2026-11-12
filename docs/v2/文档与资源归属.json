@@ -3496,13 +3496,6 @@
       "consumers": []
     },
     {
-      "path": "docs/v2/resources/v2.2/prompts/active/agent-wrapper.txt",
-      "role": "运行时权威资源",
-      "consumers": [
-        "src/features/agents/runtime.ts"
-      ]
-    },
-    {
       "path": "docs/v2/resources/v2.2/prompts/active/character-optimize.md",
       "role": "运行时权威资源",
       "consumers": [
@@ -3515,26 +3508,6 @@
       "consumers": [
         "src/features/agents/compaction.ts"
       ]
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/active/compacted_history.txt",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/active/conflict.txt",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/active/final_only.txt",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/active/identity.txt",
-      "role": "设计样例与技术参考",
-      "consumers": []
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/location-optimize.md",
@@ -3606,47 +3579,12 @@
       "consumers": []
     },
     {
-      "path": "docs/v2/resources/v2.2/prompts/active/recovery.txt",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/active/repair_direct.txt",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/active/repair_final.txt",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/active/repair_write.txt",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
       "path": "docs/v2/resources/v2.2/prompts/active/story.txt",
       "role": "运行时权威资源",
       "consumers": [
         "src/features/story/review.ts",
         "src/features/story/service.ts"
       ]
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/optimize-locations.md",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/p2-asset-editor.md",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/p3-story-editor.md",
-      "role": "设计样例与技术参考",
-      "consumers": []
     },
     {
       "path": "docs/v2/resources/v2.2/request-examples/index.json",
@@ -4254,14 +4192,6 @@
       "sha256": "cceba4171dcf6e51a811dfdddef0cf5f1c787373e204e401e979bb1cc01ae1ed"
     },
     {
-      "path": "docs/v2/resources/v2.2/prompts/active/agent-wrapper.txt",
-      "role": "运行时权威资源",
-      "consumers": [
-        "src/features/agents/runtime.ts"
-      ],
-      "sha256": "65dccc226e322e8432de4c3a26d92cffa171ff7cb57b3bc9313311d4e291cbe2"
-    },
-    {
       "path": "docs/v2/resources/v2.2/prompts/active/character-optimize.md",
       "role": "运行时权威资源",
       "consumers": [
@@ -4315,7 +4245,7 @@
       "consumers": [
         "src/features/world/service.ts"
       ],
-      "sha256": "1fa93fbaaef0861f037447e61c4ec6bd1c931becca9f360606856c9cb4f1aa98"
+      "sha256": "e63418819ebe031debf167eb03acf043a6eb99c315a4e95a722eef099ff0e09f"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p3-story.md",
@@ -4324,7 +4254,7 @@
         "src/features/story/review.ts",
         "src/features/story/service.ts"
       ],
-      "sha256": "b50c0c52bdda64583c7ee84927852a81ded88de6ec4b23f91e68e2515ecb614f"
+      "sha256": "358a3da3036b3fb0bf3e33e9058501818f62cc7a47cfc265f91202c6349ea958"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/probe_asset.txt",
@@ -4348,7 +4278,7 @@
       "consumers": [
         "src/features/agents/probe.ts"
       ],
-      "sha256": "b59b73d71acb8753e3b22671a6717285093c8fe8612ad00af08b9587af161a07"
+      "sha256": "a35c612ab6cc6e5d3030fba5c47988c2b73f740de777d87e504738de83ca01e1"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/story.txt",
@@ -4365,7 +4295,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "f90bcebfc01ef41264fd3c43099e07c116e1f675cfcc51c6ea877681c7461e96"
+      "sha256": "8d96f8a5689a592d66c92c03c3fc31f88ff28ca0d67075cefda1db1a5ae72126"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4373,7 +4303,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "6d79a3621e93a99174140ae23f9202b20ab73c8e94cd2758f1fdeb89862b36a4"
+      "sha256": "19b42cc0af5b75054794779316abb08398e0d154a4183df92fb76a7cf01b6ff3"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4381,7 +4311,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "7c4f70105cb617ef987d17cca5f6e9bf0912ac6a3ab207d33c00b42a9479626f"
+      "sha256": "e24448c73b069054f4e86458ec0b16ab1fdf4c7c474a96e6acf67de9d00a6bad"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",
@@ -4389,7 +4319,7 @@
       "consumers": [
         "src/features/world/assetReview.ts"
       ],
-      "sha256": "98a1d697e4cde844288946ba4da47107b49023079e507d6a9f0267c418618801"
+      "sha256": "20f360d2e066ad90e14b50612c25b414fc4df9b41bc1f17318f86537281bd436"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-relation-review.md",
@@ -4397,15 +4327,7 @@
       "consumers": [
         "src/features/world/assetReview.ts"
       ],
-      "sha256": "4b3ca7719b9359f620d2eb98c8e145911ffa56e5b48696f9810039be5c5738f4"
-    },
-    {
-      "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-base.md",
-      "role": "运行时权威资源",
-      "consumers": [
-        "src/features/world/organization.ts"
-      ],
-      "sha256": "24bc3e1434cb7f78adc8ae21a540c28893b3f9f40814facb228ef71a467cf832"
+      "sha256": "8a6109e2c6aa9ce582272f34a6cba9050875e60943839afb929c9d072b08775f"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-directory.md",
@@ -4413,7 +4335,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "8b2c09722cfcc36698b390fa9a7586e2ef3d7777e10a57842f072cd893e87b39"
+      "sha256": "f1f73c8794d603c7ff6890885ff75ec80cb5fb5a3c004a13ad13f1e0c98b4c07"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-candidate.md",
@@ -4421,7 +4343,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "c1f75ac6f50c13a4c3144685cd26f1fac597e7d2c1f5df242d274923e62457b8"
+      "sha256": "c9d596130e30400b4f4ee4282830a7f05e5e8f837e727092e348b71db1966410"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-profiles.md",
@@ -4429,7 +4351,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "b6e90a7bda83f741e5cfa26ab4c002280652cc539deb2071d58d35c6c1cf5fa5"
+      "sha256": "283649f872a547a3c8a642b73b20e13cee0e9c33fb4292adf095b68f2a530b69"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-relations.md",
@@ -4437,7 +4359,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "54d66c7111bbae50921bb654efff66d42cb326b86f492790f9e276d67cac1c15"
+      "sha256": "f710a244ff223cfce5737f25d80f4bc1ded988fcb75a98a737cdcdcc45744e83"
     }
   ],
   "decisions": [

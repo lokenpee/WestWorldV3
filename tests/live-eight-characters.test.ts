@@ -97,12 +97,17 @@ it.skipIf(!key)('真实8人：使用修改前值重建未优化样本，逐人�
       return { unitId: entry.unitId, tools: (message.content ?? []).filter(part => part.type === 'toolCall').map(part => part.name) }
     }).filter(turn => (turn.tools ?? []).length)
     const toolErrors = sessionEntries.filter(entry => entry.type === 'message' && (entry.message as Record<string, unknown> | undefined)?.role === 'toolResult' && (entry.message as Record<string, unknown>).isError === true).map(entry => ({ unitId: entry.unitId, toolName: (entry.message as Record<string, unknown>).toolName, text: String(((entry.message as Record<string, unknown>).content as { text?: string }[] | undefined)?.map(part => part.text ?? '').join('') ?? '').slice(0, 300) }))
+    const toolSnapshots = snapshots.filter(row => row.type === 'tool_snapshot')
+    const toolNames = toolSnapshots.flatMap(row => Array.isArray(row.schema) ? (row.schema as Record<string, unknown>[]).map(tool => String(tool.name)) : [])
+    const toolSchemaBytes = toolSnapshots.reduce((sum, row) => sum + new TextEncoder().encode(JSON.stringify(row.schema ?? [])).length, 0)
+    const systemText = traceBodies.map(body => body.systems.join('\n')).join('\n')
     const evidence = {
       book: book.title, turns, toolErrors, model: 'deepseek-flash', source: backupPath, rebuilt,
+      toolNames, toolSchemaBytes, systemLength: systemText.length,
       characters: after.map(row => ({ id: row.after?.id, name: row.after?.name, outcome: row.item?.outcome, reason: row.item?.reason, commitIds: row.item?.commitIds, before: row.before, after: row.after, edits: row.edits })),
       requests: run.requestLedger?.length ?? 0, ledger: run.requestLedger, usage: (run as typeof run & { usage?: unknown }).usage, reportUsage: run.report.usage, cost: run.report.cost, costStatus: run.report.usage.costStatus,
       traceRequests: traces.map(entry => ({ requestId: entry.requestId, executionId: entry.executionId, unitId: entry.unitId, characterId: entry.characterId, purpose: entry.purpose, status: entry.status, complete: entry.complete, final: entry.final, tools: Array.isArray(entry.toolCalls) ? entry.toolCalls.map((tool: Record<string, unknown>) => tool.name) : [] })),
-      traceSnapshots: snapshots.map(entry => ({ type: entry.type, snapshotId: entry.snapshotId, length: String(entry.content ?? '').length || (Array.isArray(entry.schema) ? entry.schema.length : 0) })), traceBodies,
+      traceSnapshots: snapshots.map(entry => ({ type: entry.type, snapshotId: entry.snapshotId, length: String(entry.content ?? '').length || (Array.isArray(entry.schema) ? entry.schema.length : 0), toolNames: entry.type === 'tool_snapshot' && Array.isArray(entry.schema) ? (entry.schema as Record<string, unknown>[]).map(tool => String(tool.name)) : undefined })), traceBodies,
       status: run.status, error: service.state(book.id)?.error, contexts: run.organization?.contexts,
       note: '5人有旧修改，已按assetEdits的before值和拆分短语重建未优化资料；3人无旧修改。完成8个profile后主动停止。',
     }
@@ -114,6 +119,12 @@ it.skipIf(!key)('真实8人：使用修改前值重建未优化样本，逐人�
     if (!traces.length) throw new Error('8人没有保存请求轨迹。')
     if (traces.some(entry => !entry.executionId || !entry.requestId || !entry.input || entry.final !== true)) throw new Error('8人请求轨迹缺少执行号、输入或收尾标记。')
     if (!snapshots.length) throw new Error('8人没有保存提示词或工具快照。')
+    if (!toolNames.length) throw new Error('8人工具快照没有记录实际工具名。')
+    for (const name of ['submit_result', 'submit_relation_review', 'record_organization_progress']) if (toolNames.includes(name)) throw new Error(`8人资料工作项仍提供其他步骤工具：${name}`)
+    for (const name of ['submit_profile_review', 'merge_assets', 'edit_character', 'set_character_relation', 'delete_character_relation']) if (!toolNames.includes(name)) throw new Error(`8人资料工作项缺少跨步骤工具：${name}`)
+    if (systemText.includes('submit_relation_review')) throw new Error('8人资料工作项系统提示词仍要求提交人物关系。')
+    if (systemText.includes('# 第一步：目录页') || systemText.includes('# 第三步：整理人物关系')) throw new Error('8人系统提示词混入其他步骤规则。')
+    if (!systemText.includes('# 第二步：优化人物资料')) throw new Error('8人系统提示词缺少第二步规则。')
     for (const body of traceBodies) {
       const tasks = body.users.filter(value => value.trim().startsWith('{') && value.includes('"workItems"'))
       if (tasks.length !== new Set(tasks).size) throw new Error('8人最终请求重复注入人物任务。')

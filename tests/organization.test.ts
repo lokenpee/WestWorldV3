@@ -11,7 +11,7 @@ import { createBackupService } from '../src/features/backup/service'
 import { createImportService } from '../src/lib/storage/importService'
 import type { Character } from '../src/features/assets/types'
 import { agentStream } from './support/agent-protocol'
-import { organizationResponse } from './support/organization-streams'
+import { organizationResponse, organizationPromptParts } from './support/organization-streams'
 import { appendEntry } from '../src/features/agents/commands'
 import { reconcileOrganizationAfterWrite } from '../src/features/agents/organizationCommands'
 import { createBookAgentRepository, createMemoryAgentRepository } from '../src/features/agents/repository'
@@ -22,7 +22,15 @@ import { relationWork } from '../src/features/agents/organizationData'
 const opened: ReturnType<typeof createWorkspace>[] = []
 const person = (id: string, name: string, extra = {}): Character => ({ id, bookId: 'a', name, aliases: [], confidence: 1, revision: 1, createdBy: 'P1', chapterIndex: '1', chapterName: '第1章', ...extra })
 const contentOf = (content: unknown) => typeof content === 'string' ? content : Array.isArray(content) ? content.map((part: { text?: string }) => part.text ?? '').join('') : ''
-const parse = (value: unknown) => { try { return JSON.parse(contentOf(value)) as Record<string, unknown> } catch { return {} } }
+const parse = (value: unknown) => {
+  const textValue = contentOf(value)
+  try { return JSON.parse(textValue) as Record<string, unknown> } catch { /* 新任务简报不是 JSON */ }
+  const parts = organizationPromptParts(value)
+  if (!parts) return {}
+  const step = parts.kind === 'directory' ? 'scan' : parts.kind === 'profile' ? 'profiles' : parts.kind === 'relations' ? 'relations' : 'resolve'
+  const contextId = parts.kind === 'profile' ? 'profiles' : parts.kind === 'relations' ? 'relations' : 'identity'
+  return { step, unitId: `${parts.kind}:${parts.id}`, contextId, work: { kind: parts.kind, data: parts.data }, workItems: [{ workItemId: parts.workItemId }] }
+}
 const key = () => crypto.randomUUID()
 const isInput = (message: { role: string; content: unknown }) => { if (message.role !== 'user') return false; const value = parse(message.content); return typeof value.step === 'string' && Array.isArray(value.workItems) }
 const respond = (init?: RequestInit) => organizationResponse(JSON.parse(init?.body as string))!
@@ -88,8 +96,8 @@ it('人物整理的最终请求不重复注入任务，系统提示词不含旧�
   expect(system).not.toContain('最后一次只能调用submit_result')
   for (const body of bodies) {
     const users = body.messages.filter(message => message.role === 'user').map(message => contentOf(message.content))
-    const tasks = users.filter(text => text.trim().startsWith('{') && text.includes('"workItems"'))
-    expect(tasks.length, '每次请求的任务 JSON 数').toBe(new Set(tasks).size)
+    const tasks = users.filter(text => text.includes('任务类型：'))
+    expect(tasks.length, '每次请求的任务简报数').toBe(new Set(tasks).size)
   }
 }, 120000)
 
@@ -300,17 +308,19 @@ it('每个工作项使用独立上下文，切换不压缩且旧历史不重送'
     const body = requests.filter(request => request.unitId === unit)
     expect(body[0].tools).not.toContain('submit_result')
     expect(body[0].tools).not.toContain('submit_relation_review')
-    expect(body[0].tools).toContain('merge_assets')
+    expect(body[0].tools).toContain('query_character_profile')
     expect(body[0].tools).toContain('edit_character')
-    expect(body[0].tools).toContain('set_character_relation')
-    expect(body[0].tools).toContain('delete_character_relation')
+    expect(body[0].tools).toContain('submit_profile_review')
+    expect(body[0].tools).toContain('get_tools')
+    expect(body[0].tools).toContain('get_tools_detail')
+    expect(body[0].tools).not.toContain('merge_assets')
     expect(body[0].system).not.toContain('第一步：目录页')
     expect(body[0].system).not.toContain('第三步：整理人物关系')
     expect(body[0].system).not.toContain('submit_relation_review')
     expect(body[0].system).toContain('submit_profile_review')
     expect(body).toHaveLength(1)
     const prompt = contentOf(body[0].messages.find(isInput)!.content)
-    expect(prompt).toContain('"kind":"profile"')
+    expect(prompt).toContain('任务类型：profile')
     expect(prompt).toContain('"identity"')
     expect(prompt).toContain('"mergeFacts"')
   }
@@ -318,24 +328,25 @@ it('每个工作项使用独立上下文，切换不压缩且旧历史不重送'
     const body = requests.filter(request => request.unitId === unit)
     expect(body[0].tools).not.toContain('submit_result')
     expect(body[0].tools).not.toContain('submit_profile_review')
-    expect(body[0].tools).toContain('merge_assets')
-    expect(body[0].tools).toContain('edit_character')
-    expect(body[0].tools).toContain('set_character_relation')
-    expect(body[0].tools).toContain('delete_character_relation')
+    expect(body[0].tools).toContain('submit_relation_review')
+    expect(body[0].tools).toContain('query_relation_work')
+    expect(body[0].tools).toContain('get_character_relation')
+    expect(body[0].tools).toContain('get_tools')
+    expect(body[0].tools).toContain('get_tools_detail')
+    expect(body[0].tools).not.toContain('merge_assets')
     expect(body[0].system).not.toContain('第一步：目录页')
     expect(body[0].system).not.toContain('第二步：优化人物资料')
     expect(body[0].system).not.toContain('submit_profile_review')
     expect(body[0].system).toContain('submit_relation_review')
-    expect(body[0].system).toContain('默认直接视为保持')
-    expect(body[0].system).toContain('多个 `targetIds` 批量查询')
-    expect(body[0].system).toContain('关系存在性优先于标签')
-    expect(body[0].system).toContain('forwardLabels:["族弟"]')
-    expect(body[0].system).toContain('reverseLabels:["族兄"]')
-    expect(body[0].system).toContain('未核实')
+    expect(body[0].system).toContain('已有连线不代表关系一定成立')
+    expect(body[0].system).toContain('必须指定 `targetIds`')
+    expect(body[0].system).toContain('正向是“族弟”')
+    expect(body[0].system).toContain('反向是“族兄”')
+    expect(body[0].system).toContain('get_tools_detail')
     expect(body).toHaveLength(1)
     const prompt = contentOf(body[0].messages.find(isInput)!.content)
-    expect(prompt).toContain('"kind":"relations"')
-    expect(prompt).toContain('"relations"')
+    expect(prompt).toContain('任务类型：relations')
+    expect(prompt).toContain('已有关系')
   }
   const before = (await service.reports('a'))[0]!
   expect(before.organization?.contexts).toMatchObject({ identity: { status: 'completed' }, profiles: { status: 'completed' }, relations: { status: 'completed' } })

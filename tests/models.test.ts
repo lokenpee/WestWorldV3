@@ -222,13 +222,20 @@ describe('模型配置与统一调用', () => {
     const { resolveModel } = await import('../src/features/models/registry')
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream('', { arguments: '{"ok":true}' })).mockResolvedValueOnce(stream('完成'))
     const resolved = await resolveModel(savedConfig, key, 'aggregation')
-    const starts: ModelTraceStart[] = []; const ends: ModelTraceEnd[] = []
-    const result = await executeAgent(resolved, { maxRequests: 3, maxTokens: 128, trace: { start: value => starts.push(value), modelEnd: value => ends.push(value) } }, { fetch: fetcher }, {
+    const starts: ModelTraceStart[] = []; const ends: ModelTraceEnd[] = []; const sent: { requestId: string; attemptId: string; body: Record<string, unknown> }[] = []
+    const result = await executeAgent(resolved, { maxRequests: 3, maxTokens: 128, trace: { start: value => starts.push(value), request: value => sent.push(value), modelEnd: value => ends.push(value) } }, { fetch: fetcher }, {
       prompt: '原始任务', systemPrompt: '系统要求',
       prepareRequest: ({ context }) => ({ context: { ...context, messages: [...context.messages, { role: 'user', content: '转换后追加', timestamp: 2 }] } }),
     })
     expect(result).toMatchObject({ ok: true, text: '完成' })
     expect(starts).toHaveLength(2)
+    expect(sent).toHaveLength(2)
+    sent.forEach((value, index) => {
+      expect(value.body).toEqual(JSON.parse(fetcher.mock.calls[index][1]?.body as string))
+      expect(value.requestId).toBe(starts[index].requestId)
+      expect(value.attemptId).toBe((ends[index].attempts as { attemptId: string }[])[0].attemptId)
+      expect(JSON.stringify(value)).not.toContain(key)
+    })
     expect(starts[0]).toMatchObject({ purpose: 'work', model: { providerId: 'custom', modelId: 'saved-aggregation' } })
     const messages = JSON.stringify((starts[0].context as { messages: unknown[] }).messages)
     expect(messages).toContain('原始任务')

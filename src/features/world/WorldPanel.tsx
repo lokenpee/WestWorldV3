@@ -152,7 +152,8 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
         const label = `第${['一', '二', '三'][index]}步：${{ scan: '识别重复人物', profiles: '优化人物资料', relations: '整理人物关系' }[step]}`
         const isActive = activeStep === step
         const status = isActive ? activeStatus : undefined
-        const disabled = !!activeStep && !isActive || (!isActive && (!!state?.running || !!activeStatus)) || !ready || scanning
+        const controllable = status === 'running' || status === 'paused'
+        const disabled = !controllable && (!!activeStep && !isActive || (!isActive && (!!state?.running || !!activeStatus)) || !ready || scanning)
         const text = status === 'running' ? `暂停第${['一', '二', '三'][index]}步` : status === 'paused' ? `继续第${['一', '二', '三'][index]}步` : label
         return <button key={step} className={isActive ? 'primary-button' : 'secondary-button'} disabled={disabled} onClick={() => {
           setError(''); setMessage('')

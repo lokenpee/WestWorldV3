@@ -53,14 +53,19 @@ function build(c,input){
  let user;
  switch(c.userTemplate){
  case 'chapter': user=`章节标识：${input.chapterIndex}\n章节名：${input.chapterName}\n\n--- 正文开始 ---\n${input.text}\n--- 正文结束 ---`;break;
- case 'identity': case 'story':user=render(text(c.userTemplate+'.txt'),{taskJson:canonical(input)});break;
+ case 'identity':user=canonical(input);break;
+ case 'story':user=render(text('story.txt'),{taskJson:canonical(input)});break;
  case 'compact':user=`【旧摘要】\n${input.previousSummary||'无'}\n【需要压缩的原始会话数据】\n${input.transcript}`;break;
  case 'direct-probe':user='回复一个字：好';break;
  case 'agent-probe':user=render(text('probe_'+input.suite+'.txt'),input);break;
  default:user=canonical(input);
  }
  const roleInstruction=profile==='asset_editor'?'只整理人物地点；不读故事会话/工作记忆，不改叙事实体。':'只整理节点、事件线和工作记忆；不合并人物地点，历史摘要不是原文事实。';
- const system=c.mode==='agent'&&c.profile!=='probe'?render(text('agent-wrapper.txt'),{bookId:input.bookId,runId:input.runId,taskId:input.taskId,profile,phase:input.phase,roleInstruction,maxSteps:c.maxSteps,businessPrompt:business}):business;
+ const system=c.mode==='agent'&&c.profile!=='probe'?`你是WestWorld V2的受控资料编辑助手。
+当前书籍=${input.bookId}；运行=${input.runId}；子任务=${input.taskId}；职责=${profile}；阶段=${input.phase}。
+${roleInstruction}
+【业务职责正文】
+${business}`:business;
  const messages=c.mode==='agent'?[{role:'system',content:system,toolsAdded:tools,timestamp:now},{role:'user',content:user,timestamp:now}]:[{role:'user',content:user,timestamp:now}];
  const window=128000,reserve=Math.min(32768,Math.max(128,Math.floor(window/4)));
  let maxTokens=c.maxTokens;
@@ -79,11 +84,11 @@ const ack={ok:true,commitId:'K1',operationKey:'task-example:1',alreadyApplied:fa
 const payload={event_line_ops:[],new_nodes:[],memory_update:{workingSummary:'本窗保留独立节点。',notes:[]}};
 finalOnly.context.messages.push(assistant('commit_story_changes',{operationKey:'task-example:1',payload},'call-1'),result('commit_story_changes','call-1',ack),{role:'user',content:'[代码提交确认] K1：摘要已提交。',timestamp:now});
 const submit=finalOnly.context.tools.find(t=>t.name==='submit_result');
-finalOnly.context.messages.push({role:'system',content:'本轮仅最终总结。',toolsRemoved:finalOnly.context.tools.filter(t=>t.name!=='submit_result').map(t=>({name:t.name})),timestamp:now},{role:'user',content:render(text('final_only.txt'),{commitIdsJson:'["K1"]',remainingIdsJson:canonical(story.workItems.map(w=>w.workItemId))}),timestamp:now});finalOnly.context.tools=[submit];examples.push(finalOnly);
-const repaired=clone(examples[0]);repaired.id='VARIANT-DIRECT-REPAIR';const badAssistant=assistant('submit_result',{characters:'invalid'},'bad-1');badAssistant.model=repaired.modelSnapshot.modelId;repaired.context.messages.push(badAssistant,result('submit_result','bad-1',{error:'INVALID_ARGS',message:'characters必须为数组'},true),{role:'user',content:render(text('repair_direct.txt'),{error:'characters必须为数组'}),timestamp:now});examples.push(repaired);
-const resume=clone(source);resume.id='VARIANT-P3-RECOVERY';resume.context.messages=[source.context.messages[0],{role:'user',content:render(text('compacted_history.txt'),{summary:'此前K1已经提交摘要，节点C1-N001尚待完成核查；原始条目E1可回查。'}),timestamp:now},{role:'user',content:render(text('recovery.txt'),{resumeJson:canonical({reason:'interrupted',appliedCommitIds:['K1'],nextOperationKey:'task-example:2',remainingWorkIds:story.workItems.map(w=>w.workItemId)})}),timestamp:now},source.context.messages[1]];examples.push(resume);
-const repairWrite=clone(source);repairWrite.id='VARIANT-P3-WRITE-REPAIR';repairWrite.context.messages.push(assistant('commit_story_changes',{operationKey:'task-example:1',payload:{...payload,memory_update:{workingSummary:'',notes:[]}}},'write-bad'),result('commit_story_changes','write-bad',{error:'INVALID_ARGS',message:'workingSummary不能为空'},true),{role:'user',content:render(text('repair_write.txt'),{error:'workingSummary不能为空',operationKey:'task-example:1',nextOperationKey:'task-example:2'}),timestamp:now});examples.push(repairWrite);
-const finalRepair=clone(finalOnly);finalRepair.id='VARIANT-P3-FINAL-REPAIR';finalRepair.context.messages.push(assistant('submit_result',{status:'completed',commitIds:['other-task-K'],summary:'错误确认',remainingWorkIds:[],reviewedItems:[]},'final-bad'),result('submit_result','final-bad',{error:'INVALID_ARGS',message:'commitIds不属于本task'},true),{role:'user',content:render(text('repair_final.txt'),{error:'commitIds不属于本task',commitIdsJson:'["K1"]'}),timestamp:now});examples.push(finalRepair);
+finalOnly.context.messages.push({role:'system',content:'本轮仅最终总结。',toolsRemoved:finalOnly.context.tools.filter(t=>t.name!=='submit_result').map(t=>({name:t.name})),timestamp:now},{role:'user',content:`本轮仅最终总结。commitIds=${'["K1"]'}；remainingWorkIds=${canonical(story.workItems.map(w=>w.workItemId))}。`,timestamp:now});finalOnly.context.tools=[submit];examples.push(finalOnly);
+const repaired=clone(examples[0]);repaired.id='VARIANT-DIRECT-REPAIR';const badAssistant=assistant('submit_result',{characters:'invalid'},'bad-1');badAssistant.model=repaired.modelSnapshot.modelId;repaired.context.messages.push(badAssistant,result('submit_result','bad-1',{error:'INVALID_ARGS',message:'characters必须为数组'},true),{role:'user',content:`结果校验未通过：characters必须为数组。请修正后重新提交。`,timestamp:now});examples.push(repaired);
+const resume=clone(source);resume.id='VARIANT-P3-RECOVERY';resume.context.messages=[source.context.messages[0],{role:'user',content:'此前摘要：K1已经提交摘要，节点C1-N001尚待完成核查；原始条目E1可回查。',timestamp:now},{role:'user',content:`恢复任务：${canonical({reason:'interrupted',appliedCommitIds:['K1'],nextOperationKey:'task-example:2',remainingWorkIds:story.workItems.map(w=>w.workItemId)})}`,timestamp:now},source.context.messages[1]];examples.push(resume);
+const repairWrite=clone(source);repairWrite.id='VARIANT-P3-WRITE-REPAIR';repairWrite.context.messages.push(assistant('commit_story_changes',{operationKey:'task-example:1',payload:{...payload,memory_update:{workingSummary:'',notes:[]}}},'write-bad'),result('commit_story_changes','write-bad',{error:'INVALID_ARGS',message:'workingSummary不能为空'},true),{role:'user',content:`写入未通过：workingSummary不能为空；请修正后使用新命令键 task-example:2。`,timestamp:now});examples.push(repairWrite);
+const finalRepair=clone(finalOnly);finalRepair.id='VARIANT-P3-FINAL-REPAIR';finalRepair.context.messages.push(assistant('submit_result',{status:'completed',commitIds:['other-task-K'],summary:'错误确认',remainingWorkIds:[],reviewedItems:[]},'final-bad'),result('submit_result','final-bad',{error:'INVALID_ARGS',message:'commitIds不属于本task'},true),{role:'user',content:`最终总结未通过：commitIds不属于本task；本task确认 ${'["K1"]'}。`,timestamp:now});examples.push(finalRepair);
 const out=path.join(r,'request-examples');fs.mkdirSync(out,{recursive:true});
 for(const x of examples)fs.writeFileSync(path.join(out,x.id+'.json'),JSON.stringify(x,null,2)+'\n');
 fs.writeFileSync(path.join(out,'index.json'),JSON.stringify({contractRevision:'2026-10-24',kind:'synthetic-contract-fixtures',modelExecuted:false,examples:examples.map(x=>x.id+'.json')},null,2)+'\n');

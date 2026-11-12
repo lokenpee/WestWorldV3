@@ -17,8 +17,38 @@ import { noteOrganizationWrite } from './organizationReview'
 export interface QueryRead { tool: string; args: Row; resultFingerprint: string }
 export interface RecordRead { table: string; id: string; resolvedId: string | null; revision: number; factFingerprint: string }
 export interface ReadSet { records: RecordRead[]; queries: QueryRead[] }
-export interface CommitAck { ok: true; commitId: string; operationKey: string; alreadyApplied: boolean; summary: string; complete?: boolean; changed?: boolean; affected?: { kind: string; id: string; revision: number }[]; pair?: { pairKey: string; state: string; editRevision: number; fingerprint: string; legacyRecordIds?: string[] } }
-interface ToolWriteResult { changed?: boolean; summary?: string; affected?: { kind: string; id: string; revision: number }[]; pair?: { pairKey: string; state: string; editRevision: number; fingerprint: string; legacyRecordIds?: string[] }; asset?: { id: string }; groupId?: string; revision?: number; reused?: boolean; clearedCount?: number; step?: string; action?: string; kind?: string; id?: string }
+export interface CommitAck { ok: boolean; commitId?: string; status?: 'succeeded' | 'partial' | 'failed'; operationKey: string; alreadyApplied: boolean; summary: string; complete?: boolean; changed?: boolean; affected?: { kind: string; id: string; revision: number }[]; pair?: { pairKey: string; state: string; editRevision: number; fingerprint: string; legacyRecordIds?: string[] } }
+interface ToolWriteResult { ok?: boolean; status?: CommitAck['status']; changed?: boolean; summary?: string; affected?: { kind: string; id: string; revision: number }[]; pair?: { pairKey: string; state: string; editRevision: number; fingerprint: string; legacyRecordIds?: string[] }; asset?: { id: string }; groupId?: string; revision?: number; reused?: boolean; clearedCount?: number; step?: string; action?: string; kind?: string; id?: string }
+
+function replayAck(applied: Row, operationKey: string): CommitAck {
+  const result = records([applied.result])[0] ?? {}
+  // 兼容旧账本：逐项失败从来不代表整次请求成功。
+  const failed = records(result.failed).length > 0
+  const status = result.status ?? (failed ? result.changed === true ? 'partial' : 'failed' : Array.isArray(result.failed) ? 'succeeded' : undefined)
+  const ack = { ...result, ok: result.ok !== false && !failed, ...(status ? { status } : {}), commitId: text(applied.commitId), operationKey, alreadyApplied: true, summary: text(applied.resultSummary) } as CommitAck
+  if (status === 'failed') delete ack.commitId
+  return ack
+}
+
+function bindReviewReads(reads: ReadSet, run: Row) {
+  const active = (run.organization as Row | undefined)?.activeWork as Row | undefined
+  const id = text(active?.characterId)
+  if (!id) return
+  for (const query of reads.queries) {
+    const field = query.tool === 'query_character_profile' ? 'id' : query.tool === 'query_relation_work' ? 'characterId' : undefined
+    if (field && !text(query.args[field])) query.args = { ...query.args, [field]: id }
+  }
+}
+
+async function restoreCompletedWork(store: AgentStore, scope: Scope, run: Row, applied: Row, name: string, args: Row, reads: ReadSet, signal?: AbortSignal) {
+  if (!['submit_profile_review', 'submit_relation_review'].includes(name) || (applied.result as Row | undefined)?.complete !== true) return
+  const active = (run.organization as Row | undefined)?.activeWork as Row | undefined
+  // 旧轮恢复可能重新挂起同一个工作项；只恢复它的完成状态，绝不能操作下一个人物。
+  const unitId = text(applied.unitId) || scope.unitId
+  if (!active || !unitId || text(active.id) !== unitId) return
+  await checkLease(store, scope, signal)
+  await replayOrganizationSubmit(store, scope, name, args, reads, text(applied.commitId))
+}
 export const domainOf = (scope: Scope) => scope.profile === 'asset_editor' ? 'world' : 'narrative'
 export async function checkLease(store: AgentStore, scope: Scope, signal?: AbortSignal) {
   signal?.throwIfAborted()
@@ -34,7 +64,7 @@ export async function appendEntry(store: AgentStore, scope: Scope, value: Row, o
   const session = await store.get('storySessions', scope.sessionId)
   if (!session || session.bookId !== scope.bookId) throw new Error('SCOPE:消息会话不属于当前书籍。')
   const id = crypto.randomUUID(); const timestamp = new Date().toISOString()
-  await store.put('storySessionEntries', { ...value, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { unitId: scope.unitId } : {}), ...(value.type === 'compaction' && !value.firstKeptEntryId ? { firstKeptEntryId: id } : {}), id, sessionId: scope.sessionId, bookId: scope.bookId, ordinal: session.nextOrdinal, parentId: session.leafId ?? null, createdAt: timestamp })
+  await store.put('storySessionEntries', { ...value, ...(scope.taskId ? { taskId: scope.taskId } : {}), ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { unitId: scope.unitId } : {}), ...(value.type === 'compaction' && !value.firstKeptEntryId ? { firstKeptEntryId: id } : {}), id, sessionId: scope.sessionId, bookId: scope.bookId, ordinal: session.nextOrdinal, parentId: session.leafId ?? null, createdAt: timestamp })
   await store.put('storySessions', { ...session, ...(options.advanceLeaf === false ? {} : { leafId: id }), nextOrdinal: Number(session.nextOrdinal) + 1, updatedAt: timestamp })
 }
 export async function taskOf(store: AgentStore, scope: Scope) {
@@ -351,8 +381,8 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
     const applied = records(run.appliedCommands).find(row => row.operationKey === operationKey)
     if (applied) {
       if (applied.payloadFingerprint !== payloadFingerprint || !organization && applied.taskId !== scope.taskId) throw new Error('IDEMPOTENCY_CONFLICT:命令键已经用于其他任务或内容。')
-      if (organization && (name === 'submit_profile_review' || name === 'submit_relation_review') && (records([applied.result])[0] as Row | undefined)?.complete === true) await replayOrganizationSubmit(store, scope, name, args, readSet, text(applied.commitId)).catch(() => undefined)
-      return { ...(records([applied.result])[0] as Row ?? {}), ok: true as const, commitId: text(applied.commitId), operationKey, alreadyApplied: true, summary: text(applied.resultSummary) } as CommitAck
+      if (organization) await restoreCompletedWork(store, scope, run, applied, name, args, readSet, signal)
+      return replayAck(applied, operationKey)
     }
     await checkLease(store, scope, signal)
     const intent = records(run.commandIntents).find(row => row.operationKey === operationKey)
@@ -371,13 +401,15 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       const applied = records(run.appliedCommands).find(row => row.operationKey === operationKey)
       if (applied) {
         if (applied.payloadFingerprint !== payloadFingerprint || !organization && applied.taskId !== scope.taskId) throw new Error('IDEMPOTENCY_CONFLICT:命令内容不一致。')
-        if (organization && (name === 'submit_profile_review' || name === 'submit_relation_review') && (records([applied.result])[0] as Row | undefined)?.complete === true) await replayOrganizationSubmit(store, scope, name, args, readSet, text(applied.commitId)).catch(() => undefined)
-        return { ...(records([applied.result])[0] as Row ?? {}), ok: true as const, commitId: text(applied.commitId), operationKey, alreadyApplied: true, summary: text(applied.resultSummary) } as CommitAck
+        if (organization) await restoreCompletedWork(store, scope, run, applied, name, args, readSet, signal)
+        return replayAck(applied, operationKey)
       }
       const intent = records(run.commandIntents).find(row => row.operationKey === operationKey && row.taskId === scope.taskId && row.state === 'prepared')
       if (!intent) throw new Error('CONFLICT:命令意图未就绪。')
       const expected = intent.expectedReadSet as unknown as ReadSet
       const dedicated = organization && (name === 'submit_profile_review' || name === 'submit_relation_review')
+      updatedReads = structuredClone(readSet)
+      if (organization) { bindReviewReads(expected, run); bindReviewReads(updatedReads, run) }
       const queryResults = organization && name === 'record_organization_progress' ? new Map<QueryRead, Row>() : dedicated ? new Map<QueryRead, Row>() : await validateReadSet(store, scope, expected)
       const previousStory = new Map<string, Row>()
       if (name === 'commit_story_changes') for (const table of ['nodes', 'eventLines', 'storyEditorNotes']) for (const row of await store.rows(table)) previousStory.set(`${table}:${row.id}`, row)
@@ -391,6 +423,11 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       const toolResult = organizationTool(name)
         ? await applyOrganizationTool(store, scope, name, args, expected, commitId, timestamp) as ToolWriteResult
         : (assetReviewTools as readonly string[]).includes(name) ? await applyAgentAssetTool(store, scope, name, args, expected, commitId, timestamp) as ToolWriteResult : undefined
+      if (toolResult?.status === 'failed') {
+        const latest = (await store.get('pipelineRuns', scope.runId))!
+        await store.put('pipelineRuns', { ...latest, commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'rejected', updatedAt: timestamp, error: { code: 'SUBMIT_FAILED', message: toolResult.summary } } : row) })
+        return { ...toolResult, ok: false, operationKey, alreadyApplied: false, summary: toolResult.summary ?? '本次提交失败。' } as CommitAck
+      }
       await noteOrganizationWrite(store, scope, name, args, toolResult?.changed === true)
       const summary = toolResult?.summary ?? (name === 'commit_asset_changes' ? '世界资产修改已提交。' : '叙事资产与工作记忆已提交。')
       const latest = (await store.get('pipelineRuns', scope.runId))!
@@ -407,7 +444,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
         const proof = { workItemId: item.workItemId, outcome: 'changed', reason: '本任务已提交该项资料的修改。' }
         if (existing < 0) changed.push(proof); else changed[existing] = proof
       }
-      if (toolResult?.pair) {
+      if (toolResult?.pair && toolResult.changed) {
         const reviewWorkId = text(args.reviewItemId)
         const reviewWork = reviewWorkId ? workItems.find(item => text(item.workItemId) === reviewWorkId) : undefined
         const work = reviewWork ?? workItems.find(item => text(item.kind) === 'relation' && text(item.id) === toolResult.pair!.pairKey)
@@ -452,9 +489,8 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
         assetReview = { ...(assetReview ?? { version: 1 }), items: reviewItems, updatedAt: timestamp }
       }
       if (organization) await reconcileOrganizationAfterWrite(store, scope, latest, name, args, toolResult as Row | undefined)
-      await store.put('pipelineRuns', { ...latest, ...(assetReview ? { assetReview } : {}), appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { ...toolResult } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
+      await store.put('pipelineRuns', { ...latest, ...(assetReview ? { assetReview } : {}), appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, ...(scope.unitId ? { unitId: scope.unitId } : {}), operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { ...toolResult } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
       await appendEntry(store, scope, { type: 'commit', summary: `${commitId}：${summary}` })
-      updatedReads = structuredClone(readSet)
       await rebaseReadSet(store, scope, updatedReads)
       await saveTask(store, scope, { readSet: updatedReads })
       if (name === 'commit_story_changes') {

@@ -8,7 +8,7 @@ import { ModelError, type Attempt, type CallMode, type CallOptions, type CallRes
 
 export interface GatewayEnvironment { fetch?: typeof fetch; now?: () => number; random?: () => number; wait?: typeof abortableDelay; beforeRequest?: () => Promise<void> }
 export interface AgentInput {
-  prompt: string; systemPrompt: string; finishTurn?: FinishTurn; tools?: AgentTool[]; messages?: AgentMessage[]; agent?: Agent
+  prompt: string; systemPrompt: string; finishTurn?: FinishTurn; tools?: AgentTool[]; getTools?: () => AgentTool[]; messages?: AgentMessage[]; agent?: Agent
   beforeToolCall?: AgentOptions['beforeToolCall']; afterToolCall?: AgentOptions['afterToolCall']; prepareRequest?: AgentOptions['prepareRequest']
   onEvent?: (event: AgentEvent) => Promise<void>; onAgent?: (agent: Agent) => void; beforeRequest?: () => Promise<void>; validateFinal?: () => void
   recoverContext?: (context: Context, model: ResolvedModel['model']) => Promise<Context | undefined>
@@ -81,6 +81,12 @@ class CallSession {
     this.attempts.push(attempt)
     this.options.onProgress?.({ state: 'requesting', attempts: this.attempts.length })
     try {
+      if (this.options.trace?.request && this.requestId) {
+        try {
+          const body = typeof init?.body === 'string' ? init.body : input instanceof Request ? await input.clone().text() : undefined
+          if (body) this.options.trace.request({ requestId: this.requestId, attemptId: attempt.attemptId!, body: JSON.parse(body) as Record<string, unknown> })
+        } catch { /* 观测失败不改变请求或阻断调用 */ }
+      }
       const response = await (this.environment.fetch ?? globalThis.fetch)(input, init)
       this.status = response.status; attempt.status = response.status
       this.retryAfter = response.headers.get('retry-after') ?? undefined
@@ -173,18 +179,21 @@ export async function executeAgent(resolved: ResolvedModel, options: CallOptions
     const { Agent } = await awaitWithSignal(import('@earendil-works/pi-agent-core'), session.controller.signal)
     let contextRecovered = false
     const streamFn: AgentOptions['streamFn'] = (_model, context) => {
+        const currentTools = input.getTools?.() ?? input.tools ?? []
+        const turnContext = currentTools.length ? { ...context, tools: currentTools } : context
         const output = new AssistantMessageEventStream()
         void (async () => {
           try {
             let turn
             let firstRequestId: string | undefined
-            try { turn = await session.runTurn(context); firstRequestId = turn.requestId }
+            try { turn = await session.runTurn(turnContext); firstRequestId = turn.requestId }
             catch (error) {
               if (classifyError(error).kind !== 'context_length' || contextRecovered || !input.recoverContext) throw error
               contextRecovered = true
-              const recovered = await input.recoverContext(context, resolved.model)
+              const recovered = await input.recoverContext(turnContext, resolved.model)
               if (!recovered) throw error
-              turn = await session.runTurn(recovered, { ...(firstRequestId ?? session.lastRequestId() ? { parentRequestId: firstRequestId ?? session.lastRequestId() } : {}), purpose: 'repair' })
+              const recoveredContext = currentTools.length ? { ...recovered, tools: currentTools } : recovered
+              turn = await session.runTurn(recoveredContext, { ...(firstRequestId ?? session.lastRequestId() ? { parentRequestId: firstRequestId ?? session.lastRequestId() } : {}), purpose: 'repair' })
             }
             for (const event of turn.events) output.push(event); output.end(turn.message)
           }

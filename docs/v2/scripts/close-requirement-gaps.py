@@ -1,7 +1,8 @@
-"""2026-10-24 目标规格补全。仅生成文档契约/请求样例，不修改应用。"""
+"""2026-10-24 历史一次性脚本。当前 P2 提示词已独立，不再生成 agent-wrapper 或 p2-organization-base，禁止直接运行。"""
 from pathlib import Path
 from copy import deepcopy as cp
 import json,hashlib
+raise SystemExit('历史脚本已停用：P2 提示词已独立，不再重建 agent-wrapper/p2-organization-base。')
 ROOT=Path(__file__).resolve().parents[1]; R=ROOT/'resources/v2.2'; BASE=ROOT/'resources'
 def read(p): return json.loads(p.read_text(encoding='utf-8'))
 def save(p,x): p.write_text(json.dumps(x,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')

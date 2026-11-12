@@ -760,6 +760,11 @@
                 "type": "string",
                 "minLength": 1
               },
+              "unitId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "提交所属人物工作项；恢复完成状态时须与当前工作项一致，旧确认可省略"
+              },
               "taskId": {
                 "type": "string",
                 "description": "持久子任务ID；同run不能将其他子任务确认作为本次总结",
@@ -2915,6 +2920,9 @@
             "unitId": {
               "type": "string",
               "minLength": 1
+            },
+            "taskId": {
+              "type": "string"
             }
           }
         },
@@ -3052,6 +3060,9 @@
             "unitId": {
               "type": "string",
               "minLength": 1
+            },
+            "taskId": {
+              "type": "string"
             }
           }
         },
@@ -3116,6 +3127,9 @@
             "unitId": {
               "type": "string",
               "minLength": 1
+            },
+            "taskId": {
+              "type": "string"
             }
           }
         },
@@ -3174,6 +3188,9 @@
             "unitId": {
               "type": "string",
               "minLength": 1
+            },
+            "taskId": {
+              "type": "string"
             }
           }
         },
@@ -3242,6 +3259,9 @@
             "unitId": {
               "type": "string",
               "minLength": 1
+            },
+            "taskId": {
+              "type": "string"
             }
           }
         },
@@ -3363,8 +3383,7 @@
               "minLength": 1
             },
             "taskId": {
-              "type": "string",
-              "minLength": 1
+              "type": "string"
             },
             "characterId": {
               "type": "string",
@@ -3467,24 +3486,72 @@
             "contentHash"
           ],
           "properties": {
-            "id": { "type": "string" },
-            "sessionId": { "type": "string" },
-            "bookId": { "type": "string" },
-            "ordinal": { "type": "integer", "minimum": 0 },
-            "parentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
-            "createdAt": { "type": "string" },
-            "type": { "const": "prompt_snapshot", "type": "string" },
-            "snapshotId": { "type": "string", "minLength": 1 },
-            "promptKind": { "type": "string", "minLength": 1 },
-            "content": { "type": "string" },
-            "contentHash": { "type": "string", "minLength": 1 },
-            "truncated": { "type": "boolean" },
-            "runId": { "type": "string" },
-            "executionId": { "type": "string" },
-            "taskId": { "type": "string" },
-            "contextId": { "type": "string" },
-            "unitId": { "type": "string" },
-            "characterId": { "type": "string" }
+            "id": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "bookId": {
+              "type": "string"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "parentId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "type": {
+              "const": "prompt_snapshot",
+              "type": "string"
+            },
+            "snapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "promptKind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "content": {
+              "type": "string"
+            },
+            "contentHash": {
+              "type": "string",
+              "minLength": 1
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "executionId": {
+              "type": "string"
+            },
+            "taskId": {
+              "type": "string"
+            },
+            "contextId": {
+              "type": "string"
+            },
+            "unitId": {
+              "type": "string"
+            },
+            "characterId": {
+              "type": "string"
+            }
           }
         },
         {
@@ -3504,24 +3571,78 @@
             "schemaHash"
           ],
           "properties": {
-            "id": { "type": "string" },
-            "sessionId": { "type": "string" },
-            "bookId": { "type": "string" },
-            "ordinal": { "type": "integer", "minimum": 0 },
-            "parentId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
-            "createdAt": { "type": "string" },
-            "type": { "const": "tool_snapshot", "type": "string" },
-            "snapshotId": { "type": "string", "minLength": 1 },
-            "toolNames": { "type": "array", "items": { "type": "string" } },
-            "schema": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-            "schemaHash": { "type": "string", "minLength": 1 },
-            "truncated": { "type": "boolean" },
-            "runId": { "type": "string" },
-            "executionId": { "type": "string" },
-            "taskId": { "type": "string" },
-            "contextId": { "type": "string" },
-            "unitId": { "type": "string" },
-            "characterId": { "type": "string" }
+            "id": {
+              "type": "string"
+            },
+            "sessionId": {
+              "type": "string"
+            },
+            "bookId": {
+              "type": "string"
+            },
+            "ordinal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "parentId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "type": {
+              "const": "tool_snapshot",
+              "type": "string"
+            },
+            "snapshotId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "toolNames": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "schemaHash": {
+              "type": "string",
+              "minLength": 1
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "runId": {
+              "type": "string"
+            },
+            "executionId": {
+              "type": "string"
+            },
+            "taskId": {
+              "type": "string"
+            },
+            "contextId": {
+              "type": "string"
+            },
+            "unitId": {
+              "type": "string"
+            },
+            "characterId": {
+              "type": "string"
+            }
           }
         }
       ]

@@ -26,12 +26,6 @@
       ]
     },
     {
-      "path": "prompts/active/agent-wrapper.txt",
-      "consumers": [
-        "src/features/agents/runtime.ts"
-      ]
-    },
-    {
       "path": "prompts/active/character-optimize.md",
       "consumers": [
         "src/features/world/optimization.ts"
@@ -125,6 +119,36 @@
     },
     {
       "path": "prompts/active/p2-asset-review.md",
+      "consumers": [
+        "src/features/world/assetReview.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p2-organization-directory.md",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p2-organization-candidate.md",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p2-organization-profiles.md",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p2-organization-relations.md",
+      "consumers": [
+        "src/features/world/organization.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p2-relation-review.md",
       "consumers": [
         "src/features/world/assetReview.ts"
       ]
