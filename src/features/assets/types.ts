@@ -41,7 +41,7 @@ export interface EventNode extends BaseAsset {
   timeCoord?: string; timePrecision?: string
 }
 export interface EventLine extends BaseAsset {
-  title: string; nodeIds: string[]; chapters: string[]; cause: string; process: string; result: string
+  title: string; summary?: string; nodeIds: string[]; chapters: string[]; cause: string; process: string; result: string
   lineStatus: 'open' | 'closed'; updatedAt: string; timeRange?: string[]
 }
 /** 节点里的称呼绑定：一个原始称呼连同它命中的全部人物编号。 */

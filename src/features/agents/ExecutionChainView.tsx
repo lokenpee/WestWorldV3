@@ -31,35 +31,25 @@ function ApiBoundary({ request, ordinal, snapshots }: { request?: Row; ordinal: 
   </>}</LazyDetails>
 }
 
-function ConversationEvent({ event, firstUser, folded }: { event: ExecutionEvent; firstUser: boolean; folded: boolean }) {
-  if (event.kind === 'system') return <LazyDetails className="run-role run-role-system" open={!folded} summary={<> SYSTEM PROMPT · 实际发送 </>}>{() => <>
+function ConversationEvent({ event, firstUser }: { event: ExecutionEvent; firstUser: boolean }) {
+  if (event.kind === 'system') return <LazyDetails className="run-role run-role-system" summary={<> SYSTEM PROMPT · 实际发送 </>}>{() => <>
     <pre>{displayContent(event.content)}</pre>
   </>}</LazyDetails>
-  if (event.kind === 'user') return <LazyDetails className="run-role run-role-user" open={!folded} summary={<> {firstUser ? 'USER · 程序注入' : 'USER · 运行消息'} </>}>{() => <>
+  if (event.kind === 'user') return <LazyDetails className="run-role run-role-user" summary={<> {firstUser ? 'USER · 程序注入' : 'USER · 运行消息'} </>}>{() => <>
     <pre>{displayContent(event.content)}</pre>
   </>}</LazyDetails>
   if (event.kind === 'other') return <LazyDetails className="run-role" summary={event.role.toUpperCase()}>{() => <pre>{event.content}</pre>}</LazyDetails>
-  if (folded && event.kind === 'compaction') return <LazyDetails className="run-role" summary="上下文压缩">{() => <pre>{event.content}</pre>}</LazyDetails>
-  if (folded && event.kind === 'assistant') return <LazyDetails className="run-role run-conversation-assistant" summary={<>ASSISTANT{event.toolCalls.length ? ` · ${event.toolCalls.length} 次工具调用` : ' · 模型回复'}</>}>{() => <>
+  if (event.kind === 'compaction') return <LazyDetails className="run-role" summary="上下文压缩">{() => <pre>{event.content}</pre>}</LazyDetails>
+  if (event.kind === 'assistant') return <LazyDetails className="run-role run-conversation-assistant" summary={<>ASSISTANT{event.toolCalls.length ? ` · ${event.toolCalls.length} 次工具调用` : ' · 模型回复'}</>}>{() => <>
     {event.thinking && <LazyDetails summary="思考内容">{() => <pre>{event.thinking}</pre>}</LazyDetails>}
     {event.content && <pre>{event.content}</pre>}
-    {event.toolCalls.map((call, index) => <section key={text(call.id) || index}><h4>TOOL CALL · {text(call.name)}</h4><pre>{displayContent(call.arguments)}</pre></section>)}
+    {event.toolCalls.map((call, index) => <LazyDetails className="run-role run-role-toolcall" key={text(call.id) || index} summary={<>TOOL CALL · {text(call.name)}</>}>{() => <pre>{displayContent(call.arguments)}</pre>}</LazyDetails>)}
   </>}</LazyDetails>
-  if (event.kind === 'compaction') return <div className="run-api-boundary run-compaction">
-    <strong>上下文压缩</strong><span>{displayContent(event.content)}</span>
-  </div>
-  if (event.kind === 'assistant') return <section className="run-conversation-assistant">
-    {event.thinking && <LazyDetails className="run-role run-role-thinking" summary={<> THINKING · 推理内容 </>}>{() => <><pre>{event.thinking}</pre></>}</LazyDetails>}
-    {event.content && <div className="run-reply"><pre>{displayContent(event.content)}</pre></div>}
-    {event.toolCalls.map((call, index) => <LazyDetails className="run-role run-role-toolcall" key={text(call.id) || index} summary={<> TOOL CALL · {text(call.name)} </>}>{() => <>
-      <pre>{displayContent(call.arguments)}</pre>
-    </>}</LazyDetails>)}
-  </section>
   const execution = event.execution
   const result = execution?.result
   const failed = event.isError || execution?.isError === true || execution?.state === 'failed'
   const state = failed ? '失败' : execution?.state === 'pending' ? '待执行' : result === undefined ? '未记录' : '成功'
-  return <LazyDetails className="run-role run-role-toolresult" open={!folded} summary={<> TOOL RESULT · {event.toolName || text(execution?.name) || '工具'}<span className={failed ? 'field-error run-result-state' : 'run-result-state'}>{state}</span> </>}>{() => <>
+  return <LazyDetails className="run-role run-role-toolresult" summary={<> TOOL RESULT · {event.toolName || text(execution?.name) || '工具'}<span className={failed ? 'field-error run-result-state' : 'run-result-state'}>{state}</span> </>}>{() => <>
     {result === undefined && !event.content ? <p className="field-help">等待返回或未记录工具结果。</p> : <pre>{result === undefined ? displayContent(event.content) : toolResultContent(result)}</pre>}
   </>}</LazyDetails>
 }
@@ -91,7 +81,7 @@ export function ExecutionChainView({ chain, edits, characterNames, raw = true, f
       blocks.push(<ApiBoundary key={`api-${event.apiIndex}`} request={folded ? requests[event.apiIndex - 1] : requests.find(row => Number(row.requestOrdinal) === event.apiIndex)} ordinal={event.apiIndex} snapshots={chain.snapshots} />)
       lastApi = event.apiIndex
     }
-    blocks.push(<ConversationEvent key={event.key} event={event} firstUser={event.key === firstUser} folded={folded} />)
+    blocks.push(<ConversationEvent key={event.key} event={event} firstUser={event.key === firstUser} />)
   }
   return <section className="execution-chain" aria-label="Agent 执行过程">
     <section className="run-stats" aria-label="执行统计">

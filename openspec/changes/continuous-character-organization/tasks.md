@@ -214,3 +214,22 @@ REQ-019 局部提示词调整。2026-11-13 用户取消拆分字段，确认保�
 - [ ] 21.3 用户以有具体外貌及身材描写的章节副本核对提取、P2整理效果，验收后同步规格。
 
 本轮检查记录：2026-11-13，`npm run test:unit -- tests/extraction.test.ts tests/merge.test.ts tests/assets.test.ts tests/profile-input.test.ts tests/agent-asset-editing.test.ts tests/world-optimization.test.ts tests/backup.test.ts --maxWorkers=2`：7文件90项通过；提示词同步完成，再次预览哈希和请求示例均为0项变化；`npm run governance:check`、`npm run openspec -- validate continuous-character-organization --strict`、`git diff --check`通过。检查使用固定响应与隔离数据库；真实提取效果待21.3用户验收。
+## 22. 第一步仅查资产、宽松归类
+
+- [x] 22.1 移除第一步原文工具，开放地点资产查询，保留用户提示词并适配工具说明；候选不要求原文证据。见阅读设计补充。
+- [x] 22.2 固定响应验证实际工具权限、资产查阅、无证据保存及其他阶段工具保持；同步提示词，运行类型、相关非live与治理/OpenSpec检查。3文件75项通过，证据见阅读设计补充。
+- [ ] 22.3 用户副本确认不再查原文、疑似组及时保存后同步规格。
+
+确认依据及实施细节见[阅读设计补充](identity-reading.md#仅查资产与疑似归类)。
+## 23. 轻量查重与人物原文限额
+
+- [x] 23.1 修正第一步low映射、人物详情与关系查询契约及精简历史投影。
+- [x] 23.2 实现第二三步人物原文一次限额、持久化/旧记录兼容及正常耗尽返回。
+- [x] 23.3 适配三步提示词和技术契约，固定响应测试、备份/恢复、类型/构建、同步及治理检查。
+- [ ] 23.4 用户副本确认实际耗时、候选质量及限额后正常完成，之后同步规格。
+
+授权及验收场景见[轻量整理设计](lightweight-review.md)。
+
+本轮实现及检查见[轻量整理检查](evidence/lightweight-review-2026-11-13.md)，用户实际效果待23.4验收。
+
+2026-11-13任务23开发检查完成：全量非live 68文件、658项通过、1项既有跳过；类型、构建、治理、OpenSpec严格校验和差异检查通过。提示词同步后再次预览0项变化。23.4用户副本验收待完成。

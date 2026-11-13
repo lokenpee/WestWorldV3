@@ -1,3 +1,4 @@
+import { storyMessages, recordStoryReads } from '../story/views'
 import type { Agent, AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core'
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai'
 import type { AgentInput } from '../models/gateway'
@@ -29,7 +30,7 @@ export interface AgentTaskOptions {
   requiredLineIds?: string[]
   reviewScope?: 'all_assets' | 'relations'
   workflow?: 'character_organization_v1' | 'story_lines_v2' | 'story_pages_v3'
-  contextId?: string; unitId?: string; organizationWorkKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string; shouldPause?: () => boolean; shouldCancel?: () => boolean
+  providedStoryItems?: Row[]; contextId?: string; unitId?: string; organizationWorkKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string; shouldPause?: () => boolean; shouldCancel?: () => boolean
 }
 export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; itemFailure?: string; readCalls: number; writeCalls: number }
 const initialReadSet = (): ReadSet => ({ records: [], queries: [] })
@@ -62,7 +63,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     let agent: Agent | undefined; let loadedMessages: AgentMessage[] = []; let persistedMessages = 0
     let trace: TraceSession | undefined
     let deferredAfterValidation = false
-    let failedSignatures = new Set<string>()
+    const failedSignatures = new Set<string>()
     let organizationConflicts = 0
     let adapter: ReturnType<typeof createAgentTools> | undefined
     try {
@@ -98,6 +99,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         if (task && task.inputFingerprint !== await store.wait(hash(options.input))) throw new Error('CONFLICT:恢复任务须使用原有冻结输入。')
         if (!task) {
           const readSet = initialReadSet()
+          if (scope.workflow === 'story_pages_v3') await recordStoryReads(store, readSet, options.providedStoryItems ?? [])
           if (scope.profile === 'story_editor' && options.input.contextHints) for (const work of options.workItems) {
             const table = storyTable(text(work.kind))
             const row = await store.get(table, text(work.id))
@@ -121,6 +123,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
       if (!scope.probe && scope.sessionId) trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.businessPrompt, purpose: 'work' })
       const systemPrompt = options.businessPrompt
+      if (scope.workflow === 'story_pages_v3') loadedMessages = storyMessages(loadedMessages)
       if (!organization && loadedMessages.length) loadedMessages.push({ role: 'system', content: systemPrompt, timestamp: Date.now() })
       persistedMessages = organization ? loadedMessages.length : loadedMessages.length ? loadedMessages.length - 1 : 0
       const prior = await repo.transaction(false, store => taskOf(store, scope))
@@ -182,7 +185,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         prepareRequest: async ({ context, model }) => {
           const messages = await prepareContext(context, model.contextWindow)
           if (!scope.probe) {
-            const rawBase = messages ?? context.messages
+            const rawBase = scope.workflow === 'story_pages_v3' ? [{ role: 'system' as const, content: systemPrompt, timestamp: Date.now() }, ...storyMessages(messages ?? context.messages)] : messages ?? context.messages
             let seenPrompt = false
             const base = organization ? rawBase.filter(message => {
               if (message.role !== 'user' || contentText(message) !== options.prompt) return true
@@ -235,31 +238,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           return undefined
         },
         afterToolCall: async ({ toolCall, result, isError }) => {
-          if (organization && tools.completed) return { terminate: true }
-          if (organization) {
-            if (!isError) { failedSignatures = new Set(); if ((organizationWriteTools as readonly string[]).includes(toolCall.name)) organizationConflicts = 0; return undefined }
-            const signature = `${toolCall.name}:${canonical(toolCall.arguments)}`
-            const message = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n')
-            if (failedSignatures.has(signature)) {
-              outcome.itemFailure = `相同工具和参数再次失败且没有新资料或提交，已留待处理：${message.slice(0, 500)}`
-              return { terminate: true }
-            }
-            failedSignatures.add(signature)
-            if (/CONFLICT|IDEMPOTENCY_CONFLICT/.test(message)) {
-              organizationConflicts++
-              if (organizationConflicts >= 3) {
-                outcome.itemFailure = `连续${organizationConflicts}次写入冲突且没有新提交，已保留当前进度并暂停：${message.slice(0, 500)}`
-                return { terminate: true }
-              }
-            } else organizationConflicts = 0
-            return undefined
-          }
-          if (scope.workflow === 'story_pages_v3') {
-            if (!isError) { failedSignatures.clear(); return undefined }
-            const signature = `${toolCall.name}:${canonical(toolCall.arguments)}`
-            if (failedSignatures.has(signature)) { outcome.itemFailure = '同一工具调用重复失败，阅读进度已保留，可继续。'; return { terminate: true } }
-            failedSignatures.add(signature); return undefined
-          }
+          if (organization || scope.workflow === 'story_pages_v3') return tools.completed ? { terminate: true } : undefined
           if (!isError || !['submit_result', 'finish_story_batch', 'commit_asset_changes', 'commit_story_changes'].includes(toolCall.name) && !isStoryWrite(toolCall.name)) return undefined
           const message = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n')
           if (message.includes('CONFLICT:')) { agent?.steer({ role: 'user', content: scope.workflow === 'story_lines_v2' ? '资料发生变化，请刷新相关详情后继续。' : '资料发生变化，请重新读取相关依据，再决定是否使用新的命令键提交。', timestamp: Date.now() }); return undefined }
@@ -268,9 +247,41 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           if (!terminate) agent?.steer({ role: 'user', content: scope.workflow === 'story_lines_v2' ? '请根据工具返回的具体错误修正后继续。' : '这是本任务唯一一次结果修正机会。请根据工具错误修正；改变写入内容时使用新的命令键。', timestamp: Date.now() })
           return terminate ? { terminate: true } : undefined
         },
-        finishTurn: () => options.shouldPause?.() || options.shouldCancel?.() || tools.summary || (organization || scope.workflow === 'story_pages_v3') && tools.completed || resumable && (usedRequests >= maxRequests || resumable && timeLeft() === 0) ? { action: 'end' } : undefined,
-        validateFinal: () => { if (!tools.completed && !tools.summary && !(resumable && (deferredAfterValidation || usedRequests >= maxRequests || resumable && timeLeft() === 0))) throw new ModelError(usedRequests >= maxRequests ? 'budget' : 'validation', usedRequests >= maxRequests ? 'BUDGET:子任务预算已用完，剩余工作交后续批次。' : '智能体尚未提交包含真实确认的任务总结。') },
-      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(organization && !scope.probe ? { reasoning: 'medium' as const } : {}), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
+        finishTurn: ({ message, toolResults }) => {
+          if (options.shouldPause?.() || options.shouldCancel?.()) return { action: 'end' }
+          // Pi 的工具查找、参数校验和拦截错误不会经过 afterToolCall。
+          // 在此按返回顺序统一处理，成功查询/提交仍清除之前的重复失败记录。
+          if (organization || scope.workflow === 'story_pages_v3') for (const result of toolResults) {
+            const call = message.content.find(part => part.type === 'toolCall' && part.id === result.toolCallId)
+            if (call?.type !== 'toolCall') continue
+            if (!result.isError) {
+              failedSignatures.clear()
+              if ((organizationWriteTools as readonly string[]).includes(call.name)) organizationConflicts = 0
+              continue
+            }
+            const signature = `${call.name}:${canonical(call.arguments)}`
+            const detail = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n')
+            if (failedSignatures.has(signature)) {
+              outcome.itemFailure = `同一工具调用重复失败，已保存进度：${detail.slice(0, 500)}`
+            }
+            failedSignatures.add(signature)
+            if (organization && /CONFLICT|IDEMPOTENCY_CONFLICT/.test(detail)) {
+              if (++organizationConflicts >= 3) outcome.itemFailure = `连续${organizationConflicts}次写入冲突且没有新提交，已保留当前进度并暂停：${detail.slice(0, 500)}`
+            } else organizationConflicts = 0
+          }
+          if (options.shouldPause?.() || options.shouldCancel?.() || tools.summary || tools.completed || outcome.itemFailure || deferredAfterValidation || usedRequests >= maxRequests || resumable && timeLeft() === 0 || message.stopReason === 'error' || message.stopReason === 'aborted') return { action: 'end' }
+          // 一轮普通说明结束不代表业务完成；保留原回复，继续同一任务。
+          if (!message.content.some(part => part.type === 'toolCall')) {
+            agent?.steer({ role: 'user', content: '当前任务尚未收到完成确认。请继续处理；需要查阅或保存时使用已提供的工具，完成后按任务说明确认结束。', timestamp: Date.now() })
+            return { action: 'continue' }
+          }
+          return undefined
+        },
+        validateFinal: () => {
+          if (tools.completed || tools.summary || options.shouldPause?.() || options.shouldCancel?.() || outcome.itemFailure || deferredAfterValidation || resumable && (usedRequests >= maxRequests || timeLeft() === 0)) return
+          throw new ModelError(usedRequests >= maxRequests ? 'budget' : 'validation', usedRequests >= maxRequests ? 'BUDGET:子任务预算已用完，剩余工作交后续批次。' : '当前任务尚未收到工具的完成确认，已保存进度。')
+        },
+      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(organization && !scope.probe ? { reasoning: (['directory', 'candidate'].includes(scope.workKind ?? '') ? 'low' : 'medium') as 'low' | 'medium' } : {}), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
       outcome.summary = adapter.summary
       if (resumable && !outcome.itemFailure && outcome.result.error && ['validation', 'context_length', 'content_policy'].includes(outcome.result.error.kind)) outcome.itemFailure = outcome.result.error.message
       if (resumable && !outcome.summary && (outcome.result.ok || outcome.itemFailure || outcome.result.error?.kind === 'budget')) {
@@ -283,7 +294,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         })
       }
       outcome.ok = tools.completed || !!outcome.summary && (outcome.result.ok || resumable && (!!outcome.itemFailure || outcome.result.error?.kind === 'budget'))
-      if (!outcome.ok) outcome.error = outcome.result.error?.message ?? '任务总结未通过校验。'; else outcome.error = undefined
+      if (!outcome.ok) outcome.error = outcome.result.error?.message ?? '当前任务尚未完成，已保存进度。'; else outcome.error = undefined
     } catch (error) { outcome.error = heartbeatFailure ? `任务因执行权异常暂停：${heartbeatFailure}` : controller.signal.aborted ? '任务已取消，已提交成果保留。' : error instanceof Error ? error.message : '智能体执行失败。' }
     finally {
       clearInterval(heartbeat); options.signal?.removeEventListener('abort', abort)

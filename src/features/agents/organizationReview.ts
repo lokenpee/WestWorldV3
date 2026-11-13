@@ -159,12 +159,8 @@ export async function noteOrganizationRead(store: AgentStore, scope: Scope, name
       const item = records(organization.profileItems).find(item => item.id === id)
       if (item && noteRead(item, await context.profile(id), fragment)) complete.add(id)
     }
-    if (organization.step === 'relations') {
-      const item = records(organization.relationItems).find(item => item.id === id)
-      if (item && noteRead(item, await context.scan(id), fragment)) complete.add(id)
-    }
   }
-  if (name === 'get_character_relation' && organization.step === 'relations') {
+  if (name === 'get_character_relation' && organization.step === 'relations' && typeof (value.data as Row)?.pairKey === 'string') {
     const data = value.data as Row, key = text(data.pairKey), fingerprint = await context.pair(key)
     const pairs = records(organization.pairChecks), item = pairs.find(row => row.pairKey === key)
     if (item) item.readFingerprint = fingerprint

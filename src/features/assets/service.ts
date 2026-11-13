@@ -25,7 +25,7 @@ const allowed: Record<AssetKind, string[]> = {
   character: ['name', 'aliases', 'chapterIndex', 'manualSourceNote', 'identity', 'ageText', 'appearance', 'personality', 'background', 'speechStyleSample', 'roleWeight'],
   location: ['name', 'aliases', 'chapterIndex', 'manualSourceNote', 'description'],
   node: ['name', 'summary', 'chapterIndex', 'quote', 'process', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions'],
-  eventLine: ['title', 'nodeIds', 'cause', 'process', 'result', 'lineStatus'],
+  eventLine: ['title', 'summary', 'nodeIds', 'cause', 'process', 'result', 'lineStatus'],
 }
 const fail = (field: keyof AssetInput, message: string): never => { throw new AssetError('VALIDATION', message, field) }
 const unique = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))]
@@ -255,7 +255,7 @@ export function createAssetService(workspace: Workspace) {
     if (!nodeIds.length) fail('nodeIds', '请至少选择一个事件节点。')
     const nodes = await db.table<EventNode>('nodes').bulkGet(nodeIds)
     if (nodes.some(node => !node || node.bookId !== bookId)) fail('nodeIds', '所选节点已删除或不属于本书，请重新选择。')
-    return { ...previous, ...base, title, nodeIds, chapters: previous?.chapters ?? [], cause: input.cause ?? previous?.cause ?? '', process: input.process ?? previous?.process ?? '', result: input.result ?? previous?.result ?? '', lineStatus: input.lineStatus ?? previous?.lineStatus ?? 'open', updatedAt: new Date().toISOString() }
+    return { ...previous, ...base, title, ...(input.summary === undefined ? {} : { summary: input.summary }), nodeIds, chapters: previous?.chapters ?? [], cause: input.cause ?? previous?.cause ?? '', process: input.process ?? previous?.process ?? '', result: input.result ?? previous?.result ?? '', lineStatus: input.lineStatus ?? previous?.lineStatus ?? 'open', updatedAt: new Date().toISOString() }
   }
 
   async function mutate<K extends AssetKind>(bookId: string, kind: K, input: AssetInput | null, id?: string, expectedRevision?: number): Promise<AssetByKind[K] | undefined> {

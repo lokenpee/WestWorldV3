@@ -55,7 +55,7 @@ export function ApiRequest({ row, index, snapshots }: { row: Row; index: number;
   const toolNames = stringList(toolSnapshot?.toolNames)
   const calls = list(row.toolCalls)
   if (!actualRequest && systemSnapshot && !messages.some(message => message.role === 'system')) messages.unshift({ role: 'system', content: systemSnapshot.content })
-  return <LazyDetails className="run-api execution-api-call" open={index === 0} aria-label={`第 ${index + 1} 次 API 请求`} summaryClassName="run-api-heading" summary={<> <strong>API {String(index + 1).padStart(2, '0')}</strong><span>{status(row.status)} · {when(row.startedAt)}</span><span>{calls.length ? `${calls.length} 次工具调用` : '文本回复'}</span> </>}>{() => <>
+  return <LazyDetails className="run-api execution-api-call" aria-label={`第 ${index + 1} 次 API 请求`} summaryClassName="run-api-heading" summary={<> <strong>API {String(index + 1).padStart(2, '0')}</strong><span>{status(row.status)} · {when(row.startedAt)}</span><span>{calls.length ? `${calls.length} 次工具调用` : '文本回复'}</span> </>}>{() => <>
     <div className="run-api-content">
       {!actualRequest && <p className="field-help run-history-note">历史记录 · 输入来自当时保存的上下文</p>}
       <section className="run-input-messages" aria-label="API 输入消息">

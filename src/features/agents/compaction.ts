@@ -1,3 +1,4 @@
+import { storyMessages } from '../story/views'
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai'
 import type { ModelService } from '../models/service'
@@ -18,12 +19,13 @@ export function addUsage(previous: Row | undefined, usage: UsageSummary): Row {
   const known = usage.costStatus === 'estimated' && (!previous || previous.costStatus === 'estimated')
   return { input: Number(previous?.input ?? 0) + usage.input, output: Number(previous?.output ?? 0) + usage.output, totalTokens: Number(previous?.totalTokens ?? 0) + usage.totalTokens, cost: Number(previous?.cost ?? 0) + (usage.cost ?? 0), costStatus: known ? 'estimated' : 'unknown' }
 }
-export async function sessionProjection(repo: AgentRepository, sessionId: string, unitId?: string) {
+export async function sessionProjection(repo: AgentRepository, sessionId: string, unitId?: string, lightweightStory = false) {
   return repo.transaction(false, async store => {
     const session = await store.get('storySessions', sessionId)
     if (!session || session.bookId !== repo.bookId) throw new Error('会话不属于当前书籍。')
     const entries = unitId && store.sessionEntries ? await store.sessionEntries(sessionId) : (await store.rows('storySessionEntries')).filter(row => row.sessionId === sessionId)
-    return { ...(unitId ? projectWorkSession(entries, unitId) : projectSession(entries, text(session.leafId) || undefined)), session, allEntries: unitId ? entries : [...entries, ...(await repo.traceRows()).filter(row => row.sessionId === sessionId)] }
+    const projectedEntries = lightweightStory ? entries.map(row => row.type === 'message' && (row.message as AgentMessage).role !== 'system' ? { ...row, message: storyMessages([row.message as AgentMessage])[0] } : row) : entries
+    return { ...(unitId ? projectWorkSession(entries, unitId) : projectSession(projectedEntries, text(session.leafId) || undefined)), session, allEntries: unitId ? entries : [...entries, ...(await repo.traceRows()).filter(row => row.sessionId === sessionId)] }
   })
 }
 function withTask(messages: AgentMessage[], prompt: string) {
@@ -35,7 +37,7 @@ function withTask(messages: AgentMessage[], prompt: string) {
 export async function compactSession(repo: AgentRepository, scope: Scope, options: {
   generate: ModelService['generate']; contextWindow: number; prompt: string; currentTask?: () => Promise<string>; systemMessage?: AgentMessage; force?: boolean; signal?: AbortSignal; onStatus?: (status: SessionStatus) => void
 }): Promise<AgentMessage[]> {
-  const projection = await sessionProjection(repo, scope.sessionId!, scope.unitId === 'directory:identity' ? scope.unitId : undefined)
+  const projection = await sessionProjection(repo, scope.sessionId!, scope.unitId === 'directory:identity' ? scope.unitId : undefined, scope.workflow === 'story_pages_v3')
   const settings = settingsForWindow(options.contextWindow)
   const before = estimateContextTokens(projection.entries, projection.messages)
   const capacity = options.contextWindow - settings.reserve

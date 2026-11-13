@@ -4255,7 +4255,7 @@
         "src/features/story/service.ts",
         "src/features/story/readingService.ts"
       ],
-      "sha256": "468487a3e7f77291511de654c7a994a1a7e0c5f62b68e733cd57b0f6efb40069"
+      "sha256": "ffca5326e7542f044e3078176cd021b20d621ec60957e103df80446c827f8f6b"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p3-review.md",
@@ -4263,7 +4263,7 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ],
-      "sha256": "5083cd20a1ce61e279f28ffa16cc80c1e77a3d363bf5cc7dfb1833af99b147c1"
+      "sha256": "ef1a549c9d11993574874268031e2744e99a33e817c6849fc0d8d8ba56b5a498"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/probe_asset.txt",
@@ -4303,7 +4303,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "5e6aab026f0e592c87fa24e23e140211b29f6e910f5b20d68684dbeefb08cc69"
+      "sha256": "736b59aebd54dd6380d38e0c74410b3c5795bd05bb81a2fa0026c59f897a56b5"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4311,7 +4311,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "512f7e90705d73d66bf0eeebf2e6e2c1ff3a5b0496b2fafcc798ab1171882c43"
+      "sha256": "46a063f1bffa84bb4bbb3253910152f8fbc8e2a7e0067bf7f02a247bc956bdc5"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4319,7 +4319,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "5ae12cdf366aa133c36a8919d5561a593168f376bad9cee5ac037283d59bb376"
+      "sha256": "446497d7e85c8f5d34a4d5e72e50bb812f0b30a9fd8c0fb6fecc90f4dcc57b97"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",
@@ -4343,7 +4343,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "28956334e10b4989591fb5fe3c926519f099552afcc7f14136007dcc555fcd86"
+      "sha256": "9591b385c02c1d8f0c7860748cae469767e2121b3585a5f2bd8482806775b78b"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-profiles.md",
@@ -4351,7 +4351,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "5b3c6ab61d98c15071824b85ccb799d9d79adec6549252831fd7b710c65ac987"
+      "sha256": "5dc1c6533dd88d54ded796c1cdd1e6960ff8820456da87a0f1081a1121c0ca59"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-relations.md",
@@ -4359,7 +4359,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "f710a244ff223cfce5737f25d80f4bc1ded988fcb75a98a737cdcdcc45744e83"
+      "sha256": "06e686deb25ac864ecb685813d5e08594af7fe8657fc9a0572556a8d56f506d8"
     }
   ],
   "decisions": [

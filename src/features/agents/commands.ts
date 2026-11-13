@@ -1,5 +1,5 @@
 import type { AgentRepository, AgentStore, Row } from './repository'
-import { canonical, hash, records, strings, text, toolContracts, validate } from './contracts'
+import { canonical, hash, records, strings, text, toolContracts, validate, parametersFor } from './contracts'
 import { assertScope, noteFingerprint, readTool, resolveAsset, type Scope } from './queries'
 import { detailTokens } from '../assets/merge'
 import { mergeWorldAssets } from '../assets/mergeCore'
@@ -181,6 +181,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
   let changed = false
   const savedNodes: Row[] = [], lineIds: string[] = []
   const wasDetailed = (table: string, id: string) => {
+    if (paged && readSet.records.some(read => read.table === table && (read.id === id || read.resolvedId === id))) return true
     const tool = ({ nodes: 'get_node_detail', eventLines: 'get_event_line_detail', storyEditorNotes: 'get_editor_note_detail' } as Record<string, string>)[table]
     const kind = ({ nodes: 'node', eventLines: 'eventLine', storyEditorNotes: 'note' } as Record<string, string>)[table]
     const details = readSet.queries.filter(query => query.tool === tool || query.tool === 'get_story_detail' && query.args.kind === kind).flatMap(query => records(queryResults.get(query)?.data)).filter(row => row.id === id && !row.fields_omitted)
@@ -250,7 +251,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     lineIds.push(id)
     const chapterOrder = new Map((await store.rows('chapters')).map(row => [text(row.chapterIndex), Number(row.order)]))
     nodes.sort((a, b) => (chapterOrder.get(text(a?.chapterIndex)) ?? 0) - (chapterOrder.get(text(b?.chapterIndex)) ?? 0) || Number(a?.order) - Number(b?.order) || text(a?.id).localeCompare(text(b?.id)))
-    const content = { title: op.title ?? old?.title, nodeIds: nodes.map(row => text(row?.id)), chapters: [...new Set(nodes.map(row => text(row?.chapterIndex)))], cause: op.cause, process: op.process, result: op.result, lineStatus: op.line_status }
+    const content = { title: op.title ?? old?.title, nodeIds: nodes.map(row => text(row?.id)), chapters: [...new Set(nodes.map(row => text(row?.chapterIndex)))], cause: op.cause, process: op.process, result: op.result, lineStatus: op.line_status, ...(op.summary === undefined ? {} : { summary: op.summary }) }
     if (old && !strings(op.merge_line_ids).length && canonical(content) === canonical(Object.fromEntries(Object.keys(content).map(key => [key, old[key]])))) continue
     changed = true
     await store.put('eventLines', { ...old, ...content, id, bookId: scope.bookId, revision: Number(old?.revision ?? 0) + 1, createdBy: old?.createdBy ?? 'P3', updatedAt: timestamp })
@@ -405,9 +406,9 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
   const organization = scope.phase === 'character_organization'
   const allowed = scope.profile === 'asset_editor'
     ? (organization ? [...organizationWriteTools] : scope.phase === 'asset_review' ? [...(relationOnly ? relationTools : assetReviewTools)] : ['commit_asset_changes'])
-    : ['commit_story_changes', ...storyWriteTools]
+    : scope.workflow === 'story_pages_v3' ? ['save_story_lines', 'save_story_notes'] : ['commit_story_changes', ...storyWriteTools]
   if (!allowed.includes(name)) throw new Error(relationOnly ? 'WRITE_SCOPE_DENIED:人物关系专项只允许保存或删除人物对关系。' : 'SCOPE:当前职责或阶段不能执行此写工具。')
-  validate(toolContracts[scope.profile].find(tool => tool.name === name)!.parameters, args)
+  validate(parametersFor(toolContracts[scope.profile].find(tool => tool.name === name)!, scope.workflow), args)
   const operationKey = text(args.operationKey); const payload = name === 'commit_asset_changes' || name === 'commit_story_changes' ? args.payload as Row : args
   const payloadFingerprint = await hash({ tool: name, payload }); const timestamp = new Date().toISOString()
   const previous = await repo.transaction(true, async store => {
@@ -456,6 +457,13 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       if (name === 'commit_asset_changes') await applyAssets(store, scope, payload, expected, commitId)
       else if (name === 'commit_story_changes') await applyStory(store, scope, payload, expected, queryResults)
       else if (isStoryWrite(name)) storyResult = await applyStory(store, scope, await storyPayload(store, scope, name, args), expected, queryResults)
+      if (name === 'save_story_lines' && scope.workflow === 'story_pages_v3' && storyResult) {
+        storyResult.lines = await Promise.all(strings(storyResult.lineIds).map(async lineId => {
+          const before = strings(previousStory.get(`eventLines:${lineId}`)?.nodeIds)
+          const after = strings((await store.get('eventLines', lineId))?.nodeIds)
+          return { lineId, added: after.filter(id => !before.includes(id)).length, removed: before.filter(id => !after.includes(id)).length }
+        }))
+      }
       signal?.throwIfAborted()
       const toolResult = organizationTool(name)
         ? await applyOrganizationTool(store, scope, name, args, expected, commitId, timestamp) as ToolWriteResult

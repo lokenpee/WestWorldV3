@@ -5,7 +5,7 @@ import { createWorkspace } from '../src/lib/storage/workspace'
 import { createModelService } from '../src/features/models/service'
 import { defaultConfig } from '../src/features/models/types'
 import { createStoryService } from '../src/features/story/service'
-import { agentStream } from './support/agent-protocol'
+import { agentStream, agentTextStream } from './support/agent-protocol'
 import { storyResponse, storyTask } from './support/story-protocol'
 import { createBookAgentRepository, createMemoryAgentRepository } from '../src/features/agents/repository'
 import { appendEntry } from '../src/features/agents/commands'
@@ -155,7 +155,7 @@ it('同一条模型回复调用两次下一页，只推进一次并返回尚未�
   expect(await reading(service)).toMatchObject({ checked: 1, pageNumber: 2, complete: false })
 })
 
-it('同一会话由AI翻过三页，多次保存持续续接原线且不重写旧经过', async () => {
+it('同一会话由AI翻过三页，多次保存持续续接原线并维护短概述', async () => {
   const bodies: Row[] = []
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => { const body = bodyOf(init); bodies.push(body); return storyResponse(body) })
   const { service, db } = await setup(25, fetcher)
@@ -164,10 +164,8 @@ it('同一会话由AI翻过三页，多次保存持续续接原线且不重写�
   const lines = await db.table('eventLines').toArray()
   expect(lines).toHaveLength(1)
   expect(lines[0].nodeIds).toHaveLength(25)
-  expect(lines[0].cause).toBe('信件待转交')
-  expect(lines[0].process).toContain('交信、传信与归还')
-  expect(lines[0].process).toContain('N011')
-  expect(lines[0].process).toContain('N025')
+  expect(lines[0].summary).toBe('交信、传信与归还，信件持续流转。')
+  expect(lines[0].process).toBe('')
   expect(await reading(service)).toMatchObject({ checked: 3, totalPages: 3, complete: true })
   expect([...new Set(bodies.map(body => storyTask(body).input.page.pageNumber))]).toEqual([1, 2, 3])
   const lastMessages = bodies.at(-1)!.messages as { role: string; content?: unknown }[]
@@ -271,6 +269,57 @@ it('取消后从未完成页恢复，同书旧线和已保存段落不重复创�
   expect((await db.table('storySessions').toArray())[0].id).toBe(sessionId)
 }, 30000)
 
+it.each(['window_link', 'global_review'])('%s普通说明后继续查询、保存及翻页，不用总结校验结束', async phase => {
+  let explanations = 0, sawContinuation = false
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = bodyOf(init), { input } = storyTask(body)
+    if (input.phase === phase) {
+      if (explanations++ < 2) return agentTextStream('先核对这条故事线的前因后果，再继续查阅。')
+      sawContinuation = true
+      expect(JSON.stringify(body.messages)).toContain('先核对这条故事线的前因后果')
+    }
+    return storyResponse(body)
+  })
+  const { db, service } = await setup(2, fetcher)
+  await service.start('a')
+  if (phase === 'global_review') await service.review('a')
+  expect(sawContinuation).toBe(true)
+  expect(service.state('a')?.error).toBeUndefined()
+  expect((await service.read('a')).progress?.status).toBe('completed')
+  expect(await db.table('eventLines').count()).toBe(1)
+  expect(JSON.stringify(await db.table('storySessionEntries').toArray())).toContain('先核对这条故事线的前因后果')
+})
+
+it.each([
+  { name: 'navigate_story_pages', args: { direction: 'invalid-direction' }, detail: 'direction' },
+  { name: 'unavailable_tool', args: {}, detail: 'not found' },
+])('$name重复失败保留真实错误和未完成页，不冒充完成或继续请求', async ({ name, args, detail }) => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => agentStream([{ name, args }]))
+  const { db, service } = await setup(2, fetcher)
+  await service.start('a')
+  expect(fetcher).toHaveBeenCalledTimes(2)
+  expect(service.state('a')?.error).toContain('同一工具调用重复失败')
+  expect(service.state('a')?.error).toContain(detail)
+  expect(service.state('a')?.error).not.toContain('任务总结')
+  expect((await service.read('a')).progress?.status).toBe('paused')
+  expect((await reading(service))?.checked).toBe(0)
+  expect(await db.table('eventLines').count()).toBe(0)
+})
+
+it('普通说明后API报错立即退出，保留实际错误而不是总结错误', async () => {
+  let requests = 0
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => ++requests === 1
+    ? agentTextStream('继续检查当前事件。')
+    : new Response(JSON.stringify({ error: { message: 'Insufficient Balance', type: 'insufficient_balance_error' } }), { status: 402 }))
+  const { service } = await setup(2, fetcher)
+  await service.start('a')
+  expect(requests).toBe(2)
+  expect(service.state('a')?.error).toContain('Insufficient Balance')
+  expect(service.state('a')?.error).not.toContain('完成确认')
+  expect((await service.read('a')).progress?.status).toBe('paused')
+  expect((await reading(service))?.checked).toBe(0)
+})
+
 it('全书复核对长线逐段阅读后再核对整线，使用独立复核提示词', async () => {
   const reviewPages: Row[] = [], systems: string[] = []
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
@@ -290,3 +339,71 @@ it('全书复核对长线逐段阅读后再核对整线，使用独立复核提�
   expect(systems.every(system => system.includes('复核'))).toBe(true)
   expect((await service.read('a')).progress).toMatchObject({ phase: 'global_review', status: 'completed' })
 }, 30000)
+
+
+it('P3重新开始显式开新轮：复用不发模型请求，全量重新检查且保留事件线', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => storyResponse(bodyOf(init)))
+  const { service, db } = await setup(12, fetcher)
+  await service.start('a')
+  const first = (await db.table('compileProgress').get('P3')).runId
+  const calls = fetcher.mock.calls.length
+  await service.start('a', 'reuse')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect((await db.table('compileProgress').get('P3')).runId).not.toBe(first)
+  expect(fetcher.mock.calls.length).toBe(calls)
+  expect(await reading(service)).toMatchObject({ complete: true, reused: 12 })
+  await service.start('a', 'all')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(fetcher.mock.calls.length).toBeGreaterThan(calls)
+  expect(await db.table('eventLines').count()).toBe(1)
+  await service.review('a')
+  const reviewed = fetcher.mock.calls.length
+  await service.review('a', 'reuse')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(fetcher.mock.calls.length).toBe(reviewed)
+}, 30000)
+
+
+it('首次目录和翻页目录直接构成读取依据，不用查详情就能保存', async () => {
+  let lineId = '', savedPage = '', requests = 0
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    requests++
+    const { input, messages } = storyTask(bodyOf(init))
+    for (const message of messages.filter(message => message.role === 'tool')) {
+      try { const result = JSON.parse(messageText(message.content)); if (result.lineIds?.length) lineId = result.lineIds[0] } catch { /* 只读取写回执 */ }
+    }
+    if (savedPage === input.page.id) return agentStream([{ name: 'navigate_story_pages', args: { direction: 'next' } }])
+    savedPage = input.page.id
+    return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: lineId ? 'append' : 'create', ...(lineId ? { lineId } : { title: '连续的信件', summary: '前后信件彼此承接。' }), nodeIds: input.workItems.map((item: Row) => item.id) }] } }])
+  })
+  const { service, db } = await setup(12, fetcher)
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(requests).toBe(4)
+  expect((await db.table('eventLines').toArray())[0].nodeIds).toHaveLength(12)
+})
+
+
+it('启动失败清除旧轮活动身份，保留原成果且修正后能重试', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => storyResponse(bodyOf(init)))
+  const { service, db, models } = await setup(1, fetcher)
+  await models.settings.clearCredential('custom')
+  await service.start('a')
+  expect(service.state('a')).toMatchObject({ running: false, error: '请先保存整理模型与密钥。' })
+  expect(service.state('a')?.runId).toBeUndefined()
+  expect(await db.table('compileProgress').get('P3')).toBeUndefined()
+  expect(fetcher).not.toHaveBeenCalled()
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://reading-fixture.invalid/v1', aggregationContextWindow: 65536 }, 'fixture-only')
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  const progress = await db.table('compileProgress').get('P3')
+  expect(service.state('a')?.runId).toBe(progress.runId)
+  const before = fetcher.mock.calls.length
+  await models.settings.clearCredential('custom')
+  await service.start('a', 'all')
+  expect(service.state('a')?.error).toBe('请先保存整理模型与密钥。')
+  expect(service.state('a')?.runId).toBeUndefined()
+  expect(fetcher.mock.calls.length).toBe(before)
+  expect(await db.table('compileProgress').get('P3')).toEqual(progress)
+  expect(await db.table('eventLines').count()).toBe(1)
+})

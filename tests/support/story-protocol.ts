@@ -38,7 +38,7 @@ export function storyResponse(body: Item, options: { inputMemory?: boolean; reus
     if (input.phase === 'global_review' || options.readOnly || !input.workItems.length) return next()
     if (commit) return next()
     if (candidate && !line) return agentStream([{ name: 'get_story_detail', args: { kind: 'eventLine', ids: [candidate.id] } }])
-    if (nodes.length) return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: line ? 'append' : 'create', ...(line ? { lineId: line.id, processAppend: `继续传递信件，涉及${input.workItems.map((item: Item) => item.id).join('、')}` } : { title: '信件流转', cause: '信件待转交', process: '交信、传信与归还', lineStatus: 'open' }), nodeIds: input.workItems.map((item: Item) => item.id), result: '按原文继续核对', reason: '原文说明同一封信的连续事件', evidenceNodeIds: input.workItems.map((item: Item) => item.id) }] } }])
+    if (nodes.length) return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: line ? 'append' : 'create', ...(line ? { lineId: line.id } : { title: '信件流转' }), nodeIds: input.workItems.map((item: Item) => item.id), summary: '交信、传信与归还，信件持续流转。', reason: '同一封信的连续事件' }] } }])
     return agentStream([
       ...Array.from({ length: Math.ceil(input.workItems.length / 10) }, (_, i) => ({ name: 'get_story_detail', args: { kind: 'node', ids: input.workItems.slice(i * 10, i * 10 + 10).map((item: Item) => item.id) } })),
       { name: 'search_story_context', args: { kind: 'eventLine', terms: ['信件流转'], limit: 20 } },

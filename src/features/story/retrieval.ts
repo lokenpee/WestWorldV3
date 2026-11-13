@@ -1,6 +1,7 @@
 import { estimateTextTokens } from '../agents/context'
 import { records, strings, text } from '../agents/contracts'
 import type { AgentStore, Row } from '../agents/repository'
+import { storyView } from './views'
 
 const excerpt = (value: unknown, size: number) => text(value).slice(0, size)
 export const storyBatchBudget = (contextWindow = 65536) => Math.min(8000, Math.max(512, Math.floor(contextWindow * 0.12)))
@@ -29,7 +30,7 @@ function termsOf(value: string) {
 }
 const searchable = (row: Row) => [row.name, row.title, row.summary, row.statement, row.cause, row.result, row.process, ...strings(row.actors), ...strings(row.targets), ...strings(row.world_delta), ...strings(row.new_facts)].map(text).join(' ').toLowerCase()
 
-export async function searchStoryContext(store: AgentStore, bookId: string, sessionId: string | undefined, args: Row) {
+export async function searchStoryContext(store: AgentStore, bookId: string, sessionId: string | undefined, args: Row, lightweight = false) {
   const nodes = (await store.rows('nodes')).filter(row => row.bookId === bookId)
   const lines = (await store.rows('eventLines')).filter(row => row.bookId === bookId)
   const notes = (await store.rows('storyEditorNotes')).filter(row => row.bookId === bookId && row.sessionId === sessionId && (row.status === 'active' || args.include_resolved === true || args.status === 'resolved'))
@@ -57,16 +58,16 @@ export async function searchStoryContext(store: AgentStore, bookId: string, sess
     return { ...item, matched, score }
   }).filter(item => !terms.length || item.score > 0).sort((a, b) => b.score - a.score || text(a.row.id).localeCompare(text(b.row.id)))
   const offset = Number(args.offset ?? 0), limit = Math.min(Number(args.limit ?? 12), 20)
-  const data: Row[] = ranked.slice(offset, offset + limit).map(item => ({ ...storyDigest(item.row, item.kind), matchedTerms: item.matched.slice(0, 8) }))
+  const data: Row[] = ranked.slice(offset, offset + limit).map(item => lightweight ? storyView(item.row, item.kind) : ({ ...storyDigest(item.row, item.kind), matchedTerms: item.matched.slice(0, 8) }))
   const truncated = offset + data.length < ranked.length
   return { data, totalCount: ranked.length, truncated, nextOffset: truncated ? offset + data.length : null }
 }
 
-export async function buildStoryContext(store: AgentStore, bookId: string, sessionId: string, rows: Row[], kind: string, includeFuture = false) {
+export async function buildStoryContext(store: AgentStore, bookId: string, sessionId: string, rows: Row[], kind: string, includeFuture = false, lightweight = false) {
   const nodeIds = kind === 'node' ? rows.map(row => text(row.id)) : [...new Set(rows.flatMap(row => strings(row.nodeIds)))].slice(0, 20)
   const terms = rows.flatMap(row => termsOf([row.name, row.title, row.summary, row.statement, row.cause].map(text).join(' ').slice(0, 800))).slice(0, 12)
-  const result = await searchStoryContext(store, bookId, sessionId, { node_ids: nodeIds, terms, limit: 12, include_future: includeFuture })
-  const assigned = rows.map(row => storyDigest(row, kind))
+  const result = await searchStoryContext(store, bookId, sessionId, { node_ids: nodeIds, terms, limit: 12, include_future: includeFuture }, lightweight)
+  const assigned = rows.map(row => lightweight ? storyView(row, kind) : storyDigest(row, kind))
   const related: Row[] = []; let used = 0
   for (const row of result.data) {
     const cost = estimateTextTokens(JSON.stringify(row))

@@ -1008,3 +1008,7 @@ T02的key允许book.lifecycle:{operationId}，value为BookLifecycleJournal；不
 ModelSnapshot新增pricingStatus（known/estimated/unknown）和pricingCurrency；应用Usage新增costStatus同枚举。旧记录缺状态按unknown读取；known/estimated必须由解析器提供币种。numeric cost仍可保存SDK累计值，但unknown不得据此显示免费/真实账单；混合统计单列已知部分。
 
 characterReferences为人物关联的读取说明；节点actorIds与targetCharacterIds保存人物编号，事件线characterIds从节点关联派生。字段字典中的当前实体仍只有18种表定义。
+
+### P3事件线概述与整理复用
+
+eventLines.summary为可选整线概述，旧cause/process/result保留；缺省时查询组合旧文本。P2组织状态identityChecks、reusedCount及P3分阶段checks/reusedChecks随pipelineRuns备份，无新表与版本迁移。字段含义和赋值规则见[实施设计](../../openspec/changes/p3-continuous-story-lines/design.md#字段变化)、[复用字段](../../openspec/changes/p3-continuous-story-lines/restart.md#字段变化)。

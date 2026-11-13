@@ -4,6 +4,7 @@
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import { records, strings, text } from './contracts'
 import type { Row } from './repository'
+import { identityMessages } from './assetViews'
 
 export const observationTypes = new Set(['request_trace', 'prompt_snapshot', 'tool_snapshot'])
 export const isObservationEntry = (row: Row) => observationTypes.has(String(row.type))
@@ -80,7 +81,10 @@ export function projectSession(entries: Row[], leafId?: string) {
 /** 独立连续工作项的压缩和恢复只沿本项历史，不混入旧的自动合并会话。 */
 export function projectWorkSession(entries: Row[], unitId: string) {
   const selected = entries.filter(row => row.unitId === unitId && !isObservationEntry(row)).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
-  return projectSession(selected.map((row, index) => ({ ...row, parentId: selected[index - 1]?.id ?? null })))
+  return projectSession(selected.map((row, index) => ({
+    ...row, parentId: selected[index - 1]?.id ?? null,
+    ...(unitId === 'directory:identity' && row.type === 'message' ? { message: identityMessages([row.message as AgentMessage])[0] } : {}),
+  })))
 }
 export function estimateContextTokens(entries: Row[], messages: AgentMessage[]): number {
   const invalidAfter = Math.max(-1, ...entries.filter(row => row.type === 'compaction' || row.type === 'omit').map(row => Number(row.ordinal)))

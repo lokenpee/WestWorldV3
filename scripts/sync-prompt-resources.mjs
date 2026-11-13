@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const resources = path.join(root, 'docs/v2/resources')
 const activePrompts = path.join(resources, 'v2.2/prompts/active')
-const storyToolNames = ['search_story_context', 'get_story_detail', 'read_original', 'save_story_lines', 'save_story_notes', 'add_story_nodes', 'navigate_story_pages', 'finish_story_batch']
+const storyToolNames = ['search_story_context', 'get_story_detail', 'save_story_lines', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch']
 const examplesDir = path.join(resources, 'v2.2/request-examples')
 const manifest = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/prompt-call-manifest.json'), 'utf8'))
 const ownershipPath = path.join(root, 'docs/v2/文档与资源归属.json')
@@ -69,6 +69,9 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
     const review = call.id === 'PROMPT-P3-GLOBAL'
     const page = { id: review ? 'orphans:1' : 'nodes:1', pageNumber: 1, totalPages: 1, type: 'node_page', ids: input.workItems.map(item => item.id) }
     const brief = input.page ? input : { phase: input.phase, queue: input.queue, page, remainingCount: input.remainingCount, workItems: hints.assigned, related: hints.related, moreRelated: hints.truncated === true, workingSummary: input.memory?.workingSummary ?? '' }
+    const view = row => row.kind === 'node' ? { id: row.id, kind: 'node', name: row.name ?? row.title, summary: row.summary ?? '', chapterIndex: row.chapterIndex ?? row.chapters?.[0] ?? '' } : row.kind === 'eventLine' ? { id: row.id, kind: 'eventLine', title: row.title, summary: row.summary ?? [row.cause, row.process, row.result].filter(Boolean).join('\n\n'), nodeIds: row.nodeIds ?? [], lineStatus: row.lineStatus ?? 'open' } : row
+    brief.workItems = brief.workItems.map(view)
+    brief.related = (brief.related ?? []).map(view)
     example.input = brief
     example.inputSchema = 'prompt-inputs.schema.json#/$defs/StoryReadingBrief'
     const discipline = normalize(fs.readFileSync(path.join(activePrompts, 'output-discipline.txt'), 'utf8')).trim()

@@ -10,6 +10,45 @@ const taskInputs = (body: { messages: { role: string; content: unknown }[] }) =>
 
 test.setTimeout(60000)
 
+for (const [index, label] of ['第一步：识别重复人物', '第二步：优化人物资料', '第三步：整理人物关系'].entries()) test(`单行状态等待、余额错误和继续：${label}`, async ({ page }, testInfo) => {
+  let fail = true, release: () => void = () => undefined
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    const body = route.request().postDataJSON()
+    const organization = organizationResponse(body)
+    if (organization && fail) {
+      await gate
+      await route.fulfill({ status: 402, contentType: 'application/json', body: JSON.stringify({ error: { message: 'Insufficient Balance', type: 'insufficient_balance_error' } }) }); return
+    }
+    await route.fulfill({ contentType: 'text/event-stream', body: await (organization ?? worldResponse(body)).text() })
+  })
+  await prepare(page)
+  await page.getByRole('button', { name: label, exact: true }).click()
+  const activity = page.getByRole('region', { name: '人物整理进度', exact: true }).locator('.agent-activity')
+  await expect(activity).toHaveCount(1)
+  await expect(activity).toContainText(/第 1 次 API · 等待模型回复 · 已等待 [1-9]\d* 秒/)
+  await expect(activity).toHaveClass(/is-active/)
+  if (index === 0) await activity.screenshot({ path: testInfo.outputPath('activity-waiting.png') })
+  release()
+  await expect(activity).toContainText('接口余额不足（402）')
+  await expect(activity).not.toHaveClass(/is-active/)
+  // 错误先展示，刷新前等待原执行器保存终态并释放执行权。
+  await expect.poll(() => page.evaluate(async () => {
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!
+    const request = indexedDB.open(name)
+    const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
+    const lease = await new Promise<unknown>(resolve => { const read = db.transaction('pipelineRuns').objectStore('pipelineRuns').get('lease:world'); read.onsuccess = () => resolve(read.result) })
+    db.close(); return !lease
+  })).toBe(true)
+  await page.reload()
+  await expect(activity).toContainText('接口余额不足（402）')
+  fail = false
+  await page.getByRole('button', { name: `继续第${['一', '二', '三'][index]}步`, exact: true }).click()
+  await expect(activity).toContainText('已完成', { timeout: 45000 })
+  await expect(activity).not.toContainText('余额不足')
+  await expect(activity).not.toHaveClass(/is-active/)
+})
+
 test('AI主动前后翻页时主面板显示当前页而不是累计完成页', async ({ page }) => {
   let calls = 0, back: () => void = () => undefined, finish: () => void = () => undefined
   const backGate = new Promise<void>(resolve => { back = resolve })
@@ -194,6 +233,9 @@ test('第二步整理详情按实际API请求展示，桌面与窄屏无重复�
   await expect(trace.locator('.run-api')).toHaveCount(0)
   await trace.locator('.run-api-boundary > summary').first().click()
   await expect(trace.locator('.run-api')).toHaveCount(1)
+  await expect(trace.locator('.run-api')).not.toHaveAttribute('open', '')
+  await trace.locator('.run-api > summary').click()
+  await expect(trace.locator('.run-api details[open]')).toHaveCount(0)
   await trace.locator('.run-assistant').scrollIntoViewIfNeeded()
   await trace.screenshot({ path: testInfo.outputPath('agent-detail-mobile.png') })
   expect(await page.getByRole('dialog', { name: '整理详情', exact: true }).evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
@@ -623,9 +665,9 @@ test('P2图稿：当前用量、跨轮覆盖、搜索和合并历史', async ({ 
   test.setTimeout(90000)
   let release: () => void = () => undefined
   const gate = new Promise<void>(resolve => { release = resolve })
-  let held = false
+  let held = false, calls = 0
   await page.route('**/world-fixture/v1/chat/completions', async route => {
-    const body = route.request().postDataJSON()
+    calls++; const body = route.request().postDataJSON()
     const response = organizationResponse(body, { onProfile: detail => detail.id === 'C1-P001' ? [{ name: 'submit_profile_review', args: { patch: { personality: '沉稳，遇事果断' }, done: true, reason: '合并重复表述' } }] : [] })
     if (response && !held && body.messages.some((message: { content?: unknown }) => contentOf(message.content).includes('任务类型：profile'))) { held = true; await gate }
     await route.fulfill({ contentType: 'text/event-stream', body: await (response ?? worldResponse(body)).text() })
@@ -656,7 +698,11 @@ test('P2图稿：当前用量、跨轮覆盖、搜索和合并历史', async ({ 
   expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
   await dialog.getByRole('button', { name: '关闭', exact: true }).click()
   await expect(second).toBeEnabled({ timeout: 30000 })
+  const previousCalls = calls
   await second.click()
+  await page.getByRole('dialog', { name: '选择整理范围' }).getByRole('button', { name: '全部重新整理', exact: true }).click()
+  await expect.poll(() => calls).toBeGreaterThan(previousCalls)
+  await expect(progress).toContainText('本次人物已处理完成', { timeout: 30000 })
   await expect(second).toBeEnabled({ timeout: 30000 })
   await page.getByRole('button', { name: '整理详情', exact: true }).click()
   await expect(dialog.getByLabel('已完成人物', { exact: true })).toContainText('沈青')
@@ -742,4 +788,29 @@ test('人物自动分层位于人物列表，保留手动层级且不调用模�
   await panel.locator('.asset-toolbar').screenshot({ path: testInfo.outputPath('character-tiers-mobile.png') })
   await panel.getByRole('button', { name: /^地点 / }).click()
   await expect(auto).toHaveCount(0)
+})
+
+
+test('P2重新开始默认复用已完成人物，不重复请求，原详情可查看', async ({ page }) => {
+  let calls = 0
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    calls++; const body = route.request().postDataJSON()
+    await route.fulfill({ contentType: 'text/event-stream', body: await (organizationResponse(body) ?? worldResponse(body)).text() })
+  })
+  await prepare(page)
+  const start = page.getByRole('button', { name: '第二步：优化人物资料', exact: true })
+  await start.click()
+  const progress = page.getByRole('region', { name: '人物整理进度', exact: true })
+  await expect(progress).toContainText('本次人物已处理完成', { timeout: 30000 })
+  const previousCalls = calls
+  await start.click()
+  const choice = page.getByRole('dialog', { name: '选择整理范围' })
+  await expect(choice.getByRole('button', { name: '复用已完成结果', exact: true })).toBeFocused()
+  await choice.getByRole('button', { name: '复用已完成结果', exact: true }).click()
+  await expect(page.locator('.world-panel')).toContainText(/已复用 [1-9]\d* 人的完成结果/)
+  await expect(progress).toContainText('本次人物已处理完成')
+  expect(calls).toBe(previousCalls)
+  await page.getByRole('button', { name: '整理详情', exact: true }).click()
+  const details = page.getByRole('dialog', { name: '整理详情', exact: true })
+  await expect(details.getByLabel('已完成人物', { exact: true })).toContainText('沈青')
 })

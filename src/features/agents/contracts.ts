@@ -6,7 +6,8 @@ import modelText from '../../../docs/v2/resources/v2.2/model-output-contract.jso
 import storageText from '../../../docs/v2/resources/v2.2/storage.schema.json?raw'
 
 export type AgentProfile = 'asset_editor' | 'story_editor'
-export interface ToolContract { name: string; description: string; parameters: TSchema; kind: string; maxResults?: number }
+export interface ToolContract { name: string; description: string; parameters: TSchema; legacyParameters?: TSchema; kind: string; maxResults?: number }
+export const parametersFor = (contract: ToolContract, workflow?: string) => workflow === 'story_pages_v3' ? contract.parameters : contract.legacyParameters ?? contract.parameters
 export const toolContracts = (JSON.parse(toolText) as { profiles: Record<AgentProfile, ToolContract[]> }).profiles
 export const resultContracts = new Map((JSON.parse(resultText) as { tools: { name: string; success: TSchema }[] }).tools.map(row => [row.name, row.success]))
 export const summarySchema = (JSON.parse(modelText) as { schemas: Record<string, TSchema> }).schemas.AgentTaskSummarySchema

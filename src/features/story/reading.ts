@@ -2,14 +2,16 @@ import { hash, records, strings, text } from '../agents/contracts'
 import type { AgentStore, Row } from '../agents/repository'
 import { noteFingerprint } from '../agents/queries'
 import { storyContent, validStoryCoverage } from './coverage'
-import { buildStoryContext, selectStoryBatch, storyDigest } from './retrieval'
+import { storyView } from './views'
+import { readingCheck, usableReadingChecks, type ReadingCheck } from './reuse'
+import { buildStoryContext, selectStoryBatch } from './retrieval'
 
 export interface ReadingPage extends Row { id: string; type: string; queue: string; ids: string[]; fingerprint: string; checkedFingerprint?: string; sourceFingerprints?: Record<string, string>; reason?: string }
-export interface ReadingState extends Row { pages: ReadingPage[]; currentPageId: string | null; receipts: string[] }
+export interface ReadingState extends Row { pages: ReadingPage[]; currentPageId: string | null; receipts: string[]; checks?: ReadingCheck[]; reusedChecks?: ReadingCheck[] }
 const stateOf = (run: Row, phase: string) => ((run.storyReading as Row | undefined)?.[phase] as ReadingState | undefined)
 const batches = (rows: Row[]) => {
   const result: Row[][] = []; let offset = 0
-  while (offset < rows.length) { const batch = selectStoryBatch(rows.slice(offset, offset + 10), 4000); result.push(batch); offset += batch.length }
+  while (offset < rows.length) { const batch = rows.slice(offset, offset + selectStoryBatch(rows.slice(offset, offset + 10).map(row => storyView(row, row.nodeIds ? 'eventLine' : row.statement ? 'note' : 'node')), 4000).length); result.push(batch); offset += batch.length }
   return result
 }
 const checked = (page: ReadingPage) => page.checkedFingerprint === page.fingerprint
@@ -38,6 +40,8 @@ async function pageSources(store: AgentStore, page: ReadingPage) {
 export async function refreshReading(store: AgentStore, runId: string, sessionId: string, phase: string): Promise<ReadingState> {
   const run = (await store.get('pipelineRuns', runId))!
   const saved = stateOf(run, phase)
+  const reusedChecks = await usableReadingChecks(store, saved?.reusedChecks ?? [])
+  const reused = (type: string, id: string) => reusedChecks.some(check => check.type === type && check.id === id)
   const nodes = await store.rows('nodes'), lines = await store.rows('eventLines')
   const chapterOrder = new Map((await store.rows('chapters')).map(row => [text(row.chapterIndex), Number(row.order)]))
   nodes.sort((a, b) => (chapterOrder.get(text(a.chapterIndex)) ?? 0) - (chapterOrder.get(text(b.chapterIndex)) ?? 0) || Number(a.order ?? 0) - Number(b.order ?? 0) || text(a.id).localeCompare(text(b.id)))
@@ -49,7 +53,7 @@ export async function refreshReading(store: AgentStore, runId: string, sessionId
     pages.push({ ...previous, ...extra, id, type, queue, ids: rows.map(row => text(row.id)), fingerprint })
   }
   if (phase === 'window_link') {
-    for (const group of batches(nodes)) await add('node_page', 'window_nodes', group)
+    for (const group of batches(nodes.filter(node => !reused('node_page', text(node.id))))) await add('node_page', 'window_nodes', group)
     // 旧窗口检查点中的有效逐项结果可复用；不会重新解释旧模型的语义结论。
     if (!saved) for (const page of pages) {
       let valid = true
@@ -62,9 +66,10 @@ export async function refreshReading(store: AgentStore, runId: string, sessionId
     }
   } else {
     const linked = new Set(lines.flatMap(line => strings(line.nodeIds)))
-    for (const group of batches(nodes.filter(row => !linked.has(text(row.id))))) await add('node_page', 'orphans', group)
+    for (const group of batches(nodes.filter(row => !linked.has(text(row.id)) && !reused('node_page', text(row.id))))) await add('node_page', 'orphans', group)
     lines.sort((a, b) => text(a.id).localeCompare(text(b.id)))
     for (const [lineIndex, line] of lines.entries()) {
+      if (reused('line_summary', text(line.id))) continue
       const members = strings(line.nodeIds).map(id => nodes.find(node => node.id === id)).filter((row): row is Row => !!row)
       const segments = batches(members)
       for (const [index, group] of segments.entries()) await add('line_segment', 'event_lines', group, { lineId: line.id, lineIndex: lineIndex + 1, totalLines: lines.length, segment: index + 1, totalSegments: segments.length })
@@ -81,7 +86,7 @@ export async function refreshReading(store: AgentStore, runId: string, sessionId
     if (sources.get(chapter) !== fingerprint) { delete page.checkedFingerprint; break }
   }
   const currentPageId = pages.some(page => page.id === saved?.currentPageId) ? saved!.currentPageId : pages.find(page => !checked(page))?.id ?? null
-  return { ...saved, pages, currentPageId, receipts: strings(saved?.receipts) }
+  return { ...saved, pages, currentPageId, receipts: strings(saved?.receipts), reusedChecks }
 }
 
 export async function saveReading(store: AgentStore, runId: string, phase: string, state: ReadingState) {
@@ -95,7 +100,7 @@ export async function readingBrief(store: AgentStore, bookId: string, sessionId:
   const kind = page.type === 'line_summary' ? 'eventLine' : page.type === 'note_page' ? 'note' : 'node'
   const table = kind === 'eventLine' ? 'eventLines' : kind === 'note' ? 'storyEditorNotes' : 'nodes'
   const rows = (await Promise.all(page.ids.map(id => store.get(table, id)))).filter((row): row is Row => !!row)
-  const hints = await buildStoryContext(store, bookId, sessionId, rows, kind, phase === 'global_review')
+  const hints = await buildStoryContext(store, bookId, sessionId, rows, kind, phase === 'global_review', true)
   const memory = await store.get('storyEditorMemory', sessionId)
   const line = page.lineId ? await store.get('eventLines', text(page.lineId)) : undefined
   const previous = line && page.type === 'line_segment' ? strings(line.nodeIds).indexOf(page.ids[0]) : -1
@@ -103,7 +108,7 @@ export async function readingBrief(store: AgentStore, bookId: string, sessionId:
   return { phase, queue: page.queue, page: { id: page.id, type: page.type, pageNumber: state.pages.indexOf(page) + 1, totalPages: state.pages.length, ids: page.ids,
     ...(page.lineId ? { lineId: page.lineId, lineIndex: page.lineIndex, totalLines: page.totalLines, ...(page.segment ? { segment: page.segment, totalSegments: page.totalSegments } : {}) } : {}) },
     remainingCount: state.pages.filter(page => !checked(page)).length, workItems: hints.assigned, related: hints.related, moreRelated: hints.truncated,
-    workingSummary: text(memory?.workingSummary), ...(line ? { line: { ...storyDigest(line, 'eventLine'), cause: text(line.cause).slice(0, 500), result: text(line.result).slice(0, 500), summaryTruncated: text(line.cause).length > 500 || text(line.result).length > 500 }, ...(prior ? { previousNode: storyDigest(prior, 'node') } : {}) } : {}) }
+    workingSummary: text(memory?.workingSummary), ...(line ? { line: storyView(line, 'eventLine'), ...(prior ? { previousNode: storyView(prior, 'node') } : {}) } : {}) }
 }
 
 export async function navigateStoryReading(store: AgentStore, scope: { bookId: string; runId: string; sessionId?: string; phase: string; taskId: string }, args: Row, callId: string) {
@@ -125,6 +130,14 @@ export async function navigateStoryReading(store: AgentStore, scope: { bookId: s
       else {
         current.checkedFingerprint = current.fingerprint; current.reason = text(args.reason) || text(args.notes) || '本页已检查。'
         current.sourceFingerprints = await pageSources(store, current)
+        if (current.type !== 'line_segment') {
+          const checks = state.checks ?? [], sources = new Map<string, string>()
+          for (const id of current.ids) {
+            const value = await readingCheck(store, current.type, id, sources), at = checks.findIndex(check => check.id === id && check.type === current.type)
+            if (at < 0) checks.push(value); else checks[at] = value
+          }
+          state.checks = checks
+        }
         state.currentPageId = state.pages.slice(at + 1).find(page => !checked(page))?.id ?? state.pages.find(page => !checked(page))?.id ?? null
         summary = '当前页已检查，已返回下一待检查页。'
       }
@@ -138,5 +151,5 @@ export async function navigateStoryReading(store: AgentStore, scope: { bookId: s
 
 export function readingProgress(state: ReadingState) {
   const page = state.pages.find(page => page.id === state.currentPageId)
-  return { pageNumber: page ? state.pages.indexOf(page) + 1 : state.pages.length, totalPages: state.pages.length, checked: state.pages.filter(checked).length, complete: state.pages.every(checked), type: page?.type, queue: page?.queue, lineId: text(page?.lineId), segment: page?.segment as number | undefined, totalSegments: page?.totalSegments as number | undefined, lineIndex: page?.lineIndex as number | undefined, totalLines: page?.totalLines as number | undefined }
+  return { reused: state.reusedChecks?.length ?? 0, pageNumber: page ? state.pages.indexOf(page) + 1 : state.pages.length, totalPages: state.pages.length, checked: state.pages.filter(checked).length, complete: state.pages.every(checked), type: page?.type, queue: page?.queue, lineId: text(page?.lineId), segment: page?.segment as number | undefined, totalSegments: page?.totalSegments as number | undefined, lineIndex: page?.lineIndex as number | undefined, totalLines: page?.totalLines as number | undefined }
 }

@@ -16,6 +16,7 @@ import { visiblePairChecks } from './organizationReport'
 import { pruneOrganizationHistory } from '../agents/p2History'
 import { organizationPrompt } from './organizationPrompt'
 import { identityPage, inheritedCandidates } from './identityCandidates'
+import { reuseOrganization, type RestartMode } from './reuse'
 import directoryPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-directory.md?raw'
 import profilePrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-profiles.md?raw'
 import relationPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-relations.md?raw'
@@ -42,7 +43,7 @@ export function createOrganizationState(characterIds: string[]): OrganizationSta
   }
 }
 
-export async function createOrganizationStepState(store: Store, step: 'scan' | 'profiles' | 'relations'): Promise<OrganizationState> {
+export async function createOrganizationStepState(store: Store, step: 'scan' | 'profiles' | 'relations', restart: RestartMode = 'all'): Promise<OrganizationState> {
   const people = await store.rows('characters') as unknown as Character[]
   const state = createOrganizationState(people.map(row => row.id))
   state.mode = 'full'
@@ -50,12 +51,14 @@ export async function createOrganizationStepState(store: Store, step: 'scan' | '
   state.statisticsPending = false
   if (step === 'scan') {
     state.candidateGroups = inheritedCandidates(await store.rows('pipelineRuns')) as unknown as OrganizationState['candidateGroups']
+    if (restart === 'reuse') await reuseOrganization(store, state as unknown as Record<string, unknown>, step)
     return state
   }
   if (step === 'profiles') {
     state.scanPages = []
     await buildProfileReview(store, state as unknown as Record<string, unknown>)
     state.runStep = 'profiles'
+    if (restart === 'reuse') await reuseOrganization(store, state as unknown as Record<string, unknown>, step)
     return state
   }
   state.profileItems = []
@@ -64,6 +67,7 @@ export async function createOrganizationStepState(store: Store, step: 'scan' | '
   state.runStep = 'relations'
   state.reviewStartedAt = new Date().toISOString()
   state.statisticsPending = false
+  if (restart === 'reuse') await reuseOrganization(store, state as unknown as Record<string, unknown>, step)
   return state
 }
 

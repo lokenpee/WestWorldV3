@@ -1791,6 +1791,10 @@
             "manual",
             "P2"
           ]
+        },
+        "summary": {
+          "type": "string",
+          "description": "事件线简短概述；旧记录缺省时使用原叙述。"
         }
       }
     },
@@ -5955,17 +5959,459 @@
               "const": "save_story_lines"
             },
             "payload": {
-              "type": "object",
-              "properties": {
-                "operations": {
-                  "type": "array",
-                  "items": {
-                    "anyOf": [
-                      {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "const": "create"
+                              },
+                              "nodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 1,
+                                "maxItems": 100,
+                                "description": "本次加入的成员节点；append保留原有成员。"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "cause": {
+                                "type": "string",
+                                "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
+                              },
+                              "process": {
+                                "type": "string",
+                                "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
+                              },
+                              "result": {
+                                "type": "string",
+                                "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
+                              },
+                              "lineStatus": {
+                                "enum": [
+                                  "open",
+                                  "closed"
+                                ],
+                                "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "description": "本次关联或调整的理由，可自然概括。"
+                              },
+                              "evidenceNodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 0,
+                                "maxItems": 100,
+                                "description": "可选的关联依据节点编号。"
+                              },
+                              "confidence": {
+                                "type": "number",
+                                "description": "可选的自评把握，不作为语义质量门槛。"
+                              },
+                              "processAppend": {
+                                "type": "string",
+                                "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
+                              },
+                              "processEdits": {
+                                "type": "array",
+                                "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "segment": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "description": "processSegments中的段落编号。"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "description": "这一段修改后的内容。"
+                                    }
+                                  },
+                                  "required": [
+                                    "segment",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "summary": {
+                                "type": "string",
+                                "description": "事件线简短概述；旧记录缺省时使用原叙述。"
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "title",
+                              "nodeIds",
+                              "cause",
+                              "process",
+                              "result",
+                              "lineStatus"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "const": "append"
+                              },
+                              "lineId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 1,
+                                "maxItems": 100,
+                                "description": "本次加入的成员节点；append保留原有成员。"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "cause": {
+                                "type": "string",
+                                "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
+                              },
+                              "process": {
+                                "type": "string",
+                                "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
+                              },
+                              "result": {
+                                "type": "string",
+                                "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
+                              },
+                              "lineStatus": {
+                                "enum": [
+                                  "open",
+                                  "closed"
+                                ],
+                                "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "description": "本次关联或调整的理由，可自然概括。"
+                              },
+                              "evidenceNodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 0,
+                                "maxItems": 100,
+                                "description": "可选的关联依据节点编号。"
+                              },
+                              "confidence": {
+                                "type": "number",
+                                "description": "可选的自评把握，不作为语义质量门槛。"
+                              },
+                              "processAppend": {
+                                "type": "string",
+                                "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
+                              },
+                              "processEdits": {
+                                "type": "array",
+                                "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "segment": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "description": "processSegments中的段落编号。"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "description": "这一段修改后的内容。"
+                                    }
+                                  },
+                                  "required": [
+                                    "segment",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "summary": {
+                                "type": "string",
+                                "description": "事件线简短概述；旧记录缺省时使用原叙述。"
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "lineId",
+                              "nodeIds"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "const": "update"
+                              },
+                              "lineId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "nodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 1,
+                                "maxItems": 100,
+                                "description": "提供时为调整后的完整成员列表，省略则保留原成员。"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "cause": {
+                                "type": "string",
+                                "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
+                              },
+                              "process": {
+                                "type": "string",
+                                "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
+                              },
+                              "result": {
+                                "type": "string",
+                                "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
+                              },
+                              "lineStatus": {
+                                "enum": [
+                                  "open",
+                                  "closed"
+                                ],
+                                "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "description": "本次关联或调整的理由，可自然概括。"
+                              },
+                              "evidenceNodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 0,
+                                "maxItems": 100,
+                                "description": "可选的关联依据节点编号。"
+                              },
+                              "confidence": {
+                                "type": "number",
+                                "description": "可选的自评把握，不作为语义质量门槛。"
+                              },
+                              "processAppend": {
+                                "type": "string",
+                                "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
+                              },
+                              "processEdits": {
+                                "type": "array",
+                                "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "segment": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "description": "processSegments中的段落编号。"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "description": "这一段修改后的内容。"
+                                    }
+                                  },
+                                  "required": [
+                                    "segment",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "summary": {
+                                "type": "string",
+                                "description": "事件线简短概述；旧记录缺省时使用原叙述。"
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "lineId"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "action": {
+                                "const": "merge"
+                              },
+                              "lineId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "mergeLineIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 1,
+                                "maxItems": 100
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "cause": {
+                                "type": "string",
+                                "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
+                              },
+                              "process": {
+                                "type": "string",
+                                "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
+                              },
+                              "result": {
+                                "type": "string",
+                                "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
+                              },
+                              "lineStatus": {
+                                "enum": [
+                                  "open",
+                                  "closed"
+                                ],
+                                "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "description": "本次关联或调整的理由，可自然概括。"
+                              },
+                              "evidenceNodeIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 0,
+                                "maxItems": 100,
+                                "description": "可选的关联依据节点编号。"
+                              },
+                              "confidence": {
+                                "type": "number",
+                                "description": "可选的自评把握，不作为语义质量门槛。"
+                              },
+                              "processAppend": {
+                                "type": "string",
+                                "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
+                              },
+                              "processEdits": {
+                                "type": "array",
+                                "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "segment": {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "description": "processSegments中的段落编号。"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "description": "这一段修改后的内容。"
+                                    }
+                                  },
+                                  "required": [
+                                    "segment",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "action",
+                              "lineId",
+                              "mergeLineIds"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "minItems": 1,
+                      "maxItems": 20
+                    },
+                    "operationKey": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "程序维护的提交键，模型无需填写。"
+                    }
+                  },
+                  "required": [
+                    "operations"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "operations"
+                  ],
+                  "properties": {
+                    "operations": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 20,
+                      "items": {
                         "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "action"
+                        ],
                         "properties": {
                           "action": {
-                            "const": "create"
+                            "enum": [
+                              "create",
+                              "append",
+                              "update",
+                              "merge"
+                            ]
+                          },
+                          "lineId": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "已有事件线编号，新建省略。"
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "事件线名称，新建填写。"
                           },
                           "nodeIds": {
                             "type": "array",
@@ -5975,288 +6421,15 @@
                             },
                             "minItems": 1,
                             "maxItems": 100,
-                            "description": "本次加入的成员节点；append保留原有成员。"
+                            "description": "新建的成员、append的新增成员，或update的完整成员。"
                           },
-                          "title": {
+                          "summary": {
                             "type": "string",
-                            "minLength": 1
-                          },
-                          "cause": {
-                            "type": "string",
-                            "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                          },
-                          "process": {
-                            "type": "string",
-                            "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                          },
-                          "result": {
-                            "type": "string",
-                            "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                          },
-                          "lineStatus": {
-                            "enum": [
-                              "open",
-                              "closed"
-                            ],
-                            "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                            "description": "简短说明整条线的承接和当前进展，提供时替换概述，省略保留。"
                           },
                           "reason": {
                             "type": "string",
-                            "description": "本次关联或调整的理由，可自然概括。"
-                          },
-                          "evidenceNodeIds": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "minItems": 0,
-                            "maxItems": 100,
-                            "description": "可选的关联依据节点编号。"
-                          },
-                          "confidence": {
-                            "type": "number",
-                            "description": "可选的自评把握，不作为语义质量门槛。"
-                          },
-                          "processAppend": {
-                            "type": "string",
-                            "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                          },
-                          "processEdits": {
-                            "type": "array",
-                            "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "segment": {
-                                  "type": "integer",
-                                  "minimum": 1,
-                                  "description": "processSegments中的段落编号。"
-                                },
-                                "text": {
-                                  "type": "string",
-                                  "description": "这一段修改后的内容。"
-                                }
-                              },
-                              "required": [
-                                "segment",
-                                "text"
-                              ],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": [
-                          "action",
-                          "title",
-                          "nodeIds",
-                          "cause",
-                          "process",
-                          "result",
-                          "lineStatus"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "action": {
-                            "const": "append"
-                          },
-                          "lineId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "nodeIds": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "minItems": 1,
-                            "maxItems": 100,
-                            "description": "本次加入的成员节点；append保留原有成员。"
-                          },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "cause": {
-                            "type": "string",
-                            "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                          },
-                          "process": {
-                            "type": "string",
-                            "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                          },
-                          "result": {
-                            "type": "string",
-                            "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                          },
-                          "lineStatus": {
-                            "enum": [
-                              "open",
-                              "closed"
-                            ],
-                            "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
-                          },
-                          "reason": {
-                            "type": "string",
-                            "description": "本次关联或调整的理由，可自然概括。"
-                          },
-                          "evidenceNodeIds": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "minItems": 0,
-                            "maxItems": 100,
-                            "description": "可选的关联依据节点编号。"
-                          },
-                          "confidence": {
-                            "type": "number",
-                            "description": "可选的自评把握，不作为语义质量门槛。"
-                          },
-                          "processAppend": {
-                            "type": "string",
-                            "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                          },
-                          "processEdits": {
-                            "type": "array",
-                            "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "segment": {
-                                  "type": "integer",
-                                  "minimum": 1,
-                                  "description": "processSegments中的段落编号。"
-                                },
-                                "text": {
-                                  "type": "string",
-                                  "description": "这一段修改后的内容。"
-                                }
-                              },
-                              "required": [
-                                "segment",
-                                "text"
-                              ],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": [
-                          "action",
-                          "lineId",
-                          "nodeIds"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "action": {
-                            "const": "update"
-                          },
-                          "lineId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "nodeIds": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "minItems": 1,
-                            "maxItems": 100,
-                            "description": "提供时为调整后的完整成员列表，省略则保留原成员。"
-                          },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "cause": {
-                            "type": "string",
-                            "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                          },
-                          "process": {
-                            "type": "string",
-                            "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                          },
-                          "result": {
-                            "type": "string",
-                            "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                          },
-                          "lineStatus": {
-                            "enum": [
-                              "open",
-                              "closed"
-                            ],
-                            "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
-                          },
-                          "reason": {
-                            "type": "string",
-                            "description": "本次关联或调整的理由，可自然概括。"
-                          },
-                          "evidenceNodeIds": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "minItems": 0,
-                            "maxItems": 100,
-                            "description": "可选的关联依据节点编号。"
-                          },
-                          "confidence": {
-                            "type": "number",
-                            "description": "可选的自评把握，不作为语义质量门槛。"
-                          },
-                          "processAppend": {
-                            "type": "string",
-                            "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                          },
-                          "processEdits": {
-                            "type": "array",
-                            "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "segment": {
-                                  "type": "integer",
-                                  "minimum": 1,
-                                  "description": "processSegments中的段落编号。"
-                                },
-                                "text": {
-                                  "type": "string",
-                                  "description": "这一段修改后的内容。"
-                                }
-                              },
-                              "required": [
-                                "segment",
-                                "text"
-                              ],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": [
-                          "action",
-                          "lineId"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "action": {
-                            "const": "merge"
-                          },
-                          "lineId": {
-                            "type": "string",
-                            "minLength": 1
+                            "description": "可选的关联或调整理由。"
                           },
                           "mergeLineIds": {
                             "type": "array",
@@ -6265,99 +6438,19 @@
                               "minLength": 1
                             },
                             "minItems": 1,
-                            "maxItems": 100
-                          },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "cause": {
-                            "type": "string",
-                            "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                          },
-                          "process": {
-                            "type": "string",
-                            "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                          },
-                          "result": {
-                            "type": "string",
-                            "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                          },
-                          "lineStatus": {
-                            "enum": [
-                              "open",
-                              "closed"
-                            ],
-                            "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
-                          },
-                          "reason": {
-                            "type": "string",
-                            "description": "本次关联或调整的理由，可自然概括。"
-                          },
-                          "evidenceNodeIds": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "minItems": 0,
                             "maxItems": 100,
-                            "description": "可选的关联依据节点编号。"
-                          },
-                          "confidence": {
-                            "type": "number",
-                            "description": "可选的自评把握，不作为语义质量门槛。"
-                          },
-                          "processAppend": {
-                            "type": "string",
-                            "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                          },
-                          "processEdits": {
-                            "type": "array",
-                            "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "segment": {
-                                  "type": "integer",
-                                  "minimum": 1,
-                                  "description": "processSegments中的段落编号。"
-                                },
-                                "text": {
-                                  "type": "string",
-                                  "description": "这一段修改后的内容。"
-                                }
-                              },
-                              "required": [
-                                "segment",
-                                "text"
-                              ],
-                              "additionalProperties": false
-                            }
+                            "description": "merge时要并入lineId的事件线。"
                           }
-                        },
-                        "required": [
-                          "action",
-                          "lineId",
-                          "mergeLineIds"
-                        ],
-                        "additionalProperties": false
+                        }
                       }
-                    ]
-                  },
-                  "minItems": 1,
-                  "maxItems": 20
-                },
-                "operationKey": {
-                  "type": "string",
-                  "minLength": 1,
-                  "description": "程序维护的提交键，模型无需填写。"
+                    },
+                    "operationKey": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
                 }
-              },
-              "required": [
-                "operations"
-              ],
-              "additionalProperties": false
+              ]
             }
           },
           "required": [
@@ -7915,6 +8008,9 @@
         },
         "lastError": {
           "$ref": "#/$defs/OrganizationWorkError"
+        },
+        "reused": {
+          "type": "boolean"
         }
       }
     },
@@ -8119,6 +8215,38 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "originalReadUnits": {
+          "description": "本轮已成功读取原文的工作项，如profile:C1-P001、relations:C1-P001；恢复继续保留。",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "identityChecks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "fingerprint"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "fingerprint": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "reusedCount": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

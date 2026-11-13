@@ -30,7 +30,7 @@ it('保存不翻页，主动前后翻阅显示当前页；回看不完成离开�
     expect(messages.filter(message => message.role === 'user' && organizationPromptParts(message.content))).toHaveLength(1)
     expect(page.totalPages).toBe(3)
     expect(page.pageNumber).toBe([1, 1, 2, 1, 2, 3, 2, 3][calls - 1])
-    if (calls === 1) return agentStream([{ name: 'save_identity_groups', args: { groups: [{ memberIds: [id(1), id(2)], reason: '随时保存' }] } }])
+    if (calls === 1) return agentStream([{ name: 'save_identity_groups', args: { groups: [{ memberIds: [id(1), id(2)], reason: '可能是同一人物，存疑交人工选择，未提供证据' }] } }])
     const run = (await db.table('pipelineRuns').toArray()).find(row => row.organization)!
     if (calls === 2) {
       expect(run.organization.scanPages.every((page: Row) => page.status === 'issued')).toBe(true)
@@ -105,7 +105,7 @@ it('连续Agent跨三页扩组、候选合组及追认早页单人；只有人�
     const body = JSON.parse(init!.body as string); requests.push(body)
     if (requests.length > 6) throw new Error(`识别循环异常：${JSON.stringify(body.messages.slice(-2))}`)
     const tools = body.tools.map((tool: { function: { name: string } }) => tool.function.name)
-    expect(tools.sort()).toEqual(['get_character_detail', 'get_character_relation', 'query_candidate_groups', 'query_character_catalog', 'read_original', 'save_identity_groups', 'navigate_identity_pages'].sort())
+    expect(tools.sort()).toEqual(['get_character_detail', 'get_character_relation', 'query_candidate_groups', 'query_character_catalog', 'query_locations', 'get_location_detail', 'save_identity_groups', 'navigate_identity_pages'].sort())
     const messages = body.messages as { role: string; content: unknown }[]
     const work = messages.map(message => organizationPromptParts(message.content)).find(Boolean)!
     const results = messages.filter(message => message.role === 'tool').map(message => json(message.content))
@@ -139,6 +139,34 @@ it('连续Agent跨三页扩组、候选合组及追认早页单人；只有人�
   expect((await w.openBook('a').table('pipelineRuns').toArray()).some(row => row.report?.groups?.some((group: Row) => group.method === 'mechanical'))).toBe(true)
 }, 30000)
 
+it('第一步可查询地点资产，保存无证据候选不改变人物或地点', async () => {
+  let calls = 0
+  const { db, service } = await fixture(async (_url, init) => {
+    const body = JSON.parse(init!.body as string), names = body.tools.map((tool: { function: { name: string } }) => tool.function.name)
+    expect(names).not.toContain('read_original')
+    calls++
+    if (calls === 1) return agentStream([{ name: 'query_locations', args: { name_like: '渡口' } }])
+    if (calls === 2) {
+      expect(JSON.stringify(body.messages)).toContain('青石渡口')
+      return agentStream([{ name: 'get_location_detail', args: { ids: ['L1'] } }])
+    }
+    if (calls === 3) {
+      expect(JSON.stringify(body.messages)).toContain('城外的渡口')
+      return agentStream([{ name: 'save_identity_groups', args: { groups: [{ memberIds: [id(1), id(2)], reason: '疑似同人，交人工选择' }] } }])
+    }
+    if (calls > 6) throw new Error('查询或保存未按预期完成')
+    return agentStream([{ name: 'navigate_identity_pages', args: { currentPageId: `scan:${calls - 4}`, direction: 'next' } }])
+  })
+  await db.table('locations').put({ id: 'L1', bookId: 'a', name: '青石渡口', description: '城外的渡口', revision: 1, chapterIndex: '1', createdBy: 'P1' })
+  const people = await db.table('characters').toArray(), locations = await db.table('locations').toArray()
+  const runId = await service.startOrganizationStep('a', 'scan')
+  await vi.waitFor(() => expect(service.state('a')?.running).toBe(false), { timeout: 10000 })
+  expect((await db.table('pipelineRuns').get(runId)).status).toBe('completed')
+  expect((await service.identityCandidates('a'))).toHaveLength(1)
+  expect(await db.table('characters').toArray()).toEqual(people)
+  expect(await db.table('locations').toArray()).toEqual(locations)
+})
+
 it('旧resolve任务不再产生自动合并工作项，疑似组保留', async () => {
   const repo = createMemoryAgentRepository('a')
   const state = createOrganizationState([]); state.step = 'resolve'; state.runStep = 'scan'
@@ -148,13 +176,19 @@ it('旧resolve任务不再产生自动合并工作项，疑似组保留', async 
   const tools = createAgentTools(repo, { bookId: 'a', profile: 'asset_editor', phase: 'character_organization', runId: 'r', taskId: 't', owner: 'o', workItemIds: [], workKind: 'candidate' })
   expect(tools.tools.map(tool => tool.name)).not.toContain('merge_assets')
   expect(tools.tools.map(tool => tool.name)).not.toContain('get_tools_detail')
+  tools.activate('read_original')
+  expect(tools.currentTools().map(tool => tool.name)).not.toContain('read_original')
+  for (const workKind of ['profile', 'relations'] as const) {
+    const other = createAgentTools(repo, { bookId: 'a', profile: 'asset_editor', phase: 'character_organization', runId: 'r', taskId: 't', owner: 'o', workItemIds: [], workKind })
+    expect(other.currentTools().map(tool => tool.name)).toContain('read_original')
+  }
 })
 
-it('后页重复失败暂停在失败页，已完成页和候选保留且不无限重启工作项', async () => {
+it.each([false, true])('后页重复失败暂停在失败页，已完成页和候选保留（参数校验失败：%s）', async invalidArgs => {
   let calls = 0
   const { db, service } = await fixture(async () => {
     calls++
-    return agentStream(calls === 1 ? [{ name: 'save_identity_groups', args: { groups: [{ memberIds: [id(1), id(2)], reason: '已保存候选' }] } }, { name: 'navigate_identity_pages', args: { currentPageId: 'scan:0', direction: 'next' } }] : [{ name: 'save_identity_groups', args: { groups: [{ memberIds: [id(101), '不存在'], reason: '错误样本' }] } }])
+    return agentStream(calls === 1 ? [{ name: 'save_identity_groups', args: { groups: [{ memberIds: [id(1), id(2)], reason: '已保存候选' }] } }, { name: 'navigate_identity_pages', args: { currentPageId: 'scan:0', direction: 'next' } }] : [{ name: 'save_identity_groups', args: invalidArgs ? { groups: 'invalid-groups' } : { groups: [{ memberIds: [id(101), '不存在'], reason: '错误样本' }] } }])
   })
   const runId = await service.startOrganizationStep('a', 'scan')
   await vi.waitFor(() => expect(service.state('a')?.running).toBe(false), { timeout: 10000 })
@@ -164,6 +198,7 @@ it('后页重复失败暂停在失败页，已完成页和候选保留且不无�
   expect(run.organization.scanPages[0]).toMatchObject({ status: 'checked' })
   expect(run.organization.scanPages[0].lastError).toBeUndefined()
   expect(run.organization.scanPages[1].lastError).toBeDefined()
+  expect(run.tasks.at(-1).lastError.message).not.toContain('任务总结')
   expect(run.organization.candidateGroups).toHaveLength(1)
   expect(await db.table('characters').count()).toBe(201)
 })

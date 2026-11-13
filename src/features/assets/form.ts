@@ -25,6 +25,7 @@ export function formValues(asset?: Asset, characters: Character[] = []): FormVal
   values.actorIds = (node.actorIds ?? []).join('\n'); values.targetCharacterIds = (node.targetCharacterIds ?? []).join('\n')
   for (const key of ['world_delta', 'new_facts', 'started_actions'] as const) values[key] = (node[key] ?? []).join('\n')
   values.nodeIds = (line.nodeIds ?? []).join('\n')
+  if ('nodeIds' in asset && line.summary === undefined) values.summary = [...new Set([line.cause, line.process, line.result].filter(Boolean))].join('\n\n')
   if ('actors' in asset) {
     const participants = nodeParticipants(asset, characters)
     values.participantIds = participants.ids.join('\n')
@@ -41,6 +42,6 @@ export function formInput(kind: AssetKind, values: FormValues, creating: boolean
     return { ...base, identity: values.identity, ageText: values.ageText, appearance: values.appearance, personality: values.personality, background: values.background, speechStyleSample: values.speechStyleSample, ...(creating ? { roleWeight: values.roleWeight as RoleWeight } : {}) }
   }
   if (kind === 'node') return { name: values.name, summary: values.summary, chapterIndex: values.chapterIndex, quote: values.quote, process: values.process, participantIds: split(values.participantIds), unlinkedParticipants: split(values.unlinkedParticipants), time_text: values.time_text, time_hint: values.time_hint, world_delta: split(values.world_delta), new_facts: split(values.new_facts), started_actions: split(values.started_actions) }
-  return { title: values.title, nodeIds: split(values.nodeIds), cause: values.cause, process: values.process, result: values.result, ...(creating ? { lineStatus: values.lineStatus as 'open' | 'closed' } : {}) }
+  return { title: values.title, summary: values.summary, nodeIds: split(values.nodeIds), cause: values.cause, process: values.process, result: values.result, ...(creating ? { lineStatus: values.lineStatus as 'open' | 'closed' } : {}) }
 }
 export const memberIds = (value: string) => split(value)

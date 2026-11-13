@@ -52,4 +52,10 @@ BUG-33，中型缺陷。用户实际运行 P2/P3 时，“运行详情”出现�
 
 ## 接手说明
 
+2026-11-13 BUG-42再次反馈的结束流程修复已获用户明确授权：“改，然后检查其他环节有没有这种情况”。本次中型局部修复范围为共用Agent运行层及P2三步、P3串联/复核的调用方。普通文字回复后继续当前未完成任务，完成仍依据工具回执；主动暂停、取消和工具失败不能被旧总结校验覆盖。不增加输出格式或字数校验。字段与存储无变化，沿用任务状态、完成回执及会话消息，旧数据与备份兼容。实施方法、数据流及验收见设计末节与任务8。
+
 读本提案、[任务](tasks.md)、[验收](acceptance.md)、[修改记录](implementation-record.md)及差异规格后实施。技术入口为 `src/features/agents/AgentRunPanel.tsx`、`src/features/world/WorldPanel.tsx`、`src/features/story/StoryPanel.tsx`；数据仍来自 `request_trace`、`prompt_snapshot`、`tool_snapshot`、`WorldRun.requestLedger` 和 `report.assetEdits`。
+
+## 2026-11-13：统一单行执行状态（BUG-42）
+用户确认P2三步、P3串联和复核均使用一行原位更新的状态，显示API次数、等待计时、返回后的真实工具动作及暂停/错误；运行中有动态光晕，停止后不再动画。用户授权开发者选择事件文案，不追加多段日志。按中型局部修改实施，关联REQ-020、REQ-019、REQ-025。
+实施与验收见[设计补充](design.md#单行执行状态)及任务7。证据见[备份诊断](../continuous-character-organization/evidence/identity-paused-2026-11-13.md)。影响agents共用状态展示、world/P2Progress、story/StoryPanel及其服务读取；模型工具和业务写权限不变。

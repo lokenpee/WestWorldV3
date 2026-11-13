@@ -2,6 +2,7 @@ import type { AgentStore, Row } from '../agents/repository'
 import { canonical, records, strings, text } from '../agents/contracts'
 import type { ReadSet } from '../agents/commands'
 import { resolveLifecycleId } from '../assets/relations'
+import { reviewContext } from '../agents/organizationReview'
 
 export async function identityPage(store: AgentStore, organization: Row, requestedId = text(organization.identityPageId)) {
   const pages = records(organization.scanPages)
@@ -24,6 +25,12 @@ export async function navigateIdentityPages(store: AgentStore, organization: Row
     return { changed: index > 0, complete: false, page, summary: index ? '已返回上一页；离开的页未标记完成。' : '已经是第一页。' }
   }
   pages[index].status = 'checked'; delete pages[index].lastError
+  const context = await reviewContext(store), checks = records(organization.identityChecks)
+  for (const id of strings(pages[index].ids)) {
+    const at = checks.findIndex(item => item.id === id), item = { id, fingerprint: await context.scan(id) }
+    if (at < 0) checks.push(item); else checks[at] = item
+  }
+  organization.identityChecks = checks
   organization.scanPages = pages
   const next = pages[index + 1] ?? pages.find(page => page.status !== 'checked')
   const page = next ? await identityPage(store, organization, text(next.pageId)) : null

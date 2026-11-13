@@ -120,7 +120,7 @@ it('人物对须实际查询核对，双端共享结论，修改只使相关结�
   await call('get_character_detail', { ids: [id, child, 'C50-P001'] })
   const checkPair = (args: Row = {}) => call('record_organization_progress', { operationKey: crypto.randomUUID(), action: 'check_item', kind: 'pair', id: pair, outcome: 'no_change', reason: '身份关系与双方资料相符', basis: [{ summary: '已读取父子关系', source: { kind: 'relation', fromId: id, toId: child } }], ...args })
   await expect(checkPair()).rejects.toThrow('先读取')
-  await expect(call('record_organization_progress', { operationKey: 'too-early', action: 'check_item', kind: 'relation_scan', id, outcome: 'no_change', reason: '尚未逐对核对' })).rejects.toThrow('未核对的人物对')
+  await expect(call('record_organization_progress', { operationKey: 'too-early', action: 'check_item', kind: 'relation_scan', id, outcome: 'no_change', reason: '只读人物资料，尚未读取关系' })).rejects.toThrow('须完整读取该人物当前关系')
   await call('get_character_relation', { fromId: id, toId: child })
   await checkPair()
   const reused = await checkPair()

@@ -1,11 +1,23 @@
 import { LazyDetails } from '../src/features/agents/LazyDetails'
 import { toolResultContent } from '../src/features/agents/requestPresentation'
 import { createElement } from 'react'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { ApiRequest, Changes } from '../src/features/agents/AgentRunPanel'
 import { ExecutionChainView } from '../src/features/agents/ExecutionChainView'
 import type { Row } from '../src/features/agents/repository'
+
+// 静态渲染无法点击summary；内容检查模拟展开指定层级，默认折叠另行验证。
+const disclosure = vi.hoisted(() => ({ mode: 'request' }))
+vi.mock('../src/features/agents/LazyDetails', async importOriginal => {
+  const actual = await importOriginal<typeof import('../src/features/agents/LazyDetails')>()
+  return { LazyDetails: (props: Parameters<typeof actual.LazyDetails>[0]) => createElement(actual.LazyDetails, {
+    ...props,
+    open: props.open || (disclosure.mode === 'request' && props.className?.split(' ').includes('run-api')) ||
+      (disclosure.mode === 'conversation' && /run-role-(system|user|toolresult)|run-conversation-assistant/.test(props.className ?? '')),
+  }) }
+})
+beforeEach(() => { disclosure.mode = 'request' })
 
 const request = (id: string, tool: string, result: unknown = `${tool}-result`): Row => ({
   requestId: id, requestOrdinal: id === 'r1' ? 1 : 2, status: 'succeeded', purpose: 'work', startedAt: '2026-11-08T00:00:00.000Z',
@@ -63,6 +75,7 @@ it('每次请求显示该次工具定义，缺少快照时明确提示', () => {
 
 
 it('执行链按一条会话时间线展示，历史输入只出现一次', () => {
+  disclosure.mode = 'conversation'
   const entries: Row[] = [
     { id: 'sys', ordinal: 1, type: 'message', message: { role: 'system', content: 'SYSTEM_ONCE' } },
     { id: 'user', ordinal: 2, type: 'message', message: { role: 'user', content: 'PROMPT_ONCE' } },
@@ -122,4 +135,15 @@ it('折叠时不执行大文本内容函数，展开时生成完整内容', () =
   const open = renderToStaticMarkup(createElement(LazyDetails, { summary: '展开', children: content, open: true }))
   expect(content).toHaveBeenCalledOnce()
   expect(open).toContain('END')
+})
+
+it('首个API请求与后续请求默认收起，不生成正文或工具内容', () => {
+  disclosure.mode = 'default'
+  for (const id of ['r1', 'r2']) {
+    const html = render({ ...request(id, 'hidden_tool'), text: '隐藏的回复' })
+    expect(html).not.toContain('open=""')
+    expect(html).not.toContain('hidden_tool')
+    expect(html).not.toContain('隐藏的回复')
+    expect(html).toContain('1 次工具调用')
+  }
 })

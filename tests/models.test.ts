@@ -261,6 +261,14 @@ describe('模型配置与统一调用', () => {
     expect(JSON.parse(fetcher.mock.calls[2][1]?.body as string)).toMatchObject({ thinking: { type: 'disabled' } })
   })
 
+  it('DeepSeek V4的low在实际请求中保持low并保留思考', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => stream('固定回复'))
+    const { service } = await setup(fetcher)
+    await service.settings.save(defaultConfig, key)
+    expect(await service.agent({ prompt: '初筛人物', systemPrompt: '简短判断' }, { reasoning: 'low' })).toMatchObject({ ok: true })
+    expect(JSON.parse(fetcher.mock.calls[0][1]?.body as string)).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: 'low' })
+  })
+
   it('目录外模型不因调用者请求思考而注入未知的供应商参数', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream('固定回复'))
     const { service } = await setup(fetcher)

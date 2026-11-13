@@ -215,7 +215,7 @@
       },
       {
         "name": "get_character_detail",
-        "description": "按编号读取完整人物资料与当前关系；人物整理全程可用include_facts:true读取合并事实底稿。长详情返回分段时，用同一编号和nextCharOffset续读至末尾。",
+        "description": "按编号读取人物自身资料，关系请单独使用 get_character_relation 查询。识别重复人物时只返回个人档案；其他任务可用 include_facts 读取合并底稿。返回分段时按 nextCharOffset 继续。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -249,7 +249,7 @@
         "kind": "read",
         "maxResults": 20,
         "maxBytes": 65536,
-        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; relation-results-included-in-result-fingerprint; read_original-records-text-fingerprint"
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution"
       },
       {
         "name": "query_locations",
@@ -330,7 +330,7 @@
       },
       {
         "name": "read_original",
-        "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。",
+        "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。 P2人物资料、关系整理各自每个人物最多成功查阅一次，暂停恢复不重置；次数耗尽正常返回提示，请依据已有资料整理并提交结论。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -1970,13 +1970,12 @@
       },
       {
         "name": "get_character_relation",
-        "description": "读取两个具体人物编号之间的当前关系、编辑版本、指纹和依据；没有连接返回 absent 或 deleted。",
+        "description": "只填 fromId 查看此人的关系概览，可用 afterId 翻页；再填 toId 查询指定人物对。识别重复人物只返回双方姓名、双向标签、状态和方向疑点，不返回证据；其他任务查询指定人物对时保留版本、指纹和依据。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
           "required": [
-            "fromId",
-            "toId"
+            "fromId"
           ],
           "properties": {
             "fromId": {
@@ -1986,11 +1985,19 @@
             "toId": {
               "type": "string",
               "minLength": 1
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "afterId": {
+              "type": "string"
             }
           }
         },
         "kind": "read",
-        "maxResults": 1,
+        "maxResults": 50,
         "maxBytes": 65536,
         "dependencyTracking": "pair-result-and-endpoint-record-fingerprint"
       },
@@ -3382,7 +3389,7 @@
         "kind": "write",
         "maxResults": 100,
         "maxBytes": 65536,
-        "description": "保存疑似人物组，支持单组或批量；可以增减成员、合组或拆组。只改疑似组，不合并人物、不翻页。",
+        "description": "保存疑似人物组，存疑也可归组，只需成员和简短说明，不要求原文证据。支持单组或批量、增减成员、合组或拆组。只改疑似组，不合并人物、不翻页。",
         "parameters": {
           "type": "object",
           "additionalProperties": false,
@@ -3430,7 +3437,7 @@
                   "reason": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "疑似依据，或移人、拆组、撤销的理由。"
+                    "description": "简短疑似说明，或移人、拆组、撤销的理由；不需要原文证据。"
                   }
                 }
               }
@@ -3684,7 +3691,7 @@
       },
       {
         "name": "get_character_detail",
-        "description": "按ID读取本书人物详细信息及revision；include_facts=true仅P2整编允许，返回事实底稿以校验覆盖。",
+        "description": "按编号读取人物自身资料，关系请单独使用 get_character_relation 查询。识别重复人物时只返回个人档案；其他任务可用 include_facts 读取合并底稿。返回分段时按 nextCharOffset 继续。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -3709,7 +3716,7 @@
         "kind": "read",
         "maxResults": 20,
         "maxBytes": 65536,
-        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
+        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution"
       },
       {
         "name": "query_locations",
@@ -3790,7 +3797,7 @@
       },
       {
         "name": "read_original",
-        "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。",
+        "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。 P2人物资料、关系整理各自每个人物最多成功查阅一次，暂停恢复不重置；次数耗尽正常返回提示，请依据已有资料整理并提交结论。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -5384,8 +5391,55 @@
       {
         "name": "get_story_detail",
         "kind": "read",
-        "description": "查看节点、事件线或线索详情。长内容按nextCharOffset续读，事件线成员按nextMemberOffset翻页；processSegments提供经过段落编号，processSegment可单独读取某段。",
+        "description": "按编号读取节点详细经过、事件线概述与成员或工作线索。长文本按nextCharOffset续读，成员按nextMemberOffset翻页。",
         "parameters": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "node",
+                "eventLine",
+                "note"
+              ]
+            },
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "maxItems": 10
+            },
+            "char_offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 6000
+            },
+            "memberOffset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "memberLimit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "kind",
+            "ids"
+          ],
+          "additionalProperties": false
+        },
+        "maxResults": 10,
+        "maxBytes": 65536,
+        "dependencyTracking": "query-result-fingerprint",
+        "legacyParameters": {
           "type": "object",
           "properties": {
             "kind": {
@@ -5433,16 +5487,87 @@
             "ids"
           ],
           "additionalProperties": false
-        },
-        "maxResults": 10,
-        "maxBytes": 65536,
-        "dependencyTracking": "query-result-fingerprint"
+        }
       },
       {
         "name": "save_story_lines",
         "kind": "write",
-        "description": "分次保存事件线。append追加节点；process替换完整经过，processEdits按段号修订，processAppend追加发展，组合时依此顺序处理。省略字段保留；merge保留双方已有脉络，任一线仍open时默认保持open。程序维护成员、章节和反向归属。",
+        "description": "批量保存事件线。create填写名称、节点和概述；append只填新增节点；update修正概述或完整成员；merge合并已有线。省略字段保留，理由可选。",
         "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operations"
+          ],
+          "properties": {
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "create",
+                      "append",
+                      "update",
+                      "merge"
+                    ]
+                  },
+                  "lineId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "已有事件线编号，新建省略。"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "事件线名称，新建填写。"
+                  },
+                  "nodeIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "description": "新建的成员、append的新增成员，或update的完整成员。"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "description": "简短说明整条线的承接和当前进展，提供时替换概述，省略保留。"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "可选的关联或调整理由。"
+                  },
+                  "mergeLineIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "description": "merge时要并入lineId的事件线。"
+                  }
+                }
+              }
+            },
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "maxBytes": 65536,
+        "legacyParameters": {
           "type": "object",
           "properties": {
             "operations": {
@@ -5846,14 +5971,97 @@
             "operations"
           ],
           "additionalProperties": false
-        },
-        "maxBytes": 65536
+        }
       },
       {
         "name": "save_story_notes",
         "kind": "write",
         "description": "保存未解线索、解决说明或工作摘要；同一线索沿用key，省略的工作摘要保留。",
         "parameters": {
+          "type": "object",
+          "properties": {
+            "notes": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "key",
+                  "status",
+                  "statement"
+                ],
+                "properties": {
+                  "key": {
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "const": "decision",
+                        "type": "string"
+                      },
+                      {
+                        "const": "review",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "active",
+                        "type": "string"
+                      },
+                      {
+                        "const": "resolved",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "statement": {
+                    "minLength": 1,
+                    "description": "检查结论、未解问题或解决说明。",
+                    "type": "string"
+                  },
+                  "nodeIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "lineIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "minItems": 0,
+              "maxItems": 20
+            },
+            "workingSummary": {
+              "type": "string",
+              "minLength": 1
+            },
+            "operationKey": {
+              "type": "string",
+              "minLength": 1,
+              "description": "程序维护的提交键，模型无需填写。"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "maxBytes": 65536,
+        "legacyParameters": {
           "type": "object",
           "properties": {
             "notes": {
@@ -5959,8 +6167,7 @@
           },
           "required": [],
           "additionalProperties": false
-        },
-        "maxBytes": 65536
+        }
       },
       {
         "name": "add_story_nodes",

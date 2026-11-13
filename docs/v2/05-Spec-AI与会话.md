@@ -43,7 +43,7 @@ deepseek和当前模型名仍为默认值，不是所有自定义地址都必须
 |---|---|---|
 | P1世界资产 | [01](resources/v2.2/prompts/active/p1-world.md) | 章节消息；WorldAssetsExtractionSchema |
 | P1叙事资产 | [02](resources/v2.2/prompts/active/p1-narrative.md) | 独立同章消息；NarrativeAssetsExtractionSchema |
-| 事件串联/复核 | [串联](resources/v2.2/prompts/active/p3-story.md) / [复核](resources/v2.2/prompts/active/p3-review.md) | 当前阅读页、相关资料摘要和工作摘要；八工具查询、分次保存、主动翻页及阶段收尾 |
+| 事件串联/复核 | [串联](resources/v2.2/prompts/active/p3-story.md) / [复核](resources/v2.2/prompts/active/p3-review.md) | 当前阅读页、相关资料摘要和工作摘要；六工具查询、分次保存、主动翻页及阶段收尾 |
 | 别名补充识别 | [P2](resources/v2.2/prompts/active/p2-identity.md) | 人物/地点类型与精简工具查询，按ID分组提交 |
 | 地点整编 | [地点整编](resources/v2.2/prompts/active/location-optimize.md) | 按需详细事实、事实ID；须覆盖全部事实 |
 | 会话压缩 | [07](resources/v2.2/prompts/active/compact.md) | 旧摘要与待压缩历史；SessionCompactionResultSchema |
@@ -75,16 +75,18 @@ direct模式由pi-ai执行，无pi-agent-core循环。有Schema时可注册唯�
 
 ## AI-04 Pi Agent执行、读写工具与最终结果
 
+普通assistant文字回复只结束当前模型回合，不代表业务任务完成。运行层保留原回复并通过Pi继续当前任务，直到工具确认完成、用户中断、实际失败或现有预算退出。P2三步与P3主动阅读的重复工具失败统一读取每轮toolResults，包含未进入工具执行的参数/工具查找错误；成功查询或提交仍清除此前重复失败记录。暂停和实际错误不再被缺少总结的校验覆盖，当前P3调用方保留itemFailure的具体原因。P1直接提取与会话压缩仍按各自结果协议处理。
+
 必须使用pi-agent-core的Agent类管理状态/工具循环，通过streamFn绑定统一pi-ai Models.streamSimple。应用包装runAgent用于配置、预算、租约、校验、持久化和事件投影；不得另写一套模型→工具→模型的业务循环替代Pi。使用Agent类的awaited事件订阅与prepareRequest保证原始assistant消息先持久化，再进入工具执行。
 
 | 职责 | 只读工具 | 写工具 | 记忆范围 |
 |---|---|---|---|
 | asset_editor | 原9个资产/原文查询工具 | commit_asset_changes | P2临时Pi Agent，不读取故事会话/长期记忆 |
-| story_editor（当前P3） | search_story_context、get_story_detail、read_original | save_story_lines、save_story_notes、add_story_nodes；另有navigate_story_pages及finish_story_batch | P3固定复用本书持久sessionId |
+| story_editor（当前P3） | search_story_context、get_story_detail | save_story_lines、save_story_notes；另有navigate_story_pages及finish_story_batch | P3固定复用本书持久sessionId |
 
-当前P3直接开放八工具；旧story_editor的14种读工具、commit_story_changes及submit_result保留兼容。工具权限按bookId/profile/phase和workflow绑定；模型不能通过参数切换书或绕过阶段约束。
+当前P3直接开放六工具；旧story_editor的14种读工具、commit_story_changes及submit_result保留兼容。工具权限按bookId/profile/phase和workflow绑定；模型不能通过参数切换书或绕过阶段约束。
 
-P3直接声明八个工具；其余Agent按当前工作项发送必需工具，并附带`get_tools` / `get_tools_detail`。`get_tools`返回当前任务允许但尚未开放的工具名称和简介；`get_tools_detail({name})`返回完整参数并把该工具加入下一次请求，模型在下一轮才能调用。激活只存在于当前Agent任务内存，运行结束失效；不允许激活当前profile/phase之外的写工具，也不跨书。P2关系工作项初始只发`submit_relation_review`、`query_relation_work`、`read_original`、`get_character_relation`、`get_legacy_relation_records`，其他工具按需发现。
+P3直接声明六个工具；其余Agent按当前工作项发送必需工具，并附带`get_tools` / `get_tools_detail`。`get_tools`返回当前任务允许但尚未开放的工具名称和简介；`get_tools_detail({name})`返回完整参数并把该工具加入下一次请求，模型在下一轮才能调用。激活只存在于当前Agent任务内存，运行结束失效；不允许激活当前profile/phase之外的写工具，也不跨书。P2关系工作项初始只发`submit_relation_review`、`query_relation_work`、`read_original`、`get_character_relation`、`get_legacy_relation_records`，其他工具按需发现。
 
 write工具的AgentTool.execute实际调用与direct共用的命令服务，按各工具契约校验结构、引用、读集revision和租约后提交当前实体；新P3的文本处理规则见AI-10。事务提交成功才返回commitId确认；模型可以根据工具结果继续查询/思考，不必等整个Agent循环结束才写业务数据。失败返回可解释工具错误，不伪装成功。
 
@@ -127,7 +129,7 @@ delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅
 | query_event_lines | status/name_like子串/章节任一相交；character先查人物资产扩充全部同组称呼，再用成员actors/targets匹配；cause/result前160；最多50 |
 | get_event_line_detail | 参数ids最多20，实际最多10条 |
 | query_characters | 主名和别名包含name_like；返回id/name/aliases/identityHint/sourceChapters/revision/指标；无详细字段；最多100 |
-| get_character_detail | 按ID取详细档案；默认排除优化缓存，include_facts=true仅P2整编显式取底稿；最多20 |
+| get_character_detail | 按ID取人物自身档案，不携带关系；默认排除优化缓存，include_facts=true仅P2整编显式取底稿；最多20 |
 | get_location_detail | 按ids1–20取完整地点；include_facts语义同上；最多20 |
 | query_locations | 主名别名包含过滤，精简行id/name/aliases/descriptionHint/sourceChapters/revision/指标；不返回完整description；最多100 |
 | read_original | 按资产来源、离散章节或连续范围选择原文；多个条件取交集。返回章节片段及续读游标，按游标从指定章节的章内位置继续；每次最多20段、20000字，并受字节限制。合并校验实际返回过的引文片段 |
@@ -187,7 +189,7 @@ NativeMessage保存标准PI形状，允许额外字段包含模型/用量/推理
 
 ## AI-09 补齐输出与回放
 
-当前工具（含P3八工具）及兼容接口的成功/空/错误/截断返回形状、目标变更和2.1历史响应分别见[11](11-AI工具返回与回放契约.md)。原2.1 tool-contracts仅为历史声明；2.2新增/变更工具执行当前入参和返回校验，未变只读投影的历史校验边界按各工具说明，不允许以旧“只读”限制取消新写能力。
+当前工具（含P3六工具）及兼容接口的成功/空/错误/截断返回形状、目标变更和2.1历史响应分别见[11](11-AI工具返回与回放契约.md)。原2.1 tool-contracts仅为历史声明；2.2新增/变更工具执行当前入参和返回校验，未变只读投影的历史校验边界按各工具说明，不允许以旧“只读”限制取消新写能力。
 
 具名模板、变量绑定和组装表在11；原始ai-message-templates仅精确字面补充。6份完整HTTP录制与服务级失败/恢复用例共同覆盖本包实际验证范围；独立验收入口与未覆盖时序见12。
 
@@ -251,7 +253,7 @@ Pi包取舍、coding层不接入的具体能力、浏览器限制和逐模块迁
 | PROMPT-P2-IDENTITY | P2 ai_identity人物或地点；agent/aggregation | P2目标Prompt+asset_editor包装+IdentityTask；写工具IdentityGroupsSchema，最终AgentTaskSummarySchema | 实现与检查见覆盖索引 |
 | PROMPT-P2-CHARACTER | P2按需人物整编；direct/aggregation | 08人物整编Prompt+JSON CharacterOptimizationTask；动态固定人物键及事实枚举 | 实现与检查见覆盖索引 |
 | PROMPT-P2-LOCATION | P2按需地点整编；direct/aggregation | 新地点整编Prompt；LocationOptimizationSchema返回description/coveredFactIds/conflicts | 实现与检查见覆盖索引 |
-| PROMPT-P3-WINDOW | P3逐页串联；agent/aggregation | p3-story.md + 公共文学说明；StoryReadingBrief与同书历史；八工具查询、分次保存、主动翻页及收尾 | 实现与检查见覆盖索引 |
+| PROMPT-P3-WINDOW | P3逐页串联；agent/aggregation | p3-story.md + 公共文学说明；StoryReadingBrief与同书历史；六工具查询、分次保存、主动翻页及收尾 | 实现与检查见覆盖索引 |
 | PROMPT-P3-GLOBAL | P3全书复核；agent/aggregation | p3-review.md + 公共文学说明；复用同一session；逐页输入孤点、当前线的分段/整线概要、线索 | 实现与检查见覆盖索引 |
 | PROMPT-COMPACT | 超预算或一次强制恢复；direct/aggregation | 07压缩Prompt+旧摘要+指定历史；SessionCompactionResultSchema；不调用Agent业务工具 | 实现与检查见覆盖索引 |
 | PROMPT-PROBE-DIRECT | 设置生成测试；direct/选定模型角色 | user“回复一个字：好”，maxTokens=8；无Schema；要求有效Pi文本 | 实现与检查见覆盖索引 |
@@ -315,12 +317,12 @@ TaskRecord.input保存首次创建任务的不可变快照。固定工作项流�
 |---|---|
 | direct提取/整编/压缩 | systemPrompt=对应active业务正文；messages仅本次user；tools仅submit_result，参数为当前输出Schema，constrainedSampling={type:json_schema,strict:prefer}。不加载P3消息历史 |
 | P2 Agent | `runtime.ts`提供业务正文，模型网关统一追加文学资料处理说明；业务规则来自独立prompt md；system=业务正文 + 公共文学说明；用Pi初始system声明当前开放的读工具+写工具+finalizer；user=结构化任务简报。完整任务`input`只用于持久化、恢复和幂等，不进入模型消息；简报只含当前对象业务资料和必要对象编号，不含bookId/runId/taskId/phase/operationKey/fingerprint。不携带P3历史 |
-| P3 Agent初次 | `readingService.ts`按阶段选择p3-story.md或p3-review.md，经模型网关追加公共文学说明；直接声明八工具，清单见[工具契约](11-AI工具返回与回放契约.md#p3-完整事件线工具)；user为“【当前阅读页】”及StoryReadingBrief，包含当前页、资料摘要、相关候选和工作摘要 |
+| P3 Agent初次 | `readingService.ts`按阶段选择p3-story.md或p3-review.md，经模型网关追加公共文学说明；直接声明六工具，清单见[工具契约](11-AI工具返回与回放契约.md#p3-完整事件线工具)；user为“【当前阅读页】”及StoryReadingBrief，包含当前页、资料摘要、相关候选和工作摘要 |
 | P3继续/恢复 | 先按AI-08恢复合法配对消息和压缩投影；若有效system或工具集合变化，用Pi系统更新追加替换/撤销声明；恢复说明由代码生成并追加，仅恢复时使用→本次story任务。不把新的system硬插在未配对toolCall和toolResult之间 |
 | 兼容工作项末轮 | system撤回全部业务工具，仅保留submit_result；结束约束和可执行白名单由代码同时收窄，变量commitIds来自本task账本，remainingIds来自分配清单。当前P3不按5分钟预算进入此末轮，按阅读进度结束阶段 |
 | 探测 | 使用probe_system及probe_asset/probe_story；完整业务工具声明可发送，但回调接隔离fixture；完成门槛见AI-15 |
 
-所有模型生成请求由`models/gateway.ts`在发送前统一追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)中的文学资料处理说明，放在system内容末尾且只保留一份；覆盖P1/P2/P3、压缩、复核、探测及重试/修正。各任务不再自行拼接，P2第一步和第二步也使用此说明。公共说明要求客观忠实处理小说资料，允许保留含义的归并精简，不禁止普通说明；输出形式与工具要求由各任务规定。P2 Agent 对模型目录声明支持思考的模型通过 Pi `reasoning: medium` 启用思考，具体强度由适配器映射到模型支持值；目录外模型不猜测能力。详情保存并展示 API 实际返回的正文与可见思考，空最终字段不清除已收到片段，重试不混用不同尝试的内容。
+所有模型生成请求由`models/gateway.ts`在发送前统一追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)中的文学资料处理说明，放在system内容末尾且只保留一份；覆盖P1/P2/P3、压缩、复核、探测及重试/修正。各任务不再自行拼接，P2第一步和第二步也使用此说明。公共说明要求客观忠实处理小说资料，允许保留含义的归并精简，不禁止普通说明；输出形式与工具要求由各任务规定。P2 Agent 对模型目录声明支持思考的模型启用思考：第一步疑似人物初筛使用 Pi `reasoning: low`，第二、三步沿用 `medium`。DeepSeek V4能力映射补齐low，使实际发送的reasoning_effort保持low；其他档位沿用适配器映射，目录外模型不猜测能力。详情保存并展示 API 实际返回的正文与可见思考，空最终字段不清除已收到片段，重试不混用不同尝试的内容。
 
 角色和阶段约束由各 prompt md 描述；bookId/runId/taskId/phase 由调用上下文和持久化任务记录绑定，不写入 system，也不写入P2人物整理的结构化任务简报，不能由工具参数切换。
 
@@ -385,3 +387,5 @@ Pi 负责模型协议、智能体循环、消息和工具事件。应用通过�
 P2按现有职责使用临时实例；P3沿用本书当前整理会话。游玩按书提供独立会话窗口，使用自己的职责、对话和工具，复用同一套保存、恢复与压缩能力。
 
 运行事件通过 Pi 原生事件接口订阅并按原顺序处理。工具调用与结果保持配对，业务写入完成后以持久提交确认核对成功；消息追加和工具确认的事务边界按03与AI-11执行。正式任务保留 Pi 的多轮工具循环，连接探测的结束条件由探测入口提供。
+
+P2/P3重新开始先选择复用已完成结果或全部重新整理；继续保留原轮。完成识别、指纹与备份兼容见[复用设计](../../openspec/changes/p3-continuous-story-lines/restart.md)。刷新加载新版程序后，继续使用当前提示词与工具，旧原始链路保留供查看。

@@ -1,13 +1,15 @@
 import type { AgentStore, Row } from './repository'
 import { hash, records, strings, text, type AgentProfile } from './contracts'
 import { characterCandidates } from '../assets/characterLinks'
-import { edgesFor, effectivePairs, pairFromPerspective, pairView, projectRelations, relationView, resolveLifecycleId, syncRelations } from '../assets/relations'
+import { effectivePairs, pairFromPerspective, resolveLifecycleId, syncRelations } from '../assets/relations'
 import { storyContent } from '../story/coverage'
 import { searchStoryContext } from '../story/retrieval'
 import type { Character, CharacterRelation, CharacterRelationEdit, Lifecycle } from '../assets/types'
 import { refreshReview } from './organizationReview'
 import { profileWork, relationWork } from './organizationData'
 import { storyProcessSegments } from './storyCommands'
+import { characterDetails, relationOverview } from './assetViews'
+import { storyView } from '../story/views'
 
 export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; contextId?: string; unitId?: string; workKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
@@ -82,6 +84,24 @@ async function references(store: AgentStore, scope: Scope, names: string[], ids:
 export async function readTool(store: AgentStore, scope: Scope, name: string, args: Row, maxResults = 100): Promise<Row> {
   if (name === 'get_story_detail') {
     if (scope.profile !== 'story_editor') throw new Error('SCOPE:故事详情仅供故事编辑使用。')
+    if (scope.workflow === 'story_pages_v3') {
+      const kind = text(args.kind), table = ({ node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[kind]
+      const data: Row[] = [], missingIds: string[] = []
+      for (const id of strings(args.ids)) {
+        const source = await resolveAsset(store, scope, table, id)
+        if (!source) { missingIds.push(id); continue }
+        const row = storyView(source, kind), field = kind === 'node' ? 'process' : kind === 'eventLine' ? 'summary' : 'statement'
+        const full = text(kind === 'node' ? source.process : row[field]), offset = Number(args.char_offset ?? 0), limit = Number(args.maxChars ?? 6000)
+        row[field] = full.slice(offset, offset + limit)
+        Object.assign(row, { charOffset: offset, totalChars: full.length, truncated: offset + limit < full.length, nextCharOffset: offset + limit < full.length ? offset + limit : null })
+        if (kind === 'eventLine') {
+          const ids = strings(row.nodeIds), start = Number(args.memberOffset ?? 0), count = Number(args.memberLimit ?? 50)
+          Object.assign(row, { nodeIds: ids.slice(start, start + count), memberOffset: start, memberCount: ids.length, membersTruncated: start + count < ids.length, nextMemberOffset: start + count < ids.length ? start + count : null })
+        }
+        data.push(row)
+      }
+      return page(data, {}, maxResults, { missingIds })
+    }
     if (args.kind !== 'eventLine') return readTool(store, scope, args.kind === 'node' ? 'get_node_detail' : 'get_editor_note_detail', { ids: args.ids, ...(args.char_offset === undefined ? {} : { char_offset: args.char_offset }), ...(args.maxChars === undefined ? {} : { maxChars: args.maxChars }) }, maxResults)
     const rows: Row[] = [], missingIds: string[] = []
     for (const id of strings(args.ids)) {
@@ -118,7 +138,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
   }
   if (name === 'search_story_context') {
     if (scope.profile !== 'story_editor') throw new Error('SCOPE:相关叙事检索仅供故事编辑使用。')
-    return searchStoryContext(store, scope.bookId, scope.sessionId, { ...args, include_future: args.include_future ?? scope.phase === 'global_review' })
+    return searchStoryContext(store, scope.bookId, scope.sessionId, { ...args, include_future: args.include_future ?? scope.phase === 'global_review' }, scope.workflow === 'story_pages_v3')
   }
   if (name === 'read_original') {
     const assetIds = strings(args.asset_ids), range = strings(args.chapter_range), requested = strings(args.chapter_indices)
@@ -340,15 +360,21 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
   }
   if (name === 'get_character_relation') {
     const fromId = text(args.fromId), toId = text(args.toId)
-    if (!fromId || !toId || fromId === toId) throw new Error('INVALID_ARGS:请给出两个不同的人物编号。')
+    if (!fromId || fromId === toId) throw new Error('INVALID_ARGS:请提供人物编号，查询两人时编号须不同。')
     const people = (await scopedRows(store, scope, 'characters')) as unknown as Character[]
-    if (!people.some(person => person.id === fromId) || !people.some(person => person.id === toId)) throw new Error('NOT_FOUND:人物不存在或已删除。')
+    if (!people.some(person => person.id === fromId) || toId && !people.some(person => person.id === toId)) throw new Error('NOT_FOUND:人物不存在或已删除。')
     const lifecycle = (await scopedRows(store, scope, 'assetLifecycle')) as unknown as Lifecycle[]
     const relations = (await scopedRows(store, scope, 'characterRelations')) as unknown as CharacterRelation[]
     const edits = (await scopedRows(store, scope, 'characterRelationEdits')) as unknown as CharacterRelationEdit[]
     const normalized = people
     const pairs = effectivePairs(syncRelations(relations, normalized, lifecycle).relations, edits, normalized)
-    return { data: pairFromPerspective(pairs, fromId, toId, normalized) }
+    const overview = (target: string) => relationOverview({ ...pairFromPerspective(pairs, fromId, target, normalized), fromName: people.find(person => person.id === fromId)?.name, toName: people.find(person => person.id === target)?.name })
+    if (toId) return { data: scope.phase === 'character_organization' && ['directory', 'candidate'].includes(scope.workKind ?? '') ? overview(toId) : pairFromPerspective(pairs, fromId, toId, normalized) }
+    const targets = [...new Set(pairs.filter(pair => pair.fromId === fromId || pair.toId === fromId).map(pair => pair.fromId === fromId ? pair.toId : pair.fromId))].sort(compare)
+    const remaining = targets.filter(id => !args.afterId || compare(id, text(args.afterId)) > 0)
+    const result = page(remaining.map(overview), args, 50)
+    const data = result.data
+    return { data, totalCount: targets.length, truncated: result.truncated, nextAfterId: result.truncated ? data.at(-1)?.toId ?? null : null }
   }
   if (name === 'get_legacy_relation_records') {
     const ids = strings(args.ids)
@@ -409,33 +435,12 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
   const detail = name.startsWith('get_')
   if (detail && args.include_facts && (scope.profile !== 'asset_editor' || !['optimize', 'character_organization'].includes(scope.phase))) throw new Error('INVALID_ARGS:事实底稿仅供世界资产整编读取。')
   if (detail) {
-    let characterRelations: { people: Character[]; rows: CharacterRelation[]; view: ReturnType<typeof pairView>; unresolved: ReturnType<typeof relationView>['unresolved']; pairs: ReturnType<typeof effectivePairs> } | undefined
-    if (table === 'characters') {
-      const people = (await scopedRows(store, scope, 'characters')) as unknown as Character[]
-      const lifecycle = (await scopedRows(store, scope, 'assetLifecycle')) as unknown as Lifecycle[]
-      const rows = (await scopedRows(store, scope, 'characterRelations')) as unknown as CharacterRelation[]
-      const edits = (await scopedRows(store, scope, 'characterRelationEdits')) as unknown as CharacterRelationEdit[]
-      const normalized = people
-      const synced = syncRelations(rows, normalized, lifecycle).relations
-      const pairs = effectivePairs(synced, edits, normalized)
-      const types = new Map(synced.map(relation => [relation.id, relation.relationType]))
-      const view = pairView(pairs, normalized)
-      view.edges = view.edges.map(edge => ({ ...edge, types: [...new Set(edge.relationIds.flatMap(id => types.get(id) ?? []))] }))
-      characterRelations = { people: normalized, rows: synced, view, unresolved: relationView(synced, normalized).unresolved, pairs }
-    }
     const rows: Row[] = []; const missing: string[] = []
     for (const id of strings(args.ids)) {
       const found = await resolveAsset(store, scope, table, id)
       if (!found) { missing.push(id); continue }
-      const row: Row = { ...found }
+      const row: Row = table === 'characters' ? characterDetails(found, scope.phase === 'character_organization' && ['directory', 'candidate'].includes(scope.workKind ?? '')) : { ...found }
       if (!args.include_facts) for (const key of ['mergeFacts', 'optimizedFactIds', 'optimizationFingerprint']) delete row[key]
-      if (characterRelations && characterRelations.people.some(person => person.id === row.id)) {
-        const projection = projectRelations(characterRelations.view.edges, characterRelations.rows, characterRelations.unresolved, text(row.id), characterRelations.people)
-        row.relations = projection.relations
-        row.relationEdges = edgesFor(characterRelations.view.edges, text(row.id))
-        row.unresolvedRelations = projection.unresolvedRelations
-        row.legacyRelationIds = [...new Set(characterRelations.pairs.filter(pair => pair.fromId === row.id || pair.toId === row.id).flatMap(pair => pair.legacyRecordIds))]
-      }
       if (table === 'nodes') row.characterReferences = await references(store, scope, [...strings(row.actors), ...strings(row.targets)], [...strings(row.actorIds), ...strings(row.targetCharacterIds)])
       if (table === 'eventLines') {
         const nodes = (await scopedRows(store, scope, 'nodes')).filter(node => strings(row.nodeIds).includes(text(node.id)))

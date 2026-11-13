@@ -1,5 +1,9 @@
 import type { Row } from '../../src/features/agents/repository'
 const contentOf = (content: unknown) => typeof content === 'string' ? content : Array.isArray(content) ? content.map(part => part.text ?? '').join('') : ''
+export function agentTextStream(content: string) {
+  const chunk = { id: 'agent-text-test', object: 'chat.completion.chunk', created: 1, model: 'test-agent', choices: [{ index: 0, delta: { role: 'assistant', content }, finish_reason: 'stop' }] }
+  return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, { headers: { 'Content-Type': 'text/event-stream' } })
+}
 export function agentStream(calls: { name: string; args: unknown }[]) {
   const chunk = (delta: unknown, finish_reason: string | null) => ({ id: 'agent-test', object: 'chat.completion.chunk', created: 1, model: 'test-agent', choices: [{ index: 0, delta, finish_reason }] })
   return new Response([chunk({ role: 'assistant', tool_calls: calls.map((call, index) => ({ index, id: `call-${index}-${crypto.randomUUID()}`, type: 'function', function: { name: call.name, arguments: JSON.stringify(call.args) } })) }, null), chunk({}, 'tool_calls')].map(value => `data: ${JSON.stringify(value)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } })

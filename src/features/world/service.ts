@@ -361,7 +361,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     await db.transaction('rw', db.tables, async () => {
       const latest = await db.table<WorldRun>('pipelineRuns').get(runId)
       if (!latest) return
-      await db.table('pipelineRuns').put({ ...latest, status, finishedAt: new Date().toISOString(), report })
+      await db.table('pipelineRuns').put({ ...latest, ...(latest.organization ? { organization: { ...latest.organization, pauseRequested: paused } } : {}), status, finishedAt: new Date().toISOString(), report })
       await db.table('compileProgress').update('P2', { status, validity: status === 'completed' ? 'current' : 'stale', updatedAt: new Date().toISOString() })
       await db.table('pipelineRuns').delete('lease:world')
       const session = sessionId ? await db.table('storySessions').get(sessionId) : undefined
@@ -416,7 +416,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     set(bookId, { running: false, paused: true, runId: run.id, organizationStep: legacyStep, phase: '已中断，可继续' })
   }
 
-  async function startOrganizationStep(bookId: string, step: OrganizationRunStep): Promise<string> {
+  async function startOrganizationStep(bookId: string, step: OrganizationRunStep, restart: import('./reuse').RestartMode = 'all'): Promise<string> {
     if (controllers.has(bookId) || mechanical.isRunning(bookId)) throw new Error('本书已有处理任务。')
     const active = await latestOrganizationRun(bookId, ['running', 'paused'])
     if (active) throw new Error('本书已有运行中或已暂停的人物整理任务，请先继续或取消。')
@@ -424,7 +424,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     const settings = await models.settings.load()
     if (!settings.apiKey || !settings.config.aggregationModel) throw new Error('请先在设置页保存整理模型与密钥。')
     const repo = createBookAgentRepository(workspace, bookId)
-    const organization = await repo.transaction(false, store => createOrganizationStepState(store, step))
+    const organization = await repo.transaction(false, store => createOrganizationStepState(store, step, restart))
     const runId = crypto.randomUUID(), owner = crypto.randomUUID(), now = new Date().toISOString()
     const controller = new AbortController()
     controllers.set(bookId, controller); activeRuns.set(bookId, runId)
@@ -476,7 +476,14 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
       if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()) && row.runId !== run.id)) throw new Error('本书已有处理任务。')
       const current = (await db.table<WorldRun>('pipelineRuns').get(run.id))!
       const organization = current.organization as (Record<string, unknown> & { pauseRequested?: boolean }) | undefined
-      if (organization) organization.pauseRequested = false
+      if (organization) {
+        organization.pauseRequested = false
+        // 用户明确继续时重试未完成项；历史任务错误留在原记录中。
+        for (const field of ['scanPages', 'profileItems', 'relationItems', 'candidateGroups']) {
+          for (const item of records(organization[field])) if (item.status !== 'checked' && item.status !== 'resolved') delete item.lastError
+        }
+        delete organization.pauseNotice
+      }
       await db.table('pipelineRuns').put({ ...current, ...(organization ? { organization } : {}), status: 'running', finishedAt: undefined })
       await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId: run.id, expiresAt: Date.now() + 30000 })
       await db.table('compileProgress').update('P2', { status: 'running', validity: 'current', updatedAt: new Date().toISOString() })

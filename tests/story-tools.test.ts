@@ -23,7 +23,7 @@ async function fixture(chapters = ['1', '20', '120'], workflow = 'story_lines_v2
   }
   const rows = (table: string) => repo.transaction(false, store => store.rows(table))
   const detail = (kind: string, ids: string[], extra: Row = {}) => call('get_story_detail', { kind, ids, ...extra })
-  const create = (title: string, nodeIds: string[]) => call('save_story_lines', { operations: [{ action: 'create', title, nodeIds, cause: '旧信留下疑问', process: '线索持续发展', result: '待后续', lineStatus: 'open', reason: '同一封旧信', confidence: 1, evidenceNodeIds: nodeIds }] })
+  const create = (title: string, nodeIds: string[]) => call('save_story_lines', { operations: [workflow === 'story_pages_v3' ? { action: 'create', title, nodeIds, summary: '旧信留下疑问，线索持续发展，尚待后续。' } : { action: 'create', title, nodeIds, cause: '旧信留下疑问', process: '线索持续发展', result: '待后续', lineStatus: 'open', reason: '同一封旧信', confidence: 1, evidenceNodeIds: nodeIds }] })
   return { repo, scope, adapter, call, rows, detail, create, workItems }
 }
 
@@ -140,19 +140,31 @@ it('发展段可增量追加和按段号改写，重放不重复追加且不用�
   expect((await f.rows('eventLines'))[0]).toMatchObject({ nodeIds: ['N1', 'N2'], cause: '旧信留下疑问', process: '线索持续发展\n\nN2提供了核查来历的线索；线索的真实性仍待后文验证。', result: '收到线索，尚未查清来历', lineStatus: 'open' })
 })
 
-it('长线按编号只读当前段后可修订，无需读全线成员或输出旧文本', async () => {
-  const f = await fixture(undefined, 'story_pages_v3'); await f.detail('node', ['N1', 'N2', 'N3'])
-  const id = ((await f.create('长线', ['N1', 'N2', 'N3'])).lineIds as string[])[0]
-  await f.repo.transaction(true, async store => { const row = (await store.get('eventLines', id))!; await store.put('eventLines', { ...row, process: `${'早期发展'.repeat(1800)}\n\n${'待核实的后续'.repeat(1800)}`, revision: 2 }) })
-  const current = createAgentTools(f.repo, f.scope)
-  const read = current.tools.find(tool => tool.name === 'get_story_detail')!
-  const response = await read.execute('segment-read', { kind: 'eventLine', ids: [id], processSegment: 2, maxChars: 100 })
-  const value = JSON.parse(response.content.filter(part => part.type === 'text').map(part => part.text).join('')) as Row
-  expect((value.data as Row[])[0]).toMatchObject({ processSegmentCount: 2, processSegments: [{ segment: 2, text: '待核实的后续'.repeat(16) + '待核实的', truncated: true, nextCharOffset: 100 }] })
-  expect(current.reads.records.some(row => row.table === 'nodes')).toBe(false)
-  const save = current.tools.find(tool => tool.name === 'save_story_lines')!
-  await save.execute('revise-current-segment', { operations: [{ action: 'update', lineId: id, processEdits: [{ segment: 2, text: '后文说明此前隐瞒身份的动机，已核对该阶段。' }] }] })
-  expect((await f.rows('eventLines'))[0].process).toBe(`${'早期发展'.repeat(1800)}\n\n后文说明此前隐瞒身份的动机，已核对该阶段。`)
+it('当前P3只有六工具，搜索目录足以保存，续接省略概述时保留旧内容', async () => {
+  const f = await fixture(undefined, 'story_pages_v3')
+  expect(f.adapter.initialTools.map(tool => tool.name).sort()).toEqual(['search_story_context', 'get_story_detail', 'save_story_lines', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch'].sort())
+  await f.call('search_story_context', { kind: 'node' })
+  const id = ((await f.create('旧信', ['N1'])).lineIds as string[])[0]
+  await f.call('search_story_context', { kind: 'eventLine' })
+  await f.call('save_story_lines', { operations: [{ action: 'append', lineId: id, nodeIds: ['N2'] }] })
+  expect((await f.rows('eventLines'))[0]).toMatchObject({ nodeIds: ['N1', 'N2'], summary: '旧信留下疑问，线索持续发展，尚待后续。' })
+  await f.call('save_story_lines', { operations: [{ action: 'update', lineId: id, summary: '后文回应旧信，来历已明。' }] })
+  expect((await f.rows('eventLines'))[0].summary).toBe('后文回应旧信，来历已明。')
+})
+
+it('节点详情按正文分页且不泄露证据和存储字段，目录概述不截断', async () => {
+  const f = await fixture(undefined, 'story_pages_v3')
+  await f.repo.transaction(true, async store => {
+    const row = (await store.get('nodes', 'N1'))!
+    await store.put('nodes', { ...row, summary: '重要伏笔'.repeat(200), process: '详细经过'.repeat(300), quote: '秘密引文', relationEvidence: ['秘密关系'] })
+  })
+  const search = await f.call('search_story_context', { kind: 'node' })
+  expect((search.data as Row[]).find(row => row.id === 'N1')?.summary).toBe('重要伏笔'.repeat(200))
+  const first = (await f.detail('node', ['N1'], { maxChars: 100 })).data as Row[]
+  expect(first[0]).toMatchObject({ process: '详细经过'.repeat(25), nextCharOffset: 100 })
+  expect(JSON.stringify(first)).not.toMatch(/秘密|bookId|revision|confidence|quote|relationEvidence/)
+  const next = (await f.detail('node', ['N1'], { char_offset: 100, maxChars: 100 })).data as Row[]
+  expect(next[0].process).toBe('详细经过'.repeat(25))
 })
 
 it('合线未重写说明时保留双方起因经过结果，并保持尚在发展的状态', async () => {
@@ -165,7 +177,7 @@ it('合线未重写说明时保留双方起因经过结果，并保持尚在发�
   expect(await f.rows('eventLines')).toMatchObject([{ id: first, nodeIds: ['N1', 'N2'], cause: '旧信起因\n\n旧信后续起因', process: '旧信发展\n\n旧信后续发展', result: '旧信结果\n\n旧信后续结果', lineStatus: 'open' }])
 })
 
-it('新阅读流程保存长摘要、长事项与概括引文，存储和备份命令形状仍可通过校验', async () => {
+it('新阅读流程不硬性限制摘要和事项长度，存储与备份仍可校验', async () => {
   const f = await fixture(undefined, 'story_pages_v3')
   const workingSummary = '三河帮旧信的来历、沿途经手人与后续回应仍需合并核对。'.repeat(100)
   const statement = '旧信解释了早年经历，但人物隐瞒事实的动机还要查阅后文。'.repeat(50)
@@ -173,11 +185,11 @@ it('新阅读流程保存长摘要、长事项与概括引文，存储和备份�
   expect(workingSummary.length).toBeGreaterThan(2000)
   expect(statement.length).toBeGreaterThan(1000)
   expect(quote.length).toBeGreaterThan(1000)
-  await f.call('save_story_notes', { workingSummary, notes: [{ key: 'letter-summary', status: 'active', statement, evidence: [{ chapterIndex: '20', quote }] }] })
+  await f.call('save_story_notes', { workingSummary, notes: [{ key: 'letter-summary', status: 'active', statement }] })
   await f.call('save_story_notes', { notes: [{ key: 'unresolved-purpose', status: 'active', statement: '三河帮的真正目标尚待查阅后文。' }] })
   const notes = await f.rows('storyEditorNotes'), memory = await f.rows('storyEditorMemory')
   expect(notes).toHaveLength(2)
-  expect(notes.find(note => note.key === 'letter-summary')).toMatchObject({ statement, evidence: [{ chapterIndex: '20', quote }] })
+  expect(notes.find(note => note.key === 'letter-summary')).toMatchObject({ statement })
   expect(notes.find(note => note.key === 'unresolved-purpose')).toMatchObject({ nodeIds: [], lineIds: [], status: 'active' })
   expect(memory).toMatchObject([{ workingSummary }])
   const run = (await f.rows('pipelineRuns')).find(row => row.id === 'r')!
@@ -185,5 +197,24 @@ it('新阅读流程保存长摘要、长事项与概括引文，存储和备份�
   for (const [schema, values] of [['StoryEditorMemory', memory], ['StoryEditorNote', notes], ['CommandIntent', run.commandIntents as Row[]]] as const) {
     for (const value of values) expect(() => validate(inputSchema(schema), JSON.parse(JSON.stringify(value)))).not.toThrow()
   }
-  await expect(f.call('save_story_notes', { notes: [{ key: 'wrong-reference', status: 'active', statement: '不存在的章节', evidence: [{ chapterIndex: '999', quote: '概括内容' }] }] })).rejects.toThrow('不属于当前书籍')
+  await expect(f.call('save_story_notes', { notes: [{ key: 'wrong-reference', status: 'active', statement: '不存在的章节', evidence: [{ chapterIndex: '999', quote: '概括内容' }] }] })).rejects.toThrow('工具参数不符合要求')
+})
+
+
+it('简短保存合线、改成员和回执重放保留旧叙述，整批失败不留下半条线', async () => {
+  const f = await fixture(undefined, 'story_pages_v3')
+  await f.call('search_story_context', { kind: 'node' })
+  const a = ((await f.create('旧信', ['N1'])).lineIds as string[])[0]
+  const b = ((await f.create('旧信后续', ['N2'])).lineIds as string[])[0]
+  await f.repo.transaction(true, async store => { const row = (await store.get('eventLines', a))!; await store.put('eventLines', { ...row, cause: '旧起因', process: '旧经过', result: '旧结果', lineStatus: 'closed' }) })
+  await f.detail('eventLine', [a, b])
+  const args = { operations: [{ action: 'merge', lineId: a, mergeLineIds: [b], summary: '旧信经后续查证，来历已经明确。' }] }
+  const merged = await f.call('save_story_lines', args, 'merge-once')
+  expect(merged.lines).toEqual([{ lineId: a, added: 1, removed: 0 }])
+  expect(await f.call('save_story_lines', args, 'merge-once')).toMatchObject({ alreadyApplied: true, commitId: merged.commitId })
+  expect(await f.rows('eventLines')).toMatchObject([{ id: a, summary: args.operations[0].summary, nodeIds: ['N1', 'N2'], cause: '旧起因', process: '旧经过', result: '旧结果', lineStatus: 'closed' }])
+  const updated = await f.call('save_story_lines', { operations: [{ action: 'update', lineId: a, nodeIds: ['N2'] }] })
+  expect(updated.lines).toEqual([{ lineId: a, added: 0, removed: 1 }])
+  await expect(f.call('save_story_lines', { operations: [{ action: 'create', title: '新线', nodeIds: ['N3'], summary: '关联' }, { action: 'create', title: '错误', nodeIds: ['missing'], summary: '关联' }] })).rejects.toThrow()
+  expect(await f.rows('eventLines')).toHaveLength(1)
 })

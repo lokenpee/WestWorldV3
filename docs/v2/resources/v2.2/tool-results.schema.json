@@ -1287,67 +1287,6 @@
                       "description": "背景 / 来历。仅当原文写到。",
                       "type": "string"
                     },
-                    "relations": {
-                      "description": "由关系表投影的兼容关系字段；聚合后的 targetId 与依据用于展示。",
-                      "type": "array",
-                      "items": {
-                        "additionalProperties": false,
-                        "type": "object",
-                        "required": [
-                          "target",
-                          "relation_type"
-                        ],
-                        "properties": {
-                          "target": {
-                            "type": "string"
-                          },
-                          "targetId": {
-                            "type": "string"
-                          },
-                          "relation_type": {
-                            "type": "string"
-                          },
-                          "relation_label": {
-                            "type": "string"
-                          },
-                          "direction": {
-                            "anyOf": [
-                              {
-                                "const": "directed",
-                                "type": "string"
-                              },
-                              {
-                                "const": "bidirectional",
-                                "type": "string"
-                              },
-                              {
-                                "const": "unspecified",
-                                "type": "string"
-                              }
-                            ]
-                          },
-                          "evidence": {
-                            "type": "array",
-                            "items": {
-                              "additionalProperties": false,
-                              "type": "object",
-                              "required": [
-                                "chapterIndex",
-                                "quote"
-                              ],
-                              "properties": {
-                                "chapterIndex": {
-                                  "type": "string"
-                                },
-                                "quote": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    },
                     "confidence": {
                       "minimum": 0,
                       "maximum": 1,
@@ -1523,128 +1462,6 @@
                       "items": {
                         "type": "string"
                       }
-                    },
-                    "relationEdges": {
-                      "description": "本人物有关的有向关系；每个有序端点对一条。",
-                      "type": "array",
-                      "items": {
-                        "additionalProperties": false,
-                        "type": "object",
-                        "required": [
-                          "fromId",
-                          "toId",
-                          "labels",
-                          "types",
-                          "relationIds",
-                          "evidence",
-                          "directionUnclear"
-                        ],
-                        "properties": {
-                          "fromId": {
-                            "type": "string"
-                          },
-                          "toId": {
-                            "type": "string"
-                          },
-                          "labels": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "types": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "relationIds": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "evidence": {
-                            "type": "array",
-                            "items": {
-                              "additionalProperties": false,
-                              "type": "object",
-                              "required": [
-                                "chapterIndex",
-                                "quote"
-                              ],
-                              "properties": {
-                                "chapterIndex": {
-                                  "type": "string"
-                                },
-                                "quote": {
-                                  "type": "string"
-                                }
-                              }
-                            }
-                          },
-                          "directionUnclear": {
-                            "type": "boolean"
-                          }
-                        }
-                      }
-                    },
-                    "unresolvedRelations": {
-                      "description": "仍有未命中端点或两端合为同一人物的原关系记录摘要。",
-                      "type": "array",
-                      "items": {
-                        "additionalProperties": false,
-                        "type": "object",
-                        "required": [
-                          "relationId",
-                          "sourceName",
-                          "targetName",
-                          "forwardLabel",
-                          "reverseLabel",
-                          "direction",
-                          "reason"
-                        ],
-                        "properties": {
-                          "relationId": {
-                            "type": "string"
-                          },
-                          "sourceName": {
-                            "type": "string"
-                          },
-                          "targetName": {
-                            "type": "string"
-                          },
-                          "forwardLabel": {
-                            "type": "string"
-                          },
-                          "reverseLabel": {
-                            "type": "string"
-                          },
-                          "direction": {
-                            "anyOf": [
-                              {
-                                "const": "directed",
-                                "type": "string"
-                              },
-                              {
-                                "const": "bidirectional",
-                                "type": "string"
-                              },
-                              {
-                                "const": "unspecified",
-                                "type": "string"
-                              }
-                            ]
-                          },
-                          "reason": {
-                            "enum": [
-                              "source_missing",
-                              "target_missing",
-                              "self"
-                            ]
-                          }
-                        }
-                      }
                     }
                   }
                 },
@@ -1709,6 +1526,77 @@
                           "type": "null"
                         }
                       ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "description": "代码分配的快照 id。格式 C{章号}-P{3 位序号}，例：C037-P003",
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "本章主要使用的称呼。可能是别名，例：琏二爷。",
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "aliases": {
+                      "description": "合并后的别名列表。例：[\"琏二爷\", \"琏二哥哥\"]",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "identity": {
+                      "description": "身份 / 职务 / 归属。例：荣国府长孙。原文没写就留空。",
+                      "type": "string"
+                    },
+                    "profile": {
+                      "additionalProperties": false,
+                      "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+                      "type": "object",
+                      "properties": {
+                        "age": {
+                          "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
+                          "type": "number"
+                        },
+                        "ageText": {
+                          "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+                          "type": "string"
+                        },
+                        "gender": {
+                          "description": "原文写明的性别，不知道则省略或填 null。",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "appearance": {
+                      "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
+                      "type": "string"
+                    },
+                    "personality": {
+                      "description": "性格。**必须能从原文找到依据**，不要凭印象概括。多条用「；」分隔。",
+                      "type": "string"
+                    },
+                    "background": {
+                      "description": "背景 / 来历。仅当原文写到。",
+                      "type": "string"
+                    },
+                    "speechStyleSample": {
+                      "description": "本章这个人的**原话片段**（直接摘录），用于后续学习他的说话味道。",
+                      "type": "string"
+                    },
+                    "resolvedFrom": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -1777,7 +1665,7 @@
       "runtimeChecksReturn": true,
       "maxResults": 20,
       "maxBytes": 65536,
-      "targetDetailRule": "revision required; raw facts only for P2 include_facts=true; actual allowed fields per data-contract and base dictionary"
+      "targetDetailRule": "人物详情不包含关系；识别重复人物仅返回个人档案。其他任务保留revision，原始底稿按include_facts读取。"
     },
     {
       "name": "query_locations",
@@ -1984,6 +1872,15 @@
             "maximum": 200000,
             "type": "integer"
           },
+          "chapter_indices": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "string"
+            },
+            "description": "需要核实的离散章节；与资产编号一起使用时只读取交集。"
+          },
           "cursor": {
             "type": "object",
             "properties": {
@@ -2001,15 +1898,6 @@
             ],
             "additionalProperties": false,
             "description": "使用上次返回的 nextCursor 继续读取。"
-          },
-          "chapter_indices": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 20,
-            "items": {
-              "type": "string"
-            },
-            "description": "需要核实的离散章节；与资产编号一起使用时只读取交集。"
           }
         }
       },
@@ -2088,6 +1976,12 @@
               ],
               "additionalProperties": false
             }
+          },
+          "readLimitReached": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
           }
         },
         "required": [
@@ -4951,76 +4845,136 @@
           "data": {
             "type": "array",
             "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "kind": {
-                  "enum": [
-                    "node",
-                    "eventLine",
-                    "note"
-                  ]
-                },
-                "title": {
-                  "type": "string"
-                },
-                "summary": {
-                  "type": "string"
-                },
-                "chapters": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "enum": [
+                        "node",
+                        "eventLine",
+                        "note"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "chapters": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 8
+                    },
+                    "nodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 12
+                    },
+                    "actors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 8
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "estimatedDetailTokens": {
+                      "type": "integer"
+                    },
+                    "matchedTerms": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 8
+                    }
                   },
-                  "maxItems": 8
+                  "required": [
+                    "id",
+                    "kind",
+                    "title",
+                    "summary",
+                    "chapters",
+                    "nodeIds",
+                    "actors",
+                    "status",
+                    "truncated",
+                    "estimatedDetailTokens",
+                    "matchedTerms"
+                  ],
+                  "additionalProperties": false
                 },
-                "nodeIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
+                {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "enum": [
+                        "node",
+                        "eventLine",
+                        "note"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "chapterIndex": {
+                      "type": "string"
+                    },
+                    "nodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "lineIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "lineStatus": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "statement": {
+                      "type": "string"
+                    }
                   },
-                  "maxItems": 12
-                },
-                "actors": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "maxItems": 8
-                },
-                "status": {
-                  "type": "string"
-                },
-                "truncated": {
-                  "type": "boolean"
-                },
-                "estimatedDetailTokens": {
-                  "type": "integer"
-                },
-                "matchedTerms": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "maxItems": 8
+                  "additionalProperties": false
                 }
-              },
-              "required": [
-                "id",
-                "kind",
-                "title",
-                "summary",
-                "chapters",
-                "nodeIds",
-                "actors",
-                "status",
-                "truncated",
-                "estimatedDetailTokens",
-                "matchedTerms"
-              ],
-              "additionalProperties": false
+              ]
             }
           },
           "totalCount": {
@@ -5687,112 +5641,249 @@
     {
       "name": "get_character_relation",
       "success": {
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "data"
-        ],
-        "properties": {
-          "data": {
+        "anyOf": [
+          {
             "additionalProperties": false,
             "type": "object",
             "required": [
-              "pairKey",
-              "fromId",
-              "toId",
-              "state",
-              "forwardLabels",
-              "reverseLabels",
-              "directionUnclear",
-              "editRevision",
-              "fingerprint",
-              "evidence",
-              "sourceRelationIds",
-              "legacyRecordIds",
-              "endpointRevisions"
+              "data"
             ],
             "properties": {
-              "pairKey": {
-                "type": "string"
-              },
-              "fromId": {
-                "type": "string"
-              },
-              "toId": {
-                "type": "string"
-              },
-              "state": {
-                "enum": [
-                  "active",
-                  "deleted",
-                  "absent"
-                ]
-              },
-              "forwardLabels": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+              "data": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "pairKey",
+                  "fromId",
+                  "toId",
+                  "state",
+                  "forwardLabels",
+                  "reverseLabels",
+                  "directionUnclear",
+                  "editRevision",
+                  "fingerprint",
+                  "evidence",
+                  "sourceRelationIds",
+                  "legacyRecordIds",
+                  "endpointRevisions"
+                ],
+                "properties": {
+                  "pairKey": {
+                    "type": "string"
+                  },
+                  "fromId": {
+                    "type": "string"
+                  },
+                  "toId": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "active",
+                      "deleted",
+                      "absent"
+                    ]
+                  },
+                  "forwardLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "reverseLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "directionUnclear": {
+                    "type": "boolean"
+                  },
+                  "editRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "fingerprint": {
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "chapterIndex",
+                        "quote"
+                      ],
+                      "properties": {
+                        "chapterIndex": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "quote": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    }
+                  },
+                  "sourceRelationIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "legacyRecordIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "endpointRevisions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "integer"
+                    }
+                  }
                 }
-              },
-              "reverseLabels": {
-                "type": "array",
-                "items": {
-                  "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "data"
+            ],
+            "properties": {
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "fromId",
+                  "toId",
+                  "state",
+                  "forwardLabels",
+                  "reverseLabels",
+                  "directionUnclear"
+                ],
+                "properties": {
+                  "fromId": {
+                    "type": "string"
+                  },
+                  "toId": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "enum": [
+                      "active",
+                      "deleted",
+                      "absent"
+                    ]
+                  },
+                  "forwardLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "reverseLabels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "directionUnclear": {
+                    "type": "boolean"
+                  },
+                  "fromName": {
+                    "type": "string"
+                  },
+                  "toName": {
+                    "type": "string"
+                  }
                 }
-              },
-              "directionUnclear": {
-                "type": "boolean"
-              },
-              "editRevision": {
-                "type": "integer",
-                "minimum": 0
-              },
-              "fingerprint": {
-                "type": "string"
-              },
-              "evidence": {
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "data",
+              "totalCount",
+              "truncated",
+              "nextAfterId"
+            ],
+            "properties": {
+              "data": {
                 "type": "array",
                 "items": {
-                  "additionalProperties": false,
                   "type": "object",
+                  "additionalProperties": false,
                   "required": [
-                    "chapterIndex",
-                    "quote"
+                    "fromId",
+                    "toId",
+                    "state",
+                    "forwardLabels",
+                    "reverseLabels",
+                    "directionUnclear"
                   ],
                   "properties": {
-                    "chapterIndex": {
-                      "type": "string",
-                      "minLength": 1
+                    "fromId": {
+                      "type": "string"
                     },
-                    "quote": {
-                      "type": "string",
-                      "minLength": 1
+                    "toId": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "enum": [
+                        "active",
+                        "deleted",
+                        "absent"
+                      ]
+                    },
+                    "forwardLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "reverseLabels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "directionUnclear": {
+                      "type": "boolean"
+                    },
+                    "fromName": {
+                      "type": "string"
+                    },
+                    "toName": {
+                      "type": "string"
                     }
                   }
                 }
               },
-              "sourceRelationIds": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
+              "totalCount": {
+                "type": "integer"
               },
-              "legacyRecordIds": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
+              "truncated": {
+                "type": "boolean"
               },
-              "endpointRevisions": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "integer"
-                }
+              "nextAfterId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             }
           }
-        }
-      }
+        ]
+      },
+      "maxResults": 50
     },
     {
       "name": "get_legacy_relation_records",
@@ -6207,11 +6298,6 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 100
-          },
-          "processSegment": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "单独读取事件线经过的某一段；编号来自processSegments。"
           }
         },
         "required": [
@@ -6274,408 +6360,76 @@
       "name": "save_story_lines",
       "input": {
         "type": "object",
-        "properties": {
-          "operations": {
-            "type": "array",
-            "items": {
-              "anyOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "action": {
-                      "const": "create"
-                    },
-                    "nodeIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 1,
-                      "maxItems": 100,
-                      "description": "本次加入的成员节点；append保留原有成员。"
-                    },
-                    "title": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "cause": {
-                      "type": "string",
-                      "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                    },
-                    "process": {
-                      "type": "string",
-                      "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                    },
-                    "result": {
-                      "type": "string",
-                      "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                    },
-                    "lineStatus": {
-                      "enum": [
-                        "open",
-                        "closed"
-                      ],
-                      "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
-                    },
-                    "reason": {
-                      "type": "string",
-                      "description": "本次关联或调整的理由，可自然概括。"
-                    },
-                    "evidenceNodeIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 0,
-                      "maxItems": 100,
-                      "description": "可选的关联依据节点编号。"
-                    },
-                    "confidence": {
-                      "type": "number",
-                      "description": "可选的自评把握，不作为语义质量门槛。"
-                    },
-                    "processAppend": {
-                      "type": "string",
-                      "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                    },
-                    "processEdits": {
-                      "type": "array",
-                      "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "segment": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "description": "processSegments中的段落编号。"
-                          },
-                          "text": {
-                            "type": "string",
-                            "description": "这一段修改后的内容。"
-                          }
-                        },
-                        "required": [
-                          "segment",
-                          "text"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "action",
-                    "title",
-                    "nodeIds",
-                    "cause",
-                    "process",
-                    "result",
-                    "lineStatus"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "action": {
-                      "const": "append"
-                    },
-                    "lineId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "nodeIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 1,
-                      "maxItems": 100,
-                      "description": "本次加入的成员节点；append保留原有成员。"
-                    },
-                    "title": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "cause": {
-                      "type": "string",
-                      "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                    },
-                    "process": {
-                      "type": "string",
-                      "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                    },
-                    "result": {
-                      "type": "string",
-                      "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                    },
-                    "lineStatus": {
-                      "enum": [
-                        "open",
-                        "closed"
-                      ],
-                      "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
-                    },
-                    "reason": {
-                      "type": "string",
-                      "description": "本次关联或调整的理由，可自然概括。"
-                    },
-                    "evidenceNodeIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 0,
-                      "maxItems": 100,
-                      "description": "可选的关联依据节点编号。"
-                    },
-                    "confidence": {
-                      "type": "number",
-                      "description": "可选的自评把握，不作为语义质量门槛。"
-                    },
-                    "processAppend": {
-                      "type": "string",
-                      "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                    },
-                    "processEdits": {
-                      "type": "array",
-                      "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "segment": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "description": "processSegments中的段落编号。"
-                          },
-                          "text": {
-                            "type": "string",
-                            "description": "这一段修改后的内容。"
-                          }
-                        },
-                        "required": [
-                          "segment",
-                          "text"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "action",
-                    "lineId",
-                    "nodeIds"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "action": {
-                      "const": "update"
-                    },
-                    "lineId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "nodeIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 1,
-                      "maxItems": 100,
-                      "description": "提供时为调整后的完整成员列表，省略则保留原成员。"
-                    },
-                    "title": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "cause": {
-                      "type": "string",
-                      "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                    },
-                    "process": {
-                      "type": "string",
-                      "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                    },
-                    "result": {
-                      "type": "string",
-                      "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                    },
-                    "lineStatus": {
-                      "enum": [
-                        "open",
-                        "closed"
-                      ],
-                      "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
-                    },
-                    "reason": {
-                      "type": "string",
-                      "description": "本次关联或调整的理由，可自然概括。"
-                    },
-                    "evidenceNodeIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 0,
-                      "maxItems": 100,
-                      "description": "可选的关联依据节点编号。"
-                    },
-                    "confidence": {
-                      "type": "number",
-                      "description": "可选的自评把握，不作为语义质量门槛。"
-                    },
-                    "processAppend": {
-                      "type": "string",
-                      "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                    },
-                    "processEdits": {
-                      "type": "array",
-                      "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "segment": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "description": "processSegments中的段落编号。"
-                          },
-                          "text": {
-                            "type": "string",
-                            "description": "这一段修改后的内容。"
-                          }
-                        },
-                        "required": [
-                          "segment",
-                          "text"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "action",
-                    "lineId"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "action": {
-                      "const": "merge"
-                    },
-                    "lineId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "mergeLineIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 1,
-                      "maxItems": 100
-                    },
-                    "title": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "cause": {
-                      "type": "string",
-                      "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                    },
-                    "process": {
-                      "type": "string",
-                      "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                    },
-                    "result": {
-                      "type": "string",
-                      "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                    },
-                    "lineStatus": {
-                      "enum": [
-                        "open",
-                        "closed"
-                      ],
-                      "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
-                    },
-                    "reason": {
-                      "type": "string",
-                      "description": "本次关联或调整的理由，可自然概括。"
-                    },
-                    "evidenceNodeIds": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "minItems": 0,
-                      "maxItems": 100,
-                      "description": "可选的关联依据节点编号。"
-                    },
-                    "confidence": {
-                      "type": "number",
-                      "description": "可选的自评把握，不作为语义质量门槛。"
-                    },
-                    "processAppend": {
-                      "type": "string",
-                      "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                    },
-                    "processEdits": {
-                      "type": "array",
-                      "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "segment": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "description": "processSegments中的段落编号。"
-                          },
-                          "text": {
-                            "type": "string",
-                            "description": "这一段修改后的内容。"
-                          }
-                        },
-                        "required": [
-                          "segment",
-                          "text"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "action",
-                    "lineId",
-                    "mergeLineIds"
-                  ],
-                  "additionalProperties": false
-                }
-              ]
-            },
-            "minItems": 1,
-            "maxItems": 20
-          },
-          "operationKey": {
-            "type": "string",
-            "minLength": 1,
-            "description": "程序维护的提交键，模型无需填写。"
-          }
-        },
+        "additionalProperties": false,
         "required": [
           "operations"
         ],
-        "additionalProperties": false
+        "properties": {
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action"
+              ],
+              "properties": {
+                "action": {
+                  "enum": [
+                    "create",
+                    "append",
+                    "update",
+                    "merge"
+                  ]
+                },
+                "lineId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "已有事件线编号，新建省略。"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "事件线名称，新建填写。"
+                },
+                "nodeIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "description": "新建的成员、append的新增成员，或update的完整成员。"
+                },
+                "summary": {
+                  "type": "string",
+                  "description": "简短说明整条线的承接和当前进展，提供时替换概述，省略保留。"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "可选的关联或调整理由。"
+                },
+                "mergeLineIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "description": "merge时要并入lineId的事件线。"
+                }
+              }
+            }
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       },
       "success": {
         "type": "object",
@@ -6750,6 +6504,31 @@
             },
             "minItems": 0,
             "maxItems": 100
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lineId": {
+                  "type": "string"
+                },
+                "added": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "removed": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "lineId",
+                "added",
+                "removed"
+              ],
+              "additionalProperties": false
+            }
           }
         }
       }
@@ -6819,30 +6598,6 @@
                   "items": {
                     "maxLength": 128,
                     "type": "string"
-                  }
-                },
-                "evidence": {
-                  "maxItems": 5,
-                  "description": "可选的原文定位线索，可用节点或事件线编号辅助查询。",
-                  "type": "array",
-                  "items": {
-                    "additionalProperties": false,
-                    "type": "object",
-                    "required": [
-                      "chapterIndex",
-                      "quote"
-                    ],
-                    "properties": {
-                      "chapterIndex": {
-                        "description": "工具返回的原文章节编号。",
-                        "type": "string"
-                      },
-                      "quote": {
-                        "minLength": 1,
-                        "description": "参考片段，可合理概括，用于回查相关原文。",
-                        "type": "string"
-                      }
-                    }
                   }
                 }
               }
@@ -6936,6 +6691,31 @@
             },
             "minItems": 0,
             "maxItems": 100
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lineId": {
+                  "type": "string"
+                },
+                "added": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "removed": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "lineId",
+                "added",
+                "removed"
+              ],
+              "additionalProperties": false
+            }
           }
         }
       }
@@ -7110,6 +6890,31 @@
             },
             "minItems": 0,
             "maxItems": 100
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lineId": {
+                  "type": "string"
+                },
+                "added": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "removed": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "lineId",
+                "added",
+                "removed"
+              ],
+              "additionalProperties": false
+            }
           }
         }
       }

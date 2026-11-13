@@ -1,9 +1,11 @@
 import type { AgentStore, Row } from './repository'
 import { canonical, records, strings, text } from './contracts'
 import type { Scope } from './queries'
+import { lineSummary } from '../story/views'
 
 export const storyWriteTools = ['save_story_lines', 'save_story_notes', 'add_story_nodes'] as const
 export const storyToolNames = ['search_story_context', 'get_story_detail', 'read_original', ...storyWriteTools, 'finish_story_batch']
+export const readingToolNames = storyToolNames.filter(name => !['read_original', 'add_story_nodes'].includes(name))
 export const isStoryWrite = (name: string) => (storyWriteTools as readonly string[]).includes(name)
 
 /** 段号来自已保存文本的位置，修改不要求模型复述原句。 */
@@ -75,13 +77,18 @@ export async function storyPayload(store: AgentStore, scope: Scope, name: string
     }
     const old = id ? await store.get('eventLines', id) : undefined
     if (id && (!old || old.bookId !== scope.bookId)) throw new Error('SCOPE:事件线不存在或不属于当前书籍。')
-    if (action === 'update' && !['nodeIds', 'title', 'cause', 'process', 'processAppend', 'processEdits', 'result', 'lineStatus'].some(key => op[key] !== undefined)) throw new Error('INVALID_ARGS:请提供要调整的成员或内容。')
+    if (scope.workflow === 'story_pages_v3') {
+      if (action === 'create' && (!text(op.title).trim() || !strings(op.nodeIds).length || typeof op.summary !== 'string')) throw new Error('INVALID_ARGS:新建请填写名称、节点和概述。')
+      if (action !== 'create' && !id || action === 'append' && !strings(op.nodeIds).length || action === 'merge' && !strings(op.mergeLineIds).length) throw new Error('INVALID_ARGS:请填写目标事件线及本次节点或合并对象。')
+    }
+    if (action === 'update' && !['nodeIds', 'title', 'summary', 'cause', 'process', 'processAppend', 'processEdits', 'result', 'lineStatus'].some(key => op[key] !== undefined)) throw new Error('INVALID_ARGS:请提供要调整的成员或内容。')
     const merging = action === 'merge' ? await Promise.all(strings(op.mergeLineIds).map(id => store.get('eventLines', id))) : []
     const combined = (field: string) => [...new Set([old, ...merging].map(row => text(row?.[field])).filter(Boolean))].join('\n\n')
     const process = revisedProcess(action === 'merge' ? combined('process') : old?.process, op)
     ops.push({ op: action, ...(id ? { line_id: id } : {}), ...(action === 'merge' ? { keep_line_id: id, merge_line_ids: op.mergeLineIds } : {}),
+      ...(op.summary !== undefined ? { summary: op.summary } : action === 'merge' && [old, ...merging].some(row => row?.summary !== undefined) ? { summary: [...new Set([old, ...merging].filter((row): row is Row => !!row).map(lineSummary).filter(Boolean))].join('\n\n') } : old?.summary === undefined ? {} : { summary: old.summary }),
       ...(op.title === undefined ? {} : { title: op.title }), node_ids: op.nodeIds ?? old?.nodeIds,
-      cause: op.cause ?? (action === 'merge' ? combined('cause') : old?.cause) ?? '', process, result: op.result ?? (action === 'merge' ? combined('result') : old?.result) ?? '', line_status: op.lineStatus ?? ([old, ...merging].some(row => row?.lineStatus === 'open') ? 'open' : old?.lineStatus) ?? 'open',
+      cause: op.cause ?? (action === 'merge' ? combined('cause') : old?.cause) ?? '', process, result: op.result ?? (action === 'merge' ? combined('result') : old?.result) ?? '', line_status: scope.workflow === 'story_pages_v3' ? old?.lineStatus ?? 'open' : op.lineStatus ?? ([old, ...merging].some(row => row?.lineStatus === 'open') ? 'open' : old?.lineStatus) ?? 'open',
       confidence: op.confidence, reason: op.reason, evidenceNodeIds: op.evidenceNodeIds })
   }
   return { event_line_ops: ops, new_nodes: [] }

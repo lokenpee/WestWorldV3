@@ -11,7 +11,7 @@ import { storyResponse, storyTask } from './support/story-protocol'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
 import { noteFingerprint } from '../src/features/agents/queries'
 import { createBookAgentRepository } from '../src/features/agents/repository'
-import { agentStream } from './support/agent-protocol'
+import { agentStream, agentTextStream } from './support/agent-protocol'
 import { appendEntry } from '../src/features/agents/commands'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
@@ -29,6 +29,17 @@ async function setup(count = 240, positions = [81, 100, 101, 180, 181, 240], fet
   return { book, workspace, db, models, service: createStoryService(workspace, models), fetcher }
 }
 afterEach(async () => { for (const workspace of opened.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
+it('旧窗口兼容入口同样允许普通说明后继续并通过实际工具收尾', async () => {
+  let requests = 0
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => ++requests === 1
+    ? agentTextStream('我先核对窗口内事件的关系。') : storyResponse(JSON.parse(init!.body as string)))
+  const { service } = await setup(2, [1, 2], fetcher)
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(requests).toBeGreaterThan(1)
+  expect((await service.read('a')).completed).toBe(1)
+})
+
 it('100原章窗口重叠20，切块跟随原章，240章只生成三个窗口', () => {
   const chapters = Array.from({ length: 240 }, (_, i) => chapter(String(i + 1), i))
   expect(createStoryWindows(chapters).map(row => [row.start, row.end])).toEqual([[0, 100], [80, 180], [160, 240]])
@@ -352,7 +363,7 @@ it('五分钟目标前提醒收尾，越过目标的在途响应仍正常结束'
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed)
   try { await fixture.service.start('a') } finally { clock.mockRestore() }
   expect(fetcher).toHaveBeenCalledTimes(2)
-  expect(systems[0]).toContain('逐页串联事件线')
+  expect(systems[0]).toContain('P3 · 串联事件线')
   expect(systems[0]).not.toContain('SDK')
   expect(notes[0]).toContain('剩余约')
   expect(notes[1]).toContain('剩余约')

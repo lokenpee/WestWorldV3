@@ -10,7 +10,7 @@ import { createOrganizationState, nextUnit } from '../src/features/world/organiz
 import { createBackupService } from '../src/features/backup/service'
 import { createImportService } from '../src/lib/storage/importService'
 import type { Character } from '../src/features/assets/types'
-import { agentStream } from './support/agent-protocol'
+import { agentStream, agentTextStream } from './support/agent-protocol'
 import { organizationResponse, organizationPromptParts } from './support/organization-streams'
 import { appendEntry } from '../src/features/agents/commands'
 import { reconcileOrganizationAfterWrite } from '../src/features/agents/organizationCommands'
@@ -52,6 +52,74 @@ async function setup(fetcher = organizationFetcher()) {
 }
 afterEach(async () => { vi.restoreAllMocks(); for (const workspace of opened.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
 
+it.each(['scan', 'profiles', 'relations'] as const)('独立%s步骤余额恢复后继续重试原待办，保留历史错误', async step => {
+  let failing = true
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => failing ? new Response(JSON.stringify({ error: { message: 'Insufficient Balance' } }), { status: 402 }) : respond(init))
+  const { service, db } = await setup(fetcher)
+  const runId = await service.startOrganizationStep('a', step)
+  await vi.waitFor(() => expect(service.state('a')?.running).toBe(false), { timeout: 10000 })
+  expect((await db.table('pipelineRuns').get(runId)).status).toBe('paused')
+  failing = false
+  await service.continueOrganization('a')
+  await vi.waitFor(() => expect(service.state('a')?.running).toBe(false), { timeout: 10000 })
+  const run = await db.table('pipelineRuns').get(runId)
+  expect(run.status, JSON.stringify({ state: service.state('a'), organization: run.organization, tasks: run.tasks })).toBe('completed')
+  expect(run.tasks[0].lastError.message).toContain('Insufficient Balance')
+  expect(fetcher.mock.calls.length).toBeGreaterThan(1)
+})
+
+it.each(['scan', 'profiles', 'relations'] as const)('%s连续普通说明后继续实际工具，保留回复且不假报完成', async step => {
+  let requests = 0
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    requests++
+    if (requests <= 2) return agentTextStream(`第${requests}段核对说明：我继续检查人物依据。`)
+    if (requests === 3) {
+      expect(init!.body).toContain('第1段核对说明')
+      const run = (await db.table('pipelineRuns').toArray()).find(row => row.organization)!
+      expect(run.status).toBe('running')
+      expect(run.organization.scanPages?.every((page: { status: string }) => page.status !== 'checked')).toBe(true)
+    }
+    if (step === 'scan') return agentStream([{ name: 'navigate_identity_pages', args: { currentPageId: 'scan:0', direction: 'next' } }])
+    return respond(init)
+  })
+  const { db, service } = await setup(fetcher)
+  const runId = await service.startOrganizationStep('a', step)
+  await vi.waitFor(() => expect(service.state('a')?.running).toBe(false), { timeout: 15000 })
+  const run = await db.table('pipelineRuns').get(runId)
+  expect(run.status, JSON.stringify(run.tasks)).toBe('completed')
+  expect(run.tasks.every((task: { lastError?: unknown }) => !task.lastError)).toBe(true)
+  expect(requests).toBeGreaterThan(2)
+  if (step === 'scan') {
+    expect(requests).toBe(3)
+    expect(run.organization.scanPages[0].status).toBe('checked')
+    expect(run.organization.candidateGroups).toHaveLength(0)
+  }
+  const entries = await db.table('storySessionEntries').toArray()
+  expect(JSON.stringify(entries)).toContain('第1段核对说明')
+})
+
+it('普通回复返回时主动暂停不触发缺少总结错误，继续后仍可完成', async () => {
+  let requested = false, release!: () => void
+  const gate = new Promise<void>(resolve => { release = resolve })
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    if (!requested) { requested = true; await gate; return agentTextStream('先说明核对思路，稍后查阅。') }
+    return respond(init)
+  })
+  const { db, service } = await setup(fetcher)
+  const runId = await service.startOrganizationStep('a', 'scan')
+  await vi.waitFor(() => expect(requested).toBe(true))
+  await service.pauseOrganization('a'); release()
+  await vi.waitFor(() => expect(service.state('a')?.running).toBe(false), { timeout: 10000 })
+  const run = await db.table('pipelineRuns').get(runId)
+  expect(run.status).toBe('paused')
+  expect(run.tasks[0].lastError).toBeUndefined()
+  expect(run.organization.scanPages[0].status).not.toBe('checked')
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  await service.continueOrganization('a')
+  await vi.waitFor(() => expect(service.state('a')?.running).toBe(false), { timeout: 10000 })
+  expect((await db.table('pipelineRuns').get(runId)).status).toBe('completed')
+})
+
 it('人物目录按稳定编号每100人一页，页码与下一页游标连续', () => {
   const state = createOrganizationState(['P10', 'P2', 'P1', ...Array.from({ length: 98 }, (_, index) => `X${index}`)])
   expect(state.scanIds[0]).toBe('P1')
@@ -70,7 +138,9 @@ it('P2运行经真实请求组装启用已知模型的思考，按模型支持�
   expect(service.state('a')?.error).toBeUndefined()
   expect(fetcher.mock.calls.length).toBeGreaterThan(0)
   for (const [, init] of fetcher.mock.calls) {
-    expect(JSON.parse(init?.body as string)).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: 'high' })
+    const body = JSON.parse(init?.body as string)
+    const work = body.messages.map((message: { content: unknown }) => organizationPromptParts(message.content)).find(Boolean)
+    expect(body).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: work?.kind === 'directory' || work?.kind === 'candidate' ? 'low' : 'high' })
   }
 })
 
@@ -119,7 +189,7 @@ it('格式10备份保留人物整理会话、候选和进度，恢复为新书�
   const source = (await db.table('compileProgress').get('P2')) as { runId: string }
   const before = await db.table('pipelineRuns').get(source.runId) as Record<string, unknown>
   const organizationBefore = before.organization as Record<string, unknown>
-  await db.table('pipelineRuns').update(source.runId, { status: 'paused', organization: { ...organizationBefore, step: 'profiles' } })
+  await db.table('pipelineRuns').update(source.runId, { status: 'paused', organization: { ...organizationBefore, step: 'profiles', originalReadUnits: ['profile:C1-P001'] } })
   const importer = createImportService(workspace)
   try {
     const backups = createBackupService(workspace, importer)
@@ -132,7 +202,7 @@ it('格式10备份保留人物整理会话、候选和进度，恢复为新书�
     const run = (await restored.table('pipelineRuns').get(source.runId)) as Record<string, unknown>
     expect(run).toMatchObject({ bookId: imported.id, workflow: 'character_organization_v1', status: 'paused' })
     const organization = run.organization as Record<string, unknown>
-    expect(organization).toMatchObject({ step: 'profiles' })
+    expect(organization).toMatchObject({ step: 'profiles', originalReadUnits: ['profile:C1-P001'] })
     expect(organization.identityPageId).toBe(organizationBefore.identityPageId)
     expect(organization.seenIdentityPageIds).toEqual(organizationBefore.seenIdentityPageIds)
     expect((organization.candidateGroups as { status: string }[])[0].status).toBe('pending')
@@ -899,3 +969,28 @@ it('人物资料提交前发生快照冲突时保留当前人物，继续后仍�
   expect(completed.organization.profileItems[0]).toMatchObject({ id: 'C1-P001', status: 'checked' })
   table.hook('updating').unsubscribe(hook)
 }, 120000)
+
+it.each(['profiles', 'relations'] as const)('%s原文耗尽正常返回后仍能提交并推进所有人物', async step => {
+  const counts = new Map<string, number>()
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = JSON.parse(init!.body as string)
+    const work = body.messages.map((message: { content: unknown }) => organizationPromptParts(message.content)).find(Boolean)!
+    const count = (counts.get(work.id) ?? 0) + 1; counts.set(work.id, count)
+    if (count <= 2) return agentStream([{ name: 'read_original', args: { chapter_indices: ['1'] } }])
+    const results = body.messages.filter((message: { role: string }) => message.role === 'tool').map((message: { content: unknown }) => JSON.parse(contentOf(message.content)))
+    expect(results.at(-1)).toMatchObject({ readLimitReached: true, chapters: [], segments: [] })
+    expect(results.at(-1)).not.toHaveProperty('error')
+    expect(results.some((result: { text?: string }) => result.text?.includes('青石渡'))).toBe(true)
+    return respond(init)
+  })
+  const { db, service, models } = await setup(fetcher)
+  const agent = vi.spyOn(models, 'agent')
+  const runId = await service.startOrganizationStep('a', step)
+  await vi.waitFor(() => expect(service.state('a')?.running).toBe(false), { timeout: 15000 })
+  const run = await db.table('pipelineRuns').get(runId)
+  expect(run.status, JSON.stringify(service.state('a'))).toBe('completed')
+  expect(run.organization.originalReadUnits).toHaveLength(4)
+  expect([...counts.values()]).toEqual([3, 3, 3, 3])
+  expect(run.tasks.every((task: { lastError?: unknown }) => !task.lastError)).toBe(true)
+  expect(agent.mock.calls.every(call => call[1]?.reasoning === 'medium')).toBe(true)
+}, 20000)

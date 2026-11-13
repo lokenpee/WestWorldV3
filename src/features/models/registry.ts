@@ -22,6 +22,8 @@ export async function resolveModel(config: ModelConfig, apiKey: string, role: Mo
   const contextWindow = role === 'aggregation' && config.aggregationContextWindow !== undefined ? config.aggregationContextWindow : known?.contextWindow ?? 8192
   const model = {
     ...(known ?? {}), id, name: known?.name ?? id, provider: config.providerId, api: config.api, baseUrl: config.baseUrl,
+    // V4正式版已支持low；修正锁定SDK中仍将low映射为不支持的目录信息。
+    ...(config.providerId === 'deepseek' && /^deepseek-v4-(pro|flash)(?:-|$)/.test(id) && known ? { thinkingLevelMap: { ...known.thinkingLevelMap, minimal: 'low', low: 'low' } } : {}),
     input: known?.input ?? ['text'], reasoning: known?.reasoning ?? false, contextWindow,
     maxTokens: known?.maxTokens ?? 8192,
     cost: official ? { ...known!.cost } : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

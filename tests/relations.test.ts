@@ -141,7 +141,7 @@ describe('人物关系与绑定', () => {
     expect(data.tables.nodes[0]).toMatchObject({ actorIds: ['A1', 'A2'], legacyActorIds: ['A2'], actorBindings: [{ mention: '张三', ids: ['A1', 'A2'] }] })
   })
 
-  it('人物详情工具与界面共用关系结果，关系变化改变读取指纹', async () => {
+  it('人物详情与关系独立，关系变化只改变关系查询指纹', async () => {
     const characters: Character[] = [
       { id: 'A1', bookId: 'a', name: '张三', revision: 1, confidence: 1, createdBy: 'manual' },
       { id: 'B1', bookId: 'a', name: '张蕾', revision: 1, confidence: 1, createdBy: 'manual' },
@@ -155,12 +155,17 @@ describe('人物关系与绑定', () => {
     const scope: Scope = { bookId: 'a', profile: 'asset_editor', phase: 'ai_identity', runId: 'run', taskId: 'task', owner: 'owner', workItemIds: [] }
     const detail = await repo.transaction(false, store => readTool(store, scope, 'get_character_detail', { ids: ['A1'] }))
     validate(resultContracts.get('get_character_detail')!, detail)
-    const rows = detail.data as { relationEdges: { fromId: string; toId: string; labels: string[]; directionUnclear: boolean }[]; relations: { target: string; relation_label?: string }[] }[]
-    expect(rows[0]).toMatchObject({ relationEdges: [{ fromId: 'A1', toId: 'B1', labels: ['父亲'], directionUnclear: false }, { fromId: 'B1', toId: 'A1', labels: ['女儿'] }], relations: [{ target: '张蕾', relation_label: '父亲' }] })
+    expect((detail.data as Record<string, unknown>[])[0]).not.toHaveProperty('relationEdges')
+    expect((detail.data as Record<string, unknown>[])[0]).not.toHaveProperty('relations')
+    const pair = await repo.transaction(false, store => readTool(store, scope, 'get_character_relation', { fromId: 'A1', toId: 'B1' }))
+    validate(resultContracts.get('get_character_relation')!, pair)
+    expect(pair.data).toMatchObject({ fromId: 'A1', toId: 'B1', forwardLabels: ['父亲'], reverseLabels: ['女儿'], directionUnclear: false })
     const before = await hash(detail)
     await repo.transaction(true, store => store.put('characterRelations', { ...relation, forwardLabel: '生父', revision: 2 }))
     const changed = await repo.transaction(false, store => readTool(store, scope, 'get_character_detail', { ids: ['A1'] }))
-    expect(await hash(changed)).not.toBe(before)
-    expect((changed.data as typeof rows)[0].relationEdges[0].labels).toEqual(['生父'])
+    expect(await hash(changed)).toBe(before)
+    const changedPair = await repo.transaction(false, store => readTool(store, scope, 'get_character_relation', { fromId: 'A1', toId: 'B1' }))
+    expect(await hash(changedPair)).not.toBe(await hash(pair))
+    expect(changedPair.data).toHaveProperty('forwardLabels', ['生父'])
   })
 })

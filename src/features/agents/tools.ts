@@ -1,12 +1,14 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { JsonValue } from '@earendil-works/pi-ai'
 import type { AgentRepository, Row } from './repository'
-import { canonical, hash, records, resultContracts, strings, summarySchema, text, toolContracts, validate, type Summary } from './contracts'
+import { canonical, hash, records, resultContracts, strings, summarySchema, text, toolContracts, validate, parametersFor, type Summary } from './contracts'
 import { assertScope, readTool, toolBytes, type Scope } from './queries'
 import { assetReviewTools, checkLease, commitCommand, relationTools, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
 import { noteOrganizationRead } from './organizationReview'
-import { isStoryWrite, storyToolNames } from './storyCommands'
+import { isStoryWrite, storyToolNames, readingToolNames } from './storyCommands'
 import { navigateStoryReading, readingProgress, refreshReading } from '../story/reading'
+import { briefItems, recordStoryReads } from '../story/views'
+import { limitsOriginalRead, readOrganizationOriginal } from './organizationReads'
 
 const tableOf: Record<string, string> = { query_character_catalog: 'characters', get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
 const initialToolNames = (scope: Scope): string[] | null => {
@@ -16,8 +18,8 @@ const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.phase === 'character_organization') {
     if (!scope.workKind) return null
     return {
-      directory: ['query_character_catalog', 'query_candidate_groups', 'get_character_detail', 'get_character_relation', 'read_original', 'save_identity_groups', 'navigate_identity_pages'],
-      candidate: ['query_character_catalog', 'query_candidate_groups', 'get_character_detail', 'get_character_relation', 'read_original', 'save_identity_groups', 'navigate_identity_pages'],
+      directory: ['query_character_catalog', 'query_candidate_groups', 'get_character_detail', 'get_character_relation', 'query_locations', 'get_location_detail', 'save_identity_groups', 'navigate_identity_pages'],
+      candidate: ['query_character_catalog', 'query_candidate_groups', 'get_character_detail', 'get_character_relation', 'query_locations', 'get_location_detail', 'save_identity_groups', 'navigate_identity_pages'],
       profile: ['query_character_profile', 'get_character_detail', 'read_original', 'edit_character', 'submit_profile_review'],
       relations: ['submit_relation_review', 'query_relation_work', 'read_original', 'get_character_relation', 'get_legacy_relation_records'],
     }[scope.workKind]
@@ -26,7 +28,7 @@ const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.phase === 'asset_review') return scope.reviewScope === 'relations'
     ? ['get_character_relation', 'get_legacy_relation_records', 'get_character_detail', 'read_original', 'set_character_relation', 'delete_character_relation', 'submit_result']
     : ['get_character_detail', 'get_location_detail', 'get_node_detail', 'get_event_line_detail', 'get_character_relation', 'read_original', 'edit_character', 'edit_location', 'edit_event_node', 'edit_event_line', 'set_character_relation', 'delete_character_relation', 'submit_result']
-  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...storyToolNames, 'navigate_story_pages'] : scope.workflow === 'story_lines_v2' ? storyToolNames : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
+  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...readingToolNames, 'navigate_story_pages'] : scope.workflow === 'story_lines_v2' ? storyToolNames : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
   return null
 }
 export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
@@ -68,16 +70,22 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       ? contract.name !== 'commit_asset_changes'
       : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
     .filter(contract => contract.kind !== 'finish' && (story ? storyToolNames.includes(contract.name) || pages && contract.name === 'navigate_story_pages' : !isStoryWrite(contract.name) && !['get_story_detail', 'navigate_story_pages'].includes(contract.name)))
+    .filter(contract => !pages || [...readingToolNames, 'navigate_story_pages'].includes(contract.name))
     .filter(contract => !relationOnly || contract.kind !== 'write' || (relationTools as readonly string[]).includes(contract.name))
   const allTools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
-    parameters: modelParameters(contract.name, contract.parameters),
+    parameters: modelParameters(contract.name, parametersFor(contract, scope.workflow)),
     outputSchema: resultContracts.get(contract.name),
     async execute(toolCallId, parameters, signal) {
-      assertScope(scope, repo.bookId); signal?.throwIfAborted(); validate(contract.parameters, parameters)
+      assertScope(scope, repo.bookId); signal?.throwIfAborted(); validate(parametersFor(contract, scope.workflow), parameters)
       if (toolBytes(parameters) > 65536) throw new Error('TOO_LARGE:工具参数超过单次处理上限。')
       const args = structuredClone(parameters) as Row
       if (pages && contract.name === 'navigate_story_pages') {
-        const value = await repo.transaction(true, async store => { await checkLease(store, scope, signal); return navigateStoryReading(store, scope, args, navigationCallId ?? toolCallId) })
+        const value = await repo.transaction(true, async store => {
+          await checkLease(store, scope, signal)
+          const value = await navigateStoryReading(store, scope, args, navigationCallId ?? toolCallId)
+          await recordStoryReads(store, reads, briefItems(value.page)); await saveTask(store, scope, { readSet: reads })
+          return value
+        })
         if (value.complete) {
           completedWork = true
           const actual = await repo.transaction(false, async store => strings((await taskOf(store, scope)).task.appliedCommitIds))
@@ -103,7 +111,16 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         value = ack as unknown as Row
       } else {
         const binding = organization && (contract.name === 'query_character_profile' || contract.name === 'query_relation_work')
-        value = await repo.transaction(binding, async store => { await checkLease(store, scope, signal); return readTool(store, scope, contract.name, args, contract.maxResults) })
+        const limited = contract.name === 'read_original' && limitsOriginalRead(scope)
+        value = await repo.transaction(binding || limited, async store => {
+          await checkLease(store, scope, signal)
+          return limited ? readOrganizationOriginal(store, scope, args, contract.maxResults) : readTool(store, scope, contract.name, args, contract.maxResults)
+        })
+        if (value.readLimitReached === true) {
+          validate(resultContracts.get(contract.name)!, value)
+          readCalls++
+          return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue }
+        }
         // 省略编号只影响本次调用的便利写法；读集始终保存实际读取的人物身份。
         if (binding) args[contract.name === 'query_character_profile' ? 'id' : 'characterId'] = text((value.data as Row).id)
         if (toolBytes(value) > 65536) throw new Error('TOO_LARGE:工具结果超过单次返回上限。')
@@ -115,6 +132,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         if (at < 0) reads.queries.push(query); else reads.queries[at] = query
         await repo.transaction(true, async store => {
           await checkLease(store, scope, signal)
+          if (pages && ['get_story_detail', 'search_story_context'].includes(contract.name)) await recordStoryReads(store, reads, records(value.data))
           const complete = await noteOrganizationRead(store, scope, contract.name, args, value)
           const table = contract.name === 'get_story_detail' ? ({ node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[text(args.kind)] : tableOf[contract.name]
           const items = records(value.data)
@@ -140,8 +158,8 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
             if (index < 0) reads.records.push(dependency); else reads.records[index] = dependency
           }
           if (contract.name === 'get_character_relation') {
-            const data = value.data as Row
-            for (const id of [text(data.fromId), text(data.toId)]) {
+            const pairs = Array.isArray(value.data) ? records(value.data) : [value.data as Row]
+            for (const id of new Set([text(args.fromId), ...pairs.flatMap(data => [text(data.fromId), text(data.toId)])].filter(Boolean))) {
               const row = await store.get('characters', id)
               const dependency = { table: 'characters', id, resolvedId: row ? id : null, revision: Number(row?.revision ?? 0), factFingerprint: await store.wait(hash(row ?? null)) }
               const index = reads.records.findIndex(read => read.table === 'characters' && read.id === id)

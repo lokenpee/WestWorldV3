@@ -10,12 +10,16 @@ import { WorldReportDialog } from './WorldReportDialog'
 import { P2OrganizationPanel } from '../agents/P2OrganizationPanel'
 import { P2Progress } from './P2Progress'
 import type { LoadP2Execution } from '../agents/useP2Execution'
+import { RestartDialog } from '../agents/RestartDialog'
 import './WorldPanel.css'
 
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 
 export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: string; service: WorldService; assets: AssetService; focusRunId?: string }) {
+  const [restartStep, setRestartStep] = useState<'scan' | 'profiles' | 'relations'>()
+  useEffect(() => setRestartStep(undefined), [bookId])
   const [showOrganization, setShowOrganization] = useState(true)
+  const [activityFailure, setActivityFailure] = useState<{ bookId: string; message: string }>()
   const loadExecution: LoadP2Execution = useCallback((id, query) => service.execution(id, query.runId, { unitId: query.objectKey }), [service])
   const [, refresh] = useState(0); const [candidates, setCandidates] = useState<Candidate[]>()
   const [selected, setSelected] = useState<Candidate>(); const [memberIds, setMemberIds] = useState<string[]>([])
@@ -164,10 +168,10 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
         const disabled = !controllable && (!!activeStep && !isActive || (!isActive && (!!state?.running || !!activeStatus)) || !ready || scanning)
         const text = status === 'running' ? `暂停第${['一', '二', '三'][index]}步` : status === 'paused' ? `继续第${['一', '二', '三'][index]}步` : label
         return <button key={step} className={isActive ? 'primary-button' : 'secondary-button'} disabled={disabled} onClick={() => {
-          setError(''); setMessage(''); setShowOrganization(true)
-          if (status === 'running') void service.pauseOrganization(bookId)
-          else if (status === 'paused') void service.continueOrganization(bookId)
-          else void service.startOrganizationStep(bookId, step)
+          setError(''); setMessage(''); setShowOrganization(true); setActivityFailure(undefined)
+          if (status !== 'running' && status !== 'paused' && allOrganizationRuns.some(run => run.organization?.runStep === step || !run.organization?.runStep)) { setRestartStep(step); return }
+          const action = status === 'running' ? service.pauseOrganization(bookId) : status === 'paused' ? service.continueOrganization(bookId) : service.startOrganizationStep(bookId, step)
+          void action.catch(failure => setActivityFailure({ bookId, message: failure instanceof Error ? failure.message : '人物整理暂时无法继续。' }))
         }}>{text}</button>
       })}
       {activeStep && (activeStatus === 'running' || activeStatus === 'paused') && <button className="text-button" onClick={() => void service.cancelOrganization(bookId)}>取消整理</button>}
@@ -175,15 +179,17 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
       <button className="text-button" onClick={() => { setTraceRunId(showOrganization ? organizationRun?.id : undefined); setTraceOpen(true) }}>整理详情</button>
       {!organizationRun && !aiRunning && reports.status === 'ready' && reports.value.length > 0 && <button className="text-button" onClick={() => setReportOpen(true)}>查看整理报告</button>}
     </div></div>
-    <p>代码整理：先自动合并完整同名项，其余候选核对后合并，可按需预览。AI整理按步骤独立执行：第一步识别重复人物，第二步优化人物资料，第三步整理人物关系；暂停保留原任务，取消后下次从头重新整理。</p>
+    <p>代码整理：先自动合并完整同名项，其余候选核对后合并，可按需预览。AI整理按步骤独立执行：第一步识别重复人物，第二步优化人物资料，第三步整理人物关系；暂停保留原任务，重新开始时可选择复用已完成结果或全部重新整理。</p>
     {eligibility.status === 'ready' && !eligibility.value.covered && <p className="muted">请先完成全书逐章提取。</p>}
     {eligibility.status === 'ready' && eligibility.value.covered && eligibility.value.locked && <p className="muted">本书已有世界、叙事或提取任务，人物整理按钮暂不可用。</p>}
     {eligibility.status === 'error' && <p role="alert">{eligibility.message}</p>}
     {scanning && !state?.running && <p role="status">正在刷新名称候选…</p>}
-    {showOrganization && organizationRun && <P2Progress bookId={bookId} run={organizationRun} load={loadExecution} phase={state?.phase} candidateCount={aiCandidates.status === 'ready' ? aiCandidates.value.filter(row => !row.dismissed).length : undefined} />}
+    {showOrganization && organizationRun && <P2Progress bookId={bookId} run={organizationRun} load={loadExecution} phase={state?.phase} error={activityFailure?.bookId === bookId ? activityFailure.message : state?.error} candidateCount={aiCandidates.status === 'ready' ? aiCandidates.value.filter(row => !row.dismissed).length : undefined} />}
+    {!!organizationRun?.organization?.reusedCount && <p>已复用 {organizationRun.organization.reusedCount} 人的完成结果</p>}
+    {activityFailure?.bookId === bookId && !organizationRun && <p role="alert">{activityFailure.message}</p>}
     {((aiRunning && !organizationRun) || queueRunning) && <p role="status">{state?.running ? `${state.phase} · 已处理 ${state.processed}/${state.total}` : `${queueData?.pending === 0 && queueData.statisticsPending ? '正在更新出场统计' : '机械合并队列处理中'} · 已处理 ${(queueData?.completed ?? 0) + (queueData?.failed ?? 0)}/${queueItems.length}`}</p>}
     {queue.status === 'error' && <p role="alert">{queue.message}</p>}
-    {(error || state?.error) && <p role="alert">{error || state?.error}</p>}
+    {(error || state?.error && !showOrganization) && <p role="alert">{error || state?.error}</p>}
     {message && <p role="status">{message}</p>}
     {(candidates || visibleCandidates.length > 0) && <div className="world-candidates" role="region" aria-label="代码整理候选"><p>{visibleCandidates.length ? `找到 ${visibleCandidates.length} 组疑似重复，请选择一组核对；确认后才会合并。` : '没有待处理的合并候选。'}</p>{visibleCandidates.map(row => <button className="secondary-button" key={row.id} onClick={() => choose(row)}>{row.ai ? 'AI发现' : '代码发现'} · {row.kind === 'character' ? '人物' : '地点'} · {candidateNames(row)} · {row.memberIds.length} 条</button>)}</div>}
     {aiCandidates.status === 'error' && <p role="alert">{aiCandidates.message}</p>}
@@ -193,5 +199,6 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
     {preview && selected && <MergeDialog bookId={bookId} kind={selected.kind} memberIds={memberIds} service={assets} locked={!ready} initialRequest={prepared} onClose={() => setPreview(false)} onPrepared={request => { setPrepared(request); setPreview(false) }} onMerged={() => undefined} />}
     {reportOpen && reports.status === 'ready' && <WorldReportDialog runs={reports.value} initialId={state?.reportId} queue={queueData ? { items: queueItems, pending: queueData.pending, completed: queueData.completed, failed: queueData.failed } : undefined} queueBusy={busy || queueSaving} onRemoveQueue={removeQueue} onReviewQueue={reviewQueue} onClose={() => setReportOpen(false)} />}
     {traceOpen && <P2OrganizationPanel bookId={bookId} loadIndex={service.organizationIndex} loadExecution={loadExecution} loadMerges={service.mergeHistory} maintainHistory={service.maintainOrganizationHistory} runs={allOrganizationRuns} initialRunId={traceRunId} initialStep={showOrganization ? undefined : 'scan'} onOpenReport={() => { setTraceOpen(false); setReportOpen(true) }} onClose={() => { setTraceOpen(false); setTraceRunId(undefined) }} />}
+    {restartStep && <RestartDialog title="重新开始人物整理" onClose={() => setRestartStep(undefined)} onChoose={mode => { const step = restartStep; setRestartStep(undefined); void service.startOrganizationStep(bookId, step, mode).catch(failure => setActivityFailure({ bookId, message: failure instanceof Error ? failure.message : "人物整理启动失败。" })) }} />}
   </section>
 }

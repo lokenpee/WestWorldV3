@@ -1,0 +1,8 @@
+.agent-activity { display: flex; align-items: center; gap: .65rem; min-width: 0; margin: .6rem 0; color: var(--text-secondary, #aaa); }
+.agent-activity-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.agent-activity-dot { width: .45rem; height: .45rem; border-radius: 50%; flex: 0 0 auto; background: currentColor; }
+.agent-activity.is-active { color: var(--accent, #c5a56b); }
+.agent-activity.is-active .agent-activity-dot { animation: agent-activity-glow 1.8s ease-in-out infinite; }
+.agent-activity.is-error { color: var(--danger, #e87979); }
+@keyframes agent-activity-glow { 0%, 100% { box-shadow: 0 0 0 2px #c5a56b15; opacity: .55; } 50% { box-shadow: 0 0 10px 4px #c5a56b55; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .agent-activity.is-active .agent-activity-dot { animation: none; } }
