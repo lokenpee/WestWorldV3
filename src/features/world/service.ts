@@ -14,10 +14,13 @@ import { createMechanicalQueue } from './mechanical'
 import { repairAutomaticProtection } from './protection'
 import { runAssetReview } from './assetReview'
 import { createLeaseHeartbeat, leaseFailureKind } from './leaseHeartbeat'
-import { createCharacterOrganizationState, createOrganizationState, createOrganizationStepState, finalizeStatistics, runCharacterOrganization } from './organization'
+import { createCharacterOrganizationState, createOrganizationState, createOrganizationStepState, runCharacterOrganization } from './organization'
 import { resolveSession } from '../agents/sessions'
 import { renewOrganizationLease } from '../agents/organizationLease'
 import { buildProfileReview, organizationReviewVersion, refreshReview } from '../agents/organizationReview'
+import { updateCharacterTiers } from './statistics'
+import { readIdentityCandidates, dismissIdentityCandidate } from './identityReview'
+import { pruneOrganizationHistory } from '../agents/p2History'
 import { readBookTrace, readExecutionChain, readOrganizationRequests, readOrganizationStepIndex } from '../agents/trace'
 import prompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-identity.md?raw'
 
@@ -528,22 +531,11 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
 
   async function updateOrganizationStatistics(bookId: string) {
     if (controllers.has(bookId) || mechanical.isRunning(bookId)) throw new Error('本书已有处理任务。')
-    const run = await latestOrganizationRun(bookId)
-    if (!run?.organization || !run.sessionId) throw new Error('没有可更新统计的人物整理运行。')
-    const owner = crypto.randomUUID(), controller = new AbortController(), repo = createBookAgentRepository(workspace, bookId), db = workspace.openBook(bookId)
+    const controller = new AbortController()
     controllers.set(bookId, controller)
-    set(bookId, { running: true, phase: '更新出场统计', error: undefined })
+    set(bookId, { running: true, phase: '人物自动分层', error: undefined })
     try {
-      await db.transaction('rw', db.tables, async () => {
-        const leases = await db.table('pipelineRuns').toArray()
-        if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()) && row.runId !== run.id)) throw new Error('本书已有处理任务。')
-        await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId: run.id, expiresAt: Date.now() + 30000 })
-      })
-      await finalizeStatistics(repo, run.id, owner, run.sessionId, controller.signal, new Date().toISOString())
-      await db.table('pipelineRuns').delete('lease:world')
-    } catch (error) {
-      set(bookId, { error: controller.signal.aborted ? '统计更新已取消。' : error instanceof Error ? error.message : '出场统计更新失败。' })
-      await db.table('pipelineRuns').delete('lease:world').catch(() => undefined)
+      return await updateCharacterTiers(workspace, bookId, controller)
     } finally {
       controllers.delete(bookId)
       set(bookId, { running: false, phase: '' })
@@ -646,7 +638,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     }
   }
 
-  return { scan, organize, confirm, start, startOrganization, startOrganizationStep, recoverOrganization, updateOrganizationStatistics, pauseOrganization, continueOrganization, continueCharacterOrganization, characterResume, cancelOrganization, startCharacterOrganization, continueRelations: (bookId: string) => start(bookId, { reviewScope: 'relations', reviewMode: 'full' }), mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), organizationIndex: (bookId: string, step: 'scan' | 'profiles' | 'relations') => readOrganizationStepIndex(workspace, bookId, step), organizationRequests: (bookId: string, query: { runId: string; step: 'scan' | 'profiles' | 'relations'; objectKey: string; before?: { startedAt: string; requestId: string }; limit?: number }) => readOrganizationRequests(workspace, bookId, query), execution: (bookId: string, runId: string, options?: { unitId?: string; contextId?: string; sessionId?: string }) => readExecutionChain(workspace, bookId, runId, options), async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
+  return { identityCandidates: (bookId: string) => readIdentityCandidates(workspace, bookId), dismissIdentityCandidate: async (bookId: string, candidate: Candidate) => { await assertReady(bookId); await dismissIdentityCandidate(workspace, bookId, candidate) }, maintainOrganizationHistory: (bookId: string) => pruneOrganizationHistory(workspace, bookId), mergeHistory: async (bookId: string) => (await workspace.openBook(bookId).table('pipelineRuns').where('stage').anyOf(['P2', 'manual_merge']).toArray()).filter(row => row.report).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt))), scan, organize, confirm, start, startOrganization, startOrganizationStep, recoverOrganization, updateOrganizationStatistics, pauseOrganization, continueOrganization, continueCharacterOrganization, characterResume, cancelOrganization, startCharacterOrganization, continueRelations: (bookId: string) => start(bookId, { reviewScope: 'relations', reviewMode: 'full' }), mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), organizationIndex: (bookId: string, step: 'scan' | 'profiles' | 'relations') => readOrganizationStepIndex(workspace, bookId, step), organizationRequests: (bookId: string, query: { runId: string; step: 'scan' | 'profiles' | 'relations'; objectKey: string; before?: { startedAt: string; requestId: string }; limit?: number }) => readOrganizationRequests(workspace, bookId, query), execution: (bookId: string, runId: string, options?: { unitId?: string; contextId?: string; sessionId?: string }) => readExecutionChain(workspace, bookId, runId, options), async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
 }
 export type WorldService = ReturnType<typeof createWorldService>
 export type { Candidate }

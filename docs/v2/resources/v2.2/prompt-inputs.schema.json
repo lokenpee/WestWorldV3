@@ -646,6 +646,94 @@
         "operationKey"
       ],
       "additionalProperties": false
+    },
+    "StoryReadingBrief": {
+      "type": "object",
+      "description": "P3模型收到的业务资料；页面及进度由程序提供，不包含内部运行凭据。",
+      "properties": {
+        "phase": {
+          "enum": [
+            "window_link",
+            "global_review"
+          ]
+        },
+        "queue": {
+          "type": "string"
+        },
+        "page": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "pageNumber": {
+              "type": "integer"
+            },
+            "totalPages": {
+              "type": "integer"
+            },
+            "type": {
+              "enum": [
+                "node_page",
+                "line_segment",
+                "line_summary",
+                "note_page"
+              ]
+            },
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "lineId": {
+              "type": "string"
+            },
+            "segment": {
+              "type": "integer"
+            },
+            "totalSegments": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "id",
+            "pageNumber",
+            "totalPages",
+            "type",
+            "ids"
+          ],
+          "additionalProperties": true
+        },
+        "remainingCount": {
+          "type": "integer"
+        },
+        "workItems": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "related": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "moreRelated": {
+          "type": "boolean"
+        },
+        "workingSummary": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "phase",
+        "queue",
+        "page",
+        "workItems"
+      ],
+      "additionalProperties": true
     }
   }
 }

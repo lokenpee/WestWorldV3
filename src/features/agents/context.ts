@@ -76,6 +76,12 @@ export function projectSession(entries: Row[], leafId?: string) {
   visible = visible.filter(row => row.type !== 'omit' && !omitted.has(text(row.id)))
   return { entries: visible, messages: repairToolPairs(visible.flatMap(entryMessages)), path }
 }
+
+/** 独立连续工作项的压缩和恢复只沿本项历史，不混入旧的自动合并会话。 */
+export function projectWorkSession(entries: Row[], unitId: string) {
+  const selected = entries.filter(row => row.unitId === unitId && !isObservationEntry(row)).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
+  return projectSession(selected.map((row, index) => ({ ...row, parentId: selected[index - 1]?.id ?? null })))
+}
 export function estimateContextTokens(entries: Row[], messages: AgentMessage[]): number {
   const invalidAfter = Math.max(-1, ...entries.filter(row => row.type === 'compaction' || row.type === 'omit').map(row => Number(row.ordinal)))
   const usageTokens = (message: Row) => {

@@ -45,7 +45,7 @@ React 页面 / 面板
 - **P2/P3 使用 Pi Agent**：`agents/runtime.ts` 管理模型循环，`agents/repository.ts` 提供带版本和租约校验的事务，`agents/commands.ts` 执行写命令。
 - **当前版本同书单任务**：同一本书的 P1/P2/P3 不跨阶段并行；P1 内部世界/叙事两条 lane 仍可并行；不同书籍互不影响。准入在 service/租约事务内检查，不只靠 UI。
 - **写入保护**：业务提交比较实际 revision/fingerprint，校验 `pipelineRuns` 租约和 P3 会话所有权/有效期；续租时间不参与业务快照比较。
-- **断点恢复**：P1 用成功凭证和 `compileProgress`；P2 用 `activeWork` + `appliedCommands`；P3 用窗口检查点、覆盖清单和持续会话。稳定 operationKey 防止回执丢失后重复写库。
+- **断点恢复**：P1 用成功凭证和 `compileProgress`；P2 用 `activeWork` + `appliedCommands`；P3 用 `pipelineRuns.storyReading` 保存阅读页、已检查进度和当前位置，并恢复本书持续会话。稳定 operationKey 防止回执丢失后重复写库。
 
 ### P1 / P2 / P3 运行链
 
@@ -53,7 +53,7 @@ React 页面 / 面板
 |---|---|---|
 | P1 逐章提取 | `ExtractionPanel` → `createExtractionService.start/startLane/reExtract` | [extraction/service.ts](src/features/extraction/service.ts)、[recovery.ts](src/features/extraction/recovery.ts)、[contracts.ts](src/features/extraction/contracts.ts) |
 | P2 世界整理 | `WorldPanel` / `AssetEditor` → `world/service.ts` | [world/service.ts](src/features/world/service.ts)、[world/organization.ts](src/features/world/organization.ts)、[agents/organizationCommands.ts](src/features/agents/organizationCommands.ts)、[agents/organizationLease.ts](src/features/agents/organizationLease.ts) |
-| P3 叙事整理 | `StoryPanel` → `story/service.ts` | [story/service.ts](src/features/story/service.ts)、[story/checkpoints.ts](src/features/story/checkpoints.ts)、[story/coverage.ts](src/features/story/coverage.ts) |
+| P3 叙事整理 | `StoryPanel` → `story/service.ts` → `readingService.ts` | [story/readingService.ts](src/features/story/readingService.ts)、[story/reading.ts](src/features/story/reading.ts)、[story/retrieval.ts](src/features/story/retrieval.ts) |
 | Agent 运行时 | P2/P3 共用 | [agents/runtime.ts](src/features/agents/runtime.ts)、[agents/repository.ts](src/features/agents/repository.ts)、[agents/tools.ts](src/features/agents/tools.ts)、[agents/commands.ts](src/features/agents/commands.ts) |
 
 ## 关键文件导航
@@ -67,7 +67,7 @@ React 页面 / 面板
 | [assets/AssetsPanel.tsx](src/features/assets/AssetsPanel.tsx) / [AssetEditor.tsx](src/features/assets/AssetEditor.tsx) | 四类资产列表、搜索、编辑、删除。 |
 | [extraction/ExtractionPanel.tsx](src/features/extraction/ExtractionPanel.tsx) | P1 开始、暂停、继续、取消、重提和结果。 |
 | [world/WorldPanel.tsx](src/features/world/WorldPanel.tsx) | P2 代码整理、机械合并、按步骤 AI 整理、报告。 |
-| [story/StoryPanel.tsx](src/features/story/StoryPanel.tsx) | P3 窗口串联、全书复核、继续和用量。 |
+| [story/StoryPanel.tsx](src/features/story/StoryPanel.tsx) | P3 逐页串联、全书复核、当前页与事件线、继续和用量。 |
 | [models/ModelSettings.tsx](src/features/models/ModelSettings.tsx) | 服务商、模型、密钥、连接和 Agent 基础测试。 |
 | [backup/BackupPanel.tsx](src/features/backup/BackupPanel.tsx) | 备份导出、预检、恢复为副本、整书删除。 |
 
@@ -99,9 +99,9 @@ React 页面 / 面板
 | P2 疑似组 | `get_character_detail`、`get_location_detail`、`read_original`、`merge_assets`、`resolve_candidate_group`、`submit_result` |
 | P2 人物资料 | `query_character_profile`、`get_character_detail`、`read_original`、`edit_character`、`submit_profile_review` |
 | P2 人物关系 | `submit_relation_review`、`query_relation_work`、`read_original`、`get_character_relation`、`get_legacy_relation_records` |
-| P3 窗口/复核 | `get_node_detail`、`query_nodes`、`query_event_lines`、`get_event_line_detail`、`read_original`、`get_editor_memory`、`query_editor_notes`、`get_editor_note_detail`、`search_story_context`、`commit_story_changes`、`submit_result` |
+| P3 串联/复核 | `search_story_context`、`get_story_detail`、`read_original`、`save_story_lines`、`save_story_notes`、`add_story_nodes`、`navigate_story_pages`、`finish_story_batch`（直接开放全部八个） |
 
-`get_tools` 只列当前任务允许但尚未开放的工具；`get_tools_detail({name})` 返回完整参数并把它加入下一次请求。激活只在当前 Agent 任务内存中，不跨书、不跨阶段。
+P3 的八个工具直接开放，不使用工具发现。首个阅读页按最多 10 项和约 4000 Token 的资料预算生成，后续由 AI 主动翻页或回看，可随时分次保存。全书复核依次检查孤立节点、每条线的分段及整线概要、待查线索。其他任务的 `get_tools` 只列当前任务允许但尚未开放的工具；`get_tools_detail({name})` 返回完整参数并把它加入下一次请求。激活只在当前 Agent 任务内存中，不跨书、不跨阶段。
 | [agents/commands.ts](src/features/agents/commands.ts) | 提交意图、`checkLease`、幂等、业务写事务。 |
 | [agents/organizationCommands.ts](src/features/agents/organizationCommands.ts) | P2 目录/候选/资料/关系工具和人物对提交。 |
 | [agents/organizationReview.ts](src/features/agents/organizationReview.ts) | P2 资料/关系复核上下文、pairChecks、失效处理。 |
@@ -133,16 +133,14 @@ React 页面 / 面板
 | 文件 | 使用场景 |
 |---|---|
 | [p1-world.md](docs/v2/resources/v2.2/prompts/active/p1-world.md) / [p1-narrative.md](docs/v2/resources/v2.2/prompts/active/p1-narrative.md) | P1 世界资产 / 叙事资产 direct 提取。 |
-| [p2-identity.md](docs/v2/resources/v2.2/prompts/active/p2-identity.md) + `identity.txt` | P2 旧身份核实 / 候选 Agent。 |
-| [p2-asset-review.md](docs/v2/resources/v2.2/prompts/active/p2-asset-review.md) | P2 全资产/关系核对。 |
-| [p2-organization-directory.md](docs/v2/resources/v2.2/prompts/active/p2-organization-directory.md) | P2 目录页工作项，独立完整提示词。 |
-| [p2-organization-candidate.md](docs/v2/resources/v2.2/prompts/active/p2-organization-candidate.md) | P2 疑似同人组工作项，独立完整提示词。 |
+| [旧P2接口提示词](docs/v2/resources/v2.2/prompts/active/README.md#旧-p2-接口仍引用的提示词) | 旧服务及测试仍引用的5份文件；当前页面三个步骤不调用。 |
+| [p2-organization-directory.md](docs/v2/resources/v2.2/prompts/active/p2-organization-directory.md) | P2 第一步：连续分页识别疑似人物，用户手动确认合并。 |
 | [p2-organization-profiles.md](docs/v2/resources/v2.2/prompts/active/p2-organization-profiles.md) | P2 人物资料工作项，独立完整提示词。 |
 | [p2-organization-relations.md](docs/v2/resources/v2.2/prompts/active/p2-organization-relations.md) | P2 人物关系工作项，独立完整提示词。 |
-| [p3-story.md](docs/v2/resources/v2.2/prompts/active/p3-story.md) + `story.txt` | P3 窗口串联 / 全书复核。 |
-| [runtime.ts](src/features/agents/runtime.ts) | 只组装业务 md 正文和 output-discipline；P2/P3 业务策略全部在各 prompt md 中，不再读取 agent-wrapper，也不把 bookId/runId/taskId/phase 写入 system。 |
+| [p3-story.md](docs/v2/resources/v2.2/prompts/active/p3-story.md) / [p3-review.md](docs/v2/resources/v2.2/prompts/active/p3-review.md) | P3 逐页串联 / 全书复核；当前页由阅读服务提供。 |
+| [runtime.ts](src/features/agents/runtime.ts) / [gateway.ts](src/features/models/gateway.ts) | runtime提供业务正文；模型网关为所有生成任务统一追加output-discipline。任务资料另行组装为user，不把bookId/runId/taskId/phase写入system。 |
 | `compact.md`、`repair_*.txt`、`recovery.txt`、`final_only.txt` | 压缩、修复、恢复和末轮收束。 |
-| `probe_*.txt`、`output-discipline.txt` | 隔离探针和所有 system 提示词尾部输出纪律。 |
+| `probe_*.txt`、[output-discipline.txt](docs/v2/resources/v2.2/prompts/active/output-discipline.txt) | 隔离探针；所有生成任务共用的文学资料处理说明，统一追加到system末尾。 |
 
 修改提示词后：
 

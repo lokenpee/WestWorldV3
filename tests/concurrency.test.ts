@@ -32,7 +32,7 @@ it.each(['world', 'story'] as const)('同书%s运行时另一阶段启动被拒�
   const gates = new Map<string, () => void>(), signals = new Map<string, AbortSignal>()
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string)
-    const kind = body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'get_editor_memory') ? 'story' : 'world'
+    const kind = body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'finish_story_batch') ? 'story' : 'world'
     if (!signals.has(kind)) {
       signals.set(kind, init!.signal!)
       await new Promise<void>((resolve, reject) => { gates.set(kind, resolve); init?.signal?.addEventListener('abort', () => reject(new DOMException('取消', 'AbortError')), { once: true }) })

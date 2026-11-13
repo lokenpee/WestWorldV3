@@ -4,8 +4,9 @@ import { pairFromPerspective } from '../assets/relations'
 import { profileContent, reviewContext } from './organizationReview'
 
 export async function profileWork(character: Character) {
-  const content = profileContent(character as unknown as Row)
-  return { ...content, id: character.id, revision: character.revision, fields: ['name', 'aliases', 'identity', 'profile', 'appearance', 'personality', 'background', 'speechStyleSample', 'mergeFacts', 'sourceChapters'] }
+  const content: Row = profileContent(character as unknown as Row)
+  delete content.mergeFacts
+  return { ...content, id: character.id, revision: character.revision, fields: ['name', 'aliases', 'identity', 'profile', 'appearance', 'personality', 'background', 'speechStyleSample', 'sourceChapters'] }
 }
 
 const brief = (value: string | undefined) => (value ?? '').slice(0, 50)

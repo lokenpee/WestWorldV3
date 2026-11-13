@@ -4,6 +4,7 @@ import type { ReadSet } from './commands'
 import type { Basis, Character, EventLine, EventNode, LocationAsset, RelationEvidence } from '../assets/types'
 import { mergeWorldAssets } from '../assets/mergeCore'
 import { applyAssetPatch } from '../assets/assetPatch'
+import { navigateIdentityPages, saveIdentityGroups } from '../world/identityCandidates'
 import { pairFromPerspective, resolveLifecycleId } from '../assets/relations'
 import { deleteCharacterPair, evidenceProblems, saveCharacterPair } from '../assets/relationEdits'
 
@@ -233,7 +234,10 @@ async function submitProfileReview(store: AgentStore, scope: Scope, args: Row, c
     item.uncertainFields = uncertain
   }
   await saveOrganization(store, (await store.get('pipelineRuns', scope.runId))!, organization)
-  return { changed: changed > 0, done, complete: done, summary: done ? '人物资料已保存并完成。' : '人物资料已保存，继续处理当前人物。', commitId, outcome }
+  const summary = !done ? '人物资料已保存，继续处理当前人物。'
+    : outcome === 'no_change' ? '本次未修改，已结束检查。'
+      : outcome === 'uncertain' ? '本次未修改，已记录待核对内容并结束检查。' : '人物资料已保存并完成。'
+  return { changed: changed > 0, done, complete: done, summary, commitId, outcome }
 }
 
 type PreparedRelationChange = {
@@ -592,6 +596,11 @@ export async function applyOrganizationTool(store: AgentStore, scope: Scope, nam
   if (name === 'submit_profile_review') return submitProfileReview(store, scope, args, commitId, timestamp)
   if (name === 'submit_relation_review') return submitRelationReview(store, scope, args, readSet, commitId)
   const { run, organization } = await organizationOf(store, scope)
+  if (name === 'save_identity_groups' || name === 'navigate_identity_pages') {
+    const result = name === 'save_identity_groups' ? await saveIdentityGroups(store, organization, args, readSet, timestamp) : await navigateIdentityPages(store, organization, args)
+    await saveOrganization(store, run, organization)
+    return result
+  }
   if (name === 'save_candidate_group') {
     const memberIds = [...new Set(strings(args.memberIds))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     if (memberIds.length < 2) throw new Error('INVALID_ARGS:疑似组至少需要两个不同人物。')
@@ -732,5 +741,5 @@ export async function applyOrganizationTool(store: AgentStore, scope: Scope, nam
 }
 
 export function organizationTool(name: string) {
-  return ['save_candidate_group', 'resolve_candidate_group', 'clear_candidate_groups', 'record_organization_progress', 'merge_assets', 'submit_profile_review', 'submit_relation_review'].includes(name)
+  return ['save_identity_groups', 'navigate_identity_pages', 'save_candidate_group', 'resolve_candidate_group', 'clear_candidate_groups', 'record_organization_progress', 'merge_assets', 'submit_profile_review', 'submit_relation_review'].includes(name)
 }

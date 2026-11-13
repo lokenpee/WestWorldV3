@@ -11,7 +11,7 @@
 | 模式 | 模型与执行 | 工具/记忆 | 当前用途 |
 |---|---|---|---|
 | direct：直接模型调用 | Prompt/上下文→pi-ai Models.complete/completeSimple或stream/streamSimple→Pi消息/用量 | 无自主工具循环、无AgentState；结构化submit_result仅为返回约束，不写库 | P1两类提取、P2人物/地点详细整编、会话压缩、提取模型探测 |
-| agent：Agent | pi-agent-core Agent管理循环/状态/工具执行，其streamFn接同一个pi-ai Models.streamSimple | 受控读写AgentTool；P3按书恢复应用持久消息与工作记忆 | P2精简查询判同、P3窗口串联与全书复核、归并Agent探测 |
+| agent：Agent | pi-agent-core Agent管理循环/状态/工具执行，其streamFn接同一个pi-ai Models.streamSimple | 受控读写AgentTool；P3按书恢复应用持久消息与工作记忆 | P2精简查询判同、P3逐页串联与全书复核、归并Agent探测 |
 
 extractionModel/aggregationModel是“用哪个模型”的角色配置，direct/agent是“怎样执行”的模式，两者分开；Agent不要求另配一套独立Provider。更换设置中的地址、模型或受支持Provider，只改变统一解析出的Pi Model，业务流程仍只使用Pi接口。
 
@@ -43,24 +43,23 @@ deepseek和当前模型名仍为默认值，不是所有自定义地址都必须
 |---|---|---|
 | P1世界资产 | [01](resources/v2.2/prompts/active/p1-world.md) | 章节消息；WorldAssetsExtractionSchema |
 | P1叙事资产 | [02](resources/v2.2/prompts/active/p1-narrative.md) | 独立同章消息；NarrativeAssetsExtractionSchema |
-| 事件串联/复核 | [P3](resources/v2.2/prompts/active/p3-story.md) | 本批ID、范围、已有线摘要、工作记忆；commit_story_changes.payload用LinkEventLinesResultSchema；最终submit_result仅用AgentTaskSummarySchema |
+| 事件串联/复核 | [串联](resources/v2.2/prompts/active/p3-story.md) / [复核](resources/v2.2/prompts/active/p3-review.md) | 当前阅读页、相关资料摘要和工作摘要；八工具查询、分次保存、主动翻页及阶段收尾 |
 | 别名补充识别 | [P2](resources/v2.2/prompts/active/p2-identity.md) | 人物/地点类型与精简工具查询，按ID分组提交 |
 | 地点整编 | [地点整编](resources/v2.2/prompts/active/location-optimize.md) | 按需详细事实、事实ID；须覆盖全部事实 |
 | 会话压缩 | [07](resources/v2.2/prompts/active/compact.md) | 旧摘要与待压缩历史；SessionCompactionResultSchema |
 | 人物整编 | [08](resources/v2.2/prompts/active/character-optimize.md) | JSON `{stage,entities:items}`，固定人物键和事实枚举 |
 
-P1用户消息必须为下列格式，换行保留；timestamp为当前毫秒：
+P1世界资产与叙事事件提示词均按任务、铁律、字段和工具组织。字段正文说明业务含义，类型、必填和枚举由工具Schema提供；公共文学资料说明由网关追加在system末尾。P1初始user消息只包含章节名称和正文，按下列格式保留换行；timestamp为当前毫秒：
 
 ```text
-章节标识：{chapterIndex}
-章节名：{chapterName}
+{chapterName}
 
---- 正文开始 ---
 {完整章节text}
---- 正文结束 ---
 ```
 
-串联/复核用户消息按AI-14的StoryTask规范JSON和story.txt模板组装，明确阶段、分配项、窗口或队列、精简目录、相关旧资料、最多6条事件线提示、工作摘要和恢复信息。
+章节编号用于程序内部的来源、任务及成功凭证。结果校验失败时按AI-03追加独立工具错误和修正消息，原章节消息保持不变。
+
+串联/复核用户消息按AI-14的StoryReadingBrief提供当前页号/总页数、资料摘要、相关候选和工作摘要。首次和恢复时提供当前页，后续页只通过navigate_story_pages返回；内部任务编号、读集和命令键由程序绑定。
 
 P2初始消息只含任务/类型/范围和分页提示，AI调用精简查询自主找候选；不常驻完整人物性格/背景/外貌或地点描述。摘要提示最多160字符，指标不携带详细底稿。分组按已查询的ID提交，跨页可查询后入本次读集；没有确定变更时groups=[]，地点整体与内部区域分开。temperature0。长内容仅在核实候选或整编阶段按需get_*_detail读取，工具参数/返回见11。
 
@@ -81,17 +80,17 @@ direct模式由pi-ai执行，无pi-agent-core循环。有Schema时可注册唯�
 | 职责 | 只读工具 | 写工具 | 记忆范围 |
 |---|---|---|---|
 | asset_editor | 原9个资产/原文查询工具 | commit_asset_changes | P2临时Pi Agent，不读取故事会话/长期记忆 |
-| story_editor | 原14个资产/原文/故事记忆查询工具 | commit_story_changes | P3固定复用本书持久sessionId |
+| story_editor（当前P3） | search_story_context、get_story_detail、read_original | save_story_lines、save_story_notes、add_story_nodes；另有navigate_story_pages及finish_story_batch | P3固定复用本书持久sessionId |
 
-共有14种读工具、2种受控写工具；两角色分别10/15个业务工具。另注册submit_result作为无写副作用的最终结果收集器，不计入业务工具数。白名单按bookId/profile/phase绑定；模型不能通过参数切换书或绕过阶段约束。
+当前P3直接开放八工具；旧story_editor的14种读工具、commit_story_changes及submit_result保留兼容。工具权限按bookId/profile/phase和workflow绑定；模型不能通过参数切换书或绕过阶段约束。
 
-Agent 初始只发送当前工作项必需的工具，并附带 `get_tools` / `get_tools_detail`。`get_tools` 返回当前任务允许但尚未开放的工具名称和简介；`get_tools_detail({name})` 返回完整参数并把该工具加入下一次请求，模型在下一轮才能调用。激活只存在于当前 Agent 任务内存，运行结束失效；不允许激活当前 profile/phase 之外的写工具，也不跨书。P2 关系工作项初始只发 `submit_relation_review`、`query_relation_work`、`read_original`、`get_character_relation`、`get_legacy_relation_records`，其他工具按需发现。
+P3直接声明八个工具；其余Agent按当前工作项发送必需工具，并附带`get_tools` / `get_tools_detail`。`get_tools`返回当前任务允许但尚未开放的工具名称和简介；`get_tools_detail({name})`返回完整参数并把该工具加入下一次请求，模型在下一轮才能调用。激活只存在于当前Agent任务内存，运行结束失效；不允许激活当前profile/phase之外的写工具，也不跨书。P2关系工作项初始只发`submit_relation_review`、`query_relation_work`、`read_original`、`get_character_relation`、`get_legacy_relation_records`，其他工具按需发现。
 
-write工具的AgentTool.execute实际调用与direct共用的命令服务，按Schema、引用/引文、事实覆盖、读集revision和租约校验后提交当前实体。事务提交成功才返回commitId确认；模型可以根据工具结果继续查询/思考，不必等整个Agent循环结束才写业务数据。失败返回可解释工具错误，不伪装成功。
+write工具的AgentTool.execute实际调用与direct共用的命令服务，按各工具契约校验结构、引用、读集revision和租约后提交当前实体；新P3的文本处理规则见AI-10。事务提交成功才返回commitId确认；模型可以根据工具结果继续查询/思考，不必等整个Agent循环结束才写业务数据。失败返回可解释工具错误，不伪装成功。
 
-Agent设置toolExecution=sequential，写工具也声明executionMode=sequential。submit_result必须独占本批调用，混合写入+最终提交的批在首次副作用前拒绝。最终使用AgentTaskSummarySchema（status/commitIds/summary/remainingWorkIds/reviewedItems）报告当前子任务结果；不再用最终submit_result重复执行已生效的资产增量。completed还须代码核覆盖，不能仅信模型声明。
+Agent设置toolExecution=sequential，写工具也声明executionMode=sequential。submit_result及finish_story_batch必须独占本批调用，混合写入与最终提交的批在首次副作用前拒绝。兼容工作项流程使用AgentTaskSummarySchema（status/commitIds/summary/remainingWorkIds/reviewedItems）报告结果；当前P3按阅读页进度收尾。两者都不重复执行已生效的资产增量，completed由程序核对。
 
-P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾；P3按[叙事整理的排队与恢复](../decisions/story-organization.md)执行预算；通过Pi subscribe、prepareRequest、beforeToolCall/afterToolCall和finishTurn管理日志/预算/终止。最后一轮只允许submit_result总结已提交结果和未完成游标，未做的写操作留待下一子任务，不强迫提交未查证业务内容。Provider特有末轮强制参数在Pi适配边界处理。
+P2身份核实按[世界资产整理决策](../decisions/world-organization.md)收尾。当前P3按阅读进度结束阶段，不设置5分钟业务收尾，也不自动切成仅能提交总结的末轮；每次请求仍受120秒超时约束。通过Pi subscribe、prepareRequest、beforeToolCall/afterToolCall和finishTurn管理日志、用量与终止。旧P3预算和submit_result末轮协议仅供历史流程兼容。
 
 工具入参及声明返回Schema均按统一校验策略处理，超过65536字节返回TOO_LARGE。业务CONFLICT需要重读相关资料，不当作网络重试；结构/业务无效最多一次定向修正。提交意图和结果收集器不持有原始DB句柄。
 
@@ -113,7 +112,7 @@ direct和agent共用同一错误归一器。signal取消或Pi stopReason=aborted
 | rate_limit | 3 | 解析Retry-After整数秒优先，否则指数 |
 | auth/content_policy/context_length/validation/cancelled/unsupported_provider/unsupported_capability/unknown | 1 | 普通服务重试禁用；结构修正至多一次，消耗普通调用预算 |
 
-delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅按字符串正则提取整数，不增加HTTP日期支持。direct默认不设固定请求轮数，P2身份核实按世界资产整理决策收尾；P3按叙事整理的排队与恢复决策执行预算，章节层不另套重试。两模式由同一服务重试策略处理可重试错误/Retry-After，不在Pi Agent外再叠加一套独立网络重试循环。退避等待必须响应signal；取消在下一事件循环结束等待并阻止下一请求，清理timer/listener；已提交确认保留。
+delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅按字符串正则提取整数，不增加HTTP日期支持。direct默认不设固定请求轮数，P2身份核实按世界资产整理决策收尾；当前P3保留单请求120秒超时，不设置固定业务总时长。章节层不另套重试。两模式由同一服务重试策略处理可重试错误/Retry-After，不在Pi Agent外再叠加一套独立网络重试循环。退避等待必须响应signal；取消在下一事件循环结束等待并阻止下一请求，清理timer/listener；已提交确认保留。
 
 有session的Agent遇context_length可额外强制压缩恢复一次，再按服务策略；不能无限压缩。模型调用失败对象统一含ok=false、原Pi stopReason、errorKind/errorMessage、attempts/attemptsUsage、mode/modelRole/bookId/runId；保留无凭据的Provider诊断。工具业务错误独立记录，写成功后末轮失败/取消不得回滚已提交实体、记忆和确认，状态与报告必须列出已应用commitIds。费用为每次返回usage.cost.input+output的总和，摘要费用也计入；不按UI货币符号自行换算。
 
@@ -142,15 +141,15 @@ delay=`round(base*2^attempt*(0.5+Math.random()))`，attempt从0。Retry-After仅
 
 ## AI-07 工作记忆、依据和检查点
 
-工作记忆结构和字段见DATA。校验要求非空trim摘要和statement/key、批内key唯一、至少一个node/line/evidence依据，节点线引用有效；新增临时节点允许在本批先声明。evidence.quote必须在指定章逐字存在；错误时回查所有章给实际所在章提示。resolved不能用于此前不存在的事项，同主题kind不能变。
+工作记忆结构和字段见DATA。save_story_notes按key保存线索，节点线引用须有效，省略的旧引用与证据保留，workingSummary可以独立保存。参考引文用于定位，不因表达与原文不逐字相同而拒绝新P3保存；已有事项标resolved前先读详情。旧commit_story_changes继续执行其原参数和领域契约。
 
 2.2不再把全库assetFingerprint作为P3批提交或检查点失效条件。叙事事实指纹包含节点/线事实、相关章原文与策略版本；节点actorIds与targetCharacterIds属于持久人物关联并参与依赖比较，事件线characterIds由成员节点派生。世界依赖按实际查询返回的kind/id/resolvedId/revision及查询页参数/结果指纹记录；提交前重读这些依赖。可另计算全库统计指纹作诊断，但不得用于阻断当前任务中与全库统计无关的提交；当前版本同书P2/P3不并行。
 
 笔记依据指纹含实际世界依赖列表（kind/id/revision或resolvedId）、引用节点/线事实、原文章段指纹与evidence/present布尔；不再纳入全库assetFingerprint。与当前计算不等则validity=stale；不直接写坏原笔记状态。dataChanged比较本会话已记录的实际依赖和叙事事实指纹；pendingCount只计kind review/status active，和staleCount独立。
 
-checkpoint key按sessionId+P3 phase+窗口/队列单元+策略版本哈希；sourceFingerprint含相关章原文、读写集节点/线事实和实际读取的世界资料revision。恢复需checkpoint completed且指纹匹配；link还核对当前实际线成员与保存memberships相等。无关世界资产变化不使整书P3失效；实际引用资料/原文变化只使相关批次和笔记过期并入复核队列。未引用的人物地点不能经全库assetFingerprint间接使全部提交失败。
+当前P3将阅读页及检查指纹保存到pipelineRuns.storyReading，恢复时提供尚未完成的当前页和查询入口。相关资料改变时重建页面，检查指纹失效的页重新进入待检查。旧checkpoint按sessionId、phase、窗口/队列和策略版本定位，恢复仍核sourceFingerprint及实际依赖，仅服务旧窗口流程。未引用的人物地点不能经全库assetFingerprint间接使全部提交失败。
 
-commit_story_changes调用的prepareEditorCommit先校验增量，按会话+主题key更新或创建notes；memory.revision从预期+1；checkpoint completed与memberships随提交生成。在事务中再核memory revision、叙事读写集revision及本批实际世界依赖revision，最后写入并追加commit摘要前1800字符。失败/取消checkpoint不能替代之前已完成批次结果。
+当前P3的事件线、线索/摘要、补点分别通过三个写工具提交，已保存内容立即生效；翻页另行持久化阅读位置和检查结果。旧commit_story_changes调用prepareEditorCommit写入增量、记忆、事项和checkpoint的流程保留兼容。写事务均核实际读集、执行权和引用，失败或取消不撤销已成功保存的内容。
 
 ## AI-08 持久消息、投影与压缩
 
@@ -188,17 +187,19 @@ NativeMessage保存标准PI形状，允许额外字段包含模型/用量/推理
 
 ## AI-09 补齐输出与回放
 
-16种目标业务工具（14读+2写，最终收集器另计）的成功/空/错误/截断返回形状、目标变更和2.1历史响应分别见[11](11-AI工具返回与回放契约.md)。原2.1 tool-contracts仅为历史声明；2.2新增/变更工具执行当前入参和返回校验，未变只读投影的历史校验边界按各工具说明，不允许以旧“只读”限制取消新写能力。
+当前工具（含P3八工具）及兼容接口的成功/空/错误/截断返回形状、目标变更和2.1历史响应分别见[11](11-AI工具返回与回放契约.md)。原2.1 tool-contracts仅为历史声明；2.2新增/变更工具执行当前入参和返回校验，未变只读投影的历史校验边界按各工具说明，不允许以旧“只读”限制取消新写能力。
 
 具名模板、变量绑定和组装表在11；原始ai-message-templates仅精确字面补充。6份完整HTTP录制与服务级失败/恢复用例共同覆盖本包实际验证范围；独立验收入口与未覆盖时序见12。
 
-## AI-10 P3置信度、自由查询与覆盖证明
+## AI-10 P3主动阅读、分次保存与完成依据
 
-window_link只接受confidence>=0.85且引用有效的event_line_ops，附reason/evidenceNodeIds；低置信关联记录review事项。global_review也不凭空造因果，允许明确结论“独立节点/暂不归线/尚无足够证据”。补点参考引文采用可选定位提示；结构与领域提交仍按统一修正规则处理。
+P3以完整因果脉络为目标，允许一条线分多次建立、续接和修订；节点可同时属于多条线。save_story_lines的confidence、reason和evidenceNodeIds可选，程序不以置信度、原文逐字匹配或叙述字数阻断保存，仍核对对象归属、引用、版本和执行权。依据不足时保存待查线索，允许保留合理孤点，不凭空补造原著事件。
 
-P2身份核实按世界资产整理决策分配预算；P3子任务按叙事整理决策分配预算；Agent可自由选择本书工具，未完成时拆分/续同会话处理下一页。步数预算仅限制单次调用，不能截断整书覆盖。任务上下文标明已看范围、未看游标和当前阶段，不得将压缩摘要当作新原文证据。
+串联按章节顺序提供小页，每页最多10项、约4000 Token资料预算；模型按需要查详情、读原文、保存一条或多条线，再主动翻页。全书复核依次读孤立节点、每条线的分段、整线概要、未解决或依据变化的线索。导航next表示当前页已检查，previous仅回看；没有修改也能前进。首次和恢复提供当前页，后续页由工具返回，不自动投递。长期记忆可查询和更新，会话按AI-08压缩。
 
-世界详情工具返回revision/当前redirect目标，代码记录实际读集。P2跨域依赖更新命中读集时，本批拒绝并同会话重查；不命中则正常提交。任务结束前再核全书覆盖清单和依赖有效性，未覆盖不能标completed。
+程序将阅读位置、检查指纹和导航回执写入pipelineRuns.storyReading，相关资料变化后重算待检查页。navigate_story_pages返回complete=true或调用finish_story_batch时，按真实剩余页判断阶段是否完成；无需逐项制造写操作。暂停后保留资料和阅读位置，继续使用本书同一会话。
+
+P3压缩历史后从持久阅读状态重建当前页，并追加当前页消息；不会重新注入阶段最初的第一页。普通请求沿用已有消息与工具返回，不重复投递后续页。
 
 ## 精简资产遍历的稳定游标
 
@@ -211,9 +212,9 @@ P2每次分配一个资产，其他候选可通过最多100条的分页查询读
 | 写工具 | 输入 | 事务与确认 |
 |---|---|---|
 | commit_asset_changes | operationKey + IdentityGroupsSchema payload | 绑定P2读集，机械融合当前characters/locations、来源映射、报告和命令凭据；返回commitId/alreadyApplied |
-| commit_story_changes | operationKey + 2.2 LinkEventLinesResultSchema payload | 节点/线、memory_update、事项、检查点、覆盖、命令凭据及代码确认同事务；空资产操作可只更新工作记忆 |
+| save_story_lines / save_story_notes / add_story_nodes | 分别提交事件线操作、线索或摘要、补充节点；程序生成命令键 | 共用叙事事务、读集和租约校验；单工具批次原子写入，返回真实 changed 和对象编号。旧 commit_story_changes 保留兼容 |
 
-读长期记忆使用现有5个故事查询工具；写记忆通过commit_story_changes，而非让模型直改数据库或只更新Pi内存。工作记忆需证据/引用校验，模型判断不自动变成原著事实。不同bookId的消息/摘要/笔记/工具作用域不共享。
+P3 通过 search_story_context 检索旧线和线索，get_story_detail 读取详情，save_story_notes 保存线索或摘要。当前工作摘要随任务提供；保存事件线不要求重写摘要。工作记忆需证据/引用校验，模型判断不自动变成原著事实。不同bookId的消息/摘要/笔记/工具作用域不共享。
 
 pipelineRuns.appliedCommands记录(runId,operationKey)、payloadFingerprint、commitId、committedAt和resultSummary，与业务修改同事务。相同键相同payload返回原确认；相同键不同payload返回IDEMPOTENCY_CONFLICT。中断恢复沿用原runId/operationKey并更换租约owner；用户明确新一轮重查才创建新runId，P3逻辑sessionId仍不变。断线、重试、页面关闭或“DB已提交但工具反馈丢失”不得造成二次合并、重复补点或记忆revision重复增长。人工CRUD、direct和Agent写服务共用相同领域校验与事务，不引入新草稿或待发布层。
 
@@ -250,8 +251,8 @@ Pi包取舍、coding层不接入的具体能力、浏览器限制和逐模块迁
 | PROMPT-P2-IDENTITY | P2 ai_identity人物或地点；agent/aggregation | P2目标Prompt+asset_editor包装+IdentityTask；写工具IdentityGroupsSchema，最终AgentTaskSummarySchema | 实现与检查见覆盖索引 |
 | PROMPT-P2-CHARACTER | P2按需人物整编；direct/aggregation | 08人物整编Prompt+JSON CharacterOptimizationTask；动态固定人物键及事实枚举 | 实现与检查见覆盖索引 |
 | PROMPT-P2-LOCATION | P2按需地点整编；direct/aggregation | 新地点整编Prompt；LocationOptimizationSchema返回description/coveredFactIds/conflicts | 实现与检查见覆盖索引 |
-| PROMPT-P3-WINDOW | P3窗口子任务；agent/aggregation | P3 Prompt+story_editor包装+phase=window_link任务+同书历史；写Link payload，最终Summary | 实现与检查见覆盖索引 |
-| PROMPT-P3-GLOBAL | P3全书复核子任务；agent/aggregation | 同一P3 Prompt及session，phase=global_review；输入孤点/线/事项当前页 | 实现与检查见覆盖索引 |
+| PROMPT-P3-WINDOW | P3逐页串联；agent/aggregation | p3-story.md + 公共文学说明；StoryReadingBrief与同书历史；八工具查询、分次保存、主动翻页及收尾 | 实现与检查见覆盖索引 |
+| PROMPT-P3-GLOBAL | P3全书复核；agent/aggregation | p3-review.md + 公共文学说明；复用同一session；逐页输入孤点、当前线的分段/整线概要、线索 | 实现与检查见覆盖索引 |
 | PROMPT-COMPACT | 超预算或一次强制恢复；direct/aggregation | 07压缩Prompt+旧摘要+指定历史；SessionCompactionResultSchema；不调用Agent业务工具 | 实现与检查见覆盖索引 |
 | PROMPT-PROBE-DIRECT | 设置生成测试；direct/选定模型角色 | user“回复一个字：好”，maxTokens=8；无Schema；要求有效Pi文本 | 实现与检查见覆盖索引 |
 | PROMPT-PROBE-AGENT | 设置工具测试；独立probe Agent/aggregation | 使用真实工具声明、隔离读写及提交确认校验 | 实现与检查见覆盖索引 |
@@ -292,7 +293,9 @@ Pi包取舍、coding层不接入的具体能力、浏览器限制和逐模块迁
 |---|---|
 | TaskIdentity | bookId/runId/taskId来自应用绑定；planVersion=2.2；remainingCount为当前phase未有效覆盖项数，不能信模型计数；resume四字段均必填，初始reason=initial、appliedCommitIds=[]、remainingWorkIds=本task分配ID，nextOperationKey建议taskId加命令序号 |
 | IdentityTask | stage=P2、phase=ai_identity、kind=当前人物或地点队列、scope=fullBook；workItems为ALG-12.4分配的1项；afterId为本次扫描起点，无则null；pageLimit=100。输入仅ID/版本/hash，不常驻人物背景等长字段。主名、别名、完整资料用工具读取 |
-| StoryTask | stage=P3；phase与queue对应：window_link→window_nodes且window必为对象，global_review→orphans/event_lines/review_notes且window=null；sessionId来自本书active会话；workItems上限100，event_lines实际最多30；afterWorkItemId无起点为null |
+| StoryReadingTask | 当前P3内部持久化任务；绑定stage/phase/sessionId，workItems为空数组，阅读进度另存pipelineRuns.storyReading，不把内部身份和命令键送入模型 |
+| StoryReadingBrief | 当前P3模型输入；包含phase、queue、page、workItems摘要、related摘要、workingSummary及剩余页数；page含id/pageNumber/totalPages/type/ids，分段时补充lineId/segment/totalSegments。首次与恢复提供同一结构，后续由导航工具返回 |
+| StoryTask（旧窗口兼容） | stage=P3；phase与queue对应：window_link→window_nodes且window为对象，global_review→orphans/event_lines/review_notes且window=null；sessionId来自本书active会话；保留旧workItems和afterWorkItemId |
 | Window | start/end按原章零基半开范围，end>start；chapterIndices为该窗口所有实际切块主键，按Chapter.order排列；不得用“章号字符串的大小”替代原章顺序 |
 | StoryTask.existingLines | 最多6条事件线提示，优先相关线；长成员与章节列表标注截短，完整内容通过详情工具读取 |
 | StoryTask.contextHints | assigned为分配项精简目录，按版本核验登记读取；related为本书相关旧节点、事件线和未解决事项候选，更多结果通过search_story_context分页检索 |
@@ -304,20 +307,20 @@ Pi包取舍、coding层不接入的具体能力、浏览器限制和逐模块迁
 
 WorkRef中revision和factFingerprint是服务读取快照，禁止模型改写；chapter类型revision=0并用全文hash。输入Schema的integer/string约束之外还必须核phase/queue、callId、书籍归属、唯一workItemId和实际分配集合。仅Schema通过不能替代这些语义校验。
 
-TaskRecord.input保存首次创建任务的不可变快照。每次实际请求从它复制requestInput：只刷新resume、remainingCount，以及P3的memory/existingLines提示，并把刷新读取记入本次读集；workItems的ID和计划版本不改，代表原始分配依据，不假装是当前行。最新数据通过工具核查。本task已确认写入导致版本变化时在resume说明并采用提交后的读基准；相关外部事实变化则原task置stale、剩余项交新task，不能静默改写冻结输入或继续使用失效版本。requestInput只用于当前请求，TaskRecord.inputFingerprint始终对应原始快照。
+TaskRecord.input保存首次创建任务的不可变快照。固定工作项流程每次实际请求从它复制requestInput，只刷新resume、remainingCount及记忆提示，最新数据通过工具核查；TaskRecord.inputFingerprint始终对应原始快照。当前P3内部StoryReadingTask的workItems为空，当前资料及逐页检查状态来自storyReading；初次和恢复生成StoryReadingBrief，后续页面通过导航工具取得。工具读写仍记录实际版本，不以冻结的旧摘要冒充最新事实。
 
 ### system、user、历史和工具的唯一顺序
 
 | 模式 | 组装顺序 |
 |---|---|
 | direct提取/整编/压缩 | systemPrompt=对应active业务正文；messages仅本次user；tools仅submit_result，参数为当前输出Schema，constrainedSampling={type:json_schema,strict:prefer}。不加载P3消息历史 |
-| P2 Agent | `runtime.ts` 只组装业务正文和输出纪律；业务规则全部来自独立 prompt md；system=业务正文 + 输出纪律；用Pi初始system声明当前开放的读工具+写工具+finalizer；user=结构化任务简报。完整任务`input`只用于持久化、恢复和幂等，不进入模型消息；简报只含当前对象业务资料和必要对象编号，不含bookId/runId/taskId/phase/operationKey/fingerprint。不携带P3历史 |
-| P3 Agent初次 | 同 `runtime.ts` 的业务正文 + 输出纪律，职责只负责叙事；初始system声明当前开放的读工具+commit_story_changes+finalizer；user=story.txt(taskJson) |
+| P2 Agent | `runtime.ts`提供业务正文，模型网关统一追加文学资料处理说明；业务规则来自独立prompt md；system=业务正文 + 公共文学说明；用Pi初始system声明当前开放的读工具+写工具+finalizer；user=结构化任务简报。完整任务`input`只用于持久化、恢复和幂等，不进入模型消息；简报只含当前对象业务资料和必要对象编号，不含bookId/runId/taskId/phase/operationKey/fingerprint。不携带P3历史 |
+| P3 Agent初次 | `readingService.ts`按阶段选择p3-story.md或p3-review.md，经模型网关追加公共文学说明；直接声明八工具，清单见[工具契约](11-AI工具返回与回放契约.md#p3-完整事件线工具)；user为“【当前阅读页】”及StoryReadingBrief，包含当前页、资料摘要、相关候选和工作摘要 |
 | P3继续/恢复 | 先按AI-08恢复合法配对消息和压缩投影；若有效system或工具集合变化，用Pi系统更新追加替换/撤销声明；恢复说明由代码生成并追加，仅恢复时使用→本次story任务。不把新的system硬插在未配对toolCall和toolResult之间 |
-| 末轮 | system撤回全部业务工具，仅保留submit_result；结束约束和可执行白名单由代码同时收窄，变量commitIds来自本task账本，remainingIds来自分配清单。只改Prompt文字而不改执行白名单不合格 |
+| 兼容工作项末轮 | system撤回全部业务工具，仅保留submit_result；结束约束和可执行白名单由代码同时收窄，变量commitIds来自本task账本，remainingIds来自分配清单。当前P3不按5分钟预算进入此末轮，按阅读进度结束阶段 |
 | 探测 | 使用probe_system及probe_asset/probe_story；完整业务工具声明可发送，但回调接隔离fixture；完成门槛见AI-15 |
 
-所有模式的system提示词都在业务正文之后追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)：direct和Agent都追加在业务正文之后。该文件是这段文字的唯一来源，代码统一读取，业务正文文件不重复保存。
+所有模型生成请求由`models/gateway.ts`在发送前统一追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)中的文学资料处理说明，放在system内容末尾且只保留一份；覆盖P1/P2/P3、压缩、复核、探测及重试/修正。各任务不再自行拼接，P2第一步和第二步也使用此说明。公共说明要求客观忠实处理小说资料，允许保留含义的归并精简，不禁止普通说明；输出形式与工具要求由各任务规定。P2 Agent 对模型目录声明支持思考的模型通过 Pi `reasoning: medium` 启用思考，具体强度由适配器映射到模型支持值；目录外模型不猜测能力。详情保存并展示 API 实际返回的正文与可见思考，空最终字段不清除已收到片段，重试不混用不同尝试的内容。
 
 角色和阶段约束由各 prompt md 描述；bookId/runId/taskId/phase 由调用上下文和持久化任务记录绑定，不写入 system，也不写入P2人物整理的结构化任务简报，不能由工具参数切换。
 
@@ -327,7 +330,7 @@ TaskRecord.input保存首次创建任务的不可变快照。每次实际请求�
 
 P2身份核实的时间、请求次数与提前收尾方式以[世界资产整理决策](../decisions/world-organization.md)为准。每次请求前提示剩余时间和次数，已提交修改与未完成项分开保存。累计使用量只计一次。
 
-P3每个子任务的5分钟时间预算收尾规则以[叙事整理决策](../decisions/story-organization.md)为准；stepsUsed在发请求前持久递增，刷新恢复不清零。maxTokens=`min(model.maxTokens或8192,reserve)`，P2/P3同式；reserve按AI-08。恢复发现已用完本任务预算则task=partial，剩余工作按新task处理。P3本轮未完成项让后续任务继续；本轮结束保存剩余清单，由用户继续。
+当前P3不设置5分钟业务收尾，也不限制每页请求次数；单请求超时仍为120秒。模型可查询、分次保存和主动翻页，直到完成本阶段，或因用户暂停、取消及执行错误停下。stepsUsed记录实际请求；maxTokens=`min(model.maxTokens或8192,reserve)`，reserve按AI-08。暂停后保留阅读位置和已保存内容，由用户继续。旧story_lines_v2的固定任务预算仅服务兼容流程。
 
 网络/服务重试仍按AI-05；每次实际Provider请求消耗stepsUsed并计usage，不存在免费重试轮。tool CONFLICT不算网络失败：代码追加冲突说明，保留工具权限供重读，消耗正常余下轮数；预算不足则partial。任务attempt统计实际Provider请求次数，与stepsUsed同时递增；启动/恢复本身不加1。P2在响应结束后收尾；其他任务到期中断时保留已提交确认。
 

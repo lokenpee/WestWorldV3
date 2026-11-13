@@ -164,3 +164,53 @@
 - [x] 16.3 优化详情索引读取与折叠内容按需渲染，验证展开全文。见[检查证据](evidence/p2-performance-2026-11-12.md#检查证据与用户自测)。
 - [x] 16.4 同样本复测、暂停恢复与相关回归、类型/构建/治理/OpenSpec，记录证据。见[检查证据](evidence/p2-performance-2026-11-12.md#检查证据与用户自测)。
 - [ ] 16.5 用户实际运行观感验收后同步归档。
+
+## 17. BUG-31 资料整理质量与输出采集（2026-11-12）
+
+依据：[用户确认、实施及验收](evidence/profile-quality-2026-11-12.md)。仅提示词约束字数，不增加提交字数校验。
+
+- [x] 17.1 重写第二步资料整理提示词，纳入七项字数要求、语义/跨字段去重与正常说明；去除第二步共用的强制直接工具输出限制。见[实施与证据](evidence/profile-quality-2026-11-12.md)。
+- [x] 17.2 从第二步预装及刷新查询输入去除 mergeFacts，保留库内数据与内部指纹；固定样本验证实际 API 输入及无字数硬拦截。profile-input与organization共40项通过，七项超限完整保存。
+- [x] 17.3 核对思考/正文从 API 到落库及详情投影，修复确证丢失和禁用路径，固定响应覆盖正常、失败与重试。trace/execution-chain共14项、models/organization共70项、agents共25项通过；见[证据](evidence/profile-quality-2026-11-12.md#开发检查记录)。
+- [x] 17.4 同步提示词资源，运行相关非 live 单元、类型、静态、构建、治理及 OpenSpec 检查，记录实际结果。全量低并发62文件/595通过/1跳过；类型、构建、治理、OpenSpec通过，静态检查无错误（5项既有警告），见[开发检查记录](evidence/profile-quality-2026-11-12.md#开发检查记录)。
+- [ ] 17.5 用户用资料样本核对去重、精简和详情输出效果，通过后同步规格与归档。
+
+## 18. AI仅发现疑似组，人工确认合并
+
+2026-11-12用户确认，设计及字段/触发/验收：[人工合并方案](ai-candidate-review.md#已确认实施设计)。
+
+- [x] 18.1 连续分页工作项、批量归类工具、受限工具集、候选持久化与旧任务恢复。见[检查记录](evidence/identity-candidates-2026-11-13.md)。
+- [x] 18.2 在现有候选位置接入AI组，人工预览/选择/确认/否决，运行中合并按钮置灰。见[检查记录](evidence/identity-candidates-2026-11-13.md)。
+- [x] 18.3 重写第一步目的、判断要求、跨页记忆及工具说明，更新契约与资源。见[检查记录](evidence/identity-candidates-2026-11-13.md)。
+- [x] 18.4 固定模型响应、恢复、权限、备份及UI专项，类型/非live/构建/治理/OpenSpec检查并记录证据。600项非live、2项生产浏览器专项及相关检查通过，见[检查记录](evidence/identity-candidates-2026-11-13.md)。
+- [ ] 18.5 用户副本自测后同步规格并归档。
+- [x] 18.6 清理无调用的候选自动合并提示词，更新资源登记及README，区分当前三步与旧接口引用；提示词同步、类型、治理及OpenSpec通过。见[资源清理记录](evidence/identity-candidates-2026-11-13.md#提示词资源清理)。
+
+## 19. 主动翻页与独立疑似组编辑
+
+用户授权及实施设计见[阅读流程](identity-reading.md)。
+
+- [x] 19.1 拆分保存与翻页工具，持久阅读位置，支持移人、拆组与撤销，更新契约和备份Schema。见[实施及检查](identity-reading.md)。
+- [x] 19.2 接入首次/恢复页、当前页码、末页结束；固定说明集中到第一步Markdown，保留用户判断要求。6项识别专项、3项生产浏览器检查通过，见[实施及检查](identity-reading.md)。
+- [x] 19.3 更新固定响应及专项测试，完成类型、非live、浏览器/构建、同步及治理/OpenSpec检查并记录证据。602项通过、1项跳过，3项生产浏览器通过，见[检查记录](identity-reading.md#开发检查记录)。
+- [ ] 19.4 用户副本验收后同步规格、归档。
+
+## 20. 所有任务统一文学资料处理说明
+
+用户确认及实施范围见[公共说明设计](shared-discipline.md)。
+
+- [x] 20.1 更新唯一discipline正文，模型请求入口统一追加，移除各业务重复拼接和例外。实现与检查见[公共说明设计](shared-discipline.md)。
+- [x] 20.2 验证实际发送内容、重试/修正和普通输出；同步提示词，完成类型、非live、构建、治理/OpenSpec检查并记录。604项通过、1项跳过，见[开发检查](shared-discipline.md#开发检查与接手)。
+- [ ] 20.3 用户副本核对实际文学处理效果后同步规格、归档。
+
+## 21. 外貌字段提取与整理说明
+
+REQ-019 局部提示词调整。2026-11-13 用户取消拆分字段，确认保留 appearance，要求提示词适中、同步其他说明；随后明确“开始吧”，要求删除冗长防御措辞。实施采用一句字段说明，沿用现有可选字符串、P2 外貌≤200字提示词要求及全部保存流程。
+
+字段、数据库、工具权限与触发方式无变化：P1 原文→submit_result.appearance→人物记录→合并/资料工具→P2 整理及显示、备份。例：原文明写“仪态端庄、身材修长”，两项均放在 appearance；P2 合并重复描述并保留具体特征。同步 P1 与 P2 提示词、提取/编辑/返回/存储 Schema 的字段说明及数据契约。类型和必填规则保持原样。
+
+- [x] 21.1 更新简短外貌说明和相关运行时 Schema，补齐整理提示词；核对保存、合并和展示链路。
+- [x] 21.2 预览并同步提示词，运行提取、合并、资料编辑、备份相关非 live 测试以及治理/OpenSpec检查；7文件90项测试通过，资源同步及治理/OpenSpec结果见下方检查记录。
+- [ ] 21.3 用户以有具体外貌及身材描写的章节副本核对提取、P2整理效果，验收后同步规格。
+
+本轮检查记录：2026-11-13，`npm run test:unit -- tests/extraction.test.ts tests/merge.test.ts tests/assets.test.ts tests/profile-input.test.ts tests/agent-asset-editing.test.ts tests/world-optimization.test.ts tests/backup.test.ts --maxWorkers=2`：7文件90项通过；提示词同步完成，再次预览哈希和请求示例均为0项变化；`npm run governance:check`、`npm run openspec -- validate continuous-character-organization --strict`、`git diff --check`通过。检查使用固定响应与隔离数据库；真实提取效果待21.3用户验收。

@@ -188,12 +188,13 @@ describe('工具查询、提交、完成与重放的真实调用链', () => {
     expect(await call('submit_result', { status: 'completed', commitIds: [ack.commitId], summary: '无变化', reviewedItems: [{ workItemId, outcome: 'no_change', reason: '保持原值' }], remainingWorkIds: [] })).toMatchObject({ accepted: true })
   })
 
-  it('三人候选组只合并两人后可登记partial，伪造提交号不能通过', async () => {
-    const { call, run } = await fixture('profile')
+  it('旧合并账本仍能核对partial，模型工具集合不再提供实际合并', async () => {
+    const { call, run, repo, scope, adapter } = await fixture('profile')
+    expect(adapter.tools.some(tool => tool.name === 'merge_assets')).toBe(false)
     await call('get_character_detail', { ids: ['A', 'B0', 'B1'] })
     const group = await call('save_candidate_group', { operationKey: 'group', memberIds: ['A', 'B0', 'B1'], reason: '疑似同人' })
     const basis = ['A', 'B0'].map(id => ({ summary: '样本确认同人', source: { kind: 'asset', assetKind: 'character', id } }))
-    const merge = await call('merge_assets', { operationKey: 'merge', kind: 'character', keepId: 'A', memberIds: ['A', 'B0'], expectedRevisions: { A: 1, B0: 1 }, reason: '两人为同人', basis })
+    const merge = await commitCommand(repo, scope, 'merge_assets', 'legacy', { operationKey: 'merge', kind: 'character', keepId: 'A', memberIds: ['A', 'B0'], expectedRevisions: { A: 1, B0: 1 }, reason: '历史内部命令兼容样本', basis }, adapter.reads)
     const args = { groupId: group.groupId, expectedRevision: group.revision, outcome: 'partial', reason: '合并两人，另一人待核对', basis: [basis[0]], commitIds: [merge.commitId] }
     await expect(call('resolve_candidate_group', { ...args, operationKey: 'fake', commitIds: ['fabricated'] })).rejects.toThrow(/提交确认/)
     expect(await call('resolve_candidate_group', { ...args, operationKey: 'resolve' })).toMatchObject({ ok: true })
@@ -201,10 +202,11 @@ describe('工具查询、提交、完成与重放的真实调用链', () => {
   })
 
   it.each(['profile', 'relations'] as const)('已绑定%s查询的人物被合并后，读集跟随有效人物而非丢失身份', async kind => {
-    const { call, run } = await fixture(kind)
+    const { call, run, repo, scope, adapter } = await fixture(kind)
     await call(kind === 'profile' ? 'query_character_profile' : 'query_relation_work', {})
     const details = records((await call('get_character_detail', { ids: ['A', 'B0'] })).data)
-    await call('merge_assets', { operationKey: 'merge-current', kind: 'character', keepId: 'B0', memberIds: ['A', 'B0'], expectedRevisions: Object.fromEntries(details.map(row => [row.id, row.revision])), reason: '合并当前人物', basis: ['A', 'B0'].map(id => ({ summary: '样本核对', source: { kind: 'asset', assetKind: 'character', id } })) })
+    expect(adapter.tools.some(tool => tool.name === 'merge_assets')).toBe(false)
+    await commitCommand(repo, scope, 'merge_assets', 'legacy', { operationKey: 'merge-current', kind: 'character', keepId: 'B0', memberIds: ['A', 'B0'], expectedRevisions: Object.fromEntries(details.map(row => [row.id, row.revision])), reason: '历史内部命令兼容样本', basis: ['A', 'B0'].map(id => ({ summary: '样本核对', source: { kind: 'asset', assetKind: 'character', id } })) }, adapter.reads)
     expect(((await run()).organization as Row).activeWork).toMatchObject({ characterId: 'B0' })
     expect(await call(kind === 'profile' ? 'submit_profile_review' : 'submit_relation_review', { ...(kind === 'profile' ? { patch: {} } : { changes: [] }), done: true })).toMatchObject({ ok: true, complete: true })
   })

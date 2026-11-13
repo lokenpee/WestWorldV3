@@ -4,6 +4,7 @@ import type { AssistantMessage, AssistantMessageEvent, Context, Usage } from '@e
 import type { Agent, AgentEvent, AgentMessage, AgentOptions, AgentTool, FinishTurn } from '@earendil-works/pi-agent-core'
 import { abortableDelay, awaitWithSignal, classifyError, redact, retryable, retryDelay, summarizeUsage } from './policy'
 import { loadProtocol } from './registry'
+import { withContextDiscipline } from '../agents/output-discipline'
 import { ModelError, type Attempt, type CallMode, type CallOptions, type CallResult, type DirectRequest, type ModelFailure, type ResolvedModel } from './types'
 
 export interface GatewayEnvironment { fetch?: typeof fetch; now?: () => number; random?: () => number; wait?: typeof abortableDelay; beforeRequest?: () => Promise<void> }
@@ -94,6 +95,7 @@ class CallSession {
     } finally { attempt.elapsedMs = this.now() - start; attempt.finishedAt = attempt.finishedAt ?? new Date(this.now()).toISOString() }
   }
   async runTurn(context: Context, traceOptions: { parentRequestId?: string; purpose?: 'work' | 'compaction' | 'repair' } = {}): Promise<{ message: AssistantMessage; events: AssistantMessageEvent[]; requestId: string }> {
+    context = withContextDiscipline(context)
     this.turn++
     this.requestId = crypto.randomUUID()
     const requestId = this.requestId
@@ -109,7 +111,7 @@ class CallSession {
         this.status = undefined; this.retryAfter = undefined; this.transportFailure = undefined
         const before = this.attempts.length
         const started = this.now()
-        const stream = client.streamSimple(this.resolved.model, context, { signal: this.controller.signal, fetch: this.transport, maxRetries: 0, transport: 'sse', timeoutMs: Math.max(1, Math.min(this.options.requestTimeoutMs ?? 180000, this.options.cooperativeTimeout ? Infinity : this.timeoutMs - (this.now() - this.started))), maxTokens: Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens), ...(this.options.temperature === undefined ? {} : { temperature: this.options.temperature }) })
+        const stream = client.streamSimple(this.resolved.model, context, { signal: this.controller.signal, fetch: this.transport, maxRetries: 0, transport: 'sse', timeoutMs: Math.max(1, Math.min(this.options.requestTimeoutMs ?? 180000, this.options.cooperativeTimeout ? Infinity : this.timeoutMs - (this.now() - this.started))), maxTokens: Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens), ...(this.options.temperature === undefined ? {} : { temperature: this.options.temperature }), ...(this.resolved.model.reasoning && this.options.reasoning ? { reasoning: this.options.reasoning } : {}) })
         const events: AssistantMessageEvent[] = []
         for await (const event of stream) { events.push(event); try { trace?.delta?.({ requestId, event }) } catch { /* 观测失败不影响模型调用 */ } }
         const raw = await stream.result()

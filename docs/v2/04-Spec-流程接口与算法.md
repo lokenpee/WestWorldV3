@@ -50,12 +50,14 @@ profile.age/gender保留目标现值，缺值补充；冲突记录“字段 冲�
 
 ## ALG-05 主名出场与层级
 
-1. scope=(processedIds或所有正文标识)去点后按原章去重。name=trim().toLowerCase；不使用别名和sourceChapters计数。
-2. 重名实体无法唯一归属则不放匹配表达式；其余名称按长度降序、locale顺序排序，转义后以`|`组成gu正则。正文小写，matchAll是非重叠匹配；长名优先。
-3. 每次命中mentions+1、原章加入Set；chapters为覆盖Set大小，scopeChapters为scope大小。
+1. scope=(processedIds或所有正文标识)去点后按原章去重。称呼取主名及已核实的稳定别名，trim后转小写；通用称谓过滤遵循人物称呼规则，不用sourceChapters代替文本计数。
+2. 称呼按长度降序、locale顺序排序，转义后以`|`组成gu正则。正文小写，matchAll非重叠匹配、长名优先；命中多人共有称呼时跳过，不再把歧义长称呼拆给短名。
+3. 唯一命中人物时mentions+1、原章加入Set；chapters为覆盖Set大小，scopeChapters为scope大小；同人物主名与已核实别名汇总。
 4. higher为章节数更大或同章节提及更大者数，same为两项都相同者数；percentile=`(higher+(same-1)/2)/max(1,实体数-1)`。
 5. 多个人全部同频→NPC；否则<0.1主要、<0.3重要、<0.8 NPC、其余路人。只有一个人物时不是flat，按公式可为主要人物。
-6. roleWeightSource=manual不覆盖，仍更新frequency；非manual写frequency与对应层级。AI调整主名后须再次计算，地点同样记录频次但不加人物层级。
+6. roleWeightSource为manual或agent时保留层级，仍更新frequency；其他来源写frequency与对应层级，来源设为frequency。地点记录频次但不加人物层级。
+
+“人物自动分层”对全书当前人物执行本算法，不受搜索及层级筛选影响。独立入口不依赖P2运行记录、Agent会话或模型配置；取得本书world租约后计算，分章计算时让出主线程，保存前核执行权及全部人物/地点的集合和revision，统一事务写入。只释放自己的租约，不改旧整理历史。旧版整理收尾可复用计算/保存函数，再自行处理原运行状态。
 
 ## ALG-06 串联、补点与批提交
 
@@ -81,7 +83,7 @@ profile.age/gender保留目标现值，缺值补充；冲突记录“字段 冲�
 
 所有task事件携带bookId/stage/runId，按三元组更新目标runtime条目，不重置其他条目。start初始化本次计数和费用，progress更新对应任务，done根据该阶段失败/降级/剩余工作及依赖有效性决定终态；cancel只abort目标控制器。每任务最近2000条日志，费用累计本次模型和摘要调用。
 
-P1单位为章/块（界面另显示原章数）；P2显示机械/AI判同/整编/报告四步和对象统计；P3分别显示窗口覆盖和全书队列覆盖，不把不同单位相加。成功、失败、跳过和总数分别展示，进度100%不等于成功。
+P1单位为章/块（界面另显示原章数）；P2显示机械/AI判同/整编/报告四步和对象统计；P3显示当前阶段、阅读页及已检查页数，复核时补充当前事件线和分段位置，不把页数和节点数相加。成功、失败、跳过和总数分别展示，进度100%不等于成功。
 
 刷新丢实时日志/控制器但保留pipelineRuns、进度、报告、会话和检查点。旧running在owner失效后显示可恢复paused；不后台自动续跑。不按“最新updatedAt的一条”覆盖整个工作台，始终同时读取P1/P2/P3各自状态。
 
@@ -139,7 +141,7 @@ prepared恢复失败不无限自动重试：租约/版本冲突转明确待重�
 
 ### ALG-12.4 覆盖项身份、派发与排序
 
-T20.coverageItems是完成证明的权威清单。workItemId=`phase + ':' + scopeKey + ':' + kind + ':' + id`，各自由标识用encodeURIComponent编码后拼接；scopeKey：P1为substep，P2为`fullBook`，P3窗口为`start-end`零基半开范围，全局为队列名。kind用于避免人物/地点/事件线ID相同造成碰撞。
+P1、P2和旧P3任务以T20.coverageItems保存覆盖清单。workItemId=`phase + ':' + scopeKey + ':' + kind + ':' + id`，各自由标识用encodeURIComponent编码后拼接；scopeKey：P1为substep，P2为`fullBook`，旧P3窗口为`start-end`零基半开范围，全局为队列名。kind用于避免人物/地点/事件线ID相同造成碰撞。当前P3的完成依据是T20.storyReading中各阅读页的检查指纹，规则见下文。
 
 | 阶段 | 建项及稳定顺序 | 单task分配上限 |
 |---|---|---|
@@ -147,12 +149,20 @@ T20.coverageItems是完成证明的权威清单。workItemId=`phase + ':' + scop
 | P2 mechanical | 当前人物再地点，类型内按ID码点顺序 | 代码单组提交；无模型 |
 | P2 ai_identity | 当前人物再地点，类型内ID码点；最多3项排队，每项独立核实 | 1个分配项，可跨资产批量查证；每次查询仍≤100 |
 | P2 optimize | 判同后重枚举；候选按类型/ID排序；非候选记录no_change与触发判断 | 人物≤3且服从tokens预算；地点1 |
-| P3 window_link | 按窗口起点顺序，再章节order、节点order、ID码点；切块按原章进入窗口 | 20个节点项 |
-| P3 global_review | 队列依次orphans、event_lines、review_notes；队内ID码点顺序 | 节点、线和事项每批最多20项 |
+| P3 window_link | 全书节点按章节order、节点order、ID码点排列；相关旧线与线索按需检索。AI自行前进或回看，不按100章窗口自动派发 | 每页最多10项，资料估算预算4000 Token；单个长项仍单独成页 |
+| P3 global_review | 孤立节点页→逐条事件线的成员分段及整线概要→未解决或依据变化的线索页 | 节点和线索每页最多10项并服从4000 Token预算；每条线各自分段检查，随后单独看整线概要 |
 
 0项阶段不发无意义模型请求，代码写零覆盖完成记录。读取工具可超出分配项查证，但未分配新对象不能借一次总结直接标checked；新建节点/线必须加入后续适用队列。P2本轮核实结束后，成功项进入按需整编，失败和未完成项保留待办；其他阶段在前一阶段当前项有效结束后切换。
 
 TaskRecord记录需要模型参与的子任务，包含P1/direct整编与Agent任务。候选生成、同来源幂等核验及非候选跳过由代码处理，不伪造Agent调用：coverage.taskId=null，该阶段仅写覆盖/报告，不融合不同来源实体；已确认组由人工或AI命令事务处理。direct通过输出Schema/领域校验后，调用方把业务修改和该task对应覆盖/状态同事务保存，reviewedItems由代码根据真实变化生成，不要求direct额外调用Agent finalizer。命令意图/operationKey账本用于本规范两种受控Agent写工具；P1成功幂等仍以T18子步骤凭证为准，整编幂等以事实/优化指纹和revision为准。
+
+#### P3主动阅读与分次保存
+
+开始和恢复时，`readingService.ts`提供当前页业务简报：页号/总页数、当前资料摘要、相关候选、工作摘要；后续资料由AI调用`navigate_story_pages`取得。`next`表示当前页已检查，程序保存该页当前指纹，再返回下一个未检查页；`previous`仅回看，不将离开的页标为完成。导航前重算页面：当前页增加新对象时先返回更新后的当前页，相关事实变化使旧检查失效。导航回执按任务和调用编号保存，同一次调用重放不重复前进。
+
+AI可以先查询、分次保存一条或多条线，再决定翻页；没有修改也能直接前进。新页发现属于已有线的节点时，`save_story_lines.append`补充成员；`processAppend`补写新的发展，`processEdits`按详情提供的段号修订已有经过。若同时传入完整`process`、段落修订和追加，依次执行完整替换→修段→追加；其余省略字段保留。程序同步成员排序、章节、时间范围和节点反向归属。文本表达和引用原文不做逐字或字数硬性判定，仍核对对象归属、引用及版本。
+
+全书复核按每条线逐段检查，再查看整线概要，核对伏笔、动机、行动、转折和结果是否贯通；需要时通过详情工具分段读长经过。该页完成只表示已经检查，未解问题可存为线索。`next`返回`complete=true`即可结束阶段；也可使用`finish_story_batch`，程序按实际剩余页核对完成情况，允许省略items且无需制造写操作。暂停、取消或错误保留已保存资料、阅读位置和持续会话，由用户继续；串联完成后等待用户启动全书复核。
 
 ### ALG-12.5 版本、事实指纹与查询依赖
 
@@ -172,6 +182,8 @@ RecordDependency必须记录实际请求ID、resolvedId、revision和事实hash�
 写事务校验使用实际revision；已完成覆盖有效性采用事实投影+依赖。任务自己的成功写入允许把本task已读、已处理对象的基准更新为提交后版本；未读取的新对象、新外部证据仍入待办。其他task覆盖只在其明确依赖发生变化时stale，不全局清空。单个workItem在同run被事实变化置stale累计3次时将run设paused/validity=stale，说明“资料持续变化，剩余N项”，等待用户继续；继续保留run和有效覆盖，重置该项本轮冲突计数。
 
 ### ALG-12.6 总结、删除/合并和全阶段完成
+
+以下逐项总结协议适用于P2及旧P3工作项流程；当前P3使用ALG-12.4的阅读页指纹和阶段收尾协议。
 
 AgentTaskSummarySchema新增必填reviewedItems：每项`{workItemId,outcome,reason}`；outcome为changed/no_change/needs_review。reviewedItems ID唯一、remainingWorkIds唯一且互斥，两集合并必须等于本task.workItemIds。commitIds必须精确列出本task所有持久成功确认，不能漏报或引用同run其他task；changed必须有本task命令写集命中该工作项或其当前解析目标。no_change/needs_review也必须有实际读取依据；needs_review为“已检查但需人工核实”，可以算覆盖，不代表事实已确定。
 

@@ -9,14 +9,15 @@ import type { AgentRepository, Row } from './repository'
 import type { Scope } from './queries'
 import { resolveSession } from './sessions'
 import { compactSession, type SessionStatus } from './compaction'
-import { projectSession, entryMessages, repairToolPairs } from './context'
+import { projectSession, projectWorkSession, entryMessages, repairToolPairs } from './context'
 import type { ModelService } from '../models/service'
-import { outputDiscipline } from './output-discipline'
 import { storyFingerprint, storyTable } from '../story/coverage'
 import { renewOrganizationLease, withOrganizationLease } from './organizationLease'
 import { leaseFailureKind } from '../world/leaseHeartbeat'
 import { appendRequestLedger } from './ledger'
 import { TraceSession } from './trace'
+import { isStoryWrite } from './storyCommands'
+import { readingBrief, refreshReading } from '../story/reading'
 
 export type AgentRunner = (input: AgentInput, options?: CallOptions) => Promise<CallResult>
 export interface AgentTaskOptions {
@@ -27,7 +28,7 @@ export interface AgentTaskOptions {
   leaseOwner?: string; retainLease?: boolean
   requiredLineIds?: string[]
   reviewScope?: 'all_assets' | 'relations'
-  workflow?: 'character_organization_v1'
+  workflow?: 'character_organization_v1' | 'story_lines_v2' | 'story_pages_v3'
   contextId?: string; unitId?: string; organizationWorkKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string; shouldPause?: () => boolean; shouldCancel?: () => boolean
 }
 export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; itemFailure?: string; readCalls: number; writeCalls: number }
@@ -56,7 +57,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     const identity = !options.probe && options.profile === 'asset_editor' && options.phase === 'ai_identity'
     const resumable = identity || organization || !options.probe && (options.profile === 'story_editor' || options.phase === 'asset_review')
     const maxRequests = options.probe ? 3 : options.maxRequests ?? 1_000_000
-    const started = Date.now(), duration = organization ? 3600000 : identity ? 180000 : resumable ? 300000 : options.timeoutMs ?? 180000
+    const started = Date.now(), duration = options.workflow === 'story_pages_v3' ? 86400000 : organization ? 3600000 : identity ? 180000 : resumable ? 300000 : options.timeoutMs ?? 180000
     const timeLeft = () => Math.max(0, duration - (Date.now() - started))
     let agent: Agent | undefined; let loadedMessages: AgentMessage[] = []; let persistedMessages = 0
     let trace: TraceSession | undefined
@@ -66,7 +67,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     let adapter: ReturnType<typeof createAgentTools> | undefined
     try {
       controller.signal.throwIfAborted()
-      if (!options.probe && (!options.workItems.length || new Set(scope.workItemIds).size !== scope.workItemIds.length || scope.workItemIds.some(id => !id))) throw new Error('INVALID_ARGS:正式任务须提供明确、唯一的分配项。')
+      if (!options.probe && scope.workflow !== 'story_pages_v3' && (!options.workItems.length || new Set(scope.workItemIds).size !== scope.workItemIds.length || scope.workItemIds.some(id => !id))) throw new Error('INVALID_ARGS:正式任务须提供明确、唯一的分配项。')
       if (scope.profile === 'asset_editor' && !['ai_identity', 'optimize', 'asset_review', 'character_organization'].includes(scope.phase) || scope.profile === 'story_editor' && !['window_link', 'global_review'].includes(scope.phase)) throw new Error('SCOPE:职责与任务阶段不一致。')
       await repo.transaction(true, async store => {
         const leases = await store.rows('pipelineRuns')
@@ -81,12 +82,14 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           scope.sessionId = text(session.id); outcome.sessionId = scope.sessionId
           await store.put('storySessions', { ...session, leaseOwner: scope.owner, leaseUntil: Date.now() + 30000 })
           const entries = store.sessionEntries ? await store.sessionEntries(scope.sessionId!) : (await store.rows('storySessionEntries')).filter(row => row.sessionId === scope.sessionId)
-          loadedMessages = organization && scope.unitId
+          loadedMessages = organization && scope.unitId === 'directory:identity'
+            ? repairToolPairs(projectWorkSession(entries, scope.unitId).messages.filter(message => message.role !== 'system'))
+            : organization && scope.unitId
             ? repairToolPairs(entries.filter(row => row.contextId === scope.contextId && row.unitId === scope.unitId && (!row.taskId || row.taskId === scope.taskId)).flatMap(entryMessages).filter(message => message.role !== 'system'))
             : projectSession(entries, text(session.leafId) || undefined).messages
         }
         let run = await store.get('pipelineRuns', scope.runId)
-        validate(inputSchema(scope.probe ? 'AgentProbeTask' : scope.profile === 'asset_editor' ? (organization ? 'CharacterOrganizationTask' : scope.phase === 'asset_review' ? 'AssetReviewTask' : 'IdentityTask') : 'StoryTask'), options.input, 'INVALID_ARGS:任务输入不符合当前职责的契约。')
+        validate(inputSchema(scope.probe ? 'AgentProbeTask' : scope.profile === 'asset_editor' ? (organization ? 'CharacterOrganizationTask' : scope.phase === 'asset_review' ? 'AssetReviewTask' : 'IdentityTask') : scope.workflow === 'story_pages_v3' ? 'StoryReadingTask' : 'StoryTask'), options.input, 'INVALID_ARGS:任务输入不符合当前职责的契约。')
         if (!scope.probe && (options.input.bookId !== scope.bookId || options.input.runId !== scope.runId || options.input.taskId !== scope.taskId || options.input.phase !== scope.phase || scope.sessionId && options.input.sessionId !== scope.sessionId || scope.contextId && options.input.contextId !== scope.contextId || scope.unitId && options.input.unitId !== scope.unitId)) throw new Error('SCOPE:任务输入与绑定范围不一致。')
         if (run && (run.bookId !== scope.bookId || run.stage !== (scope.profile === 'asset_editor' ? 'P2' : 'P3'))) throw new Error('SCOPE:运行编号不属于当前书籍或职责。')
         if (!run) run = { id: scope.runId, recordType: 'run', bookId: scope.bookId, stage: scope.profile === 'asset_editor' ? 'P2' : 'P3', status: 'running', startedAt: timestamp(), planVersion: '2.2', scope: 'fullBook', tasks: [], commandIntents: [], appliedCommands: [], aiMode: 'agent' }
@@ -117,7 +120,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       if (organization) repo = withOrganizationLease(repo, scope)
       const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
       if (!scope.probe && scope.sessionId) trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.businessPrompt, purpose: 'work' })
-      const systemPrompt = [options.businessPrompt, outputDiscipline].join('\n')
+      const systemPrompt = options.businessPrompt
       if (!organization && loadedMessages.length) loadedMessages.push({ role: 'system', content: systemPrompt, timestamp: Date.now() })
       persistedMessages = organization ? loadedMessages.length : loadedMessages.length ? loadedMessages.length - 1 : 0
       const prior = await repo.transaction(false, store => taskOf(store, scope))
@@ -154,9 +157,15 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         })
       const prepareContext = async (context: { messages: AgentMessage[] }, window: number, force = false) => {
         await persistTail()
-        if (organization || !scope.sessionId || !sessionOptions) return undefined
+        if (organization && scope.unitId !== 'directory:identity' || !scope.sessionId || !sessionOptions) return undefined
         const effectiveSystem = getCurrentSystemMessage(context.messages)
-        const messages = await compactSession(repo, scope, { generate: request => sessionOptions.generate({ ...request, beforeRequest: consumeRequest }), contextWindow: window, prompt: options.prompt, systemMessage: effectiveSystem ? { ...effectiveSystem, content: systemPrompt } : undefined, force, signal: controller.signal, onStatus: sessionOptions.onStatus })
+        const messages = await compactSession(repo, scope, { generate: request => sessionOptions.generate({ ...request, beforeRequest: consumeRequest }), contextWindow: window,
+          prompt: scope.workflow === 'story_pages_v3' ? '' : options.prompt,
+          ...(scope.workflow === 'story_pages_v3' ? { currentTask: () => repo.transaction(false, async store => {
+            const current = await refreshReading(store, scope.runId, scope.sessionId!, scope.phase)
+            return `【当前阅读页】\n${JSON.stringify(await readingBrief(store, scope.bookId, scope.sessionId!, scope.phase, current))}`
+          }) } : {}),
+          systemMessage: effectiveSystem ? { ...effectiveSystem, content: systemPrompt } : undefined, force, signal: controller.signal, onStatus: sessionOptions.onStatus })
         await repo.transaction(true, async store => { await rebaseReadSet(store, scope, tools.reads, true); await saveTask(store, scope, { readSet: tools.reads }) })
         return messages
       }
@@ -185,7 +194,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
               ? [...base, { role: 'user' as const, content: options.prompt, timestamp: Date.now() }]
               : base
             const left = maxRequests - usedRequests
-            const note = resumable
+            const note = scope.workflow === 'story_pages_v3' ? '按当前页自主查阅和分次保存；需要后续资料时调用翻页工具，未完成内容可保留进度。' : resumable
               ? maxRequests >= 1_000_000
                 ? `当前运行状态：剩余约${Math.ceil(timeLeft() / 1000)}秒；本任务不设固定请求轮数。`
                 : `当前运行状态：剩余约${Math.ceil(timeLeft() / 1000)}秒；本任务最多${maxRequests}次实际请求，已用${usedRequests}次。`
@@ -202,6 +211,10 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         recoverContext: scope.sessionId && sessionOptions ? async (context, model) => {
           const activeTools = tools.currentTools()
           if (agent) agent.state.tools = activeTools
+          if (scope.unitId === 'directory:identity') {
+            const messages = await prepareContext(context, model.contextWindow, true)
+            return messages ? { ...context, messages, tools: activeTools } : undefined
+          }
           if (organization) return { ...context, tools: activeTools, messages: [
             { role: 'user' as const, content: options.prompt, timestamp: Date.now() },
             { role: 'user' as const, content: '上一请求超出模型容量，已重建当前人物的小上下文。程序预装资料重新提供；如已保存过部分修改，用query_character_profile或query_relation_work刷新当前真实资料后继续，不要把旧工具结果当作仍然有效。', timestamp: Date.now() },
@@ -214,7 +227,9 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           if (options.shouldCancel?.()) return { block: true, terminate: true, reason: 'CANCELLED:运行已取消，工具未执行。' }
           if (options.shouldPause?.()) return { block: true, terminate: true, reason: 'PAUSED:任务已暂停，工具未执行。' }
           const batch = assistantMessage.content.filter(part => part.type === 'toolCall')
-          if (batch.some(call => call.name === 'submit_result') && batch.length !== 1) return { block: true, reason: '最终总结须独占本批调用，混合批全部操作均未执行。' }
+          // 同一回复尚未读到翻页结果，多次导航复用第一次的回执，不推进未读页。
+          if (scope.workflow === 'story_pages_v3') tools.bindNavigationCall(batch.find(call => call.name === 'navigate_story_pages')?.id)
+          if (batch.some(call => ['submit_result', 'finish_story_batch'].includes(call.name)) && batch.length !== 1) return { block: true, reason: '完成本批须单独调用，请先保存修改。' }
           const { task } = await repo.transaction(false, store => taskOf(store, scope))
           if (!resumable && Number(task.stepsUsed) >= maxRequests && toolCall.name !== 'submit_result') return { block: true, reason: '最后一次请求只允许提交任务总结。' }
           return undefined
@@ -239,17 +254,23 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
             } else organizationConflicts = 0
             return undefined
           }
-          if (!isError || !['submit_result', 'commit_asset_changes', 'commit_story_changes'].includes(toolCall.name)) return undefined
+          if (scope.workflow === 'story_pages_v3') {
+            if (!isError) { failedSignatures.clear(); return undefined }
+            const signature = `${toolCall.name}:${canonical(toolCall.arguments)}`
+            if (failedSignatures.has(signature)) { outcome.itemFailure = '同一工具调用重复失败，阅读进度已保留，可继续。'; return { terminate: true } }
+            failedSignatures.add(signature); return undefined
+          }
+          if (!isError || !['submit_result', 'finish_story_batch', 'commit_asset_changes', 'commit_story_changes'].includes(toolCall.name) && !isStoryWrite(toolCall.name)) return undefined
           const message = result.content.filter(part => part.type === 'text').map(part => part.text).join('\n')
-          if (message.includes('CONFLICT:')) { agent?.steer({ role: 'user', content: '资料发生变化，请重新读取相关依据，再决定是否使用新的命令键提交。', timestamp: Date.now() }); return undefined }
+          if (message.includes('CONFLICT:')) { agent?.steer({ role: 'user', content: scope.workflow === 'story_lines_v2' ? '资料发生变化，请刷新相关详情后继续。' : '资料发生变化，请重新读取相关依据，再决定是否使用新的命令键提交。', timestamp: Date.now() }); return undefined }
           const terminate = await repo.transaction(true, async store => { const { task } = await taskOf(store, scope); if (Number(task.repairCount) >= 1) return true; await saveTask(store, scope, { repairCount: 1 }); return false })
           if (terminate && resumable) { deferredAfterValidation = true; outcome.itemFailure = message }
-          if (!terminate) agent?.steer({ role: 'user', content: '这是本任务唯一一次结果修正机会。请根据工具错误修正；改变写入内容时使用新的命令键。', timestamp: Date.now() })
+          if (!terminate) agent?.steer({ role: 'user', content: scope.workflow === 'story_lines_v2' ? '请根据工具返回的具体错误修正后继续。' : '这是本任务唯一一次结果修正机会。请根据工具错误修正；改变写入内容时使用新的命令键。', timestamp: Date.now() })
           return terminate ? { terminate: true } : undefined
         },
-        finishTurn: () => options.shouldPause?.() || options.shouldCancel?.() || tools.summary || organization && tools.completed || resumable && (usedRequests >= maxRequests || resumable && timeLeft() === 0) ? { action: 'end' } : undefined,
+        finishTurn: () => options.shouldPause?.() || options.shouldCancel?.() || tools.summary || (organization || scope.workflow === 'story_pages_v3') && tools.completed || resumable && (usedRequests >= maxRequests || resumable && timeLeft() === 0) ? { action: 'end' } : undefined,
         validateFinal: () => { if (!tools.completed && !tools.summary && !(resumable && (deferredAfterValidation || usedRequests >= maxRequests || resumable && timeLeft() === 0))) throw new ModelError(usedRequests >= maxRequests ? 'budget' : 'validation', usedRequests >= maxRequests ? 'BUDGET:子任务预算已用完，剩余工作交后续批次。' : '智能体尚未提交包含真实确认的任务总结。') },
-      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
+      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(organization && !scope.probe ? { reasoning: 'medium' as const } : {}), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
       outcome.summary = adapter.summary
       if (resumable && !outcome.itemFailure && outcome.result.error && ['validation', 'context_length', 'content_policy'].includes(outcome.result.error.kind)) outcome.itemFailure = outcome.result.error.message
       if (resumable && !outcome.summary && (outcome.result.ok || outcome.itemFailure || outcome.result.error?.kind === 'budget')) {

@@ -1,9 +1,10 @@
 import { LazyDetails } from './LazyDetails'
+import { executionStats } from './executionStats'
 import type { ReactNode } from 'react'
 import type { Row } from './repository'
 import type { ExecutionChain } from './trace'
 import { ApiRequest, Changes } from './AgentRunPanel'
-import { projectExecution, type ExecutionEvent } from './executionChain'
+import { projectExecution, projectRequestConversation, type ExecutionEvent } from './executionChain'
 import { displayContent, toolDeclaration, toolResultContent } from './requestPresentation'
 
 const text = (value: unknown) => typeof value === 'string' ? value : ''
@@ -30,12 +31,19 @@ function ApiBoundary({ request, ordinal, snapshots }: { request?: Row; ordinal: 
   </>}</LazyDetails>
 }
 
-function ConversationEvent({ event, firstUser }: { event: ExecutionEvent; firstUser: boolean }) {
-  if (event.kind === 'system') return <LazyDetails className="run-role run-role-system" open summary={<> SYSTEM PROMPT · 实际发送 </>}>{() => <>
+function ConversationEvent({ event, firstUser, folded }: { event: ExecutionEvent; firstUser: boolean; folded: boolean }) {
+  if (event.kind === 'system') return <LazyDetails className="run-role run-role-system" open={!folded} summary={<> SYSTEM PROMPT · 实际发送 </>}>{() => <>
     <pre>{displayContent(event.content)}</pre>
   </>}</LazyDetails>
-  if (event.kind === 'user') return <LazyDetails className="run-role run-role-user" open summary={<> {firstUser ? 'USER · 程序注入' : 'USER · 运行消息'} </>}>{() => <>
+  if (event.kind === 'user') return <LazyDetails className="run-role run-role-user" open={!folded} summary={<> {firstUser ? 'USER · 程序注入' : 'USER · 运行消息'} </>}>{() => <>
     <pre>{displayContent(event.content)}</pre>
+  </>}</LazyDetails>
+  if (event.kind === 'other') return <LazyDetails className="run-role" summary={event.role.toUpperCase()}>{() => <pre>{event.content}</pre>}</LazyDetails>
+  if (folded && event.kind === 'compaction') return <LazyDetails className="run-role" summary="上下文压缩">{() => <pre>{event.content}</pre>}</LazyDetails>
+  if (folded && event.kind === 'assistant') return <LazyDetails className="run-role run-conversation-assistant" summary={<>ASSISTANT{event.toolCalls.length ? ` · ${event.toolCalls.length} 次工具调用` : ' · 模型回复'}</>}>{() => <>
+    {event.thinking && <LazyDetails summary="思考内容">{() => <pre>{event.thinking}</pre>}</LazyDetails>}
+    {event.content && <pre>{event.content}</pre>}
+    {event.toolCalls.map((call, index) => <section key={text(call.id) || index}><h4>TOOL CALL · {text(call.name)}</h4><pre>{displayContent(call.arguments)}</pre></section>)}
   </>}</LazyDetails>
   if (event.kind === 'compaction') return <div className="run-api-boundary run-compaction">
     <strong>上下文压缩</strong><span>{displayContent(event.content)}</span>
@@ -51,19 +59,15 @@ function ConversationEvent({ event, firstUser }: { event: ExecutionEvent; firstU
   const result = execution?.result
   const failed = event.isError || execution?.isError === true || execution?.state === 'failed'
   const state = failed ? '失败' : execution?.state === 'pending' ? '待执行' : result === undefined ? '未记录' : '成功'
-  return <LazyDetails className="run-role run-role-toolresult" open summary={<> TOOL RESULT · {event.toolName || text(execution?.name) || '工具'}<span className={failed ? 'field-error run-result-state' : 'run-result-state'}>{state}</span> </>}>{() => <>
+  return <LazyDetails className="run-role run-role-toolresult" open={!folded} summary={<> TOOL RESULT · {event.toolName || text(execution?.name) || '工具'}<span className={failed ? 'field-error run-result-state' : 'run-result-state'}>{state}</span> </>}>{() => <>
     {result === undefined && !event.content ? <p className="field-help">等待返回或未记录工具结果。</p> : <pre>{result === undefined ? displayContent(event.content) : toolResultContent(result)}</pre>}
   </>}</LazyDetails>
 }
 
-export function ExecutionChainView({ chain, edits, characterNames, raw = true }: { chain: ExecutionChain; edits: Row[]; characterNames?: Map<string, string>; raw?: boolean }) {
+export function ExecutionChainView({ chain, edits, characterNames, raw = true, folded = false }: { chain: ExecutionChain; edits: Row[]; characterNames?: Map<string, string>; raw?: boolean; folded?: boolean }) {
   const requests = chain.requests
-  const stats = requests.reduce<{ input: number; output: number; cacheRead: number; total: number; cost: number; tools: number }>((sum, row) => {
-    const usage = record(row.usage)
-    return { input: sum.input + (Number(usage.input) || 0), output: sum.output + (Number(usage.output) || 0), cacheRead: sum.cacheRead + (Number(usage.cacheRead) || 0), total: sum.total + (Number(usage.totalTokens) || 0), cost: sum.cost + (Number(usage.cost) || 0), tools: sum.tools + list(row.toolCalls).length }
-  }, { input: 0, output: 0, cacheRead: 0, total: 0, cost: 0, tools: 0 })
-  const projected = projectExecution(chain)
-  const events = projected.events
+  const stats = executionStats(requests)
+  const events = folded ? projectRequestConversation(chain) : projectExecution(chain).events
   const firstUser = events.find(event => event.kind === 'user')?.key
   const declarations = new Map<string, Row>()
   for (const request of requests) {
@@ -78,29 +82,29 @@ export function ExecutionChainView({ chain, edits, characterNames, raw = true }:
   let lastApi: number | undefined
   let seenSystem = ''
   for (const event of events) {
-    if (event.kind === 'user' && event.content.startsWith('当前运行状态：')) continue
-    if (event.kind === 'system') {
+    if (!folded && event.kind === 'user' && event.content.startsWith('当前运行状态：')) continue
+    if (!folded && event.kind === 'system') {
       if (seenSystem === event.content) continue
       seenSystem = event.content
     }
     if (event.kind === 'assistant' && typeof event.apiIndex === 'number' && event.apiIndex !== lastApi) {
-      blocks.push(<ApiBoundary key={`api-${event.apiIndex}`} request={requests.find(row => Number(row.requestOrdinal) === event.apiIndex)} ordinal={event.apiIndex} snapshots={chain.snapshots} />)
+      blocks.push(<ApiBoundary key={`api-${event.apiIndex}`} request={folded ? requests[event.apiIndex - 1] : requests.find(row => Number(row.requestOrdinal) === event.apiIndex)} ordinal={event.apiIndex} snapshots={chain.snapshots} />)
       lastApi = event.apiIndex
     }
-    blocks.push(<ConversationEvent key={event.key} event={event} firstUser={event.key === firstUser} />)
+    blocks.push(<ConversationEvent key={event.key} event={event} firstUser={event.key === firstUser} folded={folded} />)
   }
   return <section className="execution-chain" aria-label="Agent 执行过程">
     <section className="run-stats" aria-label="执行统计">
-      <span>API 请求 <strong>{requests.length}</strong> 次</span><span>工具调用 <strong>{stats.tools}</strong> 次</span><span>耗时 <strong>{duration(requests)}</strong></span><span>Token <strong>{stats.total}</strong>（输入 {stats.input} / 缓存 {stats.cacheRead} / 输出 {stats.output}）</span><span>费用 <strong>{stats.cost.toFixed(6)}</strong> 美元</span><span>模型 <strong>{text(requests.at(-1)?.model) || '未记录'}</strong></span>{chain.runStatus ? <span>状态 <strong>{({ running: '进行中', completed: '已完成', paused: '已暂停', cancelled: '已取消', failed: '失败' } as Record<string, string>)[chain.runStatus] ?? chain.runStatus}</strong></span> : null}
+      <span>API 请求 <strong>{stats.requests}</strong> 次</span><span>工具调用 <strong>{stats.tools}</strong> 次</span><span>耗时 <strong>{duration(requests)}</strong></span><span>Token <strong>{stats.total ?? '待返回'}</strong>（输入 {stats.input ?? '待返回'} / 缓存 {stats.cacheRead ?? '待返回'} / 输出 {stats.output ?? '待返回'}）</span><span>费用 <strong>{stats.cost === null ? '未返回' : stats.cost.toFixed(6)}</strong> 美元</span><span>模型 <strong>{text(requests.at(-1)?.model) || '未记录'}</strong></span>{chain.runStatus ? <span>状态 <strong>{({ running: '进行中', completed: '已完成', paused: '已暂停', cancelled: '已取消', failed: '失败' } as Record<string, string>)[chain.runStatus] ?? chain.runStatus}</strong></span> : null}
     </section>
     {raw && <section className="execution-conversation" aria-label="Agent 会话">
-      <p className="field-help run-conversation-note">System Prompt 和程序注入按实际发送显示一次；每次 API 只显示本次新增的 Assistant 和工具结果。展开 API 分隔行可查看该次完整请求体。</p>
+      {!folded && <p className="field-help run-conversation-note">System Prompt 和程序注入按实际发送显示一次；每次 API 只显示本次新增的 Assistant 和工具结果。展开 API 分隔行可查看该次完整请求体。</p>}
       {declarations.size > 0 && <LazyDetails className="run-role run-role-tools" summary={<> TOOLS · 本次运行可用工具（{declarations.size}） </>}>{() => <>{[...declarations.values()].map(tool => <LazyDetails className="run-tool-definition" key={text(tool.name)} summary={<> {text(tool.name)} </>}>{() => <><pre>{full(tool)}</pre></>}</LazyDetails>)}</>}</LazyDetails>}
       {events.length ? blocks : requests.length ? <section className="execution-api-calls" aria-label="旧请求记录">
         <p className="field-help">旧日志没有保存逐条会话消息，以下按请求快照显示。</p>
-        {requests.map((row, index) => <ApiRequest key={text(row.requestId) || index} row={row} index={index} snapshots={chain.snapshots} />)}
+        {requests.map((row, index) => folded ? <ApiBoundary key={text(row.requestId) || index} request={row} ordinal={index + 1} snapshots={chain.snapshots} /> : <ApiRequest key={text(row.requestId) || index} row={row} index={index} snapshots={chain.snapshots} />)}
       </section> : <p className="field-help" role="status">没有记录到 API 请求。</p>}
     </section>}
-    <Changes edits={edits} characterNames={characterNames} />
+    <Changes edits={edits} characterNames={characterNames} sideBySide={folded} />
   </section>
 }

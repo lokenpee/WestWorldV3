@@ -1,5 +1,5 @@
 import { estimateTextTokens } from '../agents/context'
-import { strings, text } from '../agents/contracts'
+import { records, strings, text } from '../agents/contracts'
 import type { AgentStore, Row } from '../agents/repository'
 
 const excerpt = (value: unknown, size: number) => text(value).slice(0, size)
@@ -32,7 +32,7 @@ const searchable = (row: Row) => [row.name, row.title, row.summary, row.statemen
 export async function searchStoryContext(store: AgentStore, bookId: string, sessionId: string | undefined, args: Row) {
   const nodes = (await store.rows('nodes')).filter(row => row.bookId === bookId)
   const lines = (await store.rows('eventLines')).filter(row => row.bookId === bookId)
-  const notes = (await store.rows('storyEditorNotes')).filter(row => row.bookId === bookId && row.sessionId === sessionId && (row.status === 'active' || args.include_resolved === true))
+  const notes = (await store.rows('storyEditorNotes')).filter(row => row.bookId === bookId && row.sessionId === sessionId && (row.status === 'active' || args.include_resolved === true || args.status === 'resolved'))
   const focus = nodes.filter(row => strings(args.node_ids).includes(text(row.id)))
   const explicit = strings(args.terms).map(value => value.trim().toLowerCase().slice(0, 128)).filter(Boolean)
   const names = focus.flatMap(row => [...strings(row.actors), ...strings(row.targets)]).filter(value => value.length >= 2).map(value => value.slice(0, 64))
@@ -40,14 +40,22 @@ export async function searchStoryContext(store: AgentStore, bookId: string, sess
   const ids = new Set(focus.map(row => text(row.id)))
   const latestChapter = focus.map(row => text(row.chapterIndex)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).at(-1)
   const candidates = [...nodes.map(row => ({ row, kind: 'node' })), ...lines.map(row => ({ row, kind: 'eventLine' })), ...notes.map(row => ({ row, kind: 'note' }))].filter(item => !ids.has(text(item.row.id)) && (!args.kind || item.kind === args.kind) && (args.include_future === true || !latestChapter || item.kind !== 'node' || text(item.row.chapterIndex).localeCompare(latestChapter, undefined, { numeric: true }) <= 0))
-  const documents = candidates.map(item => ({ ...item, content: searchable(item.row) }))
+  const range = strings(args.chapter_range)
+  const documents = candidates.filter(({ row, kind }) => {
+    if (args.status && (kind === 'eventLine' ? row.lineStatus : row.status) !== args.status) return false
+    if (range.length) {
+      const chapters = row.chapterIndex ? [text(row.chapterIndex)] : strings(row.chapters).length ? strings(row.chapters) : [...strings(row.nodeIds).flatMap(id => nodes.filter(node => node.id === id).map(node => text(node.chapterIndex))), ...records(row.evidence).map(item => text(item.chapterIndex))]
+      if (!chapters.some(chapter => chapter.localeCompare(range[0], undefined, { numeric: true }) >= 0 && chapter.localeCompare(range[1], undefined, { numeric: true }) <= 0)) return false
+    }
+    return true
+  }).map(item => ({ ...item, content: searchable(item.row) }))
   const frequency = new Map(terms.map(term => [term, documents.filter(item => item.content.includes(term)).length]))
   const ranked = documents.map(item => {
     const matched = terms.filter(term => item.content.includes(term))
     const linked = strings(item.row.nodeIds).some(id => ids.has(id))
     const score = matched.reduce((sum, term) => sum + (explicit.includes(term) ? 6 : 1) * Math.log2(2 + documents.length / Math.max(1, frequency.get(term)!)), 0) + (linked ? 30 : 0)
     return { ...item, matched, score }
-  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score || text(a.row.id).localeCompare(text(b.row.id)))
+  }).filter(item => !terms.length || item.score > 0).sort((a, b) => b.score - a.score || text(a.row.id).localeCompare(text(b.row.id)))
   const offset = Number(args.offset ?? 0), limit = Math.min(Number(args.limit ?? 12), 20)
   const data: Row[] = ranked.slice(offset, offset + limit).map(item => ({ ...storyDigest(item.row, item.kind), matchedTerms: item.matched.slice(0, 8) }))
   const truncated = offset + data.length < ranked.length

@@ -22,7 +22,7 @@
 | T12 | 单书 compileProgress | stage | 三个阶段各一条最新进度，不控制资产生效 |
 | T13 | 单书 storyEditorMemory | id=sessionId | 本书持续Agent工作摘要 |
 | T14 | 单书 storyEditorNotes | id, [sessionId+key], sessionId, kind, status | 有依据的判断/待查事项，P3提交 |
-| T15 | 单书 storyEditorCheckpoints | id, sessionId, stage, phase | P3窗口/全书复核覆盖及恢复 |
+| T15 | 单书 storyEditorCheckpoints | id, sessionId, stage, phase | 旧P3窗口检查点与历史兼容；当前分页进度在T20 |
 | T16 | 单书 storySessions | id, status | 一个活动故事会话及只读旧会话 |
 | T17 | 单书 storySessionEntries | id, [sessionId+ordinal], sessionId, parentId | 原始追加消息、compaction、commit、omit |
 | T18 | 单书 extractionReceipts | key, chapterIndex, substep | 成功子步骤凭证，P1幂等 |
@@ -97,10 +97,20 @@ name、aliases、来源、revision、createdBy、confidence、frequency、mergeN
 
 | 分支 | 必填 | 可选/生命周期 |
 |---|---|---|
-| recordType=run | id、bookId、stage=P1/P2/P3/manual_merge、status、startedAt、planVersion | phase、scope、finishedAt、coverage、input/outputFingerprint、cost/usage、report、aiMode、modelSnapshot、appliedCommands；当前提交结果立即有效，无publish分支 |
+| recordType=run | id、bookId、stage=P1/P2/P3/manual_merge、status、startedAt、planVersion | phase、scope、finishedAt、coverage、input/outputFingerprint、cost/usage、report、aiMode、modelSnapshot、appliedCommands、storyReading；当前提交结果立即有效，无publish分支 |
 | recordType=lease | id=`lease:resource`、bookId、lockKey、owner、runId、expiresAt | lockKey为extraction/world/narrative或extraction:worldAssets/extraction:narrativeAssets；P1分步骤记录extractionStep，另持有对应领域锁；事务获取/续租/释放，导出排除 |
 
 报告含前后数量、机械/AI/手工合并组、成员ID/旧名、保留ID/主名、别名/来源、整编前后tokens、失败/冲突/跳过、externalChanges和费用。报告记录已经生效的修改，不是等待审核生效的合并申请；取消/失败仍保存已提交结果和报告。无合并也有零变更报告。
+
+P3默认使用`story_pages_v3`。可选对象`storyReading`按`window_link`（逐页串联）和`global_review`（全书复核）分别保存以下阅读状态；旧记录缺省时按当前资料建页，串联阶段可承接仍有效的旧覆盖结果。
+
+| 字段 | 内容与赋值 |
+|---|---|
+| pages | 阅读页数组；包含id、type、queue、ids、fingerprint，以及可选checkedFingerprint、sourceFingerprints和reason。程序建页和刷新资料指纹；AI前进时记录当前页已检查的指纹、相关原章正文指纹及说明 |
+| currentPageId | 当前阅读位置；由首次进入、前进、回看或恢复时赋值，界面和下次模型输入读取 |
+| receipts | 按任务和工具调用编号保存导航回执；重放同一次翻页返回原结果 |
+
+阅读页是已有资料的索引，不复制节点或事件线正文。新写保存后重新计算相关页；检查指纹与当前指纹相同且相关原章正文未变化才计入完成。来源指纹按章节编号记录正文哈希，备份换书籍编号不影响结果；有效旧覆盖转换时也记录当前来源。`storyReading`随`pipelineRuns`进入v5备份，旧备份缺少该字段仍可恢复，无需迁移资产表。
 
 ## 5. 进度、会话与事务
 
@@ -108,11 +118,11 @@ P1在T12可选保存extractionJobs（两类任务范围与控制状态）、step
 
 T12保留P1/P2/P3各自进度，增加runId/phase/unit/scope=fullBook/planVersion='2.2'/validity/coverage/dependencyFingerprint。status包含idle/running/paused/cancelling/cancelled/failed/degraded/completed。validity=current/stale仅标识整理结果是否需复核，绝不决定资产能否使用。
 
-T13–T17字段沿用工作摘要、事项、检查点、会话、原始条目形状；新写固定stage=P3，phase为window_link/global_review。每书持续同一active sessionId，窗口/重试/重查不新开；旧归档只读保留。实际世界依赖为kind/id/resolvedId/revision，queryDependencies记录工具参数和返回集合指纹；不纳入全世界指纹阻断无关并行。
+T13–T17字段沿用工作摘要、事项、检查点、会话、原始条目形状；新写固定stage=P3，phase为window_link/global_review。每书持续同一active sessionId，翻页/重试/重查不新开；旧检查点和归档保留兼容。实际世界依赖为kind/id/resolvedId/revision，queryDependencies记录工具参数和返回集合指纹；不纳入全世界指纹阻断无关并行。
 
 ### 5.1 会话与运行实例
 
-bookId（书籍编号）确定资料归属，sessionId（逻辑会话编号）确定消息链，runId（运行编号）确定一次执行及其请求预算。重建 Pi 运行实例时读取原会话编号、消息链和有效摘要；继续已保存会话使用原逻辑编号。切换窗口只改变展示对象，结果写入仍使用启动时绑定的三个编号。
+bookId（书籍编号）确定资料归属，sessionId（逻辑会话编号）确定消息链，runId（运行编号）确定一次执行。重建 Pi 运行实例时读取原会话编号、消息链和有效摘要；继续已保存会话使用原逻辑编号。切换阅读页只改变当前资料，结果写入仍使用启动时绑定的三个编号。
 
 完整原始消息、工具调用与结果、摘要记录和提交确认随所属书保存。消息追加与会话末端、序号在同一事务更新；业务写入与提交确认按领域事务提交。恢复投影读取这些记录，按AI-08处理消息配对和摘要边界。相同提交凭据重放返回原确认。
 
@@ -122,7 +132,7 @@ bookId（书籍编号）确定资料归属，sessionId（逻辑会话编号）�
 
 验收核对切书后原书晚到的回复、刷新重建、工具提交后反馈丢失，以及压缩前后完整历史。导出与恢复须保留会话归属、消息顺序、摘要边界和提交确认；恢复为新书后按新书编号隔离。
 
-P1实体+凭证+生命周期+进度+run覆盖同事务；P2/手工每组目标实体+删除成员+来源映射+报告同事务；P3节点/线/记忆/事项/检查点/覆盖/代码确认同批事务。模型请求不进入数据库长事务。普通人工修改在同一短事务先核对应域锁（锁定拒绝且零写），再比较revision，提交即生效。P2/P3运行中的同域人工修改不再是合法状态；P3跨域世界依赖仍需重核。
+P1实体+凭证+生命周期+进度+run覆盖同事务；P2/手工每组目标实体+删除成员+来源映射+报告同事务；P3每次写工具将本次节点/线/记忆/事项变化与命令凭据同事务保存，导航单独保存阅读进度和导航回执。模型请求不进入数据库长事务。普通人工修改在同一短事务先核对应域锁（锁定拒绝且零写），再比较revision，提交即生效。P2/P3运行中的同域人工修改不再是合法状态；P3跨域世界依赖仍需重核。
 
 阶段结束重新枚举所属域当前ID/revision，人工新改数据未覆盖则补待办；无法收敛可paused/stale，资产仍可用。同run已核查的输出更新相应覆盖版本，不让摘要/派生变化把自身全部窗口反复失效。
 
@@ -152,7 +162,7 @@ T02的llm.config原有地址、模型名和归并窗口继续保留；可选prov
 
 T20 run可记录aiMode=direct/agent及本次modelSnapshot（providerId/api/baseUrl/modelId/modelRole/contextWindow/capabilities/credentialRef元数据）。appliedCommands为`{taskId,operationKey,payloadFingerprint,commitId,committedAt,resultSummary}[]`，中断恢复沿用原runId，显式新一轮重查新runId；同run内operationKey唯一，与当前实体/记忆/覆盖/报告同事务追加；同键同payload返回原确认，不重复应用，同键不同payload拒绝。
 
-commit_story_changes实际提交节点/线、工作记忆与检查点，允许空资产操作仅写memory_update；commit_asset_changes实际提交P2世界合并和报告。它们都是Pi AgentTool.execute调用的应用命令服务，不是仅收集意图的submit_result。final submit_result只提交AgentTaskSummarySchema摘要，不重演业务写入。
+P3 的 save_story_lines、save_story_notes、add_story_nodes 分别保存事件线、线索/工作摘要和补充节点，复用原节点、事件线、记忆及命令表。节点与事件线修改前后值及理由保存到既有 pipelineRuns.assetEdits，整理详情直接读取，命令重放不重复追加；旧记录缺省为空。CommandIntent 登记三个工具的入参；appliedCommands.result 保存 changed、真实节点编号及事件线编号，重放返回原确认。默认 workflow=story_pages_v3 直接开放八工具，以 navigate_story_pages 记录逐页检查；finish_story_batch 核对阅读进度后结束阶段，不要求逐项制造修改。story_lines_v2、commit_story_changes及旧submit_result保留历史兼容。
 
 DB提交成功但工具反馈/最终模型回复未保存时，凭据仍可恢复；重试同operationKey返回alreadyApplied=true。新增字段进入v5单书备份，活Pi Agent对象/控制器/SDK进程状态不序列化为“长期记忆”；恢复依赖应用存档重新建运行对象。
 
@@ -360,7 +370,7 @@ DB提交成功但工具反馈/最终模型回复未保存时，凭据仍可恢�
 | profile.age | number | 可省略；非null；无Schema默认 | — | 原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。 |
 | profile.ageText | string | 可省略；非null；无Schema默认 | — | 原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。 |
 | profile.gender | string | 可省略；非null；无Schema默认 | — | 原文写明的性别，不知道则省略或填 null。 |
-| appearance | string | 可省略；非null；无Schema默认 | — | 外貌。**仅当原文写到**，不要推断。 |
+| appearance | string | 可省略；非null；无Schema默认 | — | 外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。 |
 | personality | string | 可省略；非null；无Schema默认 | — | 性格。**必须能从原文找到依据**，不要凭印象概括。多条用「；」分隔。 |
 | background | string | 可省略；非null；无Schema默认 | — | 背景 / 来历。仅当原文写到。 |
 | relations | object[] | 可省略；非null；无Schema默认 | — | 本章观察到的关系。 |
@@ -461,7 +471,7 @@ DB提交成功但工具反馈/最终模型回复未保存时，凭据仍可恢�
 | totalChapters | number | 必填；非null；无Schema默认 | — | 本书持久章/块数；窗口原章数另按窗口规则计算 |
 | completedChapters | string[] | 必填；非null；无Schema默认 | — | P1两个子步骤都有成功凭证的章/块标识 |
 | failedChapters | string[] | 必填；非null；无Schema默认 | — | 重试后仍失败的章/块标识 |
-| lastWindowIndex | number | 可省略；非null；无Schema默认 | — | 旧P2窗口位置；目标P3以检查点和coverage为准 |
+| lastWindowIndex | number | 可省略；非null；无Schema默认 | — | 旧窗口位置；当前P3以pipelineRuns.storyReading为准 |
 | planKey | string | 可省略；非null；无Schema默认 | — | 计划版本/窗口/策略签名；不匹配则相关覆盖过期 |
 | editorSessionId | string | 可省略；非null；无Schema默认 | — | T16故事会话引用；P2目标运行不设置 |
 | testScope | string[] | 可省略；非null；无Schema默认 | — | 旧样本测试范围；保留历史，不解锁目标正式流程 |
@@ -499,7 +509,7 @@ DB提交成功但工具反馈/最终模型回复未保存时，凭据仍可恢�
 | bookId | string | 必填；非null；无Schema默认 | — | 所属书；必须等于数据库命名中的bookId；导入重写 |
 | sessionId | string | 可省略；非null；无Schema默认 | — | 同书T16逻辑会话ID；新数据必须写；空串/省略只兼容旧历史 |
 | revision | integer | 必填；非null；无Schema默认 | minimum=0 | 乐观并发版本；实体/事项起始1，工作摘要起始0；每次有效修改递增 |
-| workingSummary | string | 必填；非null；无Schema默认 | maxLength=2000 | P3长期工作摘要；模型提供，经长度和业务校验后替换，不当作原文事实 |
+| workingSummary | string | 必填；非null；无Schema默认 | — | P3长期工作摘要；模型提供并替换，不做字数硬核验，不当作原文事实 |
 | dataFingerprint | string | 必填；非null；无Schema默认 | — | 摘要依据指纹；空记忆返回空串；按实际相关依赖检查变化 |
 | updatedAt | string | 必填；非null；无Schema默认 | — | 应用提交时的ISO 8601时间；不替代revision并发检查 |
 
@@ -520,15 +530,15 @@ DB提交成功但工具反馈/最终模型回复未保存时，凭据仍可恢�
 | key | string | 必填；非null；无Schema默认 | minLength=1；maxLength=120 | 稳定业务键；各表构造方式见下文 |
 | kind | "decision" 或 "review" | 必填；非null；无Schema默认 | — | 按表区分事项类型、会话类型或资产类型；取值以本行枚举为准 |
 | status | "active" 或 "resolved" | 必填；非null；无Schema默认 | — | 本表状态枚举；不得把事项status与validity混为一谈 |
-| statement | string | 必填；非null；无Schema默认 | minLength=1；maxLength=1000 | 事项判断或复核结论；同一key更新，不保存长篇推理 |
+| statement | string | 必填；非null；无Schema默认 | minLength=1 | 事项判断或复核结论；同一key更新 |
 | nodeIds | string[] | 必填；非null；无Schema默认 | maxItems=20 | 同书节点ID集合；事件线非空，事项可空；代码核引用并排序去重 |
 | lineIds | string[] | 必填；非null；无Schema默认 | maxItems=20 | 同书事件线ID；工作事项可为空 |
-| evidence | object[] | 必填；非null；无Schema默认 | maxItems=5 | 逐字引文依据；无节点/线引用时至少一条有效依据 |
+| evidence | object[] | 必填；非null；无Schema默认 | maxItems=5 | 原文定位线索；新P3可为空，引用章节须属于本书 |
 | evidence[].chapterIndex | string | 必填；非null；无Schema默认 | — | 本书章节/切块标识，关联chapters.chapterIndex |
-| evidence[].quote | string | 必填；非null；无Schema默认 | minLength=1；maxLength=1000 | 该章节中连续存在的逐字原句，不要改写、拼接或增加标点。 |
+| evidence[].quote | string | 必填；非null；无Schema默认 | minLength=1 | 参考片段或合理概括，用于回查原文；新P3不逐字拦截 |
 | id | string | 必填；非null；无Schema默认 | — | 记录主键；生成后稳定，更新不重新编号 |
 | bookId | string | 必填；非null；无Schema默认 | — | 所属书；必须等于数据库命名中的bookId；导入重写 |
-| revision | integer | 必填；非null；无Schema默认 | minimum=1 | 本次工作摘要修订号=提交前memory.revision+1；新/更新事项都赋本批修订号，不是各笔记独立加1 |
+| revision | integer | 必填；非null；无Schema默认 | minimum=1 | 事项自己的版本；新建为1，有实际变化时按原事项版本加1 |
 | sessionId | string | 可省略；非null；无Schema默认 | — | 同书T16逻辑会话ID；新数据必须写；空串/省略只兼容旧历史 |
 | stage | P3 / P2 | 必填；非null；无Schema默认 | — | 阶段；新记忆/检查点固定P3，P2只允许旧历史；进度为P1/P2/P3 |
 | basisFingerprint | string | 必填；非null；无Schema默认 | — | 事项所引用节点/线/原文与实际世界依赖的指纹 |
@@ -558,7 +568,7 @@ DB提交成功但工具反馈/最终模型回复未保存时，凭据仍可恢�
 
 库：`westworld_canon_{bookId}` 目标v5。索引：`id, sessionId, stage, phase, status, updatedAt`。
 
-每会话阶段范围一个恢复点；P3代码写，恢复核验实际依赖；过期记录不能当完成。
+旧窗口流程每会话阶段范围一个恢复点；恢复核验实际依赖，过期记录不能当完成。当前P3的阅读位置和逐页完成状态见T20.storyReading。
 
 | 字段路径 | 类型/枚举 | 必填、null、默认 | 结构限制 | 含义、来源与更新 |
 |---|---|---|---|---|
@@ -624,7 +634,9 @@ DB提交成功但工具反馈/最终模型回复未保存时，凭据仍可恢�
 
 库：`westworld_canon_{bookId}` 目标v5。索引：`id, &[sessionId+ordinal], sessionId, parentId, type`。
 
-每原始消息/压缩/省略标记/代码提交一行；只追加，Pi事件落库；按ordinal读取，压缩不删除原始记录。
+每原始消息/压缩/省略标记/代码提交一行；Pi事件追加落库，按ordinal读取，压缩不删除原始记录。P2人物详情的完成替换规则见下文；P3持续会话仍保留原始历史。
+
+P2同书同人物同类型（资料/关系）新完成记录全部请求最终落库后，清理被替代的旧详情消息、工作输入、压缩及请求/快照记录。业务报告、资产及命令凭证保留；失败、暂停、未完成或新链路不完整时保留旧完成详情和当前续跑记录。旧运行可继续或会话有有效租约时跳过。清理在trace写入屏障后的事务中进行，保留仍被引用快照并修复parentId及session.leafId；失败回滚，后续完成或打开详情重试。无新表、无备份版本变化；导入旧历史沿同一入口维护。
 
 | 字段路径 | 类型/枚举 | 必填、null、默认 | 结构限制 | 含义、来源与更新 |
 |---|---|---|---|---|
@@ -750,6 +762,7 @@ run为每次运行/手动合并一行；lease为资源互斥行；编排器和�
 | [recordType=run]::planVersion | "2.2" | 必填；非null；无Schema默认 | — | 目标计划版本2.2 |
 | [recordType=run]::phase | string | 可省略；非null；无Schema默认 | — | P2=mechanical/ai_identity/optimize/report；P3=window_link/global_review；旧link/review仅历史 |
 | [recordType=run]::scope | "fullBook" | 可省略；非null；无Schema默认 | — | 全书正式运行固定fullBook |
+| [recordType=run]::storyReading | object | 可省略；非null；无Schema默认 | — | P3按阶段保存pages/currentPageId/receipts；字段与恢复规则见4.3，旧记录缺省兼容 |
 | [recordType=run]::inputFingerprint | string | 可省略；非null；无Schema默认 | — | 输入原文/策略/配置依据指纹；输入改变不自动覆盖人工资料 |
 | [recordType=run]::outputFingerprint | string | 可省略；非null；无Schema默认 | — | 本次已应用结果指纹 |
 | [recordType=run]::coverage | object | 可省略；非null；无Schema默认 | — | 当前运行覆盖清单；阶段结束重新枚举，不能仅由模型自报完成 |
@@ -838,8 +851,8 @@ run为每次运行/手动合并一行；lease为资源互斥行；编排器和�
 | T10/T11融合 | 同组目标保留id/bookId/创建来源；资料精确去重并融合，sourceChapters取并集；mergeFacts保留事实与chapters；目标revision递增，删除成员并更新T19/报告同事务。人工改事实字段后清optimizedFactIds和optimizationFingerprint。 |
 | T12 | 新正式运行必须写scope=fullBook、planVersion=2.2、runId、phase、unit、validity=current及coverage；completedChapters/failedChapters初始[]，partialChapters={}。P1 phase使用worldAssets/narrativeAssets；只有两张成功凭证齐全才入completedChapters。旧lastWindowIndex/testScope不能升级为目标已完成。 |
 | T13 | 无持久摘要时工具返回虚拟空记录：id=sessionId、bookId、sessionId、revision=0、workingSummary/dataFingerprint/updatedAt均空串，不为一次读自动建表行。首次有效memory_update写revision=1，后续加1。 |
-| T14 | 新笔记id取该书所有SN编号最大值+1，格式SN加至少6位数字；sessionId必填，stage=P3。相同(sessionId,key)更新原行且createdAt不变；新/更新笔记revision均取本次memory.revision（提交前摘要revision+1），不按笔记旧版本各自加1。status=resolved要求旧事项存在，kind不能直接改变；必须有有效nodeIds/lineIds/evidence至少一种依据。validity读时计算，不持久存储。 |
-| T15 | 检查点键由会话、stage、phase、scopeIds构成确定性键；恢复对sourceFingerprint、worldDependencies、queryDependencies复验。window_link保存window={start,end}，global_review可省略window。stage=P2/phase=link或review仅旧历史，不计目标覆盖。 |
+| T14 | 新事项分配UUID；sessionId必填，stage=P3。相同(sessionId,key)更新原行且createdAt不变；revision从1开始，实际变化时按该事项旧版本加1，与摘要版本独立。新P3可先保存待查问题，省略的旧引用和证据保留；已有事项标resolved前须读详情。validity读时计算，不持久存储；旧SN编号仍可读取。 |
+| T15 | 旧窗口流程兼容：检查点键由会话、stage、phase、scopeIds构成确定性键；恢复对sourceFingerprint、worldDependencies、queryDependencies复验。window_link保存window={start,end}，global_review可省略window。当前P3使用T20.storyReading，不以旧检查点替代本轮阅读状态。 |
 | T16/T17 | 新故事会话UUID，profile=story_editor、kind=initial、status=active、nextOrdinal=0；leafId省略。一次追加原子写entry、递增nextOrdinal并更新leafId/updatedAt。entry.id UUID，首parentId=null；租约字段只用于进程协调，备份清除。 |
 | T18 | key=chapterIndex+':'+substep；originIds可空；committedAt当前ISO时间；与该子步骤实体、T19、T12、T20覆盖同事务。inputFingerprint变化不删除旧成功凭证或自动覆盖数据。 |
 | T19 | key=kind+':'+originId。创建live/currentId=originId/revision=1；合并将所有来源扁平指向最终保留ID并增版本；删除改deleted并移除currentId。墓碑和旧ID不可被新P1重用。 |
@@ -849,7 +862,7 @@ run为每次运行/手动合并一行；lease为资源互斥行；编排器和�
 
 **准确命名：** 人物关系字段是`relation_label`；事实来源字段是`mergeFacts[].chapters`。节点使用`world_delta/new_facts/started_actions/time_text/time_hint`；事件线使用`lineStatus`，输入工具的`status`只是过滤参数。禁止自行改写成worldStateChanges/newFacts/initiatedActions/timeText或把lineStatus建成status。
 
-**恢复与删除：** T01/T02不随书删。删书删除该书全部15表和T03书架项；跨库不能保证单事务，失败须暴露残留。人工删资产按04清引用并写T19墓碑，不删除提取成功凭证。T13–T17历史不因压缩或重查清空。18表中只有T01/T02排除单书备份，T03映射book.json，T05映射chapters/*.txt，T20只导出run分支；所有导入归属重写为新bookId。
+**恢复与删除：** T01/T02不随书删。删书删除该书全部15表和T03书架项；跨库不能保证单事务，失败须暴露残留。人工删资产按04清引用并写T19墓碑，不删除提取成功凭证。T13–T17历史不因压缩或重查清空；P2人物详情按T17的成功完成替换规则清理。18表中只有T01/T02排除单书备份，T03映射book.json，T05映射chapters/*.txt，T20只导出run分支；所有导入归属重写为新bookId。
 
 **旧数据迁移差异：** 旧可编辑表存在但空必须迁为空，不从发布副本补回；旧人物speech_style_sample→speechStyleSample，已有mergeFacts[].chapters不改名。人物/地点revision缺失补1；nameSource无证据证明人工时用extracted并保留现有name；不得凭字段非空推断manualKeep。旧节点来源P2保留兼容；来源缺失不能伪造历史，迁移报告登记按旧P1节点默认的兼容处理。新增运行才能使用完整2.2阶段字段，旧摘要/事项/检查点保留而标失效。
 

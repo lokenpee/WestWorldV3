@@ -37,12 +37,12 @@ export function displayContent(value: unknown): string {
 
 export function messageRows(messages: Row[]): Row[] {
   return messages.flatMap(message => {
-    if (message.type === 'function_call') return [{ role: 'assistant', content: [{ type: 'toolCall', name: message.name, arguments: message.arguments }] }]
-    if (message.type === 'function_call_output') return [{ role: 'tool', content: message.output }]
+    if (message.type === 'function_call') return [{ role: 'assistant', content: [{ type: 'toolCall', id: message.call_id, name: message.name, arguments: message.arguments }] }]
+    if (message.type === 'function_call_output') return [{ role: 'tool', tool_call_id: message.call_id, content: message.output }]
     const blocks = requestRows(message.content)
     if (blocks.some(block => block.type === 'tool_result' || block.type === 'tool_use')) return blocks.map(block => block.type === 'tool_result'
-      ? { role: 'tool', content: block.content }
-      : block.type === 'tool_use' ? { role: 'assistant', content: [{ type: 'toolCall', name: block.name, arguments: block.input }] }
+      ? { role: 'tool', tool_call_id: block.tool_use_id, isError: block.is_error, content: block.content }
+      : block.type === 'tool_use' ? { role: 'assistant', content: [{ type: 'toolCall', id: block.id, name: block.name, arguments: block.input }] }
       : { role: message.role, content: [block] })
     return [message]
   })

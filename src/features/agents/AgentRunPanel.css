@@ -292,3 +292,20 @@
   .run-api-content { padding: 0 0.65rem 0.75rem; }
   .run-stats { gap: 0.5rem 0.75rem; }
 }
+
+.p2-person-picker { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 18px 0; }
+.p2-person-picker label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.p2-person-picker label:first-child { flex: 1 1 260px; }
+.p2-person-picker label:nth-child(2) { flex: 0 1 170px; }
+.p2-person-picker select, .p2-person-picker input { padding: 8px; width: 100%; min-width: 0; border: 1px solid var(--border); border-radius: 5px; background: white; }
+.p2-change { margin: 14px 0; padding: 14px; border: 1px solid var(--border); border-radius: 6px; }
+.p2-change-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.p2-change-columns > section { min-width: 0; padding: 10px; background: #f7f8f9; border-radius: 5px; }
+.p2-change h4, .p2-change h5 { margin: 0 0 10px; }
+.p2-change pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.p2-merge-history > section { border: 1px solid var(--border); padding: 14px; margin: 14px 0; border-radius: 7px; }
+.p2-merge-history details { padding: 12px; border-top: 1px solid var(--border); }
+.p2-merge-history summary { cursor: pointer; }
+.p2-merge-history small { color: var(--muted); display: block; margin-top: 5px; }
+
+.p2-step-tabs { flex-wrap: wrap; overflow-x: visible; }

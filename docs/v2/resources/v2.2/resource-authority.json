@@ -71,7 +71,14 @@
       "path": "prompts/active/p3-story.md",
       "consumers": [
         "src/features/story/review.ts",
-        "src/features/story/service.ts"
+        "src/features/story/service.ts",
+        "src/features/story/readingService.ts"
+      ]
+    },
+    {
+      "path": "prompts/active/p3-review.md",
+      "consumers": [
+        "src/features/story/readingService.ts"
       ]
     },
     {
@@ -95,8 +102,7 @@
     {
       "path": "prompts/active/story.txt",
       "consumers": [
-        "src/features/story/review.ts",
-        "src/features/story/service.ts"
+        "src/features/story/prompt.ts"
       ]
     },
     {
@@ -125,12 +131,6 @@
     },
     {
       "path": "prompts/active/p2-organization-directory.md",
-      "consumers": [
-        "src/features/world/organization.ts"
-      ]
-    },
-    {
-      "path": "prompts/active/p2-organization-candidate.md",
       "consumers": [
         "src/features/world/organization.ts"
       ]

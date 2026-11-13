@@ -13,6 +13,7 @@ import { rebaseStoryCoverage, saveStoryCoverage } from '../story/coverage'
 import { applyAliasChecks } from './assetAliases'
 import { applyOrganizationTool, assertBasis, hasCharacterDetailRead, organizationTool, reconcileOrganizationAfterWrite, replayOrganizationSubmit } from './organizationCommands'
 import { noteOrganizationWrite } from './organizationReview'
+import { isStoryWrite, storyAssetEdits, storyPayload, storyWriteTools } from './storyCommands'
 
 export interface QueryRead { tool: string; args: Row; resultFingerprint: string }
 export interface RecordRead { table: string; id: string; resolvedId: string | null; revision: number; factFingerprint: string }
@@ -175,19 +176,35 @@ async function applyAssets(store: AgentStore, scope: Scope, payload: Row, readSe
 }
 async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet: ReadSet, queryResults: Map<QueryRead, Row>) {
   const timestamp = new Date().toISOString(); const remap = new Map<string, string>()
+  const modern = ['story_lines_v2', 'story_pages_v3'].includes(scope.workflow ?? '')
+  const paged = scope.workflow === 'story_pages_v3'
+  let changed = false
+  const savedNodes: Row[] = [], lineIds: string[] = []
   const wasDetailed = (table: string, id: string) => {
     const tool = ({ nodes: 'get_node_detail', eventLines: 'get_event_line_detail', storyEditorNotes: 'get_editor_note_detail' } as Record<string, string>)[table]
-    return readSet.queries.some(query => query.tool === tool && records(queryResults.get(query)?.data).some(row => row.id === id && !row.fields_omitted && (row.text === undefined || text(row.text).length > 0)))
+    const kind = ({ nodes: 'node', eventLines: 'eventLine', storyEditorNotes: 'note' } as Record<string, string>)[table]
+    const details = readSet.queries.filter(query => query.tool === tool || query.tool === 'get_story_detail' && query.args.kind === kind).flatMap(query => records(queryResults.get(query)?.data)).filter(row => row.id === id && !row.fields_omitted)
+    if (paged && details.length) return true
+    if (details.some(row => row.text === undefined)) return true
+    let end = 0
+    for (const row of details.sort((a, b) => Number(a.charOffset) - Number(b.charOffset))) {
+      if (Number(row.charOffset) > end) break
+      end = Math.max(end, Number(row.charOffset) + text(row.text).length)
+      if (end >= Number(row.totalChars)) return true
+    }
+    return false
   }
   const changedChapters = new Set<string>()
   for (const source of records(payload.new_nodes)) {
     const chapter = await store.get('chapters', text(source.chapterIndex)); const original = await store.get('chapterTexts', text(source.chapterIndex))
     if (!chapter || chapter.bookId !== scope.bookId || !original || !text(source.name).trim()) throw new Error('INVALID_ARGS:新增节点的章节与名称须有效。')
+    if (modern && !readSet.records.some(read => read.table === 'chapterTexts' && read.id === source.chapterIndex)) throw new Error('INVALID_ARGS:补充节点前请读取对应章节原文。')
     const clientId = text(source.client_id)
     if (!clientId || remap.has(clientId) || await store.get('nodes', clientId) || await store.get('assetLifecycle', `node:${clientId}`)) throw new Error('INVALID_ARGS:新增节点的临时编号须唯一，且与已有编号区分。')
     const duplicate = (await store.rows('nodes')).find(row => row.chapterIndex === source.chapterIndex && row.name === source.name && text(row.quote) === text(source.quote))
-    if (duplicate) { remap.set(clientId, text(duplicate.id)); continue }
+    if (duplicate) { remap.set(clientId, text(duplicate.id)); savedNodes.push({ id: duplicate.id, name: duplicate.name, chapterIndex: duplicate.chapterIndex, reused: true }); continue }
     const id = `U-${crypto.randomUUID()}`; remap.set(clientId, id)
+    changed = true; savedNodes.push({ id, name: source.name, chapterIndex: source.chapterIndex, reused: false })
     const { client_id: _clientId, offset: _offset, ...fields } = source
     const quote = text(source.quote); const offset = quote ? text(original.text).indexOf(quote) : -1
     const nodes = await store.rows('nodes')
@@ -213,7 +230,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     const old = existingId ? await store.get('eventLines', existingId) : undefined
     if (op.op !== 'create' && (!old || old.bookId !== scope.bookId)) throw new Error('SCOPE:事件线不存在或不属于当前书籍。')
     const affectedIds = [...(existingId ? [existingId] : []), ...strings(op.merge_line_ids)]
-    for (const id of affectedIds) if (!wasDetailed('eventLines', id)) throw new Error('INVALID_ARGS:修改事件线前须调用get_event_line_detail读取详情。')
+    for (const id of affectedIds) if (!wasDetailed('eventLines', id)) throw new Error(modern ? 'INVALID_ARGS:修改事件线前须调用get_story_detail读取详情。' : 'INVALID_ARGS:修改事件线前须调用get_event_line_detail读取详情。')
     const merging = await Promise.all(strings(op.merge_line_ids).map(id => store.get('eventLines', id)))
     if (merging.some(row => !row || row.bookId !== scope.bookId) || strings(op.merge_line_ids).includes(existingId)) throw new Error('INVALID_ARGS:事件线合并成员无效。')
     const nodeIds = [...new Set([...(op.op === 'append' || op.op === 'merge' ? strings(old?.nodeIds) : []), ...merging.flatMap(row => strings(row?.nodeIds)), ...strings(op.node_ids).map(resolveId)])]
@@ -222,16 +239,21 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     if (!nodeIds.length || evidenceIds.some(id => !nodeIds.includes(id))) throw new Error('INVALID_ARGS:事件线成员与依据节点不一致。')
     const nodes = await Promise.all(nodeIds.map(id => store.get('nodes', id)))
     if (nodes.some(row => !row || row.bookId !== scope.bookId)) throw new Error('SCOPE:事件节点不存在或不属于当前书籍。')
-    const previousMembers = new Set([...(op.op === 'append' || op.op === 'merge' ? strings(old?.nodeIds) : []), ...merging.flatMap(row => strings(row?.nodeIds))])
+    const previousMembers = new Set([...(op.op === 'append' || op.op === 'merge' || modern && op.op === 'update' ? strings(old?.nodeIds) : []), ...merging.flatMap(row => strings(row?.nodeIds))])
     for (const id of [...nodeIds, ...evidenceIds]) {
       if (previousMembers.has(id) && !evidenceIds.includes(id)) continue
-      if (![...remap.values()].includes(id) && !wasDetailed('nodes', id)) throw new Error('INVALID_ARGS:新串联或作为依据的节点须先调用get_node_detail读取详情。')
+      if (![...remap.values()].includes(id) && !wasDetailed('nodes', id)) throw new Error(modern ? 'INVALID_ARGS:新串联或作为依据的节点须先调用get_story_detail读取详情。' : 'INVALID_ARGS:新串联或作为依据的节点须先调用get_node_detail读取详情。')
     }
-    if (op.op === 'create' && (await store.rows('eventLines')).some(line => canonical([...strings(line.nodeIds)].sort()) === canonical([...nodeIds].sort()))) continue
+    const duplicate = op.op === 'create' ? (await store.rows('eventLines')).find(line => canonical([...strings(line.nodeIds)].sort()) === canonical([...nodeIds].sort()) && (!modern || line.title === op.title)) : undefined
+    if (duplicate) { lineIds.push(text(duplicate.id)); continue }
     const id = existingId || `U-${crypto.randomUUID()}`
+    lineIds.push(id)
     const chapterOrder = new Map((await store.rows('chapters')).map(row => [text(row.chapterIndex), Number(row.order)]))
     nodes.sort((a, b) => (chapterOrder.get(text(a?.chapterIndex)) ?? 0) - (chapterOrder.get(text(b?.chapterIndex)) ?? 0) || Number(a?.order) - Number(b?.order) || text(a?.id).localeCompare(text(b?.id)))
-    await store.put('eventLines', { ...old, id, bookId: scope.bookId, title: op.title ?? old?.title, nodeIds: nodes.map(row => text(row?.id)), chapters: [...new Set(nodes.map(row => text(row?.chapterIndex)))], cause: op.cause, process: op.process, result: op.result, lineStatus: op.line_status, revision: Number(old?.revision ?? 0) + 1, createdBy: old?.createdBy ?? 'P3', updatedAt: timestamp })
+    const content = { title: op.title ?? old?.title, nodeIds: nodes.map(row => text(row?.id)), chapters: [...new Set(nodes.map(row => text(row?.chapterIndex)))], cause: op.cause, process: op.process, result: op.result, lineStatus: op.line_status }
+    if (old && !strings(op.merge_line_ids).length && canonical(content) === canonical(Object.fromEntries(Object.keys(content).map(key => [key, old[key]])))) continue
+    changed = true
+    await store.put('eventLines', { ...old, ...content, id, bookId: scope.bookId, revision: Number(old?.revision ?? 0) + 1, createdBy: old?.createdBy ?? 'P3', updatedAt: timestamp })
     const line = (await store.get('eventLines', id))!
     const times = nodes.map(row => text(row?.timeCoord)).filter(Boolean).sort()
     delete line.timeRange
@@ -249,25 +271,38 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     const eventLineIds = lines.filter(line => strings(line.nodeIds).includes(text(node.id))).map(line => text(line.id)).sort()
     if (canonical(eventLineIds) !== canonical(strings(node.eventLineIds).sort())) await store.put('nodes', { ...node, eventLineIds, revision: Number(node.revision) + 1 })
   }
-  const memoryUpdate = payload.memory_update as Row
+  const memoryUpdate = payload.memory_update as Row | undefined
+  if (!memoryUpdate) return { changed, nodes: savedNodes, lineIds }
   const memoryId = scope.sessionId ?? 'memory'
   const previous = await store.get('storyEditorMemory', memoryId)
-  if (!readSet.records.some(read => read.table === 'storyEditorMemory' && read.id === memoryId)) throw new Error('INVALID_ARGS:更新工作摘要前须读取当前工作记忆。')
-  await store.put('storyEditorMemory', { id: memoryId, bookId: scope.bookId, ...(scope.sessionId ? { sessionId: scope.sessionId } : {}), workingSummary: memoryUpdate.workingSummary, revision: Number(previous?.revision ?? 0) + 1, dataFingerprint: await store.wait(hash(await store.rows('nodes'))), updatedAt: timestamp })
+  if (memoryUpdate.workingSummary !== undefined && (!modern || memoryUpdate.workingSummary !== previous?.workingSummary)) {
+    if (!readSet.records.some(read => read.table === 'storyEditorMemory' && read.id === memoryId)) throw new Error('INVALID_ARGS:更新工作摘要前须读取当前工作记忆。')
+    changed = true
+    await store.put('storyEditorMemory', { id: memoryId, bookId: scope.bookId, ...(scope.sessionId ? { sessionId: scope.sessionId } : {}), workingSummary: memoryUpdate.workingSummary, revision: Number(previous?.revision ?? 0) + 1, dataFingerprint: await store.wait(hash(await store.rows('nodes'))), updatedAt: timestamp })
+  }
   for (const note of records(memoryUpdate.notes)) {
-    if (!strings(note.nodeIds).length && !strings(note.lineIds).length && !records(note.evidence).length) throw new Error('INVALID_ARGS:工作事项须有节点、事件线或引文依据。')
+    if (paged) {
+      for (const evidence of records(note.evidence)) {
+        const chapter = await store.get('chapters', text(evidence.chapterIndex))
+        if (!chapter || chapter.bookId !== scope.bookId) throw new Error('SCOPE:线索引用的章节不属于当前书籍。')
+      }
+    } else await assertEvidence(store, records(note.evidence))
+    if (!paged && !strings(note.nodeIds).length && !strings(note.lineIds).length && !records(note.evidence).length) throw new Error('INVALID_ARGS:工作事项须有节点、事件线或引文依据。')
     for (const id of strings(note.nodeIds)) if (!await store.get('nodes', resolveId(id))) throw new Error('INVALID_ARGS:事项节点不存在。')
     for (const id of strings(note.lineIds)) if (!await store.get('eventLines', id)) throw new Error('INVALID_ARGS:事项事件线不存在。')
     const old = (await store.rows('storyEditorNotes')).find(row => row.sessionId === scope.sessionId && row.key === note.key)
-    if (old && note.status === 'resolved' && !wasDetailed('storyEditorNotes', text(old.id))) throw new Error('INVALID_ARGS:解决已有线索前须调用get_editor_note_detail核对该事项。')
+    if (old && note.status === 'resolved' && !wasDetailed('storyEditorNotes', text(old.id))) throw new Error(modern ? 'INVALID_ARGS:解决已有线索前须调用get_story_detail核对该事项。' : 'INVALID_ARGS:解决已有线索前须调用get_editor_note_detail核对该事项。')
     const resolvedNote = { ...note, nodeIds: strings(note.nodeIds).map(resolveId) }
+    if (old && canonical(resolvedNote) === canonical(Object.fromEntries(Object.keys(resolvedNote).map(key => [key, old[key]])))) continue
+    changed = true
     await store.put('storyEditorNotes', { ...old, ...resolvedNote, id: old?.id ?? crypto.randomUUID(), bookId: scope.bookId, ...(scope.sessionId ? { sessionId: scope.sessionId } : {}), revision: Number(old?.revision ?? 0) + 1, stage: 'P3', basisFingerprint: await noteFingerprint(store, resolvedNote), createdAt: old?.createdAt ?? timestamp, updatedAt: timestamp })
   }
+  return { changed, nodes: savedNodes, lineIds }
 }
 
 export const assetReviewTools = ['edit_character', 'edit_location', 'edit_event_node', 'edit_event_line', 'set_character_relation', 'delete_character_relation'] as const
 export const relationTools = ['set_character_relation', 'delete_character_relation'] as const
-export const organizationWriteTools = [...assetReviewTools, 'merge_assets', 'save_candidate_group', 'resolve_candidate_group', 'clear_candidate_groups', 'record_organization_progress', 'submit_profile_review', 'submit_relation_review'] as const
+export const organizationWriteTools = [...assetReviewTools, 'save_identity_groups', 'navigate_identity_pages', 'merge_assets', 'save_candidate_group', 'resolve_candidate_group', 'clear_candidate_groups', 'record_organization_progress', 'submit_profile_review', 'submit_relation_review'] as const
 const editTables: Record<string, { table: string; kind: 'character' | 'location' | 'node' | 'eventLine'; detail: string }> = {
   edit_character: { table: 'characters', kind: 'character', detail: 'get_character_detail' },
   edit_location: { table: 'locations', kind: 'location', detail: 'get_location_detail' },
@@ -370,7 +405,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
   const organization = scope.phase === 'character_organization'
   const allowed = scope.profile === 'asset_editor'
     ? (organization ? [...organizationWriteTools] : scope.phase === 'asset_review' ? [...(relationOnly ? relationTools : assetReviewTools)] : ['commit_asset_changes'])
-    : ['commit_story_changes']
+    : ['commit_story_changes', ...storyWriteTools]
   if (!allowed.includes(name)) throw new Error(relationOnly ? 'WRITE_SCOPE_DENIED:人物关系专项只允许保存或删除人物对关系。' : 'SCOPE:当前职责或阶段不能执行此写工具。')
   validate(toolContracts[scope.profile].find(tool => tool.name === name)!.parameters, args)
   const operationKey = text(args.operationKey); const payload = name === 'commit_asset_changes' || name === 'commit_story_changes' ? args.payload as Row : args
@@ -407,22 +442,24 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       const intent = records(run.commandIntents).find(row => row.operationKey === operationKey && row.taskId === scope.taskId && row.state === 'prepared')
       if (!intent) throw new Error('CONFLICT:命令意图未就绪。')
       const expected = intent.expectedReadSet as unknown as ReadSet
-      const dedicated = organization && (name === 'submit_profile_review' || name === 'submit_relation_review')
+      const dedicated = organization && ['submit_profile_review', 'submit_relation_review', 'save_identity_groups', 'navigate_identity_pages'].includes(name)
       updatedReads = structuredClone(readSet)
       if (organization) { bindReviewReads(expected, run); bindReviewReads(updatedReads, run) }
       const queryResults = organization && name === 'record_organization_progress' ? new Map<QueryRead, Row>() : dedicated ? new Map<QueryRead, Row>() : await validateReadSet(store, scope, expected)
       const previousStory = new Map<string, Row>()
-      if (name === 'commit_story_changes') for (const table of ['nodes', 'eventLines', 'storyEditorNotes']) for (const row of await store.rows(table)) previousStory.set(`${table}:${row.id}`, row)
+      if (name === 'commit_story_changes' || isStoryWrite(name)) for (const table of ['nodes', 'eventLines', 'storyEditorNotes']) for (const row of await store.rows(table)) previousStory.set(`${table}:${row.id}`, row)
       const workTables: Record<string, string> = { character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' }
       const workItems = records((task.input as Row | undefined)?.workItems)
       const before = await Promise.all(workItems.map(item => workTables[text(item.kind)] ? store.get(workTables[text(item.kind)], text(item.id)) : undefined))
       const commitId = crypto.randomUUID()
+      let storyResult: Row | undefined
       if (name === 'commit_asset_changes') await applyAssets(store, scope, payload, expected, commitId)
       else if (name === 'commit_story_changes') await applyStory(store, scope, payload, expected, queryResults)
+      else if (isStoryWrite(name)) storyResult = await applyStory(store, scope, await storyPayload(store, scope, name, args), expected, queryResults)
       signal?.throwIfAborted()
       const toolResult = organizationTool(name)
         ? await applyOrganizationTool(store, scope, name, args, expected, commitId, timestamp) as ToolWriteResult
-        : (assetReviewTools as readonly string[]).includes(name) ? await applyAgentAssetTool(store, scope, name, args, expected, commitId, timestamp) as ToolWriteResult : undefined
+        : (assetReviewTools as readonly string[]).includes(name) ? await applyAgentAssetTool(store, scope, name, args, expected, commitId, timestamp) as ToolWriteResult : storyResult ? { ...storyResult, summary: storyResult.changed ? '故事资料已保存。' : '资料一致，本次未修改。' } as ToolWriteResult : undefined
       if (toolResult?.status === 'failed') {
         const latest = (await store.get('pipelineRuns', scope.runId))!
         await store.put('pipelineRuns', { ...latest, commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'rejected', updatedAt: timestamp, error: { code: 'SUBMIT_FAILED', message: toolResult.summary } } : row) })
@@ -431,6 +468,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       await noteOrganizationWrite(store, scope, name, args, toolResult?.changed === true)
       const summary = toolResult?.summary ?? (name === 'commit_asset_changes' ? '世界资产修改已提交。' : '叙事资产与工作记忆已提交。')
       const latest = (await store.get('pipelineRuns', scope.runId))!
+      if (storyResult) latest.assetEdits = [...records(latest.assetEdits), ...await storyAssetEdits(store, previousStory, name, args, storyResult, commitId, timestamp)]
       const changed = [...records(task.reviewedItems)]
       const businessContent = (row: Row | undefined) => {
         if (!row) return row
@@ -493,7 +531,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       await appendEntry(store, scope, { type: 'commit', summary: `${commitId}：${summary}` })
       await rebaseReadSet(store, scope, updatedReads)
       await saveTask(store, scope, { readSet: updatedReads })
-      if (name === 'commit_story_changes') {
+      if (name === 'commit_story_changes' || isStoryWrite(name)) {
         await rebaseStoryCoverage(store, scope.runId, previousStory)
         const latestTask = (await taskOf(store, scope)).task
         await saveStoryCoverage(store, scope.runId, latestTask, records(latestTask.reviewedItems).filter(item => item.outcome === 'changed'))

@@ -30,7 +30,7 @@ it('当前格式全流程备份恢复保留有效P2待办、P3完成状态和原
       if (body.tools[0].function.parameters.properties.characters) return agentStream([{ name: 'submit_result', args: { characters: [{ name: '沈青', confidence: 1 }, { name: '顾衡', confidence: 1 }], locations: [] } }])
       return agentStream([{ name: 'submit_result', args: { nodes: [{ name: '收信', summary: '沈青收到信', actors: ['沈青'], quote: '沈青收到信。', confidence: 1 }, { name: '转交信', summary: '沈青转交信', actors: ['沈青'], quote: '沈青转交信。', confidence: 1 }] } }])
     }
-    if (body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'get_editor_memory')) return storyResponse(body)
+    if (body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'finish_story_batch')) return storyResponse(body)
     const users = body.messages.filter((row: { role: string }) => row.role === 'user').map((row: { content: string | { text: string }[] }) => typeof row.content === 'string' ? row.content : row.content.map(part => part.text).join(''))
     const input = JSON.parse(users.find((value: string) => value.startsWith('{'))!)
     if (!finishWorld && input.workItems[0].id === 'C1-P002') return agentStream([{ name: 'submit_result', args: { status: 'partial', commitIds: [], summary: '待核实', reviewedItems: [], remainingWorkIds: [input.workItems[0].workItemId] } }])
@@ -65,7 +65,7 @@ it('当前格式全流程备份恢复保留有效P2待办、P3完成状态和原
   expect(runs.find(row => row.stage === 'P1').tasks.map((task: { inputFingerprint: string }) => task.inputFingerprint)).toEqual(originalRuns.find(row => row.stage === 'P1').tasks.map((task: { inputFingerprint: string }) => task.inputFingerprint))
   for (const run of runs.filter(row => row.stage !== 'P1')) for (const task of run.tasks ?? []) expect(task.inputFingerprint).toBe(await hash(task.input))
   const restoredStory = createStoryService(workspace, models)
-  expect((await restoredStory.read(restored.id)).completed).toBe(1)
+  expect((await restoredStory.read(restored.id)).reading?.complete).toBe(true)
   const calls = fetcher.mock.calls.length
   await createExtractionService(workspace, models).start(restored.id)
   expect(fetcher).toHaveBeenCalledTimes(calls)

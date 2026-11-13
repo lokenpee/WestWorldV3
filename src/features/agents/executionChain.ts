@@ -1,5 +1,6 @@
 import type { Row } from './repository'
 import type { ExecutionChain } from './trace'
+import { displayContent, messageRows, toolResultContent } from './requestPresentation'
 
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const record = (value: unknown): Row => value && typeof value === 'object' ? value as Row : {}
@@ -8,7 +9,7 @@ const contentText = (value: unknown) => typeof value === 'string' ? value : Arra
 const parts = (value: unknown) => Array.isArray(value) ? value.filter(item => item && typeof item === 'object') as Row[] : []
 const keyOf = (entry: Row) => text(entry.id) || `${text(entry.ordinal)}:${text((entry.message as Row)?.role)}`
 
-export type ExecutionEventKind = 'system' | 'user' | 'assistant' | 'toolResult' | 'compaction'
+export type ExecutionEventKind = 'system' | 'user' | 'assistant' | 'toolResult' | 'compaction' | 'other'
 export interface ExecutionEvent {
   key: string
   kind: ExecutionEventKind
@@ -71,6 +72,8 @@ export function projectExecution(chain: ExecutionChain): ProjectedExecution {
     } else if (role === 'toolResult') {
       const toolCallId = text(message.toolCallId)
       events.push({ key: keyOf(entry), kind: 'toolResult', role, content, thinking: '', toolCalls: [], toolCallId, toolName: text(message.toolName), isError: message.isError === true, execution: executionByToolCall.get(toolCallId), entry })
+    } else {
+      events.push({ key: keyOf(entry), kind: 'other', role, content: displayContent(message.content ?? message), thinking: '', toolCalls: [], isError: false, entry })
     }
   }
   if (!events.some(event => event.kind === 'system')) {
@@ -82,4 +85,42 @@ export function projectExecution(chain: ExecutionChain): ProjectedExecution {
     }
   }
   return { events, apiByToolCall: requestByToolCall, requests: chain.requests }
+}
+
+/** 从实际请求和响应重建阅读顺序；仅省略下一请求重带的同一段上下文。 */
+export function projectRequestConversation(chain: ExecutionChain): ExecutionEvent[] {
+  if (!chain.requests.length || chain.requests.some(row => record(row.input).messageFormat !== 'provider-request/v1')) return projectExecution(chain).events
+  const events: ExecutionEvent[] = []
+  let context: ExecutionEvent[] = []
+  const signature = (event: ExecutionEvent) => JSON.stringify([event.role, event.content, event.toolCallId, event.toolCalls.map(call => [call.id, call.name, call.arguments])])
+  const convert = (message: Row, key: string, apiIndex: number): ExecutionEvent => {
+    const role = ['tool', 'toolResult'].includes(text(message.role)) ? 'toolResult' : text(message.role) || text(message.type) || 'message'
+    const contentParts = parts(message.content)
+    const toolCalls = [...contentParts.filter(part => part.type === 'toolCall'), ...list(message.tool_calls).map(call => ({ id: call.id, name: record(call.function).name, arguments: record(call.function).arguments }))].map(call => {
+      let args = call.arguments
+      if (typeof args === 'string') { try { args = JSON.parse(args) } catch { /* 保留实际参数 */ } }
+      return { ...call, arguments: args }
+    })
+    const content = message.content == null ? '' : displayContent(Array.isArray(message.content) ? contentParts.filter(part => !['toolCall', 'thinking'].includes(text(part.type))) : message.content)
+    return { key, kind: ['system', 'user', 'assistant', 'toolResult'].includes(role) ? role as ExecutionEventKind : 'other', role, content, thinking: text(message.reasoning_content) || contentParts.filter(part => part.type === 'thinking').map(part => text(part.thinking)).join(''), toolCalls, toolCallId: text(message.tool_call_id ?? message.toolCallId) || undefined, toolName: text(message.name ?? message.toolName), isError: message.isError === true, apiIndex, entry: message }
+  }
+  chain.requests.forEach((request, index) => {
+    const apiIndex = index + 1, requestKey = text(request.requestId ?? request.id)
+    const input = messageRows(list(record(request.input).messages)).map((message, at) => convert(message, `${requestKey}:input:${at}`, apiIndex))
+    let common = 0
+    while (common < input.length && common < context.length && signature(input[common]) === signature(context[common])) common++
+    events.push(...input.slice(common))
+    context = [...input]
+    const calls = list(request.toolCalls)
+    if (request.text || request.thinking || calls.length) {
+      const assistant = convert({ role: 'assistant', content: [{ type: 'text', text: text(request.text) }, ...calls.map(call => ({ type: 'toolCall', id: call.toolCallId, name: call.name, arguments: call.arguments }))], reasoning_content: request.thinking }, `${requestKey}:assistant`, apiIndex)
+      events.push(assistant); context.push(assistant)
+    }
+    for (const call of calls) if (call.result !== undefined || call.resultPreview !== undefined || call.state === 'failed') {
+      const result = convert({ role: 'toolResult', toolCallId: call.toolCallId, toolName: call.name, content: toolResultContent(call.result ?? call.resultPreview), isError: call.isError === true || call.state === 'failed' }, `${requestKey}:result:${text(call.toolCallId)}`, apiIndex)
+      result.execution = call
+      events.push(result); context.push(result)
+    }
+  })
+  return events
 }

@@ -8,18 +8,19 @@ import { checkpointId, evidenceEntries, membershipsOf, type StoryCheckpoint, typ
 import { createStoryWindows, windowKey, windowNodes, type StoryWindow } from './windows'
 import { runGlobalReview, reviewQueue } from './review'
 import { recoverStoryCoverage, saveStoryCoverage, storyFingerprint, validStoryCoverage, windowFingerprint } from './coverage'
-import { hash } from '../agents/contracts'
+import { hash, records } from '../agents/contracts'
 import { buildStoryContext, lineDigest, selectStoryBatch, storyBatchBudget } from './retrieval'
 import type { SessionStatus } from '../agents/compaction'
 import { readBookTrace, readExecutionChain } from '../agents/trace'
 import { isObservationEntry } from '../agents/context'
 import storyPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-story.md?raw'
-import taskTemplate from '../../../docs/v2/resources/v2.2/prompts/active/story.txt?raw'
+import { storyTaskPrompt } from './prompt'
 import { leaseFailureKind } from '../world/leaseHeartbeat'
+import { createReadingStoryService } from './readingService'
 
 type Workspace = ReturnType<typeof createWorkspace>
 interface StoryState { running: boolean; window: number; total: number; processed: number; nodeTotal: number; error?: string; message?: string; phase?: string; queue?: string; sessionStatus?: SessionStatus }
-export function createStoryService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'settings' | 'generate'>) {
+export function createWindowStoryService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'settings' | 'generate'>) {
   const states = new Map<string, StoryState>(), controllers = new Map<string, AbortController>(), listeners = new Set<() => void>()
   const cancelled = new Set<string>()
   const set = (bookId: string, changes: Partial<StoryState>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, window: 0, total: 0, processed: 0, nodeTotal: 0 }), ...changes }); listeners.forEach(listener => listener()) }
@@ -120,26 +121,17 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
         const initial = await windowCoverage(window)
         if (!recheck && existing?.status === 'completed' && initial.covered.size === initial.current.length &&
           [await windowFingerprint(window, initial.current), await hash({ window, nodes: initial.current })].includes(existing.sourceFingerprint)) { completedWindows++; continue }
-        const attempted = new Set<string>(), readLines = new Set<string>()
-        for (const task of records(initial.run.tasks)) {
-          const prior = (task.input as Row)?.window as Row | undefined
-          if (task.phase !== 'window_link' || prior?.start !== window.start || prior?.end !== window.end) continue
-          for (const read of records((task.readSet as Row)?.records).filter(row => row.table === 'eventLines')) {
-            const row = await db.table('eventLines').get(text(read.resolvedId ?? read.id))
-            if (row && [await hash(row), await storyFingerprint('eventLines', row)].includes(text(read.factFingerprint))) readLines.add(text(row.id))
-          }
-        }
+        const attempted = new Set<string>()
         let complete = false
         for (;;) {
           await check()
           const state = await windowCoverage(window)
           const pending = state.current.filter(row => !state.covered.has(row.id))
           const lines = await db.table('eventLines').toArray()
-          const unreadLines = lines.filter(row => !readLines.has(String(row.id)))
           set(bookId, { nodeTotal: state.current.length, processed: state.covered.size })
-          if (!state.current.length || !pending.length && !unreadLines.length) { complete = true; break }
-          const kind = pending.some(row => !attempted.has(`node:${row.id}`)) ? 'node' : 'eventLine'
-          const batch = selectStoryBatch((kind === 'node' ? pending as unknown as Row[] : unreadLines).filter(row => !attempted.has(`${kind}:${row.id}`)), storyBatchBudget(settings.config.aggregationContextWindow))
+          if (!pending.length) { complete = true; break }
+          const kind = 'node'
+          const batch = selectStoryBatch((pending as unknown as Row[]).filter(row => !attempted.has(`${kind}:${row.id}`)), storyBatchBudget(settings.config.aggregationContextWindow))
           if (!batch.length) break
           for (const row of batch) attempted.add(`${kind}:${row.id}`)
           const taskId = crypto.randomUUID(), operationKey = crypto.randomUUID()
@@ -147,20 +139,17 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
           const memory = await db.table('storyEditorMemory').get(sessionId) ?? { id: sessionId, bookId, sessionId, revision: 0, workingSummary: '', dataFingerprint: '', updatedAt: '' }
           const contextHints = await repo.transaction(false, store => buildStoryContext(store, bookId, sessionId, batch, kind))
           const relatedLineIds = contextHints.related.filter(row => row.kind === 'eventLine').map(row => row.id)
-          const lineHints = [...lines].sort((a, b) => Number(relatedLineIds.includes(b.id)) - Number(relatedLineIds.includes(a.id))).slice(0, 6).map(lineDigest)
+          const lineHints = lines.filter(line => relatedLineIds.includes(line.id)).slice(0, 6).map(lineDigest)
           const input = { bookId, runId, taskId, planVersion: '2.2', remainingCount: pending.length, resume: { reason: existing ? 'continuation' : 'initial', appliedCommitIds: [], nextOperationKey: operationKey, remainingWorkIds: workItems.map(row => row.workItemId) }, stage: 'P3', phase: 'window_link', sessionId, queue: 'window_nodes', window, workItems, existingLines: lineHints, contextHints, memory, afterWorkItemId: null }
-          const result = await runtime.run(repo, { profile: 'story_editor', phase: 'window_link', sessionId, runId, taskId, leaseOwner: owner, retainLease: true, workItems, input, requiredLineIds: unreadLines.map(row => String(row.id)), businessPrompt: storyPrompt, prompt: taskTemplate.replace('{taskJson}', JSON.stringify(input)), signal: controller.signal })
+          const result = await runtime.run(repo, { profile: 'story_editor', workflow: 'story_lines_v2', phase: 'window_link', sessionId, runId, taskId, leaseOwner: owner, retainLease: true, workItems, input, businessPrompt: storyPrompt, prompt: storyTaskPrompt(input), signal: controller.signal })
           await check()
           if (!result.ok) throw new Error(result.error ?? '窗口串联失败。')
-          const task = await repo.transaction(true, async store => {
+          await repo.transaction(true, async store => {
             const run = (await store.get('pipelineRuns', runId))!
             const task = records(run.tasks).find(row => row.taskId === taskId)!
             await saveStoryCoverage(store, runId, task, result.summary?.reviewedItems as unknown as Row[] ?? [])
             return task
           })
-          for (const read of records((task.readSet as Row)?.records).filter(row => row.table === 'eventLines')) readLines.add(text(read.resolvedId ?? read.id))
-          const previousLineIds = new Set(lines.map(row => String(row.id)))
-          for (const line of await db.table('eventLines').toArray()) if (!previousLineIds.has(String(line.id))) readLines.add(String(line.id))
         }
         if (complete) completedWindows++
         await db.transaction('rw', db.tables, async () => { await check(); await saveCheckpoint(window, complete ? 'completed' : 'failed'); await db.table('compileProgress').update('P3', { lastWindowIndex: windowIndex, updatedAt: new Date().toISOString() }) })
@@ -223,7 +212,7 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
       const compact = entries.findLast(row => row.type === 'compaction')
       const review = run ? await reviewQueue(store, progress!.runId, progress!.editorSessionId) : undefined
       const memory = progress?.editorSessionId ? await store.get('storyEditorMemory', progress.editorSessionId) : undefined
-      return { progress, windows, covered, locked, leaseExpiry, checkpoints, completed: checkpoints.filter(row => row.status === 'completed').length, tasks: evidenceEntries((run?.tasks as Row[] | undefined) ?? [], nodes, lines), usage: run?.usage as { totalTokens: number; cost: number; costStatus?: string } | undefined, requestLedger: (run?.requestLedger as Row[] | undefined) ?? [], runStatus: run?.status as string | undefined, runStartedAt: run?.startedAt as string | undefined, commits: (run?.appliedCommands as Row[] | undefined) ?? [], memory, notes: review?.items.filter(row => row.queue === 'review_notes').map(row => row.row) ?? [], session: { id: progress?.editorSessionId, entryCount: entries.length, compactions: entries.filter(row => row.type === 'compaction').length, compact }, review: { total: review?.items.length ?? 0, pending: review?.pending.length ?? 0, conclusions: review?.coverage ?? [] } }
+      return { progress, windows, covered, locked, leaseExpiry, checkpoints, completed: checkpoints.filter(row => row.status === 'completed').length, tasks: evidenceEntries((run?.tasks as Row[] | undefined) ?? [], nodes, lines), usage: run?.usage as { totalTokens: number; cost: number; costStatus?: string } | undefined, requestLedger: (run?.requestLedger as Row[] | undefined) ?? [], runStatus: run?.status as string | undefined, runStartedAt: run?.startedAt as string | undefined, commits: (run?.appliedCommands as Row[] | undefined) ?? [], assetEdits: records(run?.assetEdits), memory, notes: review?.items.filter(row => row.queue === 'review_notes').map(row => row.row) ?? [], session: { id: progress?.editorSessionId, entryCount: entries.length, compactions: entries.filter(row => row.type === 'compaction').length, compact }, review: { total: review?.items.length ?? 0, pending: review?.pending.length ?? 0, conclusions: review?.coverage ?? [] } }
     })
   }
   async function history(bookId: string, offset = 0) {
@@ -234,5 +223,8 @@ export function createStoryService(workspace: Workspace, models: Pick<ModelServi
     return { sessionId: session?.id as string | undefined, total: entries.length, entries: entries.slice(offset, offset + 20) }
   }
   return { start: (bookId: string) => start(bookId), review: (bookId: string) => start(bookId, 'global_review'), read, history, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), execution: (bookId: string, runId: string, options?: { unitId?: string; contextId?: string; sessionId?: string }) => readExecutionChain(workspace, bookId, runId, options), state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { cancelled.add(bookId); controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } } }
+}
+export function createStoryService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'settings' | 'generate'>) {
+  return createReadingStoryService(workspace, models, createWindowStoryService(workspace, models))
 }
 export type StoryService = ReturnType<typeof createStoryService>

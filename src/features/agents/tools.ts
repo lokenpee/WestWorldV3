@@ -5,8 +5,10 @@ import { canonical, hash, records, resultContracts, strings, summarySchema, text
 import { assertScope, readTool, toolBytes, type Scope } from './queries'
 import { assetReviewTools, checkLease, commitCommand, relationTools, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
 import { noteOrganizationRead } from './organizationReview'
+import { isStoryWrite, storyToolNames } from './storyCommands'
+import { navigateStoryReading, readingProgress, refreshReading } from '../story/reading'
 
-const tableOf: Record<string, string> = { get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
+const tableOf: Record<string, string> = { query_character_catalog: 'characters', get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
 const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.probe) return scope.profile === 'asset_editor'
     ? ['get_character_detail', 'read_original', 'commit_asset_changes', 'submit_result']
@@ -14,8 +16,8 @@ const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.phase === 'character_organization') {
     if (!scope.workKind) return null
     return {
-      directory: ['query_character_catalog', 'save_candidate_group', 'record_organization_progress', 'submit_result'],
-      candidate: ['get_character_detail', 'get_location_detail', 'read_original', 'merge_assets', 'resolve_candidate_group', 'submit_result'],
+      directory: ['query_character_catalog', 'query_candidate_groups', 'get_character_detail', 'get_character_relation', 'read_original', 'save_identity_groups', 'navigate_identity_pages'],
+      candidate: ['query_character_catalog', 'query_candidate_groups', 'get_character_detail', 'get_character_relation', 'read_original', 'save_identity_groups', 'navigate_identity_pages'],
       profile: ['query_character_profile', 'get_character_detail', 'read_original', 'edit_character', 'submit_profile_review'],
       relations: ['submit_relation_review', 'query_relation_work', 'read_original', 'get_character_relation', 'get_legacy_relation_records'],
     }[scope.workKind]
@@ -24,7 +26,7 @@ const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.phase === 'asset_review') return scope.reviewScope === 'relations'
     ? ['get_character_relation', 'get_legacy_relation_records', 'get_character_detail', 'read_original', 'set_character_relation', 'delete_character_relation', 'submit_result']
     : ['get_character_detail', 'get_location_detail', 'get_node_detail', 'get_event_line_detail', 'get_character_relation', 'read_original', 'edit_character', 'edit_location', 'edit_event_node', 'edit_event_line', 'set_character_relation', 'delete_character_relation', 'submit_result']
-  if (scope.profile === 'story_editor') return ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
+  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...storyToolNames, 'navigate_story_pages'] : scope.workflow === 'story_lines_v2' ? storyToolNames : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
   return null
 }
 export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
@@ -32,19 +34,26 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
   let summary: Summary | undefined
   let readCalls = 0; let writeCalls = 0
   let completedWork = false
+  let navigationCallId: string | undefined
   const relationOnly = scope.phase === 'asset_review' && scope.reviewScope === 'relations'
   const organization = scope.phase === 'character_organization'
+  const pages = scope.workflow === 'story_pages_v3' && !scope.probe
+  const story = scope.profile === 'story_editor' && (scope.workflow === 'story_lines_v2' || pages) && !scope.probe
+  const finishContract = toolContracts.story_editor.find(tool => tool.name === 'finish_story_batch')!
   const workKind = scope.workKind
   // 模型只填写业务参数；执行入口继续兼容历史调用中的操作键和批次依据。
   const modelParameters = (name: string, schema: AgentTool['parameters']): AgentTool['parameters'] => {
     const properties = { ...((schema as { properties?: Row }).properties) }
-    if (organization && ['submit_profile_review', 'submit_relation_review'].includes(name)) delete properties.operationKey
+    if (organization && ['save_identity_groups', 'navigate_identity_pages', 'submit_profile_review', 'submit_relation_review'].includes(name)) delete properties.operationKey
     if (organization && name === 'submit_relation_review') delete properties.basis
+    if (isStoryWrite(name)) delete properties.operationKey
     if (scope.phase !== 'optimize' && !organization && properties.include_facts) properties.include_facts = { type: 'boolean', const: false }
     return { ...schema, properties }
   }
   const organizationAllows = (name: string) => {
     if (!organization) return true
+    if (contractIdentityScope()) return initialToolNames({ ...scope, workKind: 'directory' })!.includes(name)
+    if (['merge_assets', 'save_identity_groups', 'navigate_identity_pages', 'submit_identity_page'].includes(name)) return false
     if (name === 'commit_asset_changes') return false
     if (name === 'record_organization_progress') return !workKind || ((workKind === 'directory' || workKind === 'candidate') && (!scope.organizationStep || ['scan', 'resolve'].includes(scope.organizationStep)))
     if (name === 'clear_candidate_groups') return !workKind || (workKind === 'candidate' && scope.organizationStep === 'resolve')
@@ -52,11 +61,13 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
     if (name === 'submit_relation_review') return !workKind || workKind === 'relations'
     return true
   }
+  function contractIdentityScope() { return organization && (workKind === 'directory' || workKind === 'candidate') }
   const contracts = toolContracts[scope.profile].filter(contract => organization
     ? organizationAllows(contract.name)
     : scope.phase === 'asset_review'
       ? contract.name !== 'commit_asset_changes'
       : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
+    .filter(contract => contract.kind !== 'finish' && (story ? storyToolNames.includes(contract.name) || pages && contract.name === 'navigate_story_pages' : !isStoryWrite(contract.name) && !['get_story_detail', 'navigate_story_pages'].includes(contract.name)))
     .filter(contract => !relationOnly || contract.kind !== 'write' || (relationTools as readonly string[]).includes(contract.name))
   const allTools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
     parameters: modelParameters(contract.name, contract.parameters),
@@ -65,10 +76,23 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       assertScope(scope, repo.bookId); signal?.throwIfAborted(); validate(contract.parameters, parameters)
       if (toolBytes(parameters) > 65536) throw new Error('TOO_LARGE:工具参数超过单次处理上限。')
       const args = structuredClone(parameters) as Row
-      if (organization && (contract.name === 'submit_profile_review' || contract.name === 'submit_relation_review')) {
+      if (pages && contract.name === 'navigate_story_pages') {
+        const value = await repo.transaction(true, async store => { await checkLease(store, scope, signal); return navigateStoryReading(store, scope, args, navigationCallId ?? toolCallId) })
+        if (value.complete) {
+          completedWork = true
+          const actual = await repo.transaction(false, async store => strings((await taskOf(store, scope)).task.appliedCommitIds))
+          summary = { status: 'completed', commitIds: actual, summary: value.summary, reviewedItems: [], remainingWorkIds: [] }
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue }
+      }
+      if (story && isStoryWrite(contract.name)) {
         const { operationKey: _key, ...payload } = args
-        // 同一运行、人物工作项和内容使用稳定命令键，恢复或丢失回执后不会重复写库。
-        args.operationKey = await hash({ runId: scope.runId, unitId: scope.unitId, tool: contract.name, payload })
+        args.operationKey = await hash({ runId: scope.runId, taskId: scope.taskId, tool: contract.name, toolCallId, payload })
+      }
+      if (organization && ['save_identity_groups', 'navigate_identity_pages', 'submit_profile_review', 'submit_relation_review'].includes(contract.name)) {
+        const { operationKey: _key, ...payload } = args
+        // 人物提交按内容去重；阅读和组编辑按本次调用去重，允许回看再翻页、调整后再改回。
+        args.operationKey = await hash({ runId: scope.runId, unitId: scope.unitId, tool: contract.name, payload, ...(['save_identity_groups', 'navigate_identity_pages'].includes(contract.name) ? { toolCallId } : {}) })
       }
       if (scope.probe && !(scope.profile === 'asset_editor' ? ['get_character_detail', 'read_original', 'commit_asset_changes'] : ['get_editor_memory', 'commit_story_changes']).includes(contract.name)) throw new Error('INVALID_ARGS:探针仅允许指定调用。')
       let value: Row
@@ -92,7 +116,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         await repo.transaction(true, async store => {
           await checkLease(store, scope, signal)
           const complete = await noteOrganizationRead(store, scope, contract.name, args, value)
-          const table = tableOf[contract.name]
+          const table = contract.name === 'get_story_detail' ? ({ node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[text(args.kind)] : tableOf[contract.name]
           const items = records(value.data)
           if (table) for (const item of items) {
             if (item.fields_omitted) continue
@@ -132,17 +156,39 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue, ...(value.ok === false ? { isError: true } : {}) }
     },
   }))
-  const submitTool: AgentTool | undefined = (!organization || !workKind || workKind === 'directory' || workKind === 'candidate') ? { name: 'submit_result', label: '提交任务总结', description: '汇总当前任务的真实提交确认和待处理项。', parameters: summarySchema,
-    outputSchema: { type: 'object', properties: { accepted: { const: true }, status: { enum: ['completed', 'partial'] }, commitIds: { type: 'array', items: { type: 'string' }, uniqueItems: true } }, required: ['accepted', 'status', 'commitIds'], additionalProperties: false },
+  const submitTool: AgentTool | undefined = (!organization || !workKind) ? { name: story ? 'finish_story_batch' : 'submit_result', label: story ? '完成本批检查' : '提交任务总结', description: story ? finishContract.description : '汇总当前任务的真实提交确认和待处理项。', parameters: story ? finishContract.parameters : summarySchema,
+    outputSchema: story ? resultContracts.get('finish_story_batch') : { type: 'object', properties: { accepted: { const: true }, status: { enum: ['completed', 'partial'] }, commitIds: { type: 'array', items: { type: 'string' }, uniqueItems: true } }, required: ['accepted', 'status', 'commitIds'], additionalProperties: false },
     async execute(_id, parameters, signal) {
-      signal?.throwIfAborted(); validate(summarySchema, parameters)
+      signal?.throwIfAborted(); validate(story ? finishContract.parameters : summarySchema, parameters)
+      if (pages) {
+        const value = await repo.transaction(true, async store => {
+          await checkLease(store, scope, signal)
+          const state = await refreshReading(store, scope.runId, scope.sessionId!, scope.phase)
+          const progress = readingProgress(state), { task } = await taskOf(store, scope)
+          summary = { status: progress.complete ? 'completed' : 'partial', commitIds: strings(task.appliedCommitIds), summary: text((parameters as Row).summary) || text((parameters as Row).reason) || '当前阅读成果已保存。', reviewedItems: [], remainingWorkIds: [] }
+          return { accepted: true, status: summary.status, commitIds: summary.commitIds, remaining: state.pages.filter(page => page.fingerprint !== page.checkedFingerprint).map(page => ({ kind: 'page', id: page.id })) }
+        })
+        return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue }
+      }
       if (toolBytes(parameters) > 65536) throw new Error('TOO_LARGE:任务总结超过单次处理上限。')
-      const proposed = parameters as unknown as Summary
+      let proposed = parameters as unknown as Summary
+      let remaining: Row[] = []
       await repo.transaction(true, async store => {
         await checkLease(store, scope, signal)
         if (!scope.probe && scope.profile === 'story_editor') await validateReadSet(store, scope, reads)
         const { task } = await taskOf(store, scope)
         const actual = strings(task.appliedCommitIds)
+        if (story) {
+          const workItems = records((task.input as Row).workItems)
+          const reviewedItems = records((parameters as Row).items).map(item => {
+            const work = workItems.find(work => work.kind === item.kind && work.id === item.id)
+            if (!work) throw new Error('INVALID_ARGS:完成项不属于当前批次。')
+            return { workItemId: text(work.workItemId), outcome: text(item.outcome), reason: text(item.reason) }
+          })
+          const pending = workItems.filter(work => !reviewedItems.some(item => item.workItemId === work.workItemId))
+          remaining = pending.map(work => ({ kind: work.kind, id: work.id }))
+          proposed = { status: pending.length ? 'partial' : 'completed', commitIds: actual, summary: text((parameters as Row).summary) || (pending.length ? '本批部分检查已保存，剩余项待处理。' : '本批检查完成。'), remainingWorkIds: pending.map(work => text(work.workItemId)), reviewedItems }
+        }
         if (canonical([...actual].sort()) !== canonical([...proposed.commitIds].sort())) throw new Error('INVALID_ARGS:总结中的提交确认须与本任务真实提交一致。')
         const partition = [...proposed.reviewedItems.map(item => item.workItemId), ...proposed.remainingWorkIds]
         if (new Set(partition).size !== partition.length || canonical([...partition].sort()) !== canonical([...scope.workItemIds].sort()) || proposed.status === 'completed' && proposed.remainingWorkIds.length) throw new Error('INVALID_ARGS:总结须逐项说明已处理和待处理范围。')
@@ -181,7 +227,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         await saveTask(store, scope, { reviewedItems: proposed.reviewedItems })
       })
       summary = proposed
-      const value = { accepted: true, status: summary.status, commitIds: summary.commitIds }
+      const value = { accepted: true, status: summary.status, commitIds: summary.commitIds, ...(story ? { remaining } : {}) }
       return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue }
     },
   } : undefined
@@ -189,9 +235,9 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
   const catalogContracts = scope.probe && selected ? contracts.filter(contract => selected.includes(contract.name)) : contracts
   const catalog = new Map(catalogContracts.map(contract => [contract.name, contract]))
   const initialNames = new Set((selected ?? contracts.map(contract => contract.name)).filter(name => catalog.has(name)))
-  if (submitTool && (!selected || selected.includes('submit_result'))) initialNames.add('submit_result')
+  if (submitTool && (!selected || selected.includes(submitTool.name))) initialNames.add(submitTool.name)
   const activeNames = new Set(initialNames)
-  const discoveryTools: AgentTool[] = [
+  const discoveryTools: AgentTool[] = contractIdentityScope() || story ? [] : [
     { name: 'get_tools', label: '查看可用工具', description: '列出当前任务允许但尚未开放的工具名称和简介；需要参数时再用 get_tools_detail。', parameters: { type: 'object', additionalProperties: false, properties: {} },
       async execute(_id, _parameters, signal) {
         assertScope(scope, repo.bookId); signal?.throwIfAborted()
@@ -209,8 +255,10 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as unknown as JsonValue }
       } },
   ]
-  const currentTools = () => [...allTools.filter(tool => activeNames.has(tool.name)), ...(submitTool && activeNames.has('submit_result') ? [submitTool] : []), ...discoveryTools]
+  const currentTools = () => [...allTools.filter(tool => activeNames.has(tool.name)), ...(submitTool && activeNames.has(submitTool.name) ? [submitTool] : []), ...discoveryTools]
   const activate = (name: string) => { if (!catalog.has(name)) return false; activeNames.add(name); return true }
   const tools = [...allTools, ...(submitTool ? [submitTool] : []), ...discoveryTools]
-  return { tools, initialTools: currentTools(), currentTools, activate, reads, get summary() { return summary }, get readCalls() { return readCalls }, get writeCalls() { return writeCalls }, get completed() { return completedWork } }
+  return { tools, initialTools: currentTools(), currentTools, activate, reads,
+    bindNavigationCall(callId?: string) { navigationCallId = callId },
+    get summary() { return summary }, get readCalls() { return readCalls }, get writeCalls() { return writeCalls }, get completed() { return completedWork } }
 }

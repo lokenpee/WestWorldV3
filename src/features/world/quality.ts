@@ -3,11 +3,10 @@ import { Value } from 'typebox/value'
 import type { AssistantMessage } from '@earendil-works/pi-ai'
 import type { Fact } from '../assets/types'
 import { estimateTextTokens } from '../agents/context'
-import { withOutputDiscipline } from '../agents/output-discipline'
 import type { OptimizationDraft, QualityReview } from './types'
 
 export function qualityRequest(draft: OptimizationDraft, facts: Fact[]) {
-  const prompt = withOutputDiscipline('你是独立的世界资产档案复核员。逐项比较原始事实、此前资料与整编稿，检查独有信息遗漏、同义重复、真实分歧被抹平、无依据新增、错误别名及多人合称。事实编号齐全不等于含义保留。时间变化应带条件保留，近义措辞应合为一项。只判断本稿，不修改事实或原文。发现问题时给出具体字段、事实编号和说明，approved=false；没有问题时approved=true且issues为空。使用submit_result提交。')
+  const prompt = '你是独立的世界资产档案复核员。逐项比较原始事实、此前资料与整编稿，检查独有信息遗漏、同义重复、真实分歧被抹平、无依据新增、错误别名及多人合称。事实编号齐全不等于含义保留。时间变化应带条件保留，近义措辞应合为一项。只判断本稿，不修改事实或原文。发现问题时给出具体字段、事实编号和说明，approved=false；没有问题时approved=true且issues为空。使用submit_result提交。'
   const ids = facts.map((_, index) => `F${index + 1}`)
   const schema = { type: 'object', additionalProperties: false, required: ['approved', 'summary', 'issues'], properties: {
     approved: { type: 'boolean' }, summary: { type: 'string', minLength: 1 },

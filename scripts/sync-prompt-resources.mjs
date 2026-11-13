@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const resources = path.join(root, 'docs/v2/resources')
 const activePrompts = path.join(resources, 'v2.2/prompts/active')
+const storyToolNames = ['search_story_context', 'get_story_detail', 'read_original', 'save_story_lines', 'save_story_notes', 'add_story_nodes', 'navigate_story_pages', 'finish_story_batch']
 const examplesDir = path.join(resources, 'v2.2/request-examples')
 const manifest = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/prompt-call-manifest.json'), 'utf8'))
 const ownershipPath = path.join(root, 'docs/v2/文档与资源归属.json')
@@ -46,7 +47,41 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
   const call = callOf(String(example.id ?? ''))
   const source = promptFile(call)
   if (!source || !fs.existsSync(source)) continue
-  const prompt = normalize(fs.readFileSync(source, 'utf8'))
+  const beforeExample = JSON.stringify(example)
+  let prompt = normalize(fs.readFileSync(source, 'utf8'))
+  const extractionSchema = call.id === 'PROMPT-P1-WORLD' ? 'WorldAssetsExtractionSchema' : call.id === 'PROMPT-P1-NARRATIVE' ? 'NarrativeAssetsExtractionSchema' : undefined
+  if (extractionSchema) {
+    prompt = prompt.replace(/^---[\s\S]*?---\s*/, '')
+    example.context.messages[0].content = `${example.input.chapterName}\n\n${example.input.text}`
+    example.context.tools.find(tool => tool.name === 'submit_result').parameters = JSON.parse(fs.readFileSync(path.join(resources, 'schemas.json'), 'utf8'))[extractionSchema]
+  }
+  const story = call.id === 'PROMPT-P3-WINDOW' || call.id === 'PROMPT-P3-GLOBAL'
+  if (story) {
+    const contracts = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/tool-contracts.json'), 'utf8')).profiles.story_editor
+    example.context.tools = storyToolNames.map(name => {
+      const tool = contracts.find(item => item.name === name)
+      const parameters = structuredClone(tool.parameters)
+      delete parameters.properties.operationKey
+      return { name, description: tool.description, parameters }
+    })
+    const input = example.input
+    const hints = input.contextHints ?? { assigned: input.workItems.map(item => ({ kind: item.kind, id: item.id, title: '三河帮的线索', summary: '发现三河帮活动的迹象', chapters: ['1'] })), related: [] }
+    const review = call.id === 'PROMPT-P3-GLOBAL'
+    const page = { id: review ? 'orphans:1' : 'nodes:1', pageNumber: 1, totalPages: 1, type: 'node_page', ids: input.workItems.map(item => item.id) }
+    const brief = input.page ? input : { phase: input.phase, queue: input.queue, page, remainingCount: input.remainingCount, workItems: hints.assigned, related: hints.related, moreRelated: hints.truncated === true, workingSummary: input.memory?.workingSummary ?? '' }
+    example.input = brief
+    example.inputSchema = 'prompt-inputs.schema.json#/$defs/StoryReadingBrief'
+    const discipline = normalize(fs.readFileSync(path.join(activePrompts, 'output-discipline.txt'), 'utf8')).trim()
+    example.context.messages = [
+      { role: 'system', content: `${prompt.trimEnd()}\n\n${discipline}`, toolsAdded: example.context.tools, timestamp: 0 },
+      { role: 'user', content: `【当前阅读页】\n${JSON.stringify(brief)}`, timestamp: 1 },
+    ]
+    delete example.options.maxSteps
+    delete example.options.timeoutMs
+    example.options.requestTimeoutMs = 120000
+    if (beforeExample !== JSON.stringify(example)) { changes.examples.push(name); writeJson(file, example) }
+    continue
+  }
   let before = ''
   if (typeof example.context?.systemPrompt === 'string') {
     before = example.context.systemPrompt
@@ -61,7 +96,7 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
     before = content.slice(start + startMarker.length, end)
     message.content = `${content.slice(0, start + startMarker.length)}${prompt.trimEnd()}\n\n${content.slice(end)}`
   }
-  if (normalize(before).trimEnd() === normalize(prompt).trimEnd()) continue
+  if (extractionSchema ? beforeExample === JSON.stringify(example) : normalize(before).trimEnd() === normalize(prompt).trimEnd()) continue
   changes.examples.push(name)
   writeJson(file, example)
 }

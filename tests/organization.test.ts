@@ -31,7 +31,6 @@ const parse = (value: unknown) => {
   const contextId = parts.kind === 'profile' ? 'profiles' : parts.kind === 'relations' ? 'relations' : 'identity'
   return { step, unitId: `${parts.kind}:${parts.id}`, contextId, work: { kind: parts.kind, data: parts.data }, workItems: [{ workItemId: parts.workItemId }] }
 }
-const key = () => crypto.randomUUID()
 const isInput = (message: { role: string; content: unknown }) => { if (message.role !== 'user') return false; const value = parse(message.content); return typeof value.step === 'string' && Array.isArray(value.workItems) }
 const respond = (init?: RequestInit) => organizationResponse(JSON.parse(init?.body as string))!
 
@@ -63,7 +62,19 @@ it('人物目录按稳定编号每100人一页，页码与下一页游标连续'
   expect(state.scanPages[1]).toMatchObject({ pageId: 'scan:1', nextCursor: null })
 })
 
-it('同一持续会话完成扫描、合并、资料、关系和统计，报告保留疑似组结论', async () => {
+it('P2运行经真实请求组装启用已知模型的思考，按模型支持级别转换', async () => {
+  const fetcher = organizationFetcher()
+  const { service, models } = await setup(fetcher)
+  await models.settings.save({ ...defaultConfig, baseUrl: 'https://organization-fixture.invalid/v1' }, 'fake-key')
+  await service.startOrganization('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(fetcher.mock.calls.length).toBeGreaterThan(0)
+  for (const [, init] of fetcher.mock.calls) {
+    expect(JSON.parse(init?.body as string)).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: 'high' })
+  }
+})
+
+it('完整运行保留疑似组供人工处理，资料与关系步骤不自动合并人物', async () => {
   const { db, service } = await setup()
   await service.startOrganization('a')
   expect(service.state('a')?.error).toBeUndefined()
@@ -71,11 +82,11 @@ it('同一持续会话完成扫描、合并、资料、关系和统计，报告�
   const run = runs.find(row => row.workflow === 'character_organization_v1')!
   expect(run.status).toBe('completed')
   expect(run.report.status).toBe('completed')
-  expect(await db.table('characters').count()).toBe(3)
+  expect(await db.table('characters').count()).toBe(4)
   expect((await db.table('characters').get('C1-P001')).name).toBe('沈青')
   expect(run.organization?.step).toBe('done')
-  expect(run.organization?.candidateDecisions).toMatchObject([{ outcome: 'merged', memberIds: ['C1-P001', 'C1-P002'] }])
-  expect(run.report.organizationSummary).toMatchObject({ scannedPages: 1, candidateGroups: 1, merged: 1, profilesChecked: 3, relationsChecked: 3, statistics: 'completed' })
+  expect(run.organization?.candidateGroups).toMatchObject([{ status: 'pending', memberIds: ['C1-P001', 'C1-P002'] }])
+  expect(run.report.organizationSummary).toMatchObject({ scannedPages: 1, candidateGroups: 1, merged: 0, profilesChecked: 4, relationsChecked: 4, statistics: 'completed' })
   const traceRows = (await db.table('storySessionEntries').toArray()).filter(row => row.type === 'request_trace' && typeof row.requestId === 'string')
   expect(traceRows.length).toBeGreaterThan(0)
   expect(traceRows.every(row => row.runId === run.id && typeof row.executionId === 'string' && row.input && row.status === 'succeeded')).toBe(true)
@@ -122,7 +133,9 @@ it('格式10备份保留人物整理会话、候选和进度，恢复为新书�
     expect(run).toMatchObject({ bookId: imported.id, workflow: 'character_organization_v1', status: 'paused' })
     const organization = run.organization as Record<string, unknown>
     expect(organization).toMatchObject({ step: 'profiles' })
-    expect((organization.candidateDecisions as { outcome: string }[])[0].outcome).toBe('merged')
+    expect(organization.identityPageId).toBe(organizationBefore.identityPageId)
+    expect(organization.seenIdentityPageIds).toEqual(organizationBefore.seenIdentityPageIds)
+    expect((organization.candidateGroups as { status: string }[])[0].status).toBe('pending')
     const sessions = await restored.table('storySessions').toArray() as { bookId: string; profile: string; runId: string; id: string }[]
     expect(sessions).toHaveLength(1)
     expect(sessions[0]).toMatchObject({ bookId: imported.id, profile: 'asset_editor', runId: source.runId })
@@ -139,7 +152,7 @@ it('格式10备份保留人物整理会话、候选和进度，恢复为新书�
     const completed = (await resumed.reports(imported.id))[0]!
     expect(completed).toMatchObject({ id: source.runId, sessionId: sessions[0]!.id, status: 'completed', organization: { step: 'done', reviewVersion: 2 } })
     expect(completed.organization?.repairNotice).toBeUndefined()
-    expect(completed.report.groups).toHaveLength(1)
+    expect(completed.report.groups).toHaveLength(0)
   } finally { importer.close() }
 }, 120000)
 
@@ -159,12 +172,12 @@ it('定时器未运行而时钟跨过租期时，模型工具及下一批仍沿�
   })
   try { await service.startOrganization('a') } finally { unsubscribe() }
   expect(service.state('a')?.error).toBeUndefined()
-  expect(calls).toBeGreaterThan(10)
+  expect(calls).toBeGreaterThan(8)
   expect(handoffs).toBe(2)
   const run = (await service.reports('a'))[0]!
   expect(run.organization?.step).toBe('done')
   expect(run.report.organizationSummary?.statistics).toBe('completed')
-  expect(await db.table('characters').count()).toBe(3)
+  expect(await db.table('characters').count()).toBe(4)
   expect(await db.table('storySessions').count()).toBe(1)
 }, 120000)
 
@@ -211,9 +224,7 @@ it('不再使用固定请求次数上限，持续有进展即可完成', async (
     if (work?.kind === 'directory') {
       const results = body.messages.slice(body.messages.findLastIndex(isInput)).filter(message => message.role === 'tool').map(message => parse(message.content))
       if (results.length < 25) return agentStream([{ name: 'query_character_catalog', args: { cursor: JSON.stringify({ page: 0, offset: 0 }), limit: 100 } }])
-      const record = results.find(result => result.summary === '整理进度已更新。')
-      if (!record) return agentStream([{ name: 'record_organization_progress', args: { operationKey: key(), action: 'check_item', kind: 'scan_page', id: String((work.data as Record<string, unknown>).pageId) } }])
-      return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: [record.commitId], summary: '目录页已核对', remainingWorkIds: [], reviewedItems: [{ workItemId: String((input.workItems as Record<string, unknown>[])[0].workItemId), outcome: 'no_change', reason: '目录页已核对' }] } }])
+      return agentStream([{ name: 'navigate_identity_pages', args: { currentPageId: String((work.data as Record<string, unknown>).pageId), direction: 'next' } }])
     }
     return respond(init)
   })
@@ -290,6 +301,7 @@ it('每个工作项使用独立上下文，切换不压缩且旧历史不重送'
     return respond(init)
   })
   const { service, db, workspace } = await setup(fetcher)
+  await db.table('characters').update('C1-P003', { mergeFacts: [{ id: 'fact-only-marker', field: 'identity', text: '只存在于事实底稿的独有测试标记', chapters: ['1'] }] })
   await service.startOrganization('a')
   expect(service.state('a')?.error).toBeUndefined()
   const units = [...new Set(requests.map(request => request.unitId))]
@@ -322,7 +334,10 @@ it('每个工作项使用独立上下文，切换不压缩且旧历史不重送'
     const prompt = contentOf(body[0].messages.find(isInput)!.content)
     expect(prompt).toContain('任务类型：profile')
     expect(prompt).toContain('"identity"')
-    expect(prompt).toContain('"mergeFacts"')
+    expect(prompt).not.toContain('mergeFacts')
+    expect(JSON.stringify(body)).not.toContain('只存在于事实底稿的独有测试标记')
+    expect(body[0].system).not.toContain('直接调用工具提交结果，不写前言')
+    expect(body[0].system).toContain('【文学资料处理说明】')
   }
   for (const unit of relationUnits) {
     const body = requests.filter(request => request.unitId === unit)
@@ -368,7 +383,7 @@ it('每个工作项使用独立上下文，切换不压缩且旧历史不重送'
   const entries = await db.table('storySessionEntries').toArray()
   expect(entries.some(row => JSON.stringify(row).includes('人物整理历史原标记'))).toBe(true)
   expect(entries.some(row => row.type === 'compaction')).toBe(false)
-  expect(after.report.groups).toHaveLength(1)
+  expect(after.report.groups).toHaveLength(0)
 }, 120000)
 
 it.each(['done', 'relations'] as const)('旧规则%s轮保留合并和会话，从资料重新核对而不重复合并', async step => {
@@ -387,28 +402,26 @@ it.each(['done', 'relations'] as const)('旧规则%s轮保留合并和会话，�
   const after = (await service.reports('a'))[0]!
   expect(after).toMatchObject({ id: before.id, sessionId: before.sessionId, status: 'completed', organization: { step: 'done', reviewVersion: 2 } })
   expect(after.organization?.repairNotice).toContain('从人物资料重新检查')
-  expect(after.report.groups).toHaveLength(1)
+  expect(after.report.groups).toHaveLength(0)
   expect(after.organization?.candidateDecisions).toEqual(before.organization?.candidateDecisions)
-  expect(await db.table('characters').count()).toBe(3)
+  expect(await db.table('characters').count()).toBe(4)
   const calls = fetcher.mock.calls.slice(start).map(([, init]) => JSON.parse(init!.body as string))
   const inputs = calls.map(body => parse(body.messages.findLast(isInput)?.content))
   expect(inputs.at(-1)?.step).toBe('relations')
   expect(inputs.filter((input: Record<string, unknown>) => input.step === 'scan')).toHaveLength(0)
 }, 120000)
 
-it('第二步/第三步的 pending 候选优先作为 candidate 工作项，完成后恢复原资料项', async () => {
+it('第二步存在pending候选时继续资料项，不插入自动合并工作项', async () => {
   const store = { get: async (table: string, id: string) => table === 'characters' && id === 'C1-P001' ? person('C1-P001', '甲') : undefined } as never
   const organization = createOrganizationState(['C1-P001'])
   organization.step = 'profiles'
   organization.profileItems = [{ id: 'C1-P001', name: '甲', status: 'pending', outcome: null, reason: '', contentFingerprint: '', readRefs: [], commitIds: [] }]
   organization.candidateGroups = [{ id: 'g1', memberIds: ['C1-P001', 'C1-P002'], memberNames: ['甲', '乙'], reason: '疑似同人', status: 'pending', revision: 1, createdAt: 'x', updatedAt: 'x' }]
   organization.activeWork = null
-  const candidate = await nextUnit(store, organization)
-  expect(candidate).toMatchObject({ kind: 'candidate', data: { group: { id: 'g1' } } })
-  organization.candidateGroups[0]!.status = 'resolved'
   const profile = await nextUnit(store, organization)
   expect(profile?.kind).toBe('profile')
   expect(profile?.id).toBe('profile:C1-P001')
+  expect(organization.candidateGroups[0].status).toBe('pending')
 })
 
 it('写后只更新当前工作项版本并只失效受影响的资料/关系项', async () => {

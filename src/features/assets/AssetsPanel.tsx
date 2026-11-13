@@ -13,9 +13,10 @@ import { EventNetwork } from '../network/EventNetwork'
 import { CharacterNetwork } from '../character-network/CharacterNetwork'
 import { searchAssets, searchCharacters } from './search'
 
-export function AssetsPanel({ bookId, repository, service, kind, onKindChange, organizeDisabled, organizeDisabledReason, resumeCharacterId, onOrganizeCharacter, onContinueCharacter }: {
+export function AssetsPanel({ bookId, repository, service, kind, onKindChange, organizeDisabled, organizeDisabledReason, resumeCharacterId, onAutoTier, onOrganizeCharacter, onContinueCharacter }: {
   bookId: string; repository: BookRepository; service: AssetService; kind: AssetKind; onKindChange: (kind: AssetKind) => void
   organizeDisabled?: boolean; organizeDisabledReason?: string; resumeCharacterId?: string
+  onAutoTier?: () => Promise<{ total: number; changed: number; manual: number }>
   onOrganizeCharacter?: (characterId: string, mode: 'profile' | 'relations') => Promise<void> | void
   onContinueCharacter?: (characterId: string) => Promise<void> | void
 }) {
@@ -33,6 +34,18 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
   const [characterView, setCharacterView] = useState<'list' | 'network'>('list')
   const [lastReport, setLastReport] = useState<string>()
   const [mergeMessage, setMergeMessage] = useState('')
+  const [tiering, setTiering] = useState(false)
+  const [tierMessage, setTierMessage] = useState(''), [tierError, setTierError] = useState('')
+  const tierPending = useRef(false)
+  async function autoTier() {
+    if (!onAutoTier || tierPending.current) return
+    tierPending.current = true; setTiering(true); setTierMessage(''); setTierError('')
+    try {
+      const result = await onAutoTier()
+      setTierMessage(result.total ? `人物自动分层完成：已处理 ${result.total} 人，调整 ${result.changed} 人层级，保留 ${result.manual} 人的手动层级。` : '暂无人物可自动分层。')
+    } catch (error) { setTierError(error instanceof Error ? error.message : '人物自动分层失败，请重试。') }
+    finally { tierPending.current = false; setTiering(false); setAttempt(value => value + 1) }
+  }
   const query = useCallback(() => service.readContent(bookId), [service, bookId])
   const chapterQuery = useCallback(() => repository.listChapters(bookId), [repository, bookId])
   const data = useLiveResult(query, attempt)
@@ -90,7 +103,9 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
 
   return <section ref={panelRef} className={`assets-panel${editorVisible ? ' has-editor' : ''}${eventNetworkVisible ? ' has-network' : ''}`} aria-label="资产管理">
     <div className="asset-tabs" aria-label="资产类型">{(Object.keys(assetLabels) as AssetKind[]).map(tab => <button key={tab} aria-pressed={kind === tab} onClick={() => navigate(() => { onKindChange(tab); setSelection(undefined); setQueryText(''); setRole(''); setMergeMode(false); setMergeIds([]); setPreviewOpen(false); setMergeMessage('') })}>{assetLabels[tab]} <span>{data.value[assetTables[tab]].length}</span></button>)}</div>
-    <div className="asset-toolbar"><input hidden={characterNetworkVisible || eventNetworkVisible} aria-label="搜索资产" placeholder={kind === 'character' ? '搜索姓名或别名' : '搜索名称、别名、内容或编号'} value={queryText} onChange={event => setQueryText(event.target.value)} />{kind === 'character' && <select aria-label="筛选人物层级" value={role} onChange={event => setRole(event.target.value)}><option value="">全部层级</option>{roleWeights.map(value => <option key={value}>{value}</option>)}</select>}<button className="primary-button" disabled={locked} onClick={() => navigate(() => setSelection('new'))}>新增{assetLabels[kind]}</button>{kind === 'character' ? <div className="asset-view-switch" aria-label="展示方式"><button className="secondary-button" aria-pressed={characterView === 'list'} onClick={() => setCharacterView('list')}>人物列表</button><button className="secondary-button" aria-pressed={characterView === 'network'} onClick={() => setCharacterView('network')}>人物网络</button></div> : !worldKind && <div className="asset-view-switch" aria-label="展示方式"><button className="secondary-button" aria-pressed={!eventNetworkVisible} onClick={() => setNetworkView(false)}>列表</button><button className="secondary-button" aria-pressed={eventNetworkVisible} onClick={() => setNetworkView(true)}>事件网络</button></div>}</div>
+    <div className="asset-toolbar"><input hidden={characterNetworkVisible || eventNetworkVisible} aria-label="搜索资产" placeholder={kind === 'character' ? '搜索姓名或别名' : '搜索名称、别名、内容或编号'} value={queryText} onChange={event => setQueryText(event.target.value)} />{kind === 'character' && <select aria-label="筛选人物层级" value={role} onChange={event => setRole(event.target.value)}><option value="">全部层级</option>{roleWeights.map(value => <option key={value}>{value}</option>)}</select>}{kind === 'character' && onAutoTier && <button className="secondary-button" disabled={locked || organizeDisabled || tiering} onClick={() => navigate(() => { void autoTier() })}>{tiering ? '正在分层…' : '人物自动分层'}</button>}<button className="primary-button" disabled={locked} onClick={() => navigate(() => setSelection('new'))}>新增{assetLabels[kind]}</button>{kind === 'character' ? <div className="asset-view-switch" aria-label="展示方式"><button className="secondary-button" aria-pressed={characterView === 'list'} onClick={() => setCharacterView('list')}>人物列表</button><button className="secondary-button" aria-pressed={characterView === 'network'} onClick={() => setCharacterView('network')}>人物网络</button></div> : !worldKind && <div className="asset-view-switch" aria-label="展示方式"><button className="secondary-button" aria-pressed={!eventNetworkVisible} onClick={() => setNetworkView(false)}>列表</button><button className="secondary-button" aria-pressed={eventNetworkVisible} onClick={() => setNetworkView(true)}>事件网络</button></div>}</div>
+    {kind === 'character' && tierMessage && <p className="merge-success" role="status">{tierMessage}</p>}
+    {kind === 'character' && tierError && <p className="field-error" role="alert">{tierError}</p>}
     <div className="merge-toolbar">
       {worldKind && !mergeMode && characterView !== 'network' && <button className="secondary-button" disabled={locked} onClick={() => navigate(() => { setMergeMode(true); setMergeIds([]); setSelection(undefined); setMergeMessage('') })}>手动合并</button>}
       {mergeMode && <><span>已选 {mergeIds.length} 项{hidden ? `（含隐藏 ${hidden} 项）` : ''}</span><button className="primary-button" disabled={locked || mergeIds.length < 2} onClick={() => setPreviewOpen(true)}>确定合并</button><button className="secondary-button" onClick={() => { setMergeMode(false); setMergeIds([]); setPreviewOpen(false) }}>退出合并</button>{missingIds.length > 0 && <button className="text-button" onClick={() => setMergeIds(ids => ids.filter(id => !missingIds.includes(id)))}>清除失效选择（{missingIds.length}）</button>}</>}

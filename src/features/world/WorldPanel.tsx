@@ -5,14 +5,18 @@ import type { AssetService } from '../assets/service'
 import type { MergeRequest } from '../assets/merge'
 import type { MechanicalQueueItem } from './types'
 import { MergeDialog } from '../assets/MergeDialog'
+import { combineCandidates } from './identityReview'
 import { WorldReportDialog } from './WorldReportDialog'
 import { P2OrganizationPanel } from '../agents/P2OrganizationPanel'
-import { OrganizationProgress } from './OrganizationProgress'
+import { P2Progress } from './P2Progress'
+import type { LoadP2Execution } from '../agents/useP2Execution'
 import './WorldPanel.css'
 
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 
 export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: string; service: WorldService; assets: AssetService; focusRunId?: string }) {
+  const [showOrganization, setShowOrganization] = useState(true)
+  const loadExecution: LoadP2Execution = useCallback((id, query) => service.execution(id, query.runId, { unitId: query.objectKey }), [service])
   const [, refresh] = useState(0); const [candidates, setCandidates] = useState<Candidate[]>()
   const [selected, setSelected] = useState<Candidate>(); const [memberIds, setMemberIds] = useState<string[]>([])
   const [preview, setPreview] = useState(false); const [reportOpen, setReportOpen] = useState(false); const [traceOpen, setTraceOpen] = useState(false); const [error, setError] = useState(''); const [scanning, setScanning] = useState(false)
@@ -38,8 +42,10 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
   }, [leaseExpiry])
   const reports = useLiveResult(useCallback(() => service.reports(bookId), [service, bookId]))
   const snapshot = useLiveResult(useCallback(() => service.worldRows(bookId), [service, bookId]))
+  const aiCandidates = useLiveResult(useCallback(() => service.identityCandidates(bookId), [service, bookId]))
+  const visibleCandidates = combineCandidates(candidates ?? [], aiCandidates.status === 'ready' ? aiCandidates.value : [])
   const state = service.state(bookId); const lastReport = useRef<string | undefined>(undefined)
-  useEffect(() => { if (!focusRunId) return; setTraceRunId(focusRunId); setTraceOpen(true) }, [focusRunId])
+  useEffect(() => { if (!focusRunId) return; setShowOrganization(true); setTraceRunId(focusRunId); setTraceOpen(true) }, [focusRunId])
   useEffect(() => { void service.recoverOrganization(bookId).catch(failure => setError(failure instanceof Error ? failure.message : '人物整理状态恢复失败。')) }, [service, bookId])
   useEffect(() => service.subscribe(() => {
     refresh(value => value + 1)
@@ -50,6 +56,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
     }
   }), [service, bookId])
   async function scan() {
+    setShowOrganization(false)
     if (scanning) return
     setScanning(true); setError(''); setMessage(''); setSelected(undefined); setPrepared(undefined); setChosenName('')
     try { const result = await service.organize(bookId); setCandidates(result.candidates); setMessage(`同名自动合并 ${result.merged} 组${result.failed ? `，失败 ${result.failed} 组` : ''}。其余候选可继续核对。`) } catch (failure) { setError(failure instanceof Error ? failure.message : '候选读取失败。') } finally { setScanning(false) }
@@ -69,7 +76,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
   const activeStatus = state?.paused ? 'paused' : activeOrgRun?.status ?? (state?.running ? 'running' : undefined)
   const aiRunning = activeStatus === 'running' || !!state?.running
   const organizationRun = activeOrgRun ?? stepRuns[0] ?? allOrganizationRuns.filter(row => row.scope !== 'character')[0]
-  const busy = !!state?.running || !!activeStatus || merging || queueRunning || queueSaving
+  const busy = !!state?.running || (!!activeStatus && !(activeStep === 'scan' && activeStatus === 'paused')) || merging || queueRunning || queueSaving
   const queuedIds = new Set(queueItems.filter(item => item.status === 'pending' || item.status === 'running').flatMap(item => item.request.memberIds.map(id => `${item.kind}:${id}`)))
   const selectedRows = selected && snapshot.status === 'ready' ? (selected.kind === 'character' ? snapshot.value.characters : snapshot.value.locations).filter(row => selected.memberIds.includes(row.id)) : []
   const candidateNames = (candidate: Candidate) => snapshot.status === 'ready' ? [...new Set((candidate.kind === 'character' ? snapshot.value.characters : snapshot.value.locations).filter(row => candidate.memberIds.includes(row.id)).map(row => row.name))].slice(0, 3).join('、') : candidate.memberIds[0]
@@ -101,6 +108,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
     finally { submitting.current = false; setQueueSaving(false) }
   }
   async function runQueue() {
+    setShowOrganization(false)
     if (!ready || busy || submitting.current) return
     submitting.current = true; setQueueSaving(true); setError(''); setMessage('')
     try {
@@ -125,7 +133,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
     setPrepared(undefined); setChosenName(item.request.canonicalName)
   }
   async function confirm() {
-    if (!selected || !canConfirm || !ready || submitting.current) return
+    if (!selected || !canConfirm || !ready || busy || submitting.current) return
     submitting.current = true; setMerging(true); setError(''); setMessage('')
     const candidate = selected
     const request: MergeRequest = { memberIds: [...memberIds], keepId, canonicalName, expectedRevisions: Object.fromEntries(mergingRows.map(row => [row.id, row.revision])) }
@@ -156,7 +164,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
         const disabled = !controllable && (!!activeStep && !isActive || (!isActive && (!!state?.running || !!activeStatus)) || !ready || scanning)
         const text = status === 'running' ? `暂停第${['一', '二', '三'][index]}步` : status === 'paused' ? `继续第${['一', '二', '三'][index]}步` : label
         return <button key={step} className={isActive ? 'primary-button' : 'secondary-button'} disabled={disabled} onClick={() => {
-          setError(''); setMessage('')
+          setError(''); setMessage(''); setShowOrganization(true)
           if (status === 'running') void service.pauseOrganization(bookId)
           else if (status === 'paused') void service.continueOrganization(bookId)
           else void service.startOrganizationStep(bookId, step)
@@ -164,8 +172,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
       })}
       {activeStep && (activeStatus === 'running' || activeStatus === 'paused') && <button className="text-button" onClick={() => void service.cancelOrganization(bookId)}>取消整理</button>}
       {queueRunning && <button className="text-button" onClick={() => { void service.mechanical.stop(bookId).catch(failure => setError(failure instanceof Error ? failure.message : '停止请求失败。')) }}>停止机械合并</button>}
-      {(organizationRun || aiRunning || allOrganizationRuns.length > 0) && <button className="text-button" onClick={() => { setTraceRunId(undefined); setTraceOpen(true) }}>整理详情</button>}
-      {!activeStatus && organizationRun && <button className="text-button" disabled={busy} onClick={() => void service.updateOrganizationStatistics(bookId)}>更新出场统计</button>}
+      <button className="text-button" onClick={() => { setTraceRunId(showOrganization ? organizationRun?.id : undefined); setTraceOpen(true) }}>整理详情</button>
       {!organizationRun && !aiRunning && reports.status === 'ready' && reports.value.length > 0 && <button className="text-button" onClick={() => setReportOpen(true)}>查看整理报告</button>}
     </div></div>
     <p>代码整理：先自动合并完整同名项，其余候选核对后合并，可按需预览。AI整理按步骤独立执行：第一步识别重复人物，第二步优化人物资料，第三步整理人物关系；暂停保留原任务，取消后下次从头重新整理。</p>
@@ -173,15 +180,18 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
     {eligibility.status === 'ready' && eligibility.value.covered && eligibility.value.locked && <p className="muted">本书已有世界、叙事或提取任务，人物整理按钮暂不可用。</p>}
     {eligibility.status === 'error' && <p role="alert">{eligibility.message}</p>}
     {scanning && !state?.running && <p role="status">正在刷新名称候选…</p>}
-    {organizationRun && <OrganizationProgress run={organizationRun} running={aiRunning} />}
+    {showOrganization && organizationRun && <P2Progress bookId={bookId} run={organizationRun} load={loadExecution} phase={state?.phase} candidateCount={aiCandidates.status === 'ready' ? aiCandidates.value.filter(row => !row.dismissed).length : undefined} />}
     {((aiRunning && !organizationRun) || queueRunning) && <p role="status">{state?.running ? `${state.phase} · 已处理 ${state.processed}/${state.total}` : `${queueData?.pending === 0 && queueData.statisticsPending ? '正在更新出场统计' : '机械合并队列处理中'} · 已处理 ${(queueData?.completed ?? 0) + (queueData?.failed ?? 0)}/${queueItems.length}`}</p>}
     {queue.status === 'error' && <p role="alert">{queue.message}</p>}
     {(error || state?.error) && <p role="alert">{error || state?.error}</p>}
     {message && <p role="status">{message}</p>}
-    {candidates && <div className="world-candidates" role="region" aria-label="代码整理候选"><p>{candidates.length ? `找到 ${candidates.length} 组候选，请选择一组核对实际成员。` : '没有找到需要合并的名称候选。'}</p>{candidates.map(row => <button className="secondary-button" key={row.id} disabled={busy} onClick={() => choose(row)}>{row.kind === 'character' ? '人物' : '地点'} · {candidateNames(row)} · {row.memberIds.length} 条</button>)}</div>}
+    {(candidates || visibleCandidates.length > 0) && <div className="world-candidates" role="region" aria-label="代码整理候选"><p>{visibleCandidates.length ? `找到 ${visibleCandidates.length} 组疑似重复，请选择一组核对；确认后才会合并。` : '没有待处理的合并候选。'}</p>{visibleCandidates.map(row => <button className="secondary-button" key={row.id} onClick={() => choose(row)}>{row.ai ? 'AI发现' : '代码发现'} · {row.kind === 'character' ? '人物' : '地点'} · {candidateNames(row)} · {row.memberIds.length} 条</button>)}</div>}
+    {aiCandidates.status === 'error' && <p role="alert">{aiCandidates.message}</p>}
+    {selected?.ai && <button className="secondary-button" disabled={busy || !ready} onClick={() => { void service.dismissIdentityCandidate(bookId, selected).then(() => { choose(undefined); setMessage('已记录不是同一人。') }).catch(failure => setError(failure instanceof Error ? failure.message : '候选处理失败。')) }}>不是同一人</button>}
+    {activeStep === 'scan' && aiRunning && <p className="muted">正在识别，可查看疑似组；识别运行期间不能合并人物。</p>}
     {selected && <div className="world-selection"><p>{selected.reason}</p>{selectedRows.map(row => <label key={row.id}><input type="checkbox" disabled={busy || queuedIds.has(`${selected.kind}:${row.id}`)} checked={memberIds.includes(row.id)} onChange={event => { setMemberIds(current => event.target.checked ? [...current, row.id] : current.filter(id => id !== row.id)); setPrepared(undefined); setChosenName('') }} />{row.name} · {row.id}{queuedIds.has(`${selected.kind}:${row.id}`) ? '（已加入队列）' : ''} · {'identity' in row ? row.identity : 'description' in row ? row.description : ''}</label>)}{!sameName && !prepared && <div className="world-name-choice"><label htmlFor="world-merge-name">合并后主名</label><select id="world-merge-name" value={canonicalName} disabled={busy} onChange={event => setChosenName(event.target.value)}><option value="">请选择主名</option>{names.map(name => <option key={name} value={name}>{name}</option>)}</select></div>}{canonicalName && <p>{prepared && fresh ? '已预览：' : ''}保留 {keepId}，主名“{canonicalName}”。</p>}{prepared && !fresh && <p className="muted">资料已更新，请核对当前候选后确认。</p>}<div className="world-selection-actions"><button className="secondary-button" disabled={memberIds.length < 2 || !ready || busy} onClick={() => { if (canConfirm) setPrepared(requestForSelection()); setPreview(true) }}>预览代码合并</button><button className="secondary-button" disabled={!canConfirm || !ready || busy || queue.status !== 'ready'} onClick={() => void addQueue()}>加入待合并</button><button className="primary-button" disabled={!canConfirm || !ready || busy} onClick={() => void confirm()}>{merging ? '正在合并…' : '确认机械合并'}</button><button className="text-button" disabled={busy} onClick={() => choose(undefined)}>收起候选</button></div></div>}
     {preview && selected && <MergeDialog bookId={bookId} kind={selected.kind} memberIds={memberIds} service={assets} locked={!ready} initialRequest={prepared} onClose={() => setPreview(false)} onPrepared={request => { setPrepared(request); setPreview(false) }} onMerged={() => undefined} />}
     {reportOpen && reports.status === 'ready' && <WorldReportDialog runs={reports.value} initialId={state?.reportId} queue={queueData ? { items: queueItems, pending: queueData.pending, completed: queueData.completed, failed: queueData.failed } : undefined} queueBusy={busy || queueSaving} onRemoveQueue={removeQueue} onReviewQueue={reviewQueue} onClose={() => setReportOpen(false)} />}
-    {traceOpen && (organizationRun || aiRunning || allOrganizationRuns.length > 0) && <P2OrganizationPanel bookId={bookId} loadIndex={service.organizationIndex} loadExecution={(bookId, query) => service.execution(bookId, query.runId, { unitId: query.objectKey })} runs={allOrganizationRuns} initialRunId={traceRunId} onOpenReport={() => { setTraceOpen(false); setReportOpen(true) }} onClose={() => { setTraceOpen(false); setTraceRunId(undefined) }} />}
+    {traceOpen && <P2OrganizationPanel bookId={bookId} loadIndex={service.organizationIndex} loadExecution={loadExecution} loadMerges={service.mergeHistory} maintainHistory={service.maintainOrganizationHistory} runs={allOrganizationRuns} initialRunId={traceRunId} initialStep={showOrganization ? undefined : 'scan'} onOpenReport={() => { setTraceOpen(false); setReportOpen(true) }} onClose={() => { setTraceOpen(false); setTraceRunId(undefined) }} />}
   </section>
 }

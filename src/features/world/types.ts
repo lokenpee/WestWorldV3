@@ -60,6 +60,7 @@ export interface WorkSnapshot {
 export interface OrganizationState {
   version: 1; step: OrganizationStep; revision: number; mode?: OrganizationMode; targetCharacterId?: string; runStep?: OrganizationRunStep; pauseRequested?: boolean
   scanIds: string[]; scanPages: ScanPage[]; candidateGroups: CandidateGroup[]; candidateDecisions: CandidateDecision[]
+  identityPageId?: string; seenIdentityPageIds?: string[]
   profileItems: OrganizationItem[]; relationItems: OrganizationItem[]; pairChecks: PairCheck[]
   statisticsPending: boolean
   reviewVersion?: number; reviewStartedAt?: string; repairNotice?: string; pauseNotice?: string

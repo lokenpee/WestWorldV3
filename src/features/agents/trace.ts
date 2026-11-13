@@ -9,7 +9,7 @@ import type { OrganizationMode, OrganizationState } from '../world/types'
 import { getCurrentTools, toToolDeclaration } from '@earendil-works/pi-ai/utils/transcript'
 import { sentMessages, toolDeclaration } from './requestPresentation'
 
-export interface OrganizationStepIndexEntry { runId: string; runStartedAt: string; runStatus: string; mode: OrganizationMode; scope: 'fullBook' | 'character'; step: 'scan' | 'profiles' | 'relations'; kind: 'directory' | 'candidate' | 'profile' | 'relations'; objectKey: string; label: string; status?: string; outcome?: string | null; characterId?: string; requestCount: number; hasTrace: boolean }
+export interface OrganizationStepIndexEntry { runId: string; runStartedAt: string; runStatus: string; mode: OrganizationMode; scope: 'fullBook' | 'character'; step: 'scan' | 'profiles' | 'relations'; kind: 'directory' | 'candidate' | 'profile' | 'relations'; objectKey: string; label: string; status?: string; outcome?: string | null; characterId?: string; requestCount: number; hasTrace: boolean; detailReady?: boolean }
 export interface OrganizationRequestBefore { startedAt: string; requestId: string }
 export interface OrganizationRequestPage { requests: Row[]; snapshots: Map<string, Row>; total: number; hasEarlier: boolean; nextBefore?: OrganizationRequestBefore }
 
@@ -163,8 +163,13 @@ export class TraceSession {
     const snapshot = this.snapshotRow(snapshotId, 'tool_snapshot', { snapshotId, toolNames: tools.map(tool => text(tool.name)), schema: tools, schemaHash: digest(tools), createdAt: record.startedAt })
     if (!this.snapshots.has(snapshotId)) { this.snapshots.set(snapshotId, snapshot); this.enqueue(snapshot) }
     const prior = record.input as Row
+    const attempts = strings(prior.transportAttemptIds)
+    if (attempts.length && !attempts.includes(value.attemptId)) {
+      // 重试是新的响应，不能把失败尝试的片段拼入本次输出。
+      record.text = ''; record.thinking = ''; record.toolCalls = []
+    }
     record.input = { ...prior, messages: clone(messages), messageHashes: messages.map(message => digest(message)), messageFormat: 'provider-request/v1',
-      toolSchemaSnapshotId: snapshotId, requestParameters: parameters, transportAttemptIds: [...strings(prior.transportAttemptIds), value.attemptId] }
+      toolSchemaSnapshotId: snapshotId, requestParameters: parameters, transportAttemptIds: [...attempts, value.attemptId] }
     this.enqueue(record); this.notify()
   }
 
@@ -187,8 +192,9 @@ export class TraceSession {
     record.status = value.status
     record.modelFinishedAt = new Date(this.now()).toISOString()
     record.finishedAt = record.finishedAt ?? record.modelFinishedAt
-    record.text = message ? parts.text : text(record.text)
-    record.thinking = message ? parts.thinking : text(record.thinking)
+    // 有些最终消息只带工具调用或错误；保留本次流式响应已返回的可见内容。
+    record.text = parts.text || text(record.text)
+    record.thinking = parts.thinking || text(record.thinking)
     const prior = Array.isArray(record.toolCalls) ? record.toolCalls as Row[] : []
     record.toolCalls = parts.tools.map(tool => ({ ...(prior.find(row => row.toolCallId === tool.toolCallId) ?? {}), ...tool }))
     record.usage = usageOf(value.usage)
@@ -359,7 +365,7 @@ function originOf(group: Row, decision: Row | undefined, mode: OrganizationMode)
 }
 
 // 三个步骤同时请求索引时共享一次读取；请求完成即释放，后续刷新仍读取新数据。
-const indexReads = new WeakMap<object, Promise<{ runs: Row[]; counts: Map<string, number> }>>()
+const indexReads = new WeakMap<object, Promise<{ runs: Row[]; counts: Map<string, number>; ready: Map<string, boolean> }>>()
 async function organizationIndexData(workspace: ReturnType<typeof createWorkspace>, bookId: string) {
   const db = workspace.openBook(bookId)
   const pending = indexReads.get(db)
@@ -372,18 +378,20 @@ async function organizationIndexData(workspace: ReturnType<typeof createWorkspac
       ? await db.table('storySessionEntries').where('sessionId').anyOf(sessionIds).toArray()
       : await db.table('storySessionEntries').where('type').equals('request_trace').toArray()
     const counts = new Map<string, number>()
+    const ready = new Map<string, boolean>()
     for (const row of traces) if (row.type === 'request_trace' && runIds.has(text(row.runId))) {
       const key = `${text(row.runId)}|${traceUnit(row)}`
       counts.set(key, (counts.get(key) ?? 0) + 1)
+      ready.set(key, (ready.get(key) ?? true) && row.final === true && row.complete !== false)
     }
-    return { runs, counts }
+    return { runs, counts, ready }
   })()
   indexReads.set(db, read)
   try { return await read } finally { indexReads.delete(db) }
 }
 
 export async function readOrganizationStepIndex(workspace: ReturnType<typeof createWorkspace>, bookId: string, step: 'scan' | 'profiles' | 'relations'): Promise<OrganizationStepIndexEntry[]> {
-  const { runs, counts } = await organizationIndexData(workspace, bookId)
+  const { runs, counts, ready } = await organizationIndexData(workspace, bookId)
   const entries: OrganizationStepIndexEntry[] = []
   for (const run of runs.sort((a, b) => text(b.startedAt).localeCompare(text(a.startedAt)))) {
     const organization = run.organization as unknown as OrganizationState
@@ -392,7 +400,7 @@ export async function readOrganizationStepIndex(workspace: ReturnType<typeof cre
     const base = { runId: text(run.id), runStartedAt: text(run.startedAt), runStatus: text(run.status), mode, scope }
     const push = (entry: Omit<OrganizationStepIndexEntry, 'runId' | 'runStartedAt' | 'runStatus' | 'mode' | 'scope' | 'requestCount' | 'hasTrace'>) => {
       const count = counts.get(`${base.runId}|${entry.objectKey}`) ?? (scope === 'character' ? [...counts.entries()].filter(([key]) => key.startsWith(`${base.runId}|`)).reduce((sum, [, value]) => sum + value, 0) : 0)
-      entries.push({ ...base, ...entry, requestCount: count, hasTrace: count > 0 })
+      entries.push({ ...base, ...entry, requestCount: count, hasTrace: count > 0, detailReady: ready.get(`${base.runId}|${entry.objectKey}`) ?? false })
     }
     if (step === 'scan') {
       for (const page of records(organization.scanPages)) push({ step, kind: 'directory', objectKey: `directory:${text(page.pageId)}`, label: `目录页 ${text(page.pageId)}`, status: text(page.status) })

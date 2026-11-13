@@ -5,7 +5,7 @@ import { noteFingerprint } from '../agents/queries'
 import { saveStoryCoverage, storyFingerprint, validStoryCoverage } from './coverage'
 import { buildStoryContext, selectStoryBatch, storyBatchBudget } from './retrieval'
 import storyPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-story.md?raw'
-import taskTemplate from '../../../docs/v2/resources/v2.2/prompts/active/story.txt?raw'
+import { storyTaskPrompt } from './prompt'
 
 type Queue = 'orphans' | 'event_lines' | 'review_notes'
 interface ReviewItem { queue: Queue; table: string; row: Row; workItemId: string; kind: string; fingerprint: string }
@@ -84,7 +84,7 @@ export async function runGlobalReview(repo: AgentRepository, runtime: ReturnType
     const memory = await repo.transaction(false, store => store.get('storyEditorMemory', options.sessionId)) ?? { id: options.sessionId, bookId: repo.bookId, sessionId: options.sessionId, revision: 0, workingSummary: '', dataFingerprint: '', updatedAt: '' }
     const contextHints = await repo.transaction(false, store => buildStoryContext(store, repo.bookId, options.sessionId, batch.map(item => item.row), batch[0].kind, true))
     const input = { bookId: repo.bookId, runId: options.runId, taskId, planVersion: '2.2', remainingCount: state.pending.length, resume: { reason: state.coverage.length ? 'continuation' : 'initial', appliedCommitIds: [], nextOperationKey: operationKey, remainingWorkIds: workItems.map(row => row.workItemId) }, stage: 'P3', phase: 'global_review', sessionId: options.sessionId, queue, window: null, workItems, existingLines: [], contextHints, memory, afterWorkItemId: null }
-    const result = await runtime.run(repo, { profile: 'story_editor', phase: 'global_review', sessionId: options.sessionId, runId: options.runId, taskId, leaseOwner: options.owner, retainLease: true, workItems, input, businessPrompt: storyPrompt, prompt: taskTemplate.replace('{taskJson}', JSON.stringify(input)), signal: options.signal })
+    const result = await runtime.run(repo, { profile: 'story_editor', workflow: 'story_lines_v2', phase: 'global_review', sessionId: options.sessionId, runId: options.runId, taskId, leaseOwner: options.owner, retainLease: true, workItems, input, businessPrompt: storyPrompt, prompt: storyTaskPrompt(input), signal: options.signal })
     await options.check()
     if (!result.ok) throw new Error(result.error ?? '全书复核失败。')
     await repo.transaction(true, async store => {

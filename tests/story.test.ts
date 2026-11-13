@@ -3,7 +3,7 @@ import Dexie from 'dexie'
 import { afterEach, expect, it, vi } from 'vitest'
 import { createWorkspace, type Chapter } from '../src/lib/storage/workspace'
 import { createModelService } from '../src/features/models/service'
-import { createStoryService } from '../src/features/story/service'
+import { createWindowStoryService as createStoryService } from '../src/features/story/service'
 import { createStoryWindows } from '../src/features/story/windows'
 import { createAssetService } from '../src/features/assets/service'
 import { defaultConfig } from '../src/features/models/types'
@@ -83,16 +83,19 @@ it('叙事锁按书生效，取消在途请求后释放锁并保留已有成果'
 })
 
 
-it('已有事件线超过50条仍核对目录后页，相同成员重复创建保持一条', async () => {
+it('已有55条事件线时能找到相关旧线，窗口不重复遍历全部事件线', async () => {
   const { service, db, fetcher } = await setup(1, [1, 1])
   const nodes = await db.table('nodes').toArray(); const timestamp = new Date().toISOString()
-  await db.table('eventLines').bulkPut(Array.from({ length: 55 }, (_, index) => ({ id: `line-${String(index).padStart(3, '0')}`, bookId: 'a', title: '既有线', nodeIds: [nodes[0].id], chapters: ['1'], cause: '已有原因', process: '', result: '', lineStatus: 'open', revision: 1, createdBy: 'manual', updatedAt: timestamp })))
+  await db.table('eventLines').bulkPut(Array.from({ length: 55 }, (_, index) => ({ id: `line-${String(index).padStart(3, '0')}`, bookId: 'a', title: index === 54 ? '信件流转' : '既有线', nodeIds: [nodes[0].id], chapters: ['1'], cause: '已有原因', process: '', result: '', lineStatus: 'open', revision: 1, createdBy: 'manual', updatedAt: timestamp })))
   await db.table('nodes').update(nodes[0].id, { eventLineIds: Array.from({ length: 55 }, (_, i) => `line-${String(i).padStart(3, '0')}`) })
   await service.start('a')
   expect(service.state('a')?.error, JSON.stringify((fetcher as ReturnType<typeof vi.fn<typeof fetch>>).mock.calls.map(([, init]) => JSON.parse(init?.body as string).messages.filter((row: { role: string; content: string }) => row.role === 'tool' && !row.content.startsWith('{'))))).toBeUndefined()
   const calls = (fetcher as ReturnType<typeof vi.fn<typeof fetch>>).mock.calls.map(([, init]) => JSON.parse(init?.body as string).messages).flat()
   expect(JSON.stringify(calls)).toContain('line-054')
   expect(await db.table('eventLines').count()).toBe(55)
+  expect((await db.table('eventLines').get('line-054')).nodeIds).toEqual(nodes.map(node => node.id))
+  const progress = await db.table('compileProgress').get('P3')
+  expect((await db.table('pipelineRuns').get(progress.runId)).tasks.every((task: { input: { workItems: { kind: string }[] } }) => task.input.workItems.every(item => item.kind === 'node'))).toBe(true)
 })
 
 it('空节点窗口无需模型请求仍保存检查点，提取未完成则拒绝启动', async () => {
@@ -129,7 +132,7 @@ it('任务输入的工作记忆直接作为版本依据，追加时复用已读�
   expect(service.state('a')?.error).toBeUndefined()
   expect((await service.read('a')).completed).toBe(3)
   expect((await db.table('eventLines').toArray())[0].nodeIds).toHaveLength(6)
-  expect(fetcher.mock.calls).toHaveLength(9)
+  expect(fetcher.mock.calls).toHaveLength(11)
   const inputs = fetcher.mock.calls.map(([, init]) => JSON.parse(init?.body as string))
   expect(inputs.flatMap(body => body.messages.filter((row: { role: string; tool_calls?: { function: { name: string } }[] }) => row.role === 'assistant').flatMap((row: { tool_calls?: { function: { name: string } }[] }) => row.tool_calls?.map(call => call.function.name) ?? []))).not.toContain('get_editor_memory')
 })
@@ -175,7 +178,7 @@ it('全书复核本轮未完成项留待继续，不重复请求同一批', asyn
   let partial = false, reviewCalls = 0
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string); const { input } = storyTask(body)
-    if (partial && input.phase === 'global_review') { reviewCalls++; return agentStream([{ name: 'submit_result', args: { status: 'partial', commitIds: [], summary: '需要更多依据', reviewedItems: [], remainingWorkIds: input.workItems.map((row: { workItemId: string }) => row.workItemId) } }]) }
+    if (partial && input.phase === 'global_review') { reviewCalls++; return agentStream([{ name: 'finish_story_batch', args: { summary: '需要更多依据', items: [] } }]) }
     return storyResponse(body)
   })
   const { service, db } = await setup(1, [1, 1], fetcher)
@@ -211,7 +214,7 @@ it('长历史通过真实Pi模型适配压缩，刷新重建后沿用原会话�
   const calls = (fetcher as ReturnType<typeof vi.fn<typeof fetch>>).mock.calls.map(([, init]) => JSON.parse(init?.body as string))
   const last = calls.at(-1)
   expect(JSON.stringify(last)).toContain('历史会话压缩摘要')
-  expect(last.tools.map((tool: { function: { name: string } }) => tool.function.name)).toEqual(expect.arrayContaining(['get_event_line_detail', 'get_node_detail', 'commit_story_changes', 'submit_result']))
+  expect(last.tools.map((tool: { function: { name: string } }) => tool.function.name)).toEqual(expect.arrayContaining(['get_story_detail', 'save_story_lines', 'finish_story_batch']))
   expect(JSON.stringify(last)).not.toContain('原文核对记录。'.repeat(100))
   expect((await db.table('storySessionEntries').toArray()).some(row => JSON.stringify(row).includes('独立旧历史标记'))).toBe(true)
   const progress = await db.table('compileProgress').get('P3')
@@ -238,7 +241,7 @@ it('模型返回上下文超长时强制压缩恢复一次，后续请求继续�
   expect((await service.read('a')).progress?.status).toBe('completed')
   expect((await service.read('a')).session.compactions).toBe(1)
   const last = JSON.parse(fetcher.mock.calls.at(-1)![1]?.body as string)
-  expect(last.tools.map((tool: { function: { name: string } }) => tool.function.name)).toContain('get_event_line_detail')
+  expect(last.tools.map((tool: { function: { name: string } }) => tool.function.name)).toContain('get_story_detail')
 })
 
 it('部分窗口中断后恢复已保存覆盖，只分配剩余节点', async () => {
@@ -248,8 +251,8 @@ it('部分窗口中断后恢复已保存覆盖，只分配剩余节点', async (
     const body = JSON.parse(init?.body as string)
     if (JSON.stringify(body).includes('【需要压缩的原始会话数据】')) return storyResponse(body)
     const { input } = storyTask(body)
-    firstTask ||= input.taskId
-    if (failing && input.taskId !== firstTask) return new Response('{"error":{"message":"invalid key"}}', { status: 401 })
+    firstTask ||= input.workItems[0].id
+    if (failing && input.workItems[0].id !== firstTask) return new Response('{"error":{"message":"invalid key"}}', { status: 401 })
     if (!failing) resumedIds.push(...input.workItems.map((item: { id: string }) => item.id))
     return storyResponse(body, { readOnly: true })
   })
@@ -271,7 +274,7 @@ it('某组总结校验失败继续后续节点，保留具体工具错误供重�
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string)
     const { input } = storyTask(body)
-    if (failFirst && input.workItems.some((item: { id: string }) => item.id === 'C1-N001')) return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: ['不存在的确认'], summary: '错误总结', remainingWorkIds: [], reviewedItems: input.workItems.map((item: { workItemId: string }) => ({ workItemId: item.workItemId, outcome: 'no_change', reason: '未读取' })) } }])
+    if (failFirst && input.workItems.some((item: { id: string }) => item.id === 'C1-N001')) return agentStream([{ name: 'finish_story_batch', args: { summary: '错误总结', items: input.workItems.map((item: { kind: string; id: string }) => ({ kind: item.kind, id: item.id, outcome: 'changed', reason: '实际没有修改' })) } }])
     return storyResponse(body, { readOnly: true })
   })
   const { service } = await setup(1, Array(23).fill(1), fetcher)
@@ -279,7 +282,7 @@ it('某组总结校验失败继续后续节点，保留具体工具错误供重�
   expect(service.state('a')?.error).toBeUndefined()
   const state = await service.read('a')
   expect(state.completed).toBe(0)
-  expect(state.tasks[0].error).toContain('提交确认须与本任务真实提交一致')
+  expect(state.tasks[0].error).toContain('真实写入依据')
   expect(state.tasks[1].reviewed).toHaveLength(3)
   failFirst = false
   await service.start('a')
@@ -289,7 +292,7 @@ it('某组总结校验失败继续后续节点，保留具体工具错误供重�
 it('事件线已提交但总结失败时保存真实覆盖，继续不会重建事件线', async () => {
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string), { input, messages } = storyTask(body)
-    if (messages.some(row => row.role === 'tool' && String(row.content).includes('"commitId"'))) return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: [], summary: '漏填确认', remainingWorkIds: [], reviewedItems: input.workItems.map((item: { workItemId: string }) => ({ workItemId: item.workItemId, outcome: 'changed', reason: '已串联' })) } }])
+    if (messages.some(row => row.role === 'tool' && String(row.content).includes('"commitId"'))) return agentStream([{ name: 'finish_story_batch', args: { summary: '错误声称没有修改', items: input.workItems.map((item: { kind: string; id: string }) => ({ kind: item.kind, id: item.id, outcome: 'no_change', reason: '已串联却说未修改' })) } }])
     return storyResponse(body)
   })
   const { service, db } = await setup(1, [1, 1], fetcher)
@@ -297,7 +300,7 @@ it('事件线已提交但总结失败时保存真实覆盖，继续不会重建�
   const state = await service.read('a')
   expect(state.completed).toBe(1)
   expect(state.tasks[0]).toMatchObject({ status: 'failed', remaining: [] })
-  expect(state.tasks[0].error).toContain('提交确认须与本任务真实提交一致')
+  expect(state.tasks[0].error).toContain('该项资料已修改')
   expect(await db.table('eventLines').count()).toBe(1)
   const calls = fetcher.mock.calls.length
   await service.start('a')
@@ -314,8 +317,8 @@ it('后窗为重叠节点创建新线，前窗保持完成，继续不重复串�
       const frame = JSON.parse(line.slice(6))
       for (const call of frame.choices?.[0]?.delta?.tool_calls ?? []) {
         const args = JSON.parse(call.function.arguments)
-        if (call.function.name === 'commit_story_changes') { args.payload.event_line_ops[0].op = 'create'; args.payload.event_line_ops[0].title = '新的独立事件线'; delete args.payload.event_line_ops[0].line_id }
-        if (call.function.name === 'submit_result') for (const item of args.reviewedItems) item.outcome = 'changed'
+        if (call.function.name === 'save_story_lines') { args.operations[0].action = 'create'; args.operations[0].title = '新的独立事件线'; delete args.operations[0].lineId }
+        if (call.function.name === 'finish_story_batch') for (const item of args.items) item.outcome = 'changed'
         call.function.arguments = JSON.stringify(args)
       }
       return `data: ${JSON.stringify(frame)}`
@@ -343,14 +346,14 @@ it('五分钟目标前提醒收尾，越过目标的在途响应仍正常结束'
     await db.table('pipelineRuns').update('lease:narrative', { expiresAt: Date.now() + 30000 })
     await db.table('storySessions').toCollection().modify({ leaseUntil: Date.now() + 30000 })
     aborted.push(!!init?.signal?.aborted)
-    return agentStream([{ name: 'get_node_detail', args: { ids: input.workItems.map((item: { id: string }) => item.id) } }])
+    return agentStream([{ name: 'get_story_detail', args: { kind: 'node', ids: input.workItems.map((item: { id: string }) => item.id) } }])
   })
   const fixture = await setup(1, [1], fetcher); db = fixture.db
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed)
   try { await fixture.service.start('a') } finally { clock.mockRestore() }
   expect(fetcher).toHaveBeenCalledTimes(2)
-  expect(systems[0]).toContain('时间预算')
-  expect(systems[0]).toContain('停止扩展调查')
+  expect(systems[0]).toContain('逐页串联事件线')
+  expect(systems[0]).not.toContain('SDK')
   expect(notes[0]).toContain('剩余约')
   expect(notes[1]).toContain('剩余约')
   expect(notes[1]).toContain('不设固定请求轮数')
@@ -369,16 +372,16 @@ it('第8章线索跨窗口召回，第165章查证后沿用原线并解决原事
     const related = input.contextHints.related as { id: string; kind: string }[]
     const clue = related.find(row => row.kind === 'note'), line = input.existingLines[0]
     if (late) { expect(related.map(row => row.id)).toContain('C8-N001'); expect(clue).toBeDefined(); sawOldClue = true }
-    if (commit) return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: [commit.commitId], summary: '已查证印章线索', remainingWorkIds: [], reviewedItems: input.workItems.map((work: { workItemId: string }) => ({ workItemId: work.workItemId, outcome: 'changed', reason: '按节点依据追加印章事件' })) } }])
+    if (commit) return agentStream([{ name: 'finish_story_batch', args: { summary: '已查证印章线索', items: input.workItems.map((work: { kind: string; id: string }) => ({ kind: work.kind, id: work.id, outcome: 'changed', reason: '按节点依据追加印章事件' })) } }])
     if (!replies.length) return agentStream([
-      { name: 'get_node_detail', args: { ids: late ? ['C8-N001', 'C165-N002'] : ['C8-N001'] } },
-      { name: 'query_event_lines', args: {} },
-      ...(late ? [{ name: 'get_event_line_detail', args: { ids: [line.id] } }, { name: 'get_editor_note_detail', args: { ids: [clue!.id] } }] : []),
+      { name: 'get_story_detail', args: { kind: 'node', ids: late ? ['C8-N001', 'C165-N002'] : ['C8-N001'] } },
+      { name: 'search_story_context', args: { kind: 'eventLine' } },
+      ...(late ? [{ name: 'get_story_detail', args: { kind: 'eventLine', ids: [line.id] } }, { name: 'get_story_detail', args: { kind: 'note', ids: [clue!.id] } }] : []),
     ])
-    return agentStream([{ name: 'commit_story_changes', args: { operationKey: input.resume.nextOperationKey, payload: {
-      event_line_ops: [{ op: late ? 'append' : 'create', ...(late ? { line_id: line.id } : { title: '旧印章的去向' }), node_ids: late ? ['C165-N002'] : ['C8-N001'], cause: '印章交付', process: late ? '旧印章用于证明身份' : '旧印章去向未明', result: late ? '用途查明' : '待后续', line_status: late ? 'closed' : 'open', confidence: 1, reason: '两章同一枚旧印章', evidenceNodeIds: late ? ['C8-N001', 'C165-N002'] : ['C8-N001'] }], new_nodes: [],
-      memory_update: { workingSummary: late ? '印章线索已回收' : '记录旧印章用途疑点', notes: [{ key: 'old-seal', kind: 'review', status: late ? 'resolved' : 'active', statement: late ? '第165章说明旧印章用于证明身份' : '已知事实：陈某交出旧印章；待解问题：李某为何保管、用途是什么；关键词：旧印章、李某', nodeIds: late ? ['C8-N001', 'C165-N002'] : ['C8-N001'], lineIds: late ? [line.id] : [], evidence: [] }] },
-    } } }])
+    return agentStream([
+      { name: 'save_story_lines', args: { operations: [{ action: late ? 'append' : 'create', ...(late ? { lineId: line.id } : { title: '旧印章的去向' }), nodeIds: late ? ['C165-N002'] : ['C8-N001'], cause: '印章交付', process: late ? '旧印章用于证明身份' : '旧印章去向未明', result: late ? '用途查明' : '待后续', lineStatus: late ? 'closed' : 'open', confidence: 1, reason: '两章同一枚旧印章', evidenceNodeIds: late ? ['C8-N001', 'C165-N002'] : ['C8-N001'] }] } },
+      { name: 'save_story_notes', args: { workingSummary: late ? '印章线索已回收' : '记录旧印章用途疑点', notes: [{ key: 'old-seal', kind: 'review', status: late ? 'resolved' : 'active', statement: late ? '第165章说明旧印章用于证明身份' : '已知事实：陈某交出旧印章；待解问题：李某为何保管、用途是什么；关键词：旧印章、李某', nodeIds: late ? ['C8-N001', 'C165-N002'] : ['C8-N001'], lineIds: late ? [line.id] : [], evidence: [] }] } },
+    ])
   })
   const { service, db } = await setup(180, [8, 165], fetcher)
   await db.table('nodes').update('C8-N001', { name: '交付旧印章', summary: '陈某把旧印章交给李某，李某保管，后续用途未明', actors: ['陈某', '李某'] })
@@ -396,7 +399,7 @@ it('独立节点可用分配目录直接说明保持现状，省去不必要的�
     const { input } = storyTask(JSON.parse(init?.body as string))
     expect(input.contextHints.assigned[0]).toMatchObject({ kind: 'node', summary: '同一封信继续流转' })
     expect(input.contextHints.related).toEqual([])
-    return agentStream([{ name: 'submit_result', args: { status: 'completed', commitIds: [], summary: '独立事件，保持现状', remainingWorkIds: [], reviewedItems: input.workItems.map((work: { workItemId: string }) => ({ workItemId: work.workItemId, outcome: 'no_change', reason: '目录中没有需串联的其他事件' })) } }])
+    return agentStream([{ name: 'finish_story_batch', args: { summary: '独立事件，保持现状', items: input.workItems.map((work: { kind: string; id: string }) => ({ kind: work.kind, id: work.id, outcome: 'no_change', reason: '目录中没有需串联的其他事件' })) } }])
   })
   const { service } = await setup(1, [1], fetcher)
   await service.start('a')
@@ -411,13 +414,13 @@ it('分配目录不替代修改依据，直接根据摘要串联会要求先读�
     const error = messages.find(row => row.role === 'tool')
     if (error) {
       feedback = String(error.content)
-      return agentStream([{ name: 'submit_result', args: { status: 'partial', commitIds: [], summary: '待查详情', reviewedItems: [], remainingWorkIds: input.workItems.map((work: { workItemId: string }) => work.workItemId) } }])
+      return agentStream([{ name: 'finish_story_batch', args: { summary: '待查详情', items: [] } }])
     }
-    return agentStream([{ name: 'commit_story_changes', args: { operationKey: input.resume.nextOperationKey, payload: { event_line_ops: [{ op: 'create', title: '未经详情核对的线', node_ids: input.workItems.map((work: { id: string }) => work.id), cause: '原因', process: '经过', result: '结果', line_status: 'open', confidence: 1, reason: '只看过目录', evidenceNodeIds: input.workItems.map((work: { id: string }) => work.id) }], new_nodes: [], memory_update: { workingSummary: '尝试串联', notes: [] } } } }])
+    return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: 'create', title: '未经详情核对的线', nodeIds: input.workItems.map((work: { id: string }) => work.id), cause: '原因', process: '经过', result: '结果', lineStatus: 'open', confidence: 1, reason: '只看过目录', evidenceNodeIds: input.workItems.map((work: { id: string }) => work.id) }] } }])
   })
   const { service, db } = await setup(1, [1, 1], fetcher)
   await service.start('a')
-  expect(feedback).toContain('get_node_detail')
+  expect(feedback).toContain('get_story_detail')
   expect(await db.table('eventLines').count()).toBe(0)
   expect((await service.read('a')).completed).toBe(0)
 })

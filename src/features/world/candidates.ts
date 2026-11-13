@@ -3,7 +3,7 @@ import type { Character, LocationAsset } from '../assets/types'
 import type { WorldKind } from '../assets/merge'
 import { characterMatchNames, isContextualName } from '../assets/characterNames'
 
-export interface Candidate { id: string; kind: WorldKind; memberIds: string[]; reason: string }
+export interface Candidate { id: string; kind: WorldKind; memberIds: string[]; reason: string; ai?: { runId: string; groupId: string }; dismissed?: boolean }
 export function findExactNameGroups(kind: WorldKind, input: (Character | LocationAsset)[]): Candidate[] {
   const groups = new Map<string, string[]>()
   for (const row of input) { const name = row.name.trim(); if (!name) continue; if (!groups.has(name)) groups.set(name, []); groups.get(name)!.push(row.id) }

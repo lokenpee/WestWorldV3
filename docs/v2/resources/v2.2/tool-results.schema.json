@@ -1276,7 +1276,7 @@
                       }
                     },
                     "appearance": {
-                      "description": "外貌。**仅当原文写到**，不要推断。",
+                      "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
                       "type": "string"
                     },
                     "personality": {
@@ -4924,20 +4924,25 @@
           "include_future": {
             "type": "boolean",
             "description": "按节点检索时是否包含后续章节。窗口默认检索当前及此前节点，全书复核默认包含后续节点。"
+          },
+          "chapter_range": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "status": {
+            "enum": [
+              "open",
+              "closed",
+              "active",
+              "resolved"
+            ]
           }
         },
-        "anyOf": [
-          {
-            "required": [
-              "node_ids"
-            ]
-          },
-          {
-            "required": [
-              "terms"
-            ]
-          }
-        ],
         "additionalProperties": false
       },
       "success": {
@@ -5964,43 +5969,1319 @@
       "name": "submit_relation_review",
       "success": {
         "type": "object",
-        "required": ["ok", "status", "operationKey", "alreadyApplied", "summary", "done", "complete", "changed", "outcome", "applied", "cumulativeApplied", "unverified", "uncertain", "failed"],
+        "required": [
+          "ok",
+          "status",
+          "operationKey",
+          "alreadyApplied",
+          "summary",
+          "done",
+          "complete",
+          "changed",
+          "outcome",
+          "applied",
+          "cumulativeApplied",
+          "unverified",
+          "uncertain",
+          "failed"
+        ],
         "properties": {
-          "ok": { "type": "boolean" },
-          "status": { "enum": ["succeeded", "partial", "failed"] },
-          "commitId": { "type": "string", "minLength": 1 },
-          "operationKey": { "type": "string", "minLength": 1 },
-          "alreadyApplied": { "type": "boolean" },
-          "summary": { "type": "string" },
-          "done": { "type": "boolean" },
-          "complete": { "type": "boolean" },
-          "changed": { "type": "boolean" },
-          "outcome": { "enum": ["changed", "no_change", "uncertain"] },
-          "applied": { "type": "array", "items": { "type": "string" } },
-          "cumulativeApplied": { "type": "array", "items": { "type": "string" } },
-          "unverified": { "type": "array", "items": { "type": "string" } },
-          "uncertain": { "type": "array", "items": { "type": "string" } },
+          "ok": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "succeeded",
+              "partial",
+              "failed"
+            ]
+          },
+          "commitId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "done": {
+            "type": "boolean"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "enum": [
+              "changed",
+              "no_change",
+              "uncertain"
+            ]
+          },
+          "applied": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cumulativeApplied": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unverified": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "uncertain": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "failed": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["targetId", "code", "message", "recoverable", "repeated", "action"],
+              "required": [
+                "targetId",
+                "code",
+                "message",
+                "recoverable",
+                "repeated",
+                "action"
+              ],
               "properties": {
-                "targetId": { "type": "string" },
-                "code": { "type": "string" },
-                "message": { "type": "string" },
-                "recoverable": { "type": "boolean" },
-                "repeated": { "type": "boolean" },
-                "action": { "type": "string" }
+                "targetId": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "recoverable": {
+                  "type": "boolean"
+                },
+                "repeated": {
+                  "type": "boolean"
+                },
+                "action": {
+                  "type": "string"
+                }
               }
             }
           }
         },
         "anyOf": [
-          { "properties": { "status": { "const": "succeeded" }, "ok": { "const": true }, "failed": { "maxItems": 0 } }, "required": ["commitId"] },
-          { "properties": { "status": { "const": "partial" }, "ok": { "const": false }, "done": { "const": false }, "complete": { "const": false }, "failed": { "minItems": 1 } }, "required": ["commitId"] },
-          { "properties": { "status": { "const": "failed" }, "ok": { "const": false }, "done": { "const": false }, "complete": { "const": false }, "changed": { "const": false }, "applied": { "maxItems": 0 }, "failed": { "minItems": 1 } }, "not": { "required": ["commitId"] } }
+          {
+            "properties": {
+              "status": {
+                "const": "succeeded"
+              },
+              "ok": {
+                "const": true
+              },
+              "failed": {
+                "maxItems": 0
+              }
+            },
+            "required": [
+              "commitId"
+            ]
+          },
+          {
+            "properties": {
+              "status": {
+                "const": "partial"
+              },
+              "ok": {
+                "const": false
+              },
+              "done": {
+                "const": false
+              },
+              "complete": {
+                "const": false
+              },
+              "failed": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "commitId"
+            ]
+          },
+          {
+            "properties": {
+              "status": {
+                "const": "failed"
+              },
+              "ok": {
+                "const": false
+              },
+              "done": {
+                "const": false
+              },
+              "complete": {
+                "const": false
+              },
+              "changed": {
+                "const": false
+              },
+              "applied": {
+                "maxItems": 0
+              },
+              "failed": {
+                "minItems": 1
+              }
+            },
+            "not": {
+              "required": [
+                "commitId"
+              ]
+            }
+          }
         ]
+      }
+    },
+    {
+      "name": "save_identity_groups",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "navigate_identity_pages",
+      "success": {
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_story_detail",
+      "input": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "node",
+              "eventLine",
+              "note"
+            ]
+          },
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "char_offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "maxChars": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 6000
+          },
+          "memberOffset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "memberLimit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "processSegment": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "单独读取事件线经过的某一段；编号来自processSegments。"
+          }
+        },
+        "required": [
+          "kind",
+          "ids"
+        ],
+        "additionalProperties": false
+      },
+      "success": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "节点、线索或事件线详情；事件线可含processSegments（带编号的经过段）与processSegmentCount，长段含续读位置。"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextOffset": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "missingIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "data",
+          "totalCount",
+          "truncated",
+          "nextOffset"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "save_story_lines",
+      "input": {
+        "type": "object",
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "create"
+                    },
+                    "nodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "description": "本次加入的成员节点；append保留原有成员。"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "cause": {
+                      "type": "string",
+                      "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
+                    },
+                    "process": {
+                      "type": "string",
+                      "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
+                    },
+                    "result": {
+                      "type": "string",
+                      "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
+                    },
+                    "lineStatus": {
+                      "enum": [
+                        "open",
+                        "closed"
+                      ],
+                      "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "本次关联或调整的理由，可自然概括。"
+                    },
+                    "evidenceNodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 0,
+                      "maxItems": 100,
+                      "description": "可选的关联依据节点编号。"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "description": "可选的自评把握，不作为语义质量门槛。"
+                    },
+                    "processAppend": {
+                      "type": "string",
+                      "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
+                    },
+                    "processEdits": {
+                      "type": "array",
+                      "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "segment": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "processSegments中的段落编号。"
+                          },
+                          "text": {
+                            "type": "string",
+                            "description": "这一段修改后的内容。"
+                          }
+                        },
+                        "required": [
+                          "segment",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "title",
+                    "nodeIds",
+                    "cause",
+                    "process",
+                    "result",
+                    "lineStatus"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "append"
+                    },
+                    "lineId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "nodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "description": "本次加入的成员节点；append保留原有成员。"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "cause": {
+                      "type": "string",
+                      "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
+                    },
+                    "process": {
+                      "type": "string",
+                      "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
+                    },
+                    "result": {
+                      "type": "string",
+                      "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
+                    },
+                    "lineStatus": {
+                      "enum": [
+                        "open",
+                        "closed"
+                      ],
+                      "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "本次关联或调整的理由，可自然概括。"
+                    },
+                    "evidenceNodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 0,
+                      "maxItems": 100,
+                      "description": "可选的关联依据节点编号。"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "description": "可选的自评把握，不作为语义质量门槛。"
+                    },
+                    "processAppend": {
+                      "type": "string",
+                      "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
+                    },
+                    "processEdits": {
+                      "type": "array",
+                      "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "segment": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "processSegments中的段落编号。"
+                          },
+                          "text": {
+                            "type": "string",
+                            "description": "这一段修改后的内容。"
+                          }
+                        },
+                        "required": [
+                          "segment",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "lineId",
+                    "nodeIds"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "update"
+                    },
+                    "lineId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "nodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 1,
+                      "maxItems": 100,
+                      "description": "提供时为调整后的完整成员列表，省略则保留原成员。"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "cause": {
+                      "type": "string",
+                      "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
+                    },
+                    "process": {
+                      "type": "string",
+                      "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
+                    },
+                    "result": {
+                      "type": "string",
+                      "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
+                    },
+                    "lineStatus": {
+                      "enum": [
+                        "open",
+                        "closed"
+                      ],
+                      "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "本次关联或调整的理由，可自然概括。"
+                    },
+                    "evidenceNodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 0,
+                      "maxItems": 100,
+                      "description": "可选的关联依据节点编号。"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "description": "可选的自评把握，不作为语义质量门槛。"
+                    },
+                    "processAppend": {
+                      "type": "string",
+                      "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
+                    },
+                    "processEdits": {
+                      "type": "array",
+                      "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "segment": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "processSegments中的段落编号。"
+                          },
+                          "text": {
+                            "type": "string",
+                            "description": "这一段修改后的内容。"
+                          }
+                        },
+                        "required": [
+                          "segment",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "lineId"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "const": "merge"
+                    },
+                    "lineId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "mergeLineIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 1,
+                      "maxItems": 100
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "cause": {
+                      "type": "string",
+                      "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
+                    },
+                    "process": {
+                      "type": "string",
+                      "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
+                    },
+                    "result": {
+                      "type": "string",
+                      "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
+                    },
+                    "lineStatus": {
+                      "enum": [
+                        "open",
+                        "closed"
+                      ],
+                      "description": "open表示故事仍在发展，closed表示故事已结束；翻页和检查结束不改变故事状态。"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "description": "本次关联或调整的理由，可自然概括。"
+                    },
+                    "evidenceNodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "minItems": 0,
+                      "maxItems": 100,
+                      "description": "可选的关联依据节点编号。"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "description": "可选的自评把握，不作为语义质量门槛。"
+                    },
+                    "processAppend": {
+                      "type": "string",
+                      "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
+                    },
+                    "processEdits": {
+                      "type": "array",
+                      "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "segment": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "processSegments中的段落编号。"
+                          },
+                          "text": {
+                            "type": "string",
+                            "description": "这一段修改后的内容。"
+                          }
+                        },
+                        "required": [
+                          "segment",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "lineId",
+                    "mergeLineIds"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "程序维护的提交键，模型无需填写。"
+          }
+        },
+        "required": [
+          "operations"
+        ],
+        "additionalProperties": false
+      },
+      "success": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "summary",
+          "changed"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "chapterIndex": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reused": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "chapterIndex",
+                "reused"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "lineIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "maxItems": 100
+          }
+        }
+      }
+    },
+    {
+      "name": "save_story_notes",
+      "input": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "key",
+                "status",
+                "statement"
+              ],
+              "properties": {
+                "key": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
+                  "type": "string"
+                },
+                "kind": {
+                  "anyOf": [
+                    {
+                      "const": "decision",
+                      "type": "string"
+                    },
+                    {
+                      "const": "review",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "status": {
+                  "anyOf": [
+                    {
+                      "const": "active",
+                      "type": "string"
+                    },
+                    {
+                      "const": "resolved",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "statement": {
+                  "minLength": 1,
+                  "description": "检查结论、未解问题或解决说明。",
+                  "type": "string"
+                },
+                "nodeIds": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string"
+                  }
+                },
+                "lineIds": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string"
+                  }
+                },
+                "evidence": {
+                  "maxItems": 5,
+                  "description": "可选的原文定位线索，可用节点或事件线编号辅助查询。",
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "chapterIndex",
+                      "quote"
+                    ],
+                    "properties": {
+                      "chapterIndex": {
+                        "description": "工具返回的原文章节编号。",
+                        "type": "string"
+                      },
+                      "quote": {
+                        "minLength": 1,
+                        "description": "参考片段，可合理概括，用于回查相关原文。",
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "minItems": 0,
+            "maxItems": 20
+          },
+          "workingSummary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "程序维护的提交键，模型无需填写。"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "success": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "summary",
+          "changed"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "chapterIndex": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reused": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "chapterIndex",
+                "reused"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "lineIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "maxItems": 100
+          }
+        }
+      }
+    },
+    {
+      "name": "add_story_nodes",
+      "input": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "description": "有原文依据的补充事件节点，正式 id 由代码分配。",
+              "type": "object",
+              "required": [
+                "name",
+                "summary",
+                "actors",
+                "chapterIndex"
+              ],
+              "properties": {
+                "name": {
+                  "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+                  "type": "string"
+                },
+                "summary": {
+                  "description": "事件概述，一到两句。",
+                  "type": "string"
+                },
+                "process": {
+                  "description": "这个完整事件的详细经过：交代起因、连续行动、对话要点和结果；相关小动作合在这里，不拆成独立节点，不逐句复述。",
+                  "type": "string"
+                },
+                "actors": {
+                  "description": "事件行动者的称呼或已知姓名。",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "targets": {
+                  "description": "对象 / 承受者。例：[\"王熙凤\"]",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "world_delta": {
+                  "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "new_facts": {
+                  "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "started_actions": {
+                  "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "time_text": {
+                  "description": "原文里的**明确**时间表述。可空。例：洪武十四年三月六日 / 亥时三刻",
+                  "type": "string"
+                },
+                "time_hint": {
+                  "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+                  "type": "string"
+                },
+                "quote": {
+                  "description": "可选的原文定位参考；可省略，概述或引文差异保留为定位提示。",
+                  "type": "string"
+                },
+                "chapterIndex": {
+                  "description": "原文所在的章节标识，必须真实存在。",
+                  "type": "string"
+                }
+              }
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1,
+            "description": "程序维护的提交键，模型无需填写。"
+          }
+        },
+        "required": [
+          "nodes"
+        ],
+        "additionalProperties": false
+      },
+      "success": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ok",
+          "commitId",
+          "operationKey",
+          "alreadyApplied",
+          "summary",
+          "changed"
+        ],
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "commitId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operationKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "alreadyApplied": {
+            "type": "boolean"
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "chapterIndex": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reused": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "chapterIndex",
+                "reused"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "lineIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "maxItems": 100
+          }
+        }
+      }
+    },
+    {
+      "name": "finish_story_batch",
+      "input": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "node",
+                    "eventLine",
+                    "note"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "outcome": {
+                  "enum": [
+                    "changed",
+                    "no_change",
+                    "needs_review"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "outcome",
+                "reason"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "summary": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "可选的结束或暂停说明。"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "success": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "const": true
+          },
+          "status": {
+            "enum": [
+              "completed",
+              "partial"
+            ]
+          },
+          "commitIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 0
+          },
+          "remaining": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "kind",
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "accepted",
+          "status",
+          "commitIds",
+          "remaining"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "navigate_story_pages",
+      "input": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "enum": [
+              "next",
+              "previous"
+            ],
+            "description": "next为下一页，previous为上一页。"
+          },
+          "currentPageId": {
+            "type": "string",
+            "description": "可选的当前页编号；省略时使用程序绑定的阅读位置。"
+          },
+          "reason": {
+            "type": "string",
+            "description": "可选的本页检查结论。"
+          },
+          "notes": {
+            "type": "string",
+            "description": "可选的待查问题或阅读备注。"
+          }
+        },
+        "required": [
+          "direction"
+        ],
+        "additionalProperties": false
+      },
+      "success": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "complete",
+          "page",
+          "summary"
+        ],
+        "additionalProperties": false
       }
     }
   ],

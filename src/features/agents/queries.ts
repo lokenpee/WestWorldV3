@@ -7,6 +7,7 @@ import { searchStoryContext } from '../story/retrieval'
 import type { Character, CharacterRelation, CharacterRelationEdit, Lifecycle } from '../assets/types'
 import { refreshReview } from './organizationReview'
 import { profileWork, relationWork } from './organizationData'
+import { storyProcessSegments } from './storyCommands'
 
 export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; contextId?: string; unitId?: string; workKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
@@ -79,6 +80,42 @@ async function references(store: AgentStore, scope: Scope, names: string[], ids:
   })
 }
 export async function readTool(store: AgentStore, scope: Scope, name: string, args: Row, maxResults = 100): Promise<Row> {
+  if (name === 'get_story_detail') {
+    if (scope.profile !== 'story_editor') throw new Error('SCOPE:故事详情仅供故事编辑使用。')
+    if (args.kind !== 'eventLine') return readTool(store, scope, args.kind === 'node' ? 'get_node_detail' : 'get_editor_note_detail', { ids: args.ids, ...(args.char_offset === undefined ? {} : { char_offset: args.char_offset }), ...(args.maxChars === undefined ? {} : { maxChars: args.maxChars }) }, maxResults)
+    const rows: Row[] = [], missingIds: string[] = []
+    for (const id of strings(args.ids)) {
+      const line = await resolveAsset(store, scope, 'eventLines', id)
+      if (!line) { missingIds.push(id); continue }
+      const members = strings(line.nodeIds), start = Number(args.memberOffset ?? 0), limit = Number(args.memberLimit ?? 50)
+      const nodeIds = members.slice(start, start + limit)
+      const memberPage = { nodeIds, memberOffset: start, memberCount: members.length, membersTruncated: start + nodeIds.length < members.length, nextMemberOffset: start + nodeIds.length < members.length ? start + nodeIds.length : null }
+      const segments = storyProcessSegments(line.process)
+      if (args.processSegment !== undefined) {
+        const segment = segments.find(row => row.segment === args.processSegment)
+        const offset = Number(args.char_offset ?? 0), length = Number(args.maxChars ?? 6000)
+        const snippet = segment?.text.slice(offset, offset + length) ?? ''
+        rows.push({ id: line.id, title: line.title, revision: line.revision, lineStatus: line.lineStatus, ...memberPage,
+          processSegmentCount: segments.length, processSegments: segment ? [{ segment: segment.segment, text: snippet, charOffset: offset, totalChars: segment.text.length, truncated: offset + snippet.length < segment.text.length, nextCharOffset: offset + snippet.length < segment.text.length ? offset + snippet.length : null }] : [],
+          ...(segment ? {} : { hint: '当前段落不存在，可按processSegmentCount选择已有段落。' }) })
+      } else {
+        const row = { ...line, ...memberPage }, full = JSON.stringify(row)
+        const detail = detailFragments([row], args)[0]
+        if (detail.text === undefined) rows.push({ ...detail, processSegmentCount: segments.length, processSegments: segments.map(({ segment, text }) => ({ segment, text })) })
+        else {
+          const processStart = full.indexOf('"process":') + '"process":'.length + 1
+          const from = Number(detail.charOffset), to = from + text(detail.text).length
+          const visible = segments.filter(segment => {
+            const start = processStart + JSON.stringify(text(line.process).slice(0, segment.start)).length - 2
+            const end = start + JSON.stringify(segment.text).length - 2
+            return start < to && end > from
+          })
+          rows.push({ ...detail, processSegmentCount: segments.length, processSegments: visible.map(({ segment }) => ({ segment, hint: '本段部分内容在当前片段中；可用processSegment读取该段。' })) })
+        }
+      }
+    }
+    return page(rows, {}, maxResults, { missingIds })
+  }
   if (name === 'search_story_context') {
     if (scope.profile !== 'story_editor') throw new Error('SCOPE:相关叙事检索仅供故事编辑使用。')
     return searchStoryContext(store, scope.bookId, scope.sessionId, { ...args, include_future: args.include_future ?? scope.phase === 'global_review' })
@@ -177,7 +214,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     }
     const project = (row: Character) => ({ id: row.id, name: row.name, aliases: row.aliases ?? [], identity: row.identity ?? '' })
     if (search) {
-      const matches = people.filter(row => [row.name, ...(row.aliases ?? [])].some(value => value.toLowerCase().includes(search))).sort((a, b) => compare(a.id, b.id))
+      const matches = people.filter(row => [row.name, ...(row.aliases ?? []), row.identity ?? ''].some(value => value.toLowerCase().includes(search))).sort((a, b) => compare(a.id, b.id))
       const data = matches.slice(offset, offset + limit).map(project)
       const next = offset + data.length < matches.length ? JSON.stringify({ page: 0, offset: offset + data.length }) : null
       return { data, pageId: null, nextCursor: next, total: matches.length, fieldContinuations: [] }
@@ -210,7 +247,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     const run = await store.get('pipelineRuns', scope.runId)
     if (!run || run.bookId !== scope.bookId) throw new Error('SCOPE:整理运行不属于当前书籍。')
     const organization = (run.organization ?? {}) as Row
-    const status = text(args.status), offset = Math.max(0, Number(args.offset ?? 0)), limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 100)
+    const status = text(args.status), offset = Math.max(0, Number(args.cursor ?? args.offset ?? 0) || 0), limit = Math.min(Math.max(Number(args.limit ?? 50), 1), 100)
     const all = records(organization.candidateGroups).filter(row => !status || row.status === status).sort((a, b) => text(a.createdAt).localeCompare(text(b.createdAt)) || compare(text(a.id), text(b.id)))
     const lifecycle = await store.rows('assetLifecycle') as never
     const items = all.slice(offset, offset + limit).map(row => ({ ...row, resolvedIds: strings(row.memberIds).map(id => resolveLifecycleId(id, lifecycle)) }))

@@ -5,9 +5,8 @@ import { ModelError, type UsageSummary } from '../models/types'
 import { appendEntry, checkLease } from './commands'
 import { TraceSession } from './trace'
 import { appendRequestLedger } from './ledger'
-import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, entryMessages, findCutPoint, projectSession, settingsForWindow } from './context'
+import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, entryMessages, findCutPoint, projectSession, projectWorkSession, settingsForWindow } from './context'
 import { text, validate } from './contracts'
-import { withOutputDiscipline } from './output-discipline'
 import type { AgentRepository, Row } from './repository'
 import type { Scope } from './queries'
 import compactPrompt from '../../../docs/v2/resources/v2.2/prompts/active/compact.md?raw'
@@ -19,23 +18,24 @@ export function addUsage(previous: Row | undefined, usage: UsageSummary): Row {
   const known = usage.costStatus === 'estimated' && (!previous || previous.costStatus === 'estimated')
   return { input: Number(previous?.input ?? 0) + usage.input, output: Number(previous?.output ?? 0) + usage.output, totalTokens: Number(previous?.totalTokens ?? 0) + usage.totalTokens, cost: Number(previous?.cost ?? 0) + (usage.cost ?? 0), costStatus: known ? 'estimated' : 'unknown' }
 }
-export async function sessionProjection(repo: AgentRepository, sessionId: string) {
+export async function sessionProjection(repo: AgentRepository, sessionId: string, unitId?: string) {
   return repo.transaction(false, async store => {
     const session = await store.get('storySessions', sessionId)
     if (!session || session.bookId !== repo.bookId) throw new Error('会话不属于当前书籍。')
-    const entries = (await store.rows('storySessionEntries')).filter(row => row.sessionId === sessionId)
-    return { ...projectSession(entries, text(session.leafId) || undefined), session, allEntries: [...entries, ...(await repo.traceRows()).filter(row => row.sessionId === sessionId)] }
+    const entries = unitId && store.sessionEntries ? await store.sessionEntries(sessionId) : (await store.rows('storySessionEntries')).filter(row => row.sessionId === sessionId)
+    return { ...(unitId ? projectWorkSession(entries, unitId) : projectSession(entries, text(session.leafId) || undefined)), session, allEntries: unitId ? entries : [...entries, ...(await repo.traceRows()).filter(row => row.sessionId === sessionId)] }
   })
 }
 function withTask(messages: AgentMessage[], prompt: string) {
+  if (!prompt) return messages
   if (messages.some(message => message.role === 'user' && message.content === prompt)) return messages
   const index = messages.findIndex(message => message.role === 'user' && typeof message.content === 'string' && message.content.startsWith('[历史会话压缩摘要'))
   return [...messages.slice(0, index + 1), { role: 'user' as const, content: prompt, timestamp: Date.now() }, ...messages.slice(index + 1)]
 }
 export async function compactSession(repo: AgentRepository, scope: Scope, options: {
-  generate: ModelService['generate']; contextWindow: number; prompt: string; systemMessage?: AgentMessage; force?: boolean; signal?: AbortSignal; onStatus?: (status: SessionStatus) => void
+  generate: ModelService['generate']; contextWindow: number; prompt: string; currentTask?: () => Promise<string>; systemMessage?: AgentMessage; force?: boolean; signal?: AbortSignal; onStatus?: (status: SessionStatus) => void
 }): Promise<AgentMessage[]> {
-  const projection = await sessionProjection(repo, scope.sessionId!)
+  const projection = await sessionProjection(repo, scope.sessionId!, scope.unitId === 'directory:identity' ? scope.unitId : undefined)
   const settings = settingsForWindow(options.contextWindow)
   const before = estimateContextTokens(projection.entries, projection.messages)
   const capacity = options.contextWindow - settings.reserve
@@ -48,10 +48,12 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
     if (!cut) cut = findCutPoint(projection.entries, 64)
     if (!cut) cut = projection.entries.length
     const system = options.systemMessage ?? getCurrentSystemMessage(projection.messages)
+    const currentTask = options.currentTask ? { role: 'user' as const, content: await options.currentTask(), timestamp: Date.now() } : undefined
     const messagesFor = (summary: string, keep: Row[]) => withTask([
       ...(system ? [system] : []),
       { role: 'user', content: `[历史会话压缩摘要：仅作历史参考，可按原始条目 ID 回查]\n${summary}`, timestamp: Date.now() },
       ...keep.flatMap(entryMessages).filter(message => message.role !== 'system'),
+      ...(currentTask ? [currentTask] : []),
     ], options.prompt)
     let keep = projection.entries.slice(cut)
     if (!projection.entries.slice(0, cut).some(entry => entry.type !== 'compaction' && entryMessages(entry).some(message => message.role !== 'system'))) { cut = projection.entries.length; keep = [] }
@@ -76,7 +78,7 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
       options.signal?.throwIfAborted()
       await repo.transaction(false, store => checkLease(store, scope, options.signal))
       let validation: { code: string; path?: string; actualLength?: number; allowedLength?: number } | undefined
-      const result = await options.generate({ role: 'aggregation', context: { systemPrompt: withOutputDiscipline(`${compactPrompt}\n本次摘要最多${maxChars}字符。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。`), messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: outputSchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
+      const result = await options.generate({ role: 'aggregation', context: { systemPrompt: `${compactPrompt}\n本次摘要最多${maxChars}字符。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。`, messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: outputSchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
         validate(message) {
           const summaryError = (code: string, detail: string, extra: { actualLength?: number; allowedLength?: number } = {}) => {
             validation = { code, path: 'summary', ...extra }
@@ -113,6 +115,7 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
       const session = (await store.get('storySessions', scope.sessionId!))!
       if (session.leafId !== projection.session.leafId) throw new Error('压缩期间会话已变化，请重试。')
       await appendEntry(store, scope, { type: 'compaction', summary, firstKeptEntryId: text(keep[0]?.id), tokensBefore: before, tokensAfter: after, ...(system ? { systemMessage: system } : {}), usage })
+      if (currentTask) await appendEntry(store, scope, { type: 'message', message: currentTask })
     })
     options.onStatus?.({ state: 'compacted', before, after })
     return messages

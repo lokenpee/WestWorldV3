@@ -103,17 +103,14 @@ export function organizationResponse(body: { messages: { role: string; content: 
   const data = rows(results.flatMap(result => rows(result.data)))
   const detail = (id: string) => data.find(row => String(row.id) === id && typeof row.revision === 'number')
   if (work.kind === 'directory') {
-    const page = Number(String((work.data as Row).pageId).split(':')[1] ?? 0)
-    const catalog = results.find(result => typeof result.pageId === 'string' && Array.isArray(result.data))
-    if (!catalog) return agentStream([{ name: 'query_character_catalog', args: { cursor: JSON.stringify({ page, offset: 0 }), limit: 100 } }])
-    const pageRows = rows(catalog.data)
-    const groups = groupOf(pageRows)
-    const saved = results.filter(result => typeof result.groupId === 'string')
-    if (!results.some(result => result.summary === '整理进度已更新。')) return agentStream([
-      ...groups.filter((_, index) => !saved[index]).map(members => ({ name: 'save_candidate_group', args: { operationKey: key(), memberIds: members.map(row => String(row.id)), reason: '姓名、别名或身份指向同一人物' } })),
-      { name: 'record_organization_progress', args: { operationKey: key(), action: 'check_item', kind: 'scan_page', id: String((work.data as Row).pageId) } },
+    const next = results.findLast(result => result.page)?.page as Row | undefined
+    const page = next ?? work.data
+    const people = rows(page.people)
+    const groups = groupOf(people).map(members => ({ memberIds: members.map(row => String(row.id)), reason: '姓名、别名或身份指向同一人物' }))
+    return agentStream([
+      ...(groups.length ? [{ name: 'save_identity_groups', args: { groups } }] : []),
+      { name: 'navigate_identity_pages', args: { currentPageId: page.pageId, direction: 'next' } },
     ])
-    return submit('no_change')
   }
   if (work.kind === 'candidate') {
     const group = (work.data as Row).group as Row

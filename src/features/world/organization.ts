@@ -5,17 +5,18 @@ import { createBookAgentRepository } from '../agents/repository'
 import { appendEntry } from '../agents/commands'
 import { resolveSession } from '../agents/sessions'
 import { hash, text } from '../agents/contracts'
-import { createFrequencyCounter } from '../assets/derive'
-import type { Character, LocationAsset } from '../assets/types'
+import { prepareStatistics, saveStatistics } from './statistics'
+import type { Character } from '../assets/types'
 import type { ActiveWork, OrganizationState, WorkKind } from './types'
 import { renewOrganizationLease } from '../agents/organizationLease'
 import { buildRelationReview, buildProfileReview, organizationReviewVersion, reviewContext } from '../agents/organizationReview'
 import { profileWork, relationOverview } from '../agents/organizationData'
 import { resolveLifecycleId } from '../assets/relations'
 import { visiblePairChecks } from './organizationReport'
+import { pruneOrganizationHistory } from '../agents/p2History'
 import { organizationPrompt } from './organizationPrompt'
+import { identityPage, inheritedCandidates } from './identityCandidates'
 import directoryPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-directory.md?raw'
-import candidatePrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-candidate.md?raw'
 import profilePrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-profiles.md?raw'
 import relationPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p2-organization-relations.md?raw'
 
@@ -23,10 +24,10 @@ type Workspace = ReturnType<typeof createWorkspace>
 type Store = import('../agents/repository').AgentStore
 const pageSize = 100
 const pageId = (index: number) => `scan:${index}`
-export const organizationExecutionVersion = 4
+export const organizationExecutionVersion = 6
 const stageOf = (step: OrganizationState['step']) => step === 'scan' || step === 'resolve' ? 'identity' : step === 'profiles' ? 'profiles' : step === 'relations' ? 'relations' : undefined
 const contextIdOf = (kind: WorkKind) => kind === 'directory' || kind === 'candidate' ? 'identity' : kind === 'profile' ? 'profiles' : 'relations'
-const promptFor = (kind: WorkKind) => ({ directory: directoryPrompt, candidate: candidatePrompt, profile: profilePrompt, relations: relationPrompt }[kind])
+const promptFor = (kind: WorkKind) => ({ directory: directoryPrompt, candidate: directoryPrompt, profile: profilePrompt, relations: relationPrompt }[kind])
 
 export function createOrganizationState(characterIds: string[]): OrganizationState {
   const ids = [...new Set(characterIds)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
@@ -47,7 +48,10 @@ export async function createOrganizationStepState(store: Store, step: 'scan' | '
   state.mode = 'full'
   state.runStep = step
   state.statisticsPending = false
-  if (step === 'scan') return state
+  if (step === 'scan') {
+    state.candidateGroups = inheritedCandidates(await store.rows('pipelineRuns')) as unknown as OrganizationState['candidateGroups']
+    return state
+  }
   if (step === 'profiles') {
     state.scanPages = []
     await buildProfileReview(store, state as unknown as Record<string, unknown>)
@@ -89,7 +93,6 @@ export async function createCharacterOrganizationState(store: Store, characterId
 
 function targetComplete(organization: OrganizationState) {
   if (!organization.mode || organization.mode === 'full') return false
-  if (organization.candidateGroups.some(group => group.status === 'pending')) return false
   if (organization.mode === 'profile') return organization.profileItems.some(item => item.id === organization.targetCharacterId && item.status === 'checked')
   return organization.relationItems.some(item => item.id === organization.targetCharacterId && item.status === 'checked') && !visiblePairChecks(organization).some(pair => !pair.outcome)
 }
@@ -116,6 +119,7 @@ async function ensureExecution(organization: OrganizationState) {
   if (Number(organization.executionVersion) === organizationExecutionVersion) { syncContexts(organization); return false }
   organization.executionVersion = organizationExecutionVersion
   organization.activeWork = null
+  if (organization.step === 'resolve') organization.step = 'scan'
   syncContexts(organization)
   return true
 }
@@ -124,24 +128,16 @@ interface WorkUnit { id: string; kind: WorkKind; characterId?: string; summary: 
 
 export async function nextUnit(store: Store, organization: OrganizationState): Promise<WorkUnit | null> {
   for (let guard = 0; guard < 8; guard++) {
-    if ((organization.step === 'profiles' || organization.step === 'relations') && organization.candidateGroups.some(row => row.status === 'pending' && !row.lastError)) {
-      const group = organization.candidateGroups.find(row => row.status === 'pending' && !row.lastError)!
-      return { id: `candidate:${group.id}`, kind: 'candidate', summary: `后续疑似组 ${group.memberNames?.join('、') || group.memberIds.join('、')}`, data: { group }, version: Number(group.revision) }
-    }
     if (organization.step === 'scan') {
-      const page = organization.scanPages.find(row => row.status !== 'checked' && !row.lastError)
-      if (page) return { id: `directory:${page.pageId}`, kind: 'directory', summary: `目录页 ${page.pageId}（${page.ids.length}人）`, data: { pageId: page.pageId, ids: page.ids, nextCursor: page.nextCursor }, version: 0 }
-      if (organization.scanPages.some(row => row.status !== 'checked')) return null
-      organization.step = 'resolve'; syncContexts(organization); continue
+      if (organization.scanPages.find(row => row.status !== 'checked')?.lastError) return null
+      const pending = organization.scanPages.find(row => row.status !== 'checked')
+      const page = pending ? await identityPage(store, organization as unknown as Record<string, unknown>, pending.pageId) : null
+      if (page) return { id: 'directory:identity', kind: 'directory', summary: '连续识别疑似人物', data: { ...page, scannedPages: organization.scanPages.filter(row => row.status === 'checked').length, totalPages: organization.scanPages.length, candidateCount: organization.candidateGroups.filter(row => row.status === 'pending').length }, version: 0 }
+      if (organization.runStep === 'scan') { organization.step = 'done'; organization.statisticsPending = false; syncContexts(organization); return null }
+      await buildProfileReview(store, organization as unknown as Record<string, unknown>); syncContexts(organization); continue
     }
     if (organization.step === 'resolve') {
-      const group = organization.candidateGroups.find(row => row.status === 'pending' && !row.lastError)
-      if (group) return { id: `candidate:${group.id}`, kind: 'candidate', summary: `疑似组 ${group.memberNames?.join('、') || group.memberIds.join('、')}`, data: { group }, version: Number(group.revision) }
-      if (organization.candidateGroups.some(row => row.status === 'pending')) return null
-      if (organization.candidateGroups.length) organization.candidateGroups = []
-      if (organization.runStep === 'scan') { organization.step = 'done'; organization.statisticsPending = false; syncContexts(organization); return null }
-      await buildProfileReview(store, organization as unknown as Record<string, unknown>)
-      syncContexts(organization); continue
+      organization.step = 'scan'; syncContexts(organization); continue
     }
     if (organization.step === 'profiles') {
       const item = organization.profileItems.find(row => row.status === 'pending' && !row.lastError)
@@ -179,7 +175,7 @@ async function unitCompleteResolved(repo: ReturnType<typeof createBookAgentRepos
 }
 
 function unitComplete(organization: OrganizationState, work: ActiveWork) {
-  if (work.kind === 'directory') return organization.scanPages.find(row => row.pageId === work.targetId)?.status === 'checked'
+  if (work.kind === 'directory') return organization.scanPages.every(row => row.status === 'checked')
   if (work.kind === 'candidate') return organization.candidateGroups.find(row => row.id === work.targetId)?.status === 'resolved' || !organization.candidateGroups.some(row => row.id === work.targetId)
   if (work.kind === 'profile') return organization.profileItems.find(row => row.id === work.characterId)?.status === 'checked'
   if (work.kind === 'relations') return organization.relationItems.find(row => row.id === work.characterId)?.status === 'checked'
@@ -187,24 +183,11 @@ function unitComplete(organization: OrganizationState, work: ActiveWork) {
 }
 
 export async function finalizeStatistics(repo: ReturnType<typeof createBookAgentRepository>, runId: string, owner: string, sessionId: string, signal: AbortSignal, timestamp: string) {
-  const snapshot = await repo.transaction(false, async store => ({
-    people: await store.rows('characters') as unknown as Character[],
-    places: await store.rows('locations') as unknown as LocationAsset[],
-    texts: await store.rows('chapterTexts') as unknown as { chapterIndex: string; text: string }[],
-  }))
-  const peopleCounter = createFrequencyCounter(snapshot.people, true)
-  const placeCounter = createFrequencyCounter(snapshot.places, false)
-  for (const textRow of snapshot.texts) { peopleCounter.add(textRow); placeCounter.add(textRow) }
-  const updates = [...peopleCounter.result().map((row, index) => ({ table: 'characters', row: row as Character, before: snapshot.people[index] })), ...placeCounter.result().map((row, index) => ({ table: 'locations', row: row as unknown as LocationAsset, before: snapshot.places[index] }))]
-    .filter(({ row, before }) => JSON.stringify(row) !== JSON.stringify(before))
+  const plan = await prepareStatistics(repo, signal)
   await repo.transaction(true, async store => {
     signal.throwIfAborted()
     await renewOrganizationLease(store, { bookId: repo.bookId, runId, owner, sessionId })
-    for (const { table, row, before } of updates) {
-      const current = await store.get(table, text(row.id))
-      if (!current || Number(current.revision) !== Number(before.revision)) throw new Error('CONFLICT:统计期间资料已变化，请继续整理。')
-      await store.put(table, { ...current, frequency: row.frequency, ...(table === 'characters' ? { roleWeight: (row as Character).roleWeight ?? current.roleWeight, roleWeightSource: (row as Character).roleWeightSource ?? current.roleWeightSource } : {}), revision: Number(current.revision) + 1, updatedAt: timestamp })
-    }
+    await saveStatistics(store, plan, timestamp)
     const run = await store.get('pipelineRuns', runId)
     if (!run?.organization) throw new Error('CONFLICT:人物整理进度不存在。')
     const organization = run.organization as unknown as OrganizationState
@@ -322,6 +305,8 @@ export async function runCharacterOrganization(workspace: Workspace, bookId: str
         syncContexts(state)
         await store.put('pipelineRuns', { ...current, organization: state })
       })
+      // 此时业务完成和runtime日志均已保存；历史维护失败不撤销成功提交。
+      if (unit.kind === 'profile' || unit.kind === 'relations') await pruneOrganizationHistory(workspace, bookId).catch(() => undefined)
       const completed = await organizationOf(repo, options.runId)
       const nextDone = completed.organization.scanPages.filter(item => item.status === 'checked').length + completed.organization.candidateDecisions.length + completed.organization.profileItems.filter(item => item.status === 'checked').length + completed.organization.relationItems.filter(item => item.status === 'checked').length
       options.onProgress?.(nextDone, total)
@@ -355,7 +340,7 @@ export async function runCharacterOrganization(workspace: Workspace, bookId: str
       } else {
         if (unit.kind === 'profile') { const item = state.profileItems.find(row => row.id === unit.characterId); if (item) item.lastError = error }
         if (unit.kind === 'relations') { const item = state.relationItems.find(row => row.id === unit.characterId); if (item) item.lastError = error }
-        if (unit.kind === 'directory') { const page = state.scanPages.find(row => row.pageId === String((unit.data as Record<string, unknown>).pageId)); if (page) page.lastError = error }
+        if (unit.kind === 'directory') { const page = state.scanPages.find(row => row.status !== 'checked'); if (page) page.lastError = error }
         if (unit.kind === 'candidate') { const group = state.candidateGroups.find(row => row.id === (unit.data.group as Record<string, unknown>)?.id); if (group) (group as unknown as Record<string, unknown>).lastError = error }
         state.activeWork = null
       }

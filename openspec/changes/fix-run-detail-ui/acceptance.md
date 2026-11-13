@@ -29,3 +29,5 @@
 | 2026-11-08 | 按 API 消息流重构 | 整理详情改为单条会话时间线：顶部统计，API 输入按 SYSTEM/USER/ASSISTANT/TOOL RESULT 展示，当前返回与 TOOL CALL/TOOL EXECUTION/TOOL RESULT 紧随，底部实际修改；删除三个大标签；修复 toolResult 覆盖 assistant 文本 | 组件、472 项单元测试、开发/生产世界与叙事浏览器测试、typecheck、lint、build、治理和 OpenSpec 通过；用户自测待做 |
 | 2026-11-08 | 重复输入与系统提示词复核 | 最终请求按消息文本去重人物任务；组织整理预算改为 `budgetRule`，删除 `100000` 与“最后一次只能调用 submit_result”，保留目录/疑似组 submit_result 规则；toolResult 不再覆盖 assistant 文本 | 真实单人复验：请求角色 system/user/user，人物任务 1 份，系统提示词无旧规则；`tests/organization.test.ts` 新增多请求任务不重复断言 |
 | 2026-11-11 | 单条API记录与模型工具参数精简 | 实际发送体记录、工具单份快照、删除重复事件/拼接JSON、角色分区及工具结果去包装；关系参数定义减少32.2% | [本轮实现、检查及用户自测](evidence/2026-11-11-api-view.md)；用户观感待验收 |
+
+| 2026-11-12 | P2用户图稿与人物历史替换 | 当前人物动态用量、完成历史去重搜索、折叠真实消息、修改并排及合并历史；成功保存后清理旧详情 | [任务6检查与用户自测](evidence/2026-11-12-user-layout.md)；用户副本验收待做 |

@@ -20,6 +20,24 @@ async function fixture() {
 const result = (summary: string) => ({ ok: true, mode: 'direct', attempts: [], elapsedMs: 1, text: '', value: { summary }, usage: { input: 100, output: 10, cacheRead: 0, cacheWrite: 0, totalTokens: 110, costStatus: 'unknown' } })
 const generator = (summary = '本书旧资料已核对，参照原始条目回查，当前任务以精确编号为准。') => vi.fn(async () => result(summary)) as unknown as ModelService['generate']
 
+it('分页识别压缩后跨任务恢复摘要与后续页，不混入其他工作项', async () => {
+  const repo = await fixture(), identityScope = { ...scope, unitId: 'directory:identity' }
+  await repo.transaction(true, async store => {
+    for (const row of await store.rows('storySessionEntries')) await store.put('storySessionEntries', { ...row, unitId: identityScope.unitId })
+    await appendEntry(store, { ...scope, unitId: 'candidate:legacy' }, { type: 'message', message: { role: 'user', content: '旧版自动合并任务', timestamp: 4 } })
+  })
+  const generate = generator('已看前两页，疑似组G1包含P001和P102；继续第三页。')
+  await compactSession(repo, identityScope, { generate, contextWindow: 8192, prompt: '当前任务精确编号N-123' })
+  await repo.transaction(true, store => appendEntry(store, { ...identityScope, taskId: 'resumed-task' }, { type: 'message', message: { role: 'user', content: '第三页人物P201', timestamp: 5 } }))
+  const restored = await sessionProjection(repo, 'session', identityScope.unitId)
+  const messages = JSON.stringify(restored.messages)
+  expect(messages).toContain('疑似组G1包含P001和P102')
+  expect(messages).toContain('第三页人物P201')
+  expect(messages).not.toContain('旧版自动合并任务')
+  expect(messages).not.toContain('旧资料'.repeat(200))
+  expect(restored.allEntries.filter(row => row.type === 'compaction')).toHaveLength(1)
+})
+
 it('压缩按窗口缩放预算，中文字符按权重估算', () => {
   expect(estimateTextTokens('汉字ABCD')).toBe(4)
   expect(settingsForWindow(8192)).toEqual({ reserve: 2048, keep: 2048 })

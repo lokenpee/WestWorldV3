@@ -1,4 +1,4 @@
-import type { AssistantMessage, AssistantMessageEvent, Context, Model, Usage } from '@earendil-works/pi-ai'
+import type { AssistantMessage, AssistantMessageEvent, Context, Model, ThinkingLevel, Usage } from '@earendil-works/pi-ai'
 
 export const modelApis = ['openai-completions', 'openai-responses', 'anthropic-messages'] as const
 export type ModelApi = typeof modelApis[number]
@@ -40,7 +40,7 @@ export interface CallResult {
   usage: UsageSummary; error?: ModelFailure; message?: AssistantMessage
 }
 export interface CallProgress { state: 'preparing' | 'requesting' | 'waiting'; attempts: number; delayMs?: number }
-export interface CallOptions { beforeRequest?: () => Promise<void>; signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; cooperativeTimeout?: boolean; requestTimeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number; unboundedRequests?: boolean; trace?: ModelTraceHooks; tracePurpose?: TracePurpose }
+export interface CallOptions { beforeRequest?: () => Promise<void>; signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; cooperativeTimeout?: boolean; requestTimeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number; reasoning?: ThinkingLevel; unboundedRequests?: boolean; trace?: ModelTraceHooks; tracePurpose?: TracePurpose }
 export interface DirectRequest<T = string> extends CallOptions {
   role: ModelRole; context: Context; validate?: (message: AssistantMessage) => T; repairPrompt?: string; repairAttempts?: number
 }

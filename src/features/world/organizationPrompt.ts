@@ -52,16 +52,17 @@ function relationBody(data: Row): string {
 function dataBlock(kind: WorkKind, data: Row): string {
   if (kind === 'relations') return relationBody(data)
   const clean: Row = { ...data }
-  if (kind === 'profile') delete clean.revision
+  if (kind === 'profile') {
+    delete clean.revision
+    delete clean.fields
+    delete clean.mergeFacts
+  }
   if (kind === 'candidate') return ['```json', JSON.stringify(clean, null, 2), '```'].join('\n')
   return ['```json', JSON.stringify(clean, null, 2), '```'].join('\n')
 }
 
 const instructions: Record<WorkKind, string[]> = {
-  directory: [
-    '- 以上是本页人物编号；如尚未读取目录内容，使用 `query_character_catalog` 读取本页，不要重复读取其他页。',
-    '- 按本页实际人物判断是否需要登记疑似同人组，不要跨页推测。',
-  ],
+  directory: [],
   candidate: [
     '- 以上是待核对组的成员和原因；读取成员详情后判断是否同一人，不需要重新扫描全书。',
     '- 合并前必须核对成员的实际资料和原文依据；无法确认时登记为待核对。',
@@ -87,7 +88,7 @@ export function organizationPrompt(unit: { kind: WorkKind; characterId?: string;
       ? text((data.group as Row | undefined)?.id)
       : text(data.id)
   const objectName = unit.kind === 'directory'
-    ? `目录页 ${objectId}`
+    ? `人物目录 ${data.pageNumber ?? 1}/${data.totalPages ?? 1} 页`
     : unit.kind === 'candidate'
       ? unit.summary
       : `${text(data.name) || unit.summary}（${objectId}）`
@@ -103,7 +104,7 @@ export function organizationPrompt(unit: { kind: WorkKind; characterId?: string;
     '# 已提供的资料',
     dataBlock(unit.kind, data),
     '',
-    '# 工作说明',
+    ...(instructions[unit.kind].length ? ['# 工作说明'] : []),
     ...instructions[unit.kind],
   ].join('\n')
 }

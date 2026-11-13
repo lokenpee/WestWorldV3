@@ -2,12 +2,95 @@ import { expect, test, type Page } from '@playwright/test'
 import { addEmptyBook } from '../support/browser-books'
 import { worldResponse, worldText } from '../support/world-streams'
 import { organizationResponse } from '../support/organization-streams'
+import { agentStream } from '../support/agent-protocol'
 
 const contentOf = (content: unknown) => typeof content === 'string' ? content : Array.isArray(content) ? content.map((part: { text?: string }) => part.text ?? '').join('') : ''
 const parseContent = (content: unknown) => { try { return JSON.parse(contentOf(content)) as Record<string, unknown> } catch { return {} } }
 const taskInputs = (body: { messages: { role: string; content: unknown }[] }) => body.messages.filter(message => message.role === 'user').map(message => parseContent(message.content)).filter(input => typeof input.step === 'string')
 
 test.setTimeout(60000)
+
+test('AI主动前后翻页时主面板显示当前页而不是累计完成页', async ({ page }) => {
+  let calls = 0, back: () => void = () => undefined, finish: () => void = () => undefined
+  const backGate = new Promise<void>(resolve => { back = resolve })
+  const finishGate = new Promise<void>(resolve => { finish = resolve })
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    const body = route.request().postDataJSON()
+    if (!body.tools?.some((tool: { function?: { name?: string } }) => tool.function?.name === 'navigate_identity_pages')) {
+      await route.fulfill({ contentType: 'text/event-stream', body: await worldResponse(body).text() }); return
+    }
+    calls++
+    if (calls === 3) await backGate
+    if (calls === 4) await finishGate
+    const indices = [0, 1, 2, 1, 2]
+    await route.fulfill({ contentType: 'text/event-stream', body: await agentStream([{ name: 'navigate_identity_pages', args: { currentPageId: `scan:${indices[calls - 1]}`, direction: calls === 3 ? 'previous' : 'next' } }]).text() })
+  })
+  await prepare(page)
+  await page.evaluate(async () => {
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!
+    const request = indexedDB.open(name)
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
+    const first = await new Promise<Record<string, unknown>>((resolve, reject) => { const read = db.transaction('characters').objectStore('characters').getAll(); read.onsuccess = () => resolve(read.result[0]); read.onerror = () => reject(read.error) })
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('characters', 'readwrite')
+      for (let index = 0; index < 201; index++) tx.objectStore('characters').put({ ...first, id: `TEST-${index}`, name: `翻页样本${index}`, aliases: [], identity: `样本身份${index}` })
+      tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error)
+    })
+    db.close()
+  })
+  await page.reload()
+  await page.getByRole('button', { name: '第一步：识别重复人物', exact: true }).click()
+  await expect(page.getByText('当前第 3 / 3 页 · 待人工核对 0 组', { exact: true })).toBeVisible()
+  back()
+  await expect(page.getByText('当前第 2 / 3 页 · 待人工核对 0 组', { exact: true })).toBeVisible()
+  finish()
+  await expect.poll(async () => (await organizationSnapshot(page))?.status).toBe('completed')
+  expect(calls).toBe(5)
+})
+
+test('AI疑似组显示在原候选区，识别中合并置灰，结束后由用户合并', async ({ page }) => {
+  let round = 0, release: () => void = () => undefined
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    const body = route.request().postDataJSON()
+    if (body.tools?.some((tool: { function?: { name?: string } }) => tool.function?.name === 'navigate_identity_pages')) {
+      round++
+      if (round === 1) await gate
+    }
+    await route.fulfill({ contentType: 'text/event-stream', body: await (organizationResponse(body) ?? worldResponse(body)).text() })
+  })
+  await prepare(page)
+  // 先完成一次发现，保留持久候选；第二次识别期间打开同一位置核对。
+  release()
+  const first = page.getByRole('button', { name: '第一步：识别重复人物', exact: true })
+  await first.click()
+  await expect.poll(async () => (await organizationSnapshot(page))?.status, { timeout: 45000 }).toBe('completed')
+  await expect(first).toBeEnabled({ timeout: 45000 })
+  const candidates = page.getByRole('region', { name: '代码整理候选', exact: true })
+  await expect(candidates.getByRole('button', { name: /AI发现.*沈青/ }).first()).toBeVisible()
+  await page.reload()
+  await expect(candidates.getByRole('button', { name: /AI发现.*沈青/ }).first()).toBeVisible()
+  await page.unroute('**/world-fixture/v1/chat/completions')
+  let releaseSecond: () => void = () => undefined
+  const secondGate = new Promise<void>(resolve => { releaseSecond = resolve })
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    await secondGate
+    await route.fulfill({ contentType: 'text/event-stream', body: await agentStream([{ name: 'navigate_identity_pages', args: { currentPageId: 'scan:0', direction: 'next' } }]).text() })
+  })
+  await first.click()
+  await candidates.getByRole('button', { name: /AI发现.*沈青/ }).first().click()
+  const confirm = page.getByRole('button', { name: '确认机械合并', exact: true })
+  await expect(confirm).toBeDisabled()
+  await expect(page.getByRole('button', { name: '加入待合并', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '手动合并', exact: true })).toBeDisabled()
+  releaseSecond(); await expect(first).toBeEnabled({ timeout: 45000 })
+  await page.getByLabel('合并后主名').selectOption({ label: '沈青' })
+  await expect(confirm).toBeEnabled()
+  await confirm.click()
+  await expect(page.getByRole('status').filter({ hasText: '已合并“沈青”' })).toBeVisible()
+  await expect(candidates.getByRole('button', { name: /AI发现.*沈青/ })).toHaveCount(0)
+  await expect(page.getByText('当前第 1 / 1 页 · 待人工核对 0 组', { exact: true })).toBeVisible()
+})
 
 test('P2 三步可独立启动且不会自动串到下一步', async ({ page }) => {
   const steps: string[] = []
@@ -39,7 +122,7 @@ test('第三步运行中可以暂停并继续，按钮不会被租约禁用', as
   await page.route('**/world-fixture/v1/chat/completions', async route => {
     const body = route.request().postDataJSON()
     const organization = organizationResponse(body)
-    if (organization && !held && body.messages.some((message: { content?: unknown }) => String(message.content ?? '').includes('任务类型：relations'))) {
+    if (organization && !held && body.messages.some((message: { content?: unknown }) => contentOf(message.content).includes('任务类型：relations'))) {
       held = true
       await gate
     }
@@ -71,25 +154,28 @@ test('第二步整理详情按实际API请求展示，桌面与窄屏无重复�
   await expect(page.getByRole('button', { name: '查看整理报告', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '整理详情', exact: true }).click()
   const trace = page.getByRole('dialog', { name: '整理详情', exact: true })
-  await expect(trace.getByRole('tab', { name: /第一步：识别与合并/ })).toBeVisible()
-  await expect(trace.getByRole('tab', { name: /第二步：整理人物资料/ })).toBeVisible()
-  await expect(trace.getByRole('tab', { name: /第三步：整理人物关系/ })).toBeVisible()
-  await trace.getByRole('tab', { name: /第二步：整理人物资料/ }).click()
-  await expect(trace.getByRole('button', { name: /人物资料 · 沈青/ }).first()).toBeVisible({ timeout: 15000 })
-  await trace.getByRole('button', { name: /人物资料 · 沈青/ }).first().click()
+  await expect(trace.getByRole('button', { name: '识别与合并记录', exact: true })).toBeVisible()
+  await expect(trace.getByRole('button', { name: '人物资料', exact: true })).toBeVisible()
+  await expect(trace.getByRole('button', { name: '人物关系', exact: true })).toBeVisible()
+  await trace.getByRole('button', { name: '人物资料', exact: true }).click()
+  await expect(trace.getByLabel('已完成人物', { exact: true })).toContainText('沈青', { timeout: 15000 })
+  await trace.getByLabel('已完成人物', { exact: true }).selectOption({ label: '沈青（C1-P001）' })
   await expect(trace).toContainText('API 请求')
   await expect(trace.locator('.execution-events')).toHaveCount(0)
   const conversation = trace.locator('.execution-conversation')
   const conversationPart = (selector: string) => conversation.locator(`:scope > ${selector}`)
   await expect(conversationPart('.run-role-system')).toHaveCount(1, { timeout: 15000 })
-  await expect(conversationPart('.run-role-user')).toHaveCount(1)
+  expect(await conversationPart('.run-role-user').count()).toBeGreaterThanOrEqual(1)
   await expect(conversationPart('.run-role-tools')).not.toHaveAttribute('open', '')
   await expect(trace.getByText('原始请求 JSON', { exact: false })).toHaveCount(0)
   await expect(trace.getByText('历史记录', { exact: false })).toHaveCount(0)
+  await expect(conversation.locator(':scope > details[open]')).toHaveCount(0)
+  await expect(conversation.locator('pre')).toHaveCount(0)
+  await conversation.locator('.run-role-user > summary').first().click()
   await expect(conversation.locator('.run-role-user').first()).toHaveAttribute('open', '')
+  await expect(conversation.locator('.run-role-user pre').first()).toContainText('沈青')
   await conversation.locator('.run-role-user > summary').first().click()
-  await expect(conversation.locator('.run-role-user').first()).not.toHaveAttribute('open', '')
-  await conversation.locator('.run-role-user > summary').first().click()
+  await expect(conversation.locator('.run-role-user pre')).toHaveCount(0)
   await trace.locator('.run-selected-object').screenshot({ path: testInfo.outputPath('agent-detail-desktop.png') })
   await expect(trace).toContainText('工具调用')
   await expect(trace).toContainText('SYSTEM')
@@ -103,8 +189,8 @@ test('第二步整理详情按实际API请求展示，桌面与窄屏无重复�
   await expect(page.getByRole('button', { name: '编辑 张三丰', exact: true })).toBeVisible()
   await page.setViewportSize({ width: 375, height: 812 })
   await page.getByRole('button', { name: '整理详情', exact: true }).click()
-  await trace.getByRole('tab', { name: /第二步：整理人物资料/ }).click()
-  await trace.getByRole('button', { name: /人物资料 · 沈青/ }).first().click()
+  await trace.getByRole('button', { name: '人物资料', exact: true }).click()
+  await trace.getByLabel('已完成人物', { exact: true }).selectOption({ label: '沈青（C1-P001）' })
   await expect(trace.locator('.run-api')).toHaveCount(0)
   await trace.locator('.run-api-boundary > summary').first().click()
   await expect(trace.locator('.run-api')).toHaveCount(1)
@@ -145,14 +231,14 @@ test('人物编辑页可单独启动资料整理并打开对应 P2 详情', asyn
   await expect(relations).toBeVisible()
   await profile.click()
   const trace = page.getByRole('dialog', { name: '整理详情', exact: true })
-  await expect(trace.getByRole('tab', { name: /第二步：整理人物资料/ })).toBeVisible()
-  await expect(trace.getByRole('button', { name: /人物资料 · 沈青/ }).first()).toBeVisible({ timeout: 20000 })
+  await expect(trace.getByRole('button', { name: '人物资料', exact: true })).toBeVisible()
+  await expect(trace.getByLabel('已完成人物', { exact: true })).toContainText('沈青', { timeout: 20000 })
   await expect(trace).toContainText('API 请求')
   await trace.getByRole('button', { name: '关闭', exact: true }).click()
   await relations.click()
   const relationTrace = page.getByRole('dialog', { name: '整理详情', exact: true })
-  await expect(relationTrace.getByRole('tab', { name: /第三步：整理人物关系/ })).toBeVisible()
-  await expect(relationTrace.getByRole('button', { name: /人物关系 · 沈青/ }).first()).toBeVisible({ timeout: 20000 })
+  await expect(relationTrace.getByRole('button', { name: '人物关系', exact: true })).toBeVisible()
+  await expect(relationTrace.getByLabel('已完成人物', { exact: true })).toContainText('沈青', { timeout: 20000 })
   await relationTrace.getByRole('button', { name: '关闭', exact: true }).click()
 })
 
@@ -512,8 +598,9 @@ test('P2性能隔离样本：历史日志下三个步骤和详情响应', async 
   }
   await page.getByRole('button', { name: '整理详情', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '整理详情', exact: true })
-  await dialog.getByRole('tab', { name: /第二步：整理人物资料/ }).click()
-  await dialog.getByRole('button', { name: /人物资料 · 沈青/ }).first().click({ timeout: 30000 })
+  await dialog.getByRole('button', { name: '人物资料', exact: true }).click()
+  await expect(dialog.getByLabel('已完成人物', { exact: true })).toContainText('沈青', { timeout: 30000 })
+  await dialog.getByLabel('已完成人物', { exact: true }).selectOption({ label: '沈青（C1-P001）' })
   await dialog.locator('.run-api-boundary > summary').first().click()
   await expect(dialog.locator('.run-api').first()).toBeVisible({ timeout: 30000 })
   const metrics = await page.evaluate(() => (window as unknown as { p2Metrics: { longTasks: number[]; fullLogReads: number } }).p2Metrics)
@@ -529,4 +616,130 @@ test('P2性能隔离样本：历史日志下三个步骤和详情响应', async 
   await expect.poll(() => dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('p2-details-mobile.png') })
   await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+})
+
+
+test('P2图稿：当前用量、跨轮覆盖、搜索和合并历史', async ({ page }, testInfo) => {
+  test.setTimeout(90000)
+  let release: () => void = () => undefined
+  const gate = new Promise<void>(resolve => { release = resolve })
+  let held = false
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    const body = route.request().postDataJSON()
+    const response = organizationResponse(body, { onProfile: detail => detail.id === 'C1-P001' ? [{ name: 'submit_profile_review', args: { patch: { personality: '沉稳，遇事果断' }, done: true, reason: '合并重复表述' } }] : [] })
+    if (response && !held && body.messages.some((message: { content?: unknown }) => contentOf(message.content).includes('任务类型：profile'))) { held = true; await gate }
+    await route.fulfill({ contentType: 'text/event-stream', body: await (response ?? worldResponse(body)).text() })
+  })
+  await prepare(page)
+  const second = page.getByRole('button', { name: '第二步：优化人物资料', exact: true })
+  await second.click()
+  await expect.poll(() => held).toBe(true)
+  const progress = page.getByRole('region', { name: '人物整理进度', exact: true })
+  await expect(progress).toContainText('C1-P001')
+  await expect(progress).toContainText('已调用 API：1 次')
+  await expect(progress).toContainText('输入 待返回 Token')
+  await progress.screenshot({ path: testInfo.outputPath('p2-current-person.png') })
+  await page.getByRole('button', { name: '整理详情', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '整理详情', exact: true })
+  await expect(dialog.getByRole('region', { name: '执行统计', exact: true })).toContainText('API 请求 1 次')
+  await expect(dialog.getByLabel('已完成人物', { exact: true }).locator('option:not([value=""])')).toHaveCount(0)
+  release()
+  await expect(dialog.getByLabel('已完成人物', { exact: true })).toContainText('沈青')
+  await dialog.getByLabel('已完成人物', { exact: true }).selectOption({ label: '沈青（C1-P001）' })
+  await expect(dialog.locator('.p2-change')).toContainText('沉稳，遇事果断')
+  await expect(dialog.locator('.p2-change')).toContainText('合并重复表述')
+  await expect(dialog.getByRole('heading', { name: '人物资料 · 沈青（C1-P001）', exact: true })).toBeVisible()
+  await dialog.screenshot({ path: testInfo.outputPath('p2-changes-desktop.png') })
+  await page.setViewportSize({ width: 375, height: 812 })
+  await dialog.locator('.p2-change').scrollIntoViewIfNeeded()
+  await dialog.screenshot({ path: testInfo.outputPath('p2-changes-mobile.png') })
+  expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await expect(second).toBeEnabled({ timeout: 30000 })
+  await second.click()
+  await expect(second).toBeEnabled({ timeout: 30000 })
+  await page.getByRole('button', { name: '整理详情', exact: true }).click()
+  await expect(dialog.getByLabel('已完成人物', { exact: true })).toContainText('沈青')
+  await dialog.getByLabel('搜索已完成人物', { exact: true }).fill('C1-P001')
+  await dialog.getByRole('button', { name: '搜索', exact: true }).click()
+  await expect(dialog.getByLabel('已完成人物', { exact: true }).locator('option:not([value=""])')).toHaveCount(1)
+  await expect(dialog).toContainText('本次没有实际写库修改')
+  await expect.poll(() => page.evaluate(async () => {
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!
+    const request = indexedDB.open(name)
+    const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
+    const rows = await new Promise<Record<string, unknown>[]>(resolve => { const req = db.transaction('storySessionEntries').objectStore('storySessionEntries').getAll(); req.onsuccess = () => resolve(req.result) })
+    const runs = await new Promise<Record<string, unknown>[]>(resolve => { const req = db.transaction('pipelineRuns').objectStore('pipelineRuns').getAll(); req.onsuccess = () => resolve(req.result) })
+    db.close()
+    return { traceRuns: new Set(rows.filter(row => row.type === 'request_trace' && row.unitId === 'profile:C1-P001').map(row => row.runId)).size, businessRuns: runs.filter(row => (row.organization as { runStep?: string } | undefined)?.runStep === 'profiles').length }
+  }), { timeout: 15000 }).toEqual({ traceRuns: 1, businessRuns: 2 })
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+  await page.getByRole('button', { name: '代码整理', exact: true }).click()
+  await expect(page.getByRole('button', { name: '代码整理', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: '整理详情', exact: true }).click()
+  await expect(dialog.getByRole('region', { name: '合并历史', exact: true })).toBeVisible()
+  expect(await dialog.locator('.p2-step-tabs').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+  await expect(dialog.getByRole('region', { name: 'Agent 执行过程', exact: true })).toHaveCount(0)
+  await expect(dialog.locator('.p2-merge-history details')).not.toHaveCount(0)
+  await dialog.locator('.p2-merge-history details > summary').first().click()
+  await expect(dialog).toContainText('合并后的结果')
+  await dialog.screenshot({ path: testInfo.outputPath('p2-merge-history.png') })
+})
+
+
+test('人物自动分层位于人物列表，保留手动层级且不调用模型，失败后可重试', async ({ page }, testInfo) => {
+  let calls = 0
+  await page.route('**/world-fixture/v1/chat/completions', async route => {
+    calls++
+    await route.fulfill({ contentType: 'text/event-stream', body: await worldResponse(route.request().postDataJSON()).text() })
+  })
+  await prepare(page)
+  const initialCalls = calls
+  const panel = page.getByRole('region', { name: '资产管理', exact: true })
+  const auto = panel.getByRole('button', { name: '人物自动分层', exact: true })
+  await expect(auto).toBeVisible()
+  expect(await auto.evaluate(el => el.previousElementSibling?.getAttribute('aria-label'))).toBe('筛选人物层级')
+  expect(await auto.evaluate(el => el.nextElementSibling?.textContent)).toBe('新增人物')
+  await expect(page.getByRole('button', { name: '更新出场统计', exact: true })).toHaveCount(0)
+  await panel.getByRole('button', { name: '编辑 沈青', exact: true }).first().click()
+  await panel.getByLabel('人物层级', { exact: true }).selectOption('路人')
+  await expect(panel.getByRole('status').filter({ hasText: '已保存' })).toBeVisible()
+  await panel.getByLabel('筛选人物层级', { exact: true }).selectOption('路人')
+  // 模拟一次本地存储失败，验证错误展示及重试；仅作用于此测试的独立浏览器。
+  await page.evaluate(() => {
+    const original = IDBObjectStore.prototype.put
+    IDBObjectStore.prototype.put = function (...args: Parameters<typeof original>) {
+      if (this.name === 'pipelineRuns' && args[0]?.id === 'lease:world') {
+        IDBObjectStore.prototype.put = original
+        throw new Error('测试存储失败')
+      }
+      return original.apply(this, args)
+    }
+  })
+  await auto.click()
+  await expect(panel.getByRole('alert')).toContainText('测试存储失败')
+  await expect(auto).toBeEnabled()
+  await auto.click()
+  await expect(panel.getByRole('status').filter({ hasText: '人物自动分层完成' })).toContainText('已处理 7 人')
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+  await expect(panel.getByLabel('人物层级', { exact: true })).toHaveValue('路人')
+  expect(calls).toBe(initialCalls)
+  const stored = await page.evaluate(async () => {
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!
+    const request = indexedDB.open(name)
+    const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
+    const rows = await new Promise<Record<string, unknown>[]>(resolve => { const req = db.transaction('characters').objectStore('characters').getAll(); req.onsuccess = () => resolve(req.result) })
+    const runs = await new Promise<Record<string, unknown>[]>(resolve => { const req = db.transaction('pipelineRuns').objectStore('pipelineRuns').getAll(); req.onsuccess = () => resolve(req.result) })
+    db.close()
+    return { measured: rows.filter(row => row.frequency).length, manual: rows.find(row => row.id === 'C1-P001'), p2: runs.filter(row => row.stage === 'P2').length, locks: runs.filter(row => row.recordType === 'lease').length }
+  })
+  expect(stored).toMatchObject({ measured: 7, manual: { roleWeight: '路人', roleWeightSource: 'manual' }, p2: 0, locks: 0 })
+  await panel.locator('.asset-toolbar').screenshot({ path: testInfo.outputPath('character-tiers-desktop.png') })
+  await page.setViewportSize({ width: 375, height: 812 })
+  await auto.click()
+  await expect(panel.getByRole('status').filter({ hasText: '人物自动分层完成' })).toContainText('调整 0 人层级')
+  expect(await panel.locator('.asset-toolbar').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+  await panel.locator('.asset-toolbar').screenshot({ path: testInfo.outputPath('character-tiers-mobile.png') })
+  await panel.getByRole('button', { name: /^地点 / }).click()
+  await expect(auto).toHaveCount(0)
 })

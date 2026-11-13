@@ -5,7 +5,6 @@ import type { Character, LocationAsset, Fact } from '../assets/types'
 import { rebuildFacts } from '../assets/derive'
 import { detailTokens, fuseText, type WorldKind } from '../assets/merge'
 import { hash } from '../agents/contracts'
-import { withOutputDiscipline } from '../agents/output-discipline'
 import { estimateTextTokens } from '../agents/context'
 import schemasText from '../../../docs/v2/resources/schemas.json?raw'
 import outputText from '../../../docs/v2/resources/v2.2/model-output-contract.json?raw'
@@ -47,7 +46,7 @@ function normalize(schema: Shape, value: unknown): unknown {
 }
 export async function optimizationRequest(kind: WorldKind, row: Entity) {
   const facts = entityFacts(kind, row)
-  const prompt = `${withOutputDiscipline(kind === 'character' ? characterPrompt : locationPrompt)}\n本次任务为展示档案整编。保留事实指保留信息含义与来源，不要求逐字保留重复措辞；同义、近义及包含关系的表述须归并，独有信息、时间变化和真实分歧继续保留。\n`
+  const prompt = `${kind === 'character' ? characterPrompt : locationPrompt}\n本次任务为展示档案整编。保留事实指保留信息含义与来源，不要求逐字保留重复措辞；同义、近义及包含关系的表述须归并，独有信息、时间变化和真实分歧继续保留。\n`
   const fingerprint = await hash({ version: 'semantic-quality-1', prompt, names: [row.name, ...(row.aliases ?? [])].map(name => name.trim()).sort(), facts, notes: row.mergeNotes ?? [] })
   const shortFacts = facts.map((fact, i) => ({ ...fact, id: `F${i + 1}` }))
   const ids = shortFacts.map(fact => fact.id)

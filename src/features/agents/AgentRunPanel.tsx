@@ -82,7 +82,24 @@ export function ApiRequest({ row, index, snapshots }: { row: Row; index: number;
   </>}</LazyDetails>
 }
 
-export function Changes({ edits, characterNames }: { edits: Row[]; characterNames?: Map<string, string> }) {
+export function Changes({ edits, characterNames, sideBySide = false }: { edits: Row[]; characterNames?: Map<string, string>; sideBySide?: boolean }) {
+  if (sideBySide) {
+    const names = (edit: Row) => {
+      const id = text(edit.id)
+      if (edit.kind === 'relation') { try { return (JSON.parse(id) as string[]).map(id => `${characterNames?.get(id) || id}（${id}）`).join(' ↔ ') } catch { return id } }
+      return `${characterNames?.get(id) || id}（${id}）`
+    }
+    const fieldLabel = (field: string) => ({ forwardLabels: '正向称谓', reverseLabels: '反向称谓', forwardLabel: '正向称谓', reverseLabel: '反向称谓', name: '姓名', aliases: '别名', identity: '身份', appearance: '外貌', personality: '性格', background: '经历', speechStyleSample: '说话特点', state: '关系状态', directionUnclear: '方向不明' } as Record<string, string>)[field] ?? field
+    return <section className="run-changes"><h3>本次实际修改</h3>
+      {!edits.length && <p className="field-help">本次没有实际写库修改。</p>}
+      {edits.map((edit, index) => <article className="p2-change" key={`${text(edit.commitId)}:${index}`}>
+        <h4>对象：{names(edit)}</h4>
+        <div className="p2-change-columns">{(['before', 'after'] as const).map(side => <section key={side}><h5>{side === 'before' ? '修改前' : '修改后'}</h5>{list(edit.fieldChanges).map((change, at) => <div key={at}><strong>{fieldLabel(text(change.field))}</strong><pre>{full(change[side])}</pre></div>)}</section>)}</div>
+        <p>理由：{text(edit.reason) || '未填写'}</p>
+        {edit.evidenceStatus === 'unverified' && <p className="field-help">依据尚未核实。</p>}
+      </article>)}
+    </section>
+  }
   const groups = new Map<string, Row[]>()
   for (const edit of edits) {
     const id = text(edit.characterId) || text(edit.id)

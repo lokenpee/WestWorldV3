@@ -302,7 +302,7 @@
                     "type": "string"
                   },
                   "appearance": {
-                    "description": "外貌",
+                    "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
                     "type": "string"
                   },
                   "personality": {
@@ -434,7 +434,7 @@
         }
       },
       "appearance": {
-        "description": "外貌",
+        "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
         "type": "string"
       },
       "personality": {
@@ -476,12 +476,12 @@
               "minLength": 1
             },
             "relation_label": {
-              "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
+              "description": "本人物相对于目标的身份，如父亲、儿子、朋友；关系依据不足时省略该条关系。",
               "type": "string",
               "minLength": 1
             },
             "reverse_label": {
-              "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
+              "description": "目标相对于本人物的身份，如儿子、父亲、朋友；关系依据不足时省略该条关系。",
               "type": "string",
               "minLength": 1
             },
@@ -565,7 +565,7 @@
         }
       },
       "appearance": {
-        "description": "外貌。**仅当原文写到**，不要推断。",
+        "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
         "type": "string"
       },
       "personality": {
@@ -607,12 +607,12 @@
               "minLength": 1
             },
             "relation_label": {
-              "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
+              "description": "本人物相对于目标的身份，如父亲、儿子、朋友；关系依据不足时省略该条关系。",
               "type": "string",
               "minLength": 1
             },
             "reverse_label": {
-              "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
+              "description": "目标相对于本人物的身份，如儿子、父亲、朋友；关系依据不足时省略该条关系。",
               "type": "string",
               "minLength": 1
             },
@@ -1923,7 +1923,7 @@
               "type": "string"
             },
             "quote": {
-              "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+              "description": "用于回查的原文片段。",
               "type": "string"
             },
             "offset": {
@@ -2197,7 +2197,7 @@
             }
           },
           "appearance": {
-            "description": "外貌",
+            "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
             "type": "string"
           },
           "personality": {
@@ -2378,7 +2378,7 @@
               "type": "string"
             },
             "quote": {
-              "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+              "description": "用于回查的原文片段。",
               "type": "string"
             },
             "offset": {
@@ -2508,7 +2508,7 @@
         "type": "string"
       },
       "quote": {
-        "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+        "description": "用于回查的原文片段。",
         "type": "string"
       },
       "offset": {
@@ -2593,7 +2593,7 @@
         "type": "string"
       },
       "quote": {
-        "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+        "description": "用于回查的原文片段。",
         "type": "string"
       },
       "offset": {
@@ -2646,7 +2646,7 @@
             "type": "string"
           },
           "appearance": {
-            "description": "外貌",
+            "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
             "type": "string"
           },
           "personality": {
@@ -2715,12 +2715,12 @@
         "minLength": 1
       },
       "relation_label": {
-        "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
+        "description": "本人物相对于目标的身份，如父亲、儿子、朋友；关系依据不足时省略该条关系。",
         "type": "string",
         "minLength": 1
       },
       "reverse_label": {
-        "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
+        "description": "目标相对于本人物的身份，如儿子、父亲、朋友；关系依据不足时省略该条关系。",
         "type": "string",
         "minLength": 1
       },
@@ -2830,7 +2830,7 @@
         }
       },
       "appearance": {
-        "description": "外貌。**仅当原文写到**，不要推断。",
+        "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
         "type": "string"
       },
       "personality": {
@@ -2872,12 +2872,12 @@
               "minLength": 1
             },
             "relation_label": {
-              "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
+              "description": "本人物相对于目标的身份，如父亲、儿子、朋友；关系依据不足时省略该条关系。",
               "type": "string",
               "minLength": 1
             },
             "reverse_label": {
-              "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
+              "description": "目标相对于本人物的身份，如儿子、父亲、朋友；关系依据不足时省略该条关系。",
               "type": "string",
               "minLength": 1
             },
@@ -3258,7 +3258,7 @@
         "type": "string"
       },
       "quote": {
-        "description": "原文片段，用于回查校验。必须是原文里真实存在的句子。",
+        "description": "用于回查的原文片段。",
         "type": "string"
       },
       "offset": {
@@ -4240,7 +4240,7 @@
               }
             },
             "appearance": {
-              "description": "外貌。**仅当原文写到**，不要推断。",
+              "description": "外貌、气质、身材，含女性的性相关身体特征；按原文具体描写提取。",
               "type": "string"
             },
             "personality": {
@@ -4282,12 +4282,12 @@
                     "minLength": 1
                   },
                   "relation_label": {
-                    "description": "本人物相对于目标的身份关系标签。例：妹妹 / 父亲 / 朋友。不能填写宝二哥、林妹妹等称呼或打趣等互动；证据不足填未知。",
+                    "description": "本人物相对于目标的身份，如父亲、儿子、朋友；关系依据不足时省略该条关系。",
                     "type": "string",
                     "minLength": 1
                   },
                   "reverse_label": {
-                    "description": "目标相对于本人物的身份关系标签。例：兄长 / 子女 / 朋友。不能填写称呼；证据不足填未知。",
+                    "description": "目标相对于本人物的身份，如儿子、父亲、朋友；关系依据不足时省略该条关系。",
                     "type": "string",
                     "minLength": 1
                   },

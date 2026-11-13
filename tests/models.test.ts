@@ -7,6 +7,8 @@ import { defaultConfig, ModelError, type ModelConfig, type ModelTraceEnd, type M
 import { abortableDelay, classifyError, redact, retryDelay } from '../src/features/models/policy'
 import type { GatewayEnvironment } from '../src/features/models/gateway'
 import { Type } from 'typebox'
+import { outputDiscipline, withContextDiscipline } from '../src/features/agents/output-discipline'
+import type { Context } from '@earendil-works/pi-ai'
 import { anthropicBody, responsesBody } from './support/model-streams'
 
 const opened: ReturnType<typeof createWorkspace>[] = []
@@ -26,12 +28,54 @@ function stream(text = '好', tool?: { arguments: string }) {
   return new Response(chunks.map(value => `data: ${JSON.stringify(value)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } })
 }
 function httpError(status: number, text = 'temporary failure', headers: HeadersInit = {}) { return new Response(JSON.stringify({ error: { message: text } }), { status, headers: { 'Content-Type': 'application/json', ...headers } }) }
+
+function systemText(body: Record<string, unknown>): string {
+  const content = (value: unknown): string => typeof value === 'string' ? value : Array.isArray(value) ? value.map(part => typeof part === 'object' && part ? String((part as { text?: string }).text ?? '') : '').join('\n') : ''
+  if (body.instructions) return content(body.instructions)
+  if (body.system) return content(body.system)
+  return ((body.messages ?? body.input ?? []) as { role: string; content: unknown }[]).filter(row => ['system', 'developer'].includes(row.role)).map(row => content(row.content)).join('\n\n')
+}
+function expectDiscipline(body: Record<string, unknown>) {
+  const text = systemText(body)
+  expect(text.split(outputDiscipline)).toHaveLength(2)
+  expect(text.trimEnd().endsWith(outputDiscipline)).toBe(true)
+  expect(text).not.toContain('直接调用工具提交结果，不写前言')
+}
 afterEach(async () => {
   vi.restoreAllMocks()
   for (const workspace of opened.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) }
 })
 
 describe('模型配置与统一调用', () => {
+  it('公共说明统一放在实际系统提示末尾，保留动态系统内容且不修改调用者数据', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream('正常说明'))
+    const { service } = await setup(fetcher)
+    const context: Context = { systemPrompt: `业务正文\n${outputDiscipline}`, messages: [
+      { role: 'system', content: '本次动态要求', timestamp: 1 },
+      { role: 'user', content: '待处理资料', timestamp: 2 },
+    ] }
+    const before = structuredClone(context)
+    const result = await service.generate({ role: 'aggregation', context })
+    expect(result).toMatchObject({ ok: true, text: '正常说明' })
+    const body = JSON.parse(fetcher.mock.calls[0][1]?.body as string)
+    expectDiscipline(body)
+    expect(systemText(body)).toContain('业务正文'); expect(systemText(body)).toContain('本次动态要求')
+    expect(context).toEqual(before)
+  })
+
+  it('系统分节和恢复上下文重复处理时公共说明只有一份，用户引用原文不被改动', () => {
+    const context: Context = { messages: [
+      { role: 'system', content: [{ type: 'text', text: `业务正文\n${outputDiscipline}` }], sections: { task: '任务分节' }, timestamp: 1 },
+      { role: 'user', content: outputDiscipline, timestamp: 2 },
+    ] }
+    const before = structuredClone(context)
+    const once = withContextDiscipline(context), twice = withContextDiscipline(once)
+    expect(twice).toEqual(once); expect(context).toEqual(before)
+    expect(twice.messages[1]).toEqual(before.messages[1])
+    const system = twice.messages[0]
+    expect(system.role).toBe('system')
+    if (system.role === 'system') expect(Object.values(system.sections!)).toEqual(['任务分节', outputDiscipline])
+  })
   it('先保存服务连接即可拉取模型，按角色选择后再生成', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ data: [{ id: 'selected-model' }] })).mockResolvedValueOnce(stream())
     const { service } = await setup(fetcher)
@@ -180,6 +224,7 @@ describe('模型配置与统一调用', () => {
     expect(result).toMatchObject({ ok: true, value: { ok: true } })
     expect(fetcher).toHaveBeenCalledTimes(3)
     expect(result.usage.totalTokens).toBe(10)
+    for (const [, init] of fetcher.mock.calls) expectDiscipline(JSON.parse(init?.body as string))
     const repaired = JSON.parse(fetcher.mock.calls[2][1]?.body as string)
     expect(repaired.messages.some((row: { role: string; content: string }) => row.role === 'assistant' && row.content === 'bad json')).toBe(true)
   })
@@ -201,6 +246,29 @@ describe('模型配置与统一调用', () => {
     expect(result).toMatchObject({ ok: true, mode: 'agent', text: '好', snapshot: { modelId: 'saved-aggregation', modelRole: 'aggregation' } })
     expect(result.attempts).toHaveLength(1)
     expect(JSON.parse(fetcher.mock.calls[0][1]?.body as string).model).toBe('saved-aggregation')
+  })
+
+  it('显式请求思考时由Pi按已知模型能力启用，direct与探测默认保持原样', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => stream('固定回复'))
+    const { service } = await setup(fetcher)
+    await service.settings.save(defaultConfig, key)
+    const result = await service.agent({ prompt: '固定任务', systemPrompt: '固定系统要求' }, { reasoning: 'medium' })
+    expect(result).toMatchObject({ ok: true, text: '固定回复' })
+    expect(JSON.parse(fetcher.mock.calls[0][1]?.body as string)).toMatchObject({ model: 'deepseek-v4-pro', thinking: { type: 'enabled' }, reasoning_effort: 'high' })
+    expect((await service.probe('direct')).ok).toBe(true)
+    expect(JSON.parse(fetcher.mock.calls[1][1]?.body as string)).toMatchObject({ thinking: { type: 'disabled' } })
+    expect((await service.probe('agent')).ok).toBe(true)
+    expect(JSON.parse(fetcher.mock.calls[2][1]?.body as string)).toMatchObject({ thinking: { type: 'disabled' } })
+  })
+
+  it('目录外模型不因调用者请求思考而注入未知的供应商参数', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(stream('固定回复'))
+    const { service } = await setup(fetcher)
+    expect((await service.agent({ prompt: '固定任务', systemPrompt: '固定系统要求' }, { reasoning: 'medium' })).ok).toBe(true)
+    const body = JSON.parse(fetcher.mock.calls[0][1]?.body as string)
+    expect(body).not.toHaveProperty('thinking')
+    expect(body).not.toHaveProperty('reasoning')
+    expect(body).not.toHaveProperty('reasoning_effort')
   })
 
   it('共享Agent入口使用调用者任务输入，默认由Pi在工具结果后继续运行', async () => {
@@ -231,6 +299,7 @@ describe('模型配置与统一调用', () => {
     expect(starts).toHaveLength(2)
     expect(sent).toHaveLength(2)
     sent.forEach((value, index) => {
+      expectDiscipline(value.body)
       expect(value.body).toEqual(JSON.parse(fetcher.mock.calls[index][1]?.body as string))
       expect(value.requestId).toBe(starts[index].requestId)
       expect(value.attemptId).toBe((ends[index].attempts as { attemptId: string }[])[0].attemptId)
@@ -331,6 +400,7 @@ describe('模型配置与统一调用', () => {
     await service.settings.save({ ...savedConfig, api }, key)
     const result = await service.probe('direct')
     expect(result).toMatchObject({ ok: true, text: '好' })
+    expectDiscipline(JSON.parse(fetcher.mock.calls[0][1]?.body as string))
     const url = new URL(String(fetcher.mock.calls[0][0]))
     expect(url.origin + url.pathname).toBe(`https://models.example/v1/${api === 'openai-responses' ? 'responses' : 'messages'}`)
     if (api === 'anthropic-messages') expect(url.searchParams.get('beta')).toBe('true')

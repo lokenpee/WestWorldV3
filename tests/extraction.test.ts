@@ -266,17 +266,59 @@ it('P1-B 传闻和猜测保留来源与不确定性，不写成已确认事实',
 
 it('P1提示词包含关系存在性、未具名指向和传闻不确定性规则', () => {
   const worldPrompt = promptOf('worldAssets')
-  expect(worldPrompt).toContain('普通交谈、偶遇、共同出现、单方面思念、一次性互动')
+  expect(worldPrompt).toContain('仅同场、交谈、想起、打量或打算办事不足以建立关系')
   expect(worldPrompt).toContain('临时同盟')
-  expect(worldPrompt).toContain('不猜测具体人物')
-  expect(worldPrompt).toContain('泛称（如“有人”“众人”）不能作为具体关系对象')
-  expect(worldPrompt).toContain('同场出现、看见、听见、一次对话、心里想起、打算让某人办事')
-  expect(worldPrompt).toContain('不要用本章之外的背景知识补全关系')
-  expect(worldPrompt).toContain('`relations` 可以为空，不要用“未知”代替')
-  expect(worldPrompt).toContain('“未知 ↔ 未知”说明本章没有关系依据')
-  expect(worldPrompt).toContain('“想起长公主”“走近并打量某人”不能创建关系')
-  expect(worldPrompt).toContain('不要为同一人建立两套关系')
+  expect(worldPrompt).toContain('未具名但能明确指向的人物')
+  expect(worldPrompt).toContain('“有人”“众人”等泛称不作为具体人物')
+  expect(worldPrompt).toContain('依据不足时省略该条关系')
+  expect(worldPrompt).toContain('关系目标使用该条主名')
+  expect(worldPrompt).toContain('正向填“父亲”、反向填“儿子”')
   expect(promptOf('narrativeAssets')).toContain('猜测、传闻、谎言、未经证实的指控')
+})
+
+it.each(['worldAssets', 'narrativeAssets'] as const)('P1 %s 初始消息纯净，修正独立追加且保存来源不变', async failingStep => {
+  const text = '  沈青送信。\n沈青说：“你好”。青石镇。\n'
+  const calls = { worldAssets: 0, narrativeAssets: 0 }
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const request = JSON.parse(init?.body as string)
+    const step = request.tools[0].function.parameters.properties.characters ? 'worldAssets' : 'narrativeAssets'
+    calls[step]++
+    if (step === failingStep && calls[step] === 1) return stream(step === 'worldAssets'
+      ? { characters: [{ name: '', confidence: 1 }], locations: [] }
+      : { nodes: [{ name: '', summary: '送信', actors: ['沈青'], quote: '', confidence: 1 }] })
+    return stream(step === 'worldAssets' ? world : narrative)
+  })
+  const { service, db } = await setup(fetcher, 1, [text])
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(fetcher).toHaveBeenCalledTimes(3)
+  for (const [, init] of fetcher.mock.calls) {
+    const request = JSON.parse(init?.body as string)
+    const messages = request.messages as { role: string; content: string }[]
+    const users = messages.filter(row => row.role === 'user')
+    expect(users[0].content).toBe(`第1章\n\n${text}`)
+    expect(request.tools.map((tool: { function: { name: string } }) => tool.function.name)).toEqual(['submit_result'])
+    expect(JSON.stringify(request.tools)).not.toContain('证据不足填未知')
+    const system = messages.filter(row => row.role === 'system').map(row => row.content).join('\n')
+    expect([...system.matchAll(/^## (.+)$/gm)].map(match => match[1])).toEqual(['任务', '铁律', '字段', '工具'])
+    expect(system).toContain('【文学资料处理说明】')
+    expect(system).not.toMatch(/不要输出任何 id|工具参数的字段|AUTO-GENERATED|自检清单|章节标识|证据不足填未知/)
+    if (users.length > 1) {
+      expect(users).toHaveLength(2)
+      expect(users[1].content).toContain('实际错误：')
+      expect(users[1].content).not.toContain(text)
+      expect(messages.some(row => row.role === 'assistant')).toBe(true)
+      expect(messages.some(row => row.role === 'tool' && row.content.includes('结果校验未通过'))).toBe(true)
+    }
+  }
+  expect(calls[failingStep]).toBe(2)
+  expect(await db.table('extractionReceipts').count()).toBe(2)
+  expect(await db.table('characters').count()).toBe(world.characters.length)
+  expect(await db.table('nodes').count()).toBe(narrative.nodes.length)
+  const character = (await db.table('characters').toArray())[0]
+  const node = (await db.table('nodes').toArray())[0]
+  expect(character).toMatchObject({ chapterIndex: '1', chapterName: '第1章' })
+  expect(node).toMatchObject({ chapterIndex: '1', chapterName: '第1章' })
 })
 
 it('续期延迟超过有效期时，同一执行者保存回复并继续所有章节', async () => {

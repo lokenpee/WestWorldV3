@@ -138,7 +138,8 @@ it('负查询结果变化参与冲突校验，回调丢失后重复命令仍只�
 
 it('真实书籍仓储保存Pi消息与提交，另一书使用独立实例，可恢复原会话', async () => {
   const { workspace, models } = await setup(scriptedAgentFetcher())
-  const runtime = createAgentRuntime(models.agent)
+  const runner = vi.fn(models.agent)
+  const runtime = createAgentRuntime(runner)
   for (const bookId of ['a', 'b']) {
     await workspace.settings.books.add({ id: bookId, title: bookId, sourceFileName: `${bookId}.txt`, createdAt: new Date().toISOString() })
     const repo = createBookAgentRepository(workspace, bookId)
@@ -153,12 +154,14 @@ it('真实书籍仓储保存Pi消息与提交，另一书使用独立实例，�
     const book = (await workspace.settings.books.get(bookId))!
     expect(await validateBookData({ book, tables })).toEqual([])
   }
+  expect(runner.mock.calls.every(([, options]) => options?.reasoning === undefined)).toBe(true)
 })
 
 
 it('两个正式书籍使用独立Pi实例，重建运行器仍恢复同一会话和原始消息', async () => {
   const { workspace, models } = await setup(scriptedAgentFetcher())
-  const runtime = createAgentRuntime(models.agent)
+  const runner = vi.fn(models.agent)
+  const runtime = createAgentRuntime(runner)
   const sessions = new Map<string, string>()
   async function runBook(bookId: string, engine = runtime) {
     const repo = createBookAgentRepository(workspace, bookId)
@@ -184,13 +187,14 @@ it('两个正式书籍使用独立Pi实例，重建运行器仍恢复同一会�
   expect(runtime.instance('a', 'story_editor')).toBeDefined()
   expect(runtime.instance('a', 'story_editor')).not.toBe(runtime.instance('b', 'story_editor'))
   const original = (await workspace.openBook('a').table('storySessionEntries').toArray()).filter(row => !isObservationEntry(row)).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
-  const repo = await runBook('a', createAgentRuntime(models.agent))
+  const repo = await runBook('a', createAgentRuntime(runner))
   const restored = (await repo.transaction(false, store => store.rows('storySessionEntries'))).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
   expect(restored.length).toBeGreaterThan(original.length)
   expect(restored.slice(0, original.length)).toEqual(original)
   expect(JSON.stringify(restored)).not.toContain('PRIVATE_BOOK_b')
   const tables = emptyTables(); for (const name of tableNames) tables[name] = await workspace.openBook('a').table(name).toArray()
   expect(await validateBookData({ book: (await workspace.settings.books.get('a'))!, tables })).toEqual([])
+  expect(runner.mock.calls.every(([, options]) => options?.reasoning === undefined)).toBe(true)
 })
 
 it('混合最终总结与写入批次在副作用前拒绝，普通文本无法冒充成功', async () => {
@@ -373,10 +377,11 @@ it('按工作项只发送必要工具，get_tools_detail 激活后下一次请�
   expect(initial).toEqual(expect.arrayContaining(['submit_relation_review', 'query_relation_work', 'read_original', 'get_character_relation', 'get_legacy_relation_records', 'get_tools', 'get_tools_detail']))
   expect(initial).not.toContain('merge_assets')
   const listed = await adapter.tools.find(tool => tool.name === 'get_tools')!.execute('tools', {}) as { content: { text: string }[] }
-  expect(JSON.parse(listed.content[0]!.text).tools.map((tool: { name: string }) => tool.name)).toContain('merge_assets')
-  const detail = await adapter.tools.find(tool => tool.name === 'get_tools_detail')!.execute('detail', { name: 'merge_assets' }) as { content: { text: string }[] }
-  expect(JSON.parse(detail.content[0]!.text)).toMatchObject({ name: 'merge_assets', activated: true })
-  expect(adapter.currentTools().map(tool => tool.name)).toContain('merge_assets')
+  expect(JSON.parse(listed.content[0]!.text).tools.map((tool: { name: string }) => tool.name)).not.toContain('merge_assets')
+  await expect(adapter.tools.find(tool => tool.name === 'get_tools_detail')!.execute('forbidden', { name: 'merge_assets' })).rejects.toThrow('工具不可用')
+  const detail = await adapter.tools.find(tool => tool.name === 'get_tools_detail')!.execute('detail', { name: 'get_character_detail' }) as { content: { text: string }[] }
+  expect(JSON.parse(detail.content[0]!.text)).toMatchObject({ name: 'get_character_detail', activated: true })
+  expect(adapter.currentTools().map(tool => tool.name)).toContain('get_character_detail')
 })
 
 it('get_tools_detail 激活的工具进入下一次运行时请求', async () => {

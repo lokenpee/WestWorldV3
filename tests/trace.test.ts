@@ -9,6 +9,7 @@ import { readBookTrace, TraceSession } from '../src/features/agents/trace'
 import { markMissingTraceRefs } from '../src/features/backup/codec'
 import type { BookTables } from '../src/features/backup/data'
 import { messageRows, sentMessages } from '../src/features/agents/requestPresentation'
+import { projectRequestConversation } from '../src/features/agents/executionChain'
 
 const bookId = 'trace-book'
 const sessionId = 'session-trace'
@@ -26,6 +27,64 @@ async function fixture() {
   const repo = createMemoryAgentRepository(bookId, { storySessions: [{ id: sessionId, bookId, profile: 'asset_editor', status: 'active', leafId: null, nextOrdinal: 1 }] })
   return repo
 }
+
+it('最终只含工具调用时保留已收到的正文与思考，落库后详情仍可读取且不重复', async () => {
+  const repo = await fixture()
+  const trace = new TraceSession(repo, { bookId, runId: 'run-stream', executionId: 'exec-stream', sessionId })
+  const requestId = 'stream-request'
+  trace.hooks.start({ requestId, purpose: 'work', model: { providerId: 'custom', modelId: 'fixture' }, context, turn: 1, startedAt: '2026-11-12T00:00:00.000Z' })
+  trace.hooks.request!({ requestId, attemptId: 'stream-attempt', body: { messages: [{ role: 'user', content: '整理当前人物' }] } })
+  const deltas = [
+    { type: 'thinking_delta', delta: '收到的思考片段。' },
+    { type: 'text_delta', delta: '将合并重复表述。' },
+  ] as const
+  for (const event of deltas) trace.hooks.delta!({ requestId, event: event as never })
+  const message = { role: 'assistant', content: [{ type: 'toolCall', id: 'stream-call', name: 'submit_profile_review', arguments: { patch: {}, done: true } }], stopReason: 'toolUse' } as never
+  trace.hooks.modelEnd({ requestId, message, attempts: [], status: 'succeeded' })
+  // Agent 在模型请求结束后回放相同事件；不能再次拼接流式文本。
+  for (const event of deltas) trace.handleEvent({ type: 'message_update', assistantMessageEvent: event } as AgentEvent)
+  trace.handleEvent({ type: 'message_end', message })
+  trace.handleEvent({ type: 'turn_end', message, toolResults: [] })
+  await trace.close()
+  const requests = (await repo.traceRows()).filter(row => row.type === 'request_trace')
+  expect(requests[0]).toMatchObject({ text: '将合并重复表述。', thinking: '收到的思考片段。' })
+  const assistant = projectRequestConversation({ entries: [], requests, snapshots: new Map() }).filter(event => event.kind === 'assistant')
+  expect(assistant).toHaveLength(1)
+  expect(assistant[0]).toMatchObject({ content: '将合并重复表述。', thinking: '收到的思考片段。' })
+  expect(assistant[0].toolCalls).toHaveLength(1)
+})
+
+it.each(['failed', 'cancelled'] as const)('请求%s时保留已返回片段，后续请求不继承', async status => {
+  const repo = await fixture()
+  const trace = new TraceSession(repo, { bookId, runId: 'run-partial', executionId: 'exec-partial', sessionId })
+  trace.hooks.start({ requestId: 'partial', purpose: 'work', model: { providerId: 'custom', modelId: 'fixture' }, context, turn: 1, startedAt: '2026-11-12T00:00:00.000Z' })
+  trace.hooks.delta!({ requestId: 'partial', event: { type: 'thinking_delta', delta: '部分思考' } as never })
+  trace.hooks.delta!({ requestId: 'partial', event: { type: 'text_delta', delta: '部分正文' } as never })
+  trace.hooks.modelEnd({ requestId: 'partial', message: { role: 'assistant', content: [], stopReason: status === 'cancelled' ? 'aborted' : 'error' } as never, attempts: [], status })
+  trace.hooks.start({ requestId: 'next', purpose: 'work', model: { providerId: 'custom', modelId: 'fixture' }, context, turn: 2, startedAt: '2026-11-12T00:00:01.000Z' })
+  trace.hooks.delta!({ requestId: 'next', event: { type: 'text_delta', delta: '本次' } as never })
+  trace.hooks.modelEnd({ requestId: 'next', message: { role: 'assistant', content: [{ type: 'text', text: '本次完整正文' }, { type: 'thinking', thinking: '本次完整思考' }], stopReason: 'stop' } as never, attempts: [], status: 'succeeded' })
+  await trace.close()
+  const requests = (await repo.traceRows()).filter(row => row.type === 'request_trace')
+  expect(requests.find(row => row.requestId === 'partial')).toMatchObject({ status, text: '部分正文', thinking: '部分思考' })
+  expect(requests.find(row => row.requestId === 'next')).toMatchObject({ text: '本次完整正文', thinking: '本次完整思考' })
+})
+
+it('同一请求重试时不把失败尝试的正文和思考混入成功响应', async () => {
+  const repo = await fixture()
+  const trace = new TraceSession(repo, { bookId, runId: 'run-retry', executionId: 'exec-retry', sessionId })
+  const requestId = 'retry', body = { messages: [{ role: 'user', content: '整理当前人物' }] }
+  trace.hooks.start({ requestId, purpose: 'work', model: { providerId: 'custom', modelId: 'fixture' }, context, turn: 1, startedAt: '2026-11-12T00:00:00.000Z' })
+  trace.hooks.request!({ requestId, attemptId: 'failed-attempt', body })
+  trace.hooks.delta!({ requestId, event: { type: 'text_delta', delta: '失败尝试正文' } as never })
+  trace.hooks.delta!({ requestId, event: { type: 'thinking_delta', delta: '失败尝试思考' } as never })
+  trace.hooks.request!({ requestId, attemptId: 'success-attempt', body })
+  trace.hooks.delta!({ requestId, event: { type: 'text_delta', delta: '成功尝试正文' } as never })
+  trace.hooks.modelEnd({ requestId, message: { role: 'assistant', content: [{ type: 'toolCall', id: 'retry-call', name: 'submit_profile_review', arguments: { patch: {}, done: true } }], stopReason: 'toolUse' } as never, attempts: [], status: 'succeeded' })
+  await trace.close()
+  const request = (await repo.traceRows()).find(row => row.type === 'request_trace')!
+  expect(request).toMatchObject({ text: '成功尝试正文', thinking: '', input: { transportAttemptIds: ['failed-attempt', 'success-attempt'] } })
+})
 
 it('实际发送体覆盖SDK上下文，只保存一份模型工具声明，重试保持同一请求', async () => {
   const repo = await fixture()
