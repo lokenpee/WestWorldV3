@@ -4,17 +4,20 @@ import type { WorldKind } from '../assets/merge'
 import { characterMatchNames, isContextualName } from '../assets/characterNames'
 
 export interface Candidate { id: string; kind: WorldKind; memberIds: string[]; reason: string; ai?: { runId: string; groupId: string }; dismissed?: boolean }
+export type CandidateEntity = Pick<Character | LocationAsset, 'id' | 'name' | 'aliases'>
 export function findExactNameGroups(kind: WorldKind, input: (Character | LocationAsset)[]): Candidate[] {
   const groups = new Map<string, string[]>()
   for (const row of input) { const name = row.name.trim(); if (!name) continue; if (!groups.has(name)) groups.set(name, []); groups.get(name)!.push(row.id) }
   return [...groups].filter(([, ids]) => ids.length > 1).map(([, ids]) => ({ id: `exact:${kind}:${[...ids].sort().join('|')}`, kind, memberIds: [...ids].sort(), reason: '完整主名相同，按当前规则自动机械合并。' }))
 }
 const expression = (value: string) => { const end = value.lastIndexOf('/'); return new RegExp(value.slice(1, end), value.slice(end + 1)) }
+const whitespace = expression(parameters.normalization.whitespaceRegex), punctuation = expression(parameters.normalization.punctuationRegex)
+const suffixes = parameters.normalization.suffixReplacements.map(row => ({ pattern: expression(row.regex), replacement: row.replacement }))
 export function normalizeName(value: string) {
   const original = value.trim()
-  let name = value.replace(expression(parameters.normalization.whitespaceRegex), ' ').trim()
-  for (const replacement of parameters.normalization.suffixReplacements) name = name.replace(expression(replacement.regex), replacement.replacement)
-  return (name || original).toLowerCase().replace(expression(parameters.normalization.punctuationRegex), '')
+  let name = value.replace(whitespace, ' ').trim()
+  for (const replacement of suffixes) name = name.replace(replacement.pattern, replacement.replacement)
+  return (name || original).toLowerCase().replace(punctuation, '')
 }
 function distance(a: string, b: string) {
   let previous = Array.from({ length: b.length + 1 }, (_, i) => i)
@@ -25,7 +28,7 @@ export function aliasScore(left: string[], right: string[]) {
   return normalizedAliasScore(normalizeAliases(left), normalizeAliases(right))
 }
 const normalizeAliases = (names: string[]) => [...new Set(names.map(normalizeName).filter(Boolean))].sort()
-function normalizedAliasScore(a: string[], b: string[], minimum?: number) {
+function normalizedAliasScore(a: string[], b: string[], minimum?: number, difference = distance) {
   const n = Math.max(a.length, b.length)
   if (!n) return 0
   const totalLength = [...a, ...b].reduce((sum, name) => sum + name.length, 0)
@@ -34,7 +37,7 @@ function normalizedAliasScore(a: string[], b: string[], minimum?: number) {
     const upper = left.reduce((sum, length, index) => sum + Math.min(length, right[index] ?? 0), 0)
     if (2 * upper / totalLength <= minimum) return 0
   }
-  const weights = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => a[i] && b[j] ? Math.max(a[i].length, b[j].length) - distance(a[i], b[j]) : 0))
+  const weights = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => a[i] && b[j] ? Math.max(a[i].length, b[j].length) - difference(a[i], b[j]) : 0))
   const u = Array(n + 1).fill(0), v = Array(n + 1).fill(0), p = Array(n + 1).fill(0), way = Array(n + 1).fill(0)
   for (let i = 1; i <= n; i++) {
     p[0] = i; let j0 = 0; const min = Array(n + 1).fill(Infinity), used = Array(n + 1).fill(false)
@@ -49,10 +52,10 @@ function normalizedAliasScore(a: string[], b: string[], minimum?: number) {
   const sum = p.slice(1).reduce((sum, i, j) => sum + weights[i - 1][j], 0)
   return 2 * sum / totalLength
 }
-export function findCandidates(kind: WorldKind, input: (Character | LocationAsset)[]): Candidate[] {
+export function findCandidates(kind: WorldKind, input: CandidateEntity[]): Candidate[] {
   const rows = [...input].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
   const normalizedNames = rows.map(row => kind === 'character' && isContextualName(row.name) ? '' : normalizeName(row.name))
-  const namesOf = (row: Character | LocationAsset) => kind === 'character'
+  const namesOf = (row: CandidateEntity) => kind === 'character'
     ? characterMatchNames(row)
     : [row.name, ...(row.aliases ?? [])].map(name => name.trim()).filter(Boolean)
   const normalizedNameSets = rows.map(row => new Set(namesOf(row).map(normalizeName).filter(Boolean)))
@@ -80,9 +83,25 @@ export function findCandidates(kind: WorldKind, input: (Character | LocationAsse
   const isStrong = (name: string) => name.length >= matching.distinctiveNameMinLength || strongNames.has(name)
   // O2：原有首轮分组后的整组别名相似度，保持对全部分组的比较；整组都是短泛称时不连接。
   const first = groups()
-  const groupNames = first.map(indices => normalizeAliases(indices.flatMap(index => kind === 'character' ? characterMatchNames(rows[index]) : [rows[index].name, ...(rows[index].aliases ?? [])])))
+  const groupNames = first.map(indices => [...new Set(indices.flatMap(index => [...normalizedNameSets[index]]))].sort())
+  const frequency = new Map<string, number>()
+  for (const names of groupNames) for (const name of names) frequency.set(name, (frequency.get(name) ?? 0) + 1)
+  const distances = new Map<string, Map<string, number>>()
+  let cachedCount = 0
+  const difference = (left: string, right: string) => {
+    if (left === right) return 0
+    if ((frequency.get(left) ?? 0) < 2 || (frequency.get(right) ?? 0) < 2) return distance(left, right)
+    const [a, b] = left < right ? [left, right] : [right, left]
+    const cached = distances.get(a)?.get(b)
+    if (cached !== undefined) return cached
+    const value = distance(a, b)
+    if (cachedCount >= 20000) { distances.clear(); cachedCount = 0 }
+    if (!distances.has(a)) distances.set(a, new Map())
+    distances.get(a)!.set(b, value); cachedCount++
+    return value
+  }
   for (let i = 0; i < first.length; i++) for (let j = i + 1; j < first.length; j++) {
-    if (normalizedAliasScore(groupNames[i], groupNames[j], 0.9) > 0.9 && (groupNames[i].some(isStrong) || groupNames[j].some(isStrong))) addEdge(first[i][0], first[j][0], '整组别名相似度大于0.9')
+    if (normalizedAliasScore(groupNames[i], groupNames[j], 0.9, difference) > 0.9 && (groupNames[i].some(isStrong) || groupNames[j].some(isStrong))) addEdge(first[i][0], first[j][0], '整组别名相似度大于0.9')
   }
   // 新增规则只使用称呼索引生成记录对，不改变 O1/O2 的输入。
   const index = new Map<string, number[]>()

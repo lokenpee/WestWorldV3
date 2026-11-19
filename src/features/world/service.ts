@@ -4,7 +4,8 @@ import type { ModelService } from '../models/service'
 import type { AssetService } from '../assets/service'
 import type { Character, LocationAsset } from '../assets/types'
 import type { MergeRequest, WorldKind } from '../assets/merge'
-import { findCandidates, type Candidate } from './candidates'
+import type { Candidate } from './candidates'
+import { candidateInput, scanCandidateRows } from './candidateScanner'
 import { emptyReport, type WorldReport, type WorldRun, type ReviewMode, type ReviewScope, type OrganizationRunStep } from './types'
 import { coverage, type Receipt } from '../extraction/recovery'
 import { createBookAgentRepository, type Row } from '../agents/repository'
@@ -50,21 +51,36 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     const db = workspace.openBook(bookId)
     return transact(db, 'r', [db.table('characters'), db.table('locations')], async (db) => ({ characters: await db.table<Character>('characters').toArray(), locations: await db.table<LocationAsset>('locations').toArray() }))
   }
+  const scans = new Map<string, AbortController>()
   async function scan(bookId: string, saveReport = true) {
-    await assertReady(bookId)
-    const snapshot = await worldRows(bookId)
-    const candidates = [...findCandidates('character', snapshot.characters), ...findCandidates('location', snapshot.locations)]
-    if (!saveReport) return candidates
-    const id = crypto.randomUUID(), now = new Date().toISOString(); const report = emptyReport({ characters: snapshot.characters.length, locations: snapshot.locations.length })
-    report.status = 'completed'
-    const names = (kind: 'character' | 'location') => new Map((kind === 'character' ? snapshot.characters : snapshot.locations).map(row => [row.id, row.name]))
-    report.skipped = candidates.map(row => {
-      const nameOf = names(row.kind)
-      return `${row.kind === 'character' ? '人物' : '地点'}候选：${row.memberIds.map(id => `${nameOf.get(id) ?? id}（${id}）`).join('、')}；${row.reason}`
-    })
-    await workspace.openBook(bookId).table('pipelineRuns').put({ id, recordType: 'run', bookId, stage: 'P2', phase: 'mechanical', status: 'completed', startedAt: now, finishedAt: now, planVersion: '2.2', report })
-    set(bookId, { reportId: id, reportType: 'code', error: undefined })
-    return candidates
+    scans.get(bookId)?.abort(new DOMException('候选扫描已取消，已保存的合并结果保留。', 'AbortError'))
+    const controller = new AbortController(); scans.set(bookId, controller)
+    try {
+      await assertReady(bookId)
+      const snapshot = await worldRows(bookId)
+      const candidates = await scanCandidateRows(bookId, snapshot, controller.signal)
+      controller.signal.throwIfAborted()
+      await assertReady(bookId)
+      const db = workspace.openBook(bookId)
+      let reportId: string | undefined
+      await transact(db, 'rw', [db.tables], async db => {
+        controller.signal.throwIfAborted()
+        const current = { characters: await db.table<Character>('characters').toArray(), locations: await db.table<LocationAsset>('locations').toArray() }
+        if (JSON.stringify(candidateInput(current)) !== JSON.stringify(candidateInput(snapshot))) throw new Error('扫描期间人物或地点名称已变化，请重新扫描。')
+        if (!saveReport) return
+        const id = crypto.randomUUID(), now = new Date().toISOString()
+        const report = emptyReport({ characters: snapshot.characters.length, locations: snapshot.locations.length })
+        report.status = 'completed'
+        const names = { character: new Map(snapshot.characters.map(row => [row.id, row.name])), location: new Map(snapshot.locations.map(row => [row.id, row.name])) }
+        report.skipped = candidates.map(row => `${row.kind === 'character' ? '人物' : '地点'}候选：${row.memberIds.map(id => `${names[row.kind].get(id) ?? id}（${id}）`).join('、')}；${row.reason}`)
+        controller.signal.throwIfAborted()
+        await db.table('pipelineRuns').put({ id, recordType: 'run', bookId, stage: 'P2', phase: 'mechanical', status: 'completed', startedAt: now, finishedAt: now, planVersion: '2.2', report })
+        reportId = id
+      })
+      controller.signal.throwIfAborted()
+      if (reportId) set(bookId, { reportId, reportType: 'code', error: undefined })
+      return candidates
+    } finally { if (scans.get(bookId) === controller) scans.delete(bookId) }
   }
   async function confirm<K extends WorldKind>(bookId: string, kind: K, request: MergeRequest) {
     await assertReady(bookId)
@@ -680,7 +696,7 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     }
   }
 
-  return { identityCandidates: (bookId: string) => readIdentityCandidates(workspace, bookId), dismissIdentityCandidate: async (bookId: string, candidate: Candidate) => { await assertReady(bookId); await dismissIdentityCandidate(workspace, bookId, candidate) }, maintainOrganizationHistory: (bookId: string) => pruneOrganizationHistory(workspace, bookId), mergeHistory: async (bookId: string) => (await workspace.openBook(bookId).table('pipelineRuns').where('stage').anyOf(['P2', 'manual_merge']).toArray()).filter(row => row.report).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt))), scan, organize, confirm, start, startOrganization, startOrganizationStep, recoverOrganization, updateOrganizationStatistics, pauseOrganization, continueOrganization, continueCharacterOrganization, characterResume, cancelOrganization, startCharacterOrganization, continueRelations: (bookId: string) => start(bookId, { reviewScope: 'relations', reviewMode: 'full' }), mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), organizationIndex: (bookId: string, step: 'scan' | 'profiles' | 'relations') => readOrganizationStepIndex(workspace, bookId, step), organizationRequests: (bookId: string, query: { runId: string; step: 'scan' | 'profiles' | 'relations'; objectKey: string; before?: { startedAt: string; requestId: string }; limit?: number }) => readOrganizationRequests(workspace, bookId, query), execution: (bookId: string, runId: string, options?: { unitId?: string; contextId?: string; sessionId?: string }) => readExecutionChain(workspace, bookId, runId, options), async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
+  return { identityCandidates: (bookId: string) => readIdentityCandidates(workspace, bookId), dismissIdentityCandidate: async (bookId: string, candidate: Candidate) => { await assertReady(bookId); await dismissIdentityCandidate(workspace, bookId, candidate) }, maintainOrganizationHistory: (bookId: string) => pruneOrganizationHistory(workspace, bookId), mergeHistory: async (bookId: string) => (await workspace.openBook(bookId).table('pipelineRuns').where('stage').anyOf(['P2', 'manual_merge']).toArray()).filter(row => row.report).sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt))), scan, cancelScan: (bookId: string) => scans.get(bookId)?.abort(new DOMException('候选扫描已取消，已保存的合并结果保留。', 'AbortError')), organize, confirm, start, startOrganization, startOrganizationStep, recoverOrganization, updateOrganizationStatistics, pauseOrganization, continueOrganization, continueCharacterOrganization, characterResume, cancelOrganization, startCharacterOrganization, continueRelations: (bookId: string) => start(bookId, { reviewScope: 'relations', reviewMode: 'full' }), mechanical, eligibility, worldRows, state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { if (mechanical.isRunning(bookId)) void mechanical.stop(bookId); else controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } }, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), organizationIndex: (bookId: string, step: 'scan' | 'profiles' | 'relations') => readOrganizationStepIndex(workspace, bookId, step), organizationRequests: (bookId: string, query: { runId: string; step: 'scan' | 'profiles' | 'relations'; objectKey: string; before?: { startedAt: string; requestId: string }; limit?: number }) => readOrganizationRequests(workspace, bookId, query), execution: (bookId: string, runId: string, options?: { unitId?: string; contextId?: string; sessionId?: string }) => readExecutionChain(workspace, bookId, runId, options), async reports(bookId: string) { return (await workspace.openBook(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).filter(row => !!row.report).sort((a, b) => (b.finishedAt ?? b.startedAt).localeCompare(a.finishedAt ?? a.startedAt)) } }
 }
 export type WorldService = ReturnType<typeof createWorldService>
 export type { Candidate }

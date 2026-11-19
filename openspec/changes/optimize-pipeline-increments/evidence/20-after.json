@@ -1,0 +1,71 @@
+{
+  "optimization": 20,
+  "ref": "working-tree",
+  "samples": [
+    {
+      "size": 100,
+      "groups": 0,
+      "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runs": [
+        {
+          "elapsedMs": 112.6,
+          "maxTimerGapMs": 60.6
+        },
+        {
+          "elapsedMs": 74.9,
+          "maxTimerGapMs": 8.9
+        },
+        {
+          "elapsedMs": 70.8,
+          "maxTimerGapMs": 8.9
+        }
+      ],
+      "medianElapsedMs": 74.9,
+      "medianMaxTimerGapMs": 8.9
+    },
+    {
+      "size": 300,
+      "groups": 0,
+      "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runs": [
+        {
+          "elapsedMs": 490.9,
+          "maxTimerGapMs": 9.7
+        },
+        {
+          "elapsedMs": 457.6,
+          "maxTimerGapMs": 9.2
+        },
+        {
+          "elapsedMs": 454.7,
+          "maxTimerGapMs": 9.2
+        }
+      ],
+      "medianElapsedMs": 457.6,
+      "medianMaxTimerGapMs": 9.2
+    },
+    {
+      "size": 600,
+      "groups": 0,
+      "digest": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "runs": [
+        {
+          "elapsedMs": 1708.3,
+          "maxTimerGapMs": 9.2
+        },
+        {
+          "elapsedMs": 1732,
+          "maxTimerGapMs": 9.9
+        },
+        {
+          "elapsedMs": 1737.7,
+          "maxTimerGapMs": 9.3
+        }
+      ],
+      "medianElapsedMs": 1732,
+      "medianMaxTimerGapMs": 9.3
+    }
+  ],
+  "mainThreadScansPerRun": 0,
+  "browser": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0"
+}

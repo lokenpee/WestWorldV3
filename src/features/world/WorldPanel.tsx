@@ -59,6 +59,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
       if (latest.reportType === 'ai') setReportOpen(true)
     }
   }), [service, bookId])
+  useEffect(() => () => service.cancelScan(bookId), [bookId, service])
   async function scan() {
     setShowOrganization(false)
     if (scanning) return
@@ -80,7 +81,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
   const activeStatus = state?.paused ? 'paused' : activeOrgRun?.status ?? (state?.running ? 'running' : undefined)
   const aiRunning = activeStatus === 'running' || !!state?.running
   const organizationRun = activeOrgRun ?? stepRuns[0] ?? allOrganizationRuns.filter(row => row.scope !== 'character')[0]
-  const busy = !!state?.running || (!!activeStatus && !(activeStep === 'scan' && activeStatus === 'paused')) || merging || queueRunning || queueSaving
+  const busy = scanning || !!state?.running || (!!activeStatus && !(activeStep === 'scan' && activeStatus === 'paused')) || merging || queueRunning || queueSaving
   const queuedIds = new Set(queueItems.filter(item => item.status === 'pending' || item.status === 'running').flatMap(item => item.request.memberIds.map(id => `${item.kind}:${id}`)))
   const selectedRows = selected && snapshot.status === 'ready' ? (selected.kind === 'character' ? snapshot.value.characters : snapshot.value.locations).filter(row => selected.memberIds.includes(row.id)) : []
   const candidateNames = (candidate: Candidate) => snapshot.status === 'ready' ? [...new Set((candidate.kind === 'character' ? snapshot.value.characters : snapshot.value.locations).filter(row => candidate.memberIds.includes(row.id)).map(row => row.name))].slice(0, 3).join('、') : candidate.memberIds[0]
@@ -146,6 +147,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
       setPrepared(undefined)
       setMessage(`已合并“${result.asset.name}”，减少 ${request.memberIds.length - 1} 条。可继续处理剩余候选。`)
       try {
+        setScanning(true)
         const updated = await service.scan(bookId, false)
         setCandidates(updated)
         const next = updated.find(row => row.kind === candidate.kind && row.memberIds.some(id => candidate.memberIds.includes(id))) ?? updated[0]
@@ -153,7 +155,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
       } catch (failure) {
         setCandidates(current => current?.filter(row => row.id !== candidate.id)); setSelected(undefined)
         setError(`合并已保存，候选刷新失败：${failure instanceof Error ? failure.message : '请重新扫描。'}`)
-      }
+      } finally { setScanning(false) }
     } catch (failure) { setError(failure instanceof Error ? failure.message : '合并失败，请重试。') }
     finally { submitting.current = false; setMerging(false) }
   }
@@ -183,7 +185,7 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
     {eligibility.status === 'ready' && !eligibility.value.covered && <p className="muted">请先完成全书逐章提取。</p>}
     {eligibility.status === 'ready' && eligibility.value.covered && eligibility.value.locked && <p className="muted">本书已有世界、叙事或提取任务，人物整理按钮暂不可用。</p>}
     {eligibility.status === 'error' && <p role="alert">{eligibility.message}</p>}
-    {scanning && !state?.running && <p role="status">正在刷新名称候选…</p>}
+    {scanning && !state?.running && <p role="status">正在后台扫描名称候选…<button className="text-button" onClick={() => service.cancelScan(bookId)}>取消候选扫描</button></p>}
     {showOrganization && organizationRun && <P2Progress bookId={bookId} run={organizationRun} load={loadExecution} phase={state?.phase} error={activityFailure?.bookId === bookId ? activityFailure.message : state?.error} candidateCount={aiCandidates.status === 'ready' ? aiCandidates.value.filter(row => !row.dismissed).length : undefined} />}
     {!!organizationRun?.organization?.reusedCount && <p>已复用 {organizationRun.organization.reusedCount} 人的完成结果</p>}
     {activityFailure?.bookId === bookId && !organizationRun && <p role="alert">{activityFailure.message}</p>}
