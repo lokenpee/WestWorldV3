@@ -1,0 +1,39 @@
+{
+  "optimization": 17,
+  "sample": {
+    "storedRows": 1000,
+    "batchSize": 20
+  },
+  "measurements": [
+    {
+      "name": "count",
+      "requests": 1,
+      "returnedBytes": 37891,
+      "sentBytes": 82
+    },
+    {
+      "name": "filteredCount",
+      "requests": 1,
+      "returnedBytes": 7579,
+      "sentBytes": 167
+    },
+    {
+      "name": "bulkGet",
+      "requests": 20,
+      "returnedBytes": 1670,
+      "sentBytes": 1310
+    },
+    {
+      "name": "bulkUpdate",
+      "requests": 42,
+      "returnedBytes": 2094,
+      "sentBytes": 6450
+    },
+    {
+      "name": "bulkDelete",
+      "requests": 22,
+      "returnedBytes": 424,
+      "sentBytes": 2930
+    }
+  ]
+}

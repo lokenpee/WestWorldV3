@@ -96,11 +96,12 @@ export class SqliteRecordStore {
     return { records, ...(hasMore ? { nextKey: records.at(-1)!.key } : {}) }
   }
 
-  count(scope: string, table: string): number {
-    return Number((this.database.prepare('SELECT count(*) AS count FROM records WHERE scope=? AND tableName=?').get(scope, table) as { count: number }).count)
+  count(scope: string, table: string, query: RecordQuery = {}): number {
+    const { index, args, filter, direction, limit, offset } = this.queryParts(scope, table, query)
+    return Number(this.database.prepare(`SELECT count(*) AS count FROM (SELECT recordKey FROM records WHERE scope=? AND tableName=?${filter} ORDER BY ${index} ${direction},recordKey ${direction} LIMIT ? OFFSET ?)`).get(...args, limit, offset)!.count)
   }
 
-  query(scope: string, table: string, query: RecordQuery = {}): StoredRecord[] {
+  private queryParts(scope: string, table: string, query: RecordQuery) {
     const field = (name: string) => {
       if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(name)) throw new Error('无效查询字段。')
       return `json_extract(body,'$.${name}')`
@@ -119,9 +120,19 @@ export class SqliteRecordStore {
     const direction = query.reverse ? 'DESC' : 'ASC'
     const limit = query.limit ?? -1, offset = query.offset ?? 0
     if (!Number.isSafeInteger(limit) || limit < -1 || !Number.isSafeInteger(offset) || offset < 0) throw new Error('无效分页参数。')
+    return { index, args, filter, direction, limit, offset }
+  }
+  query(scope: string, table: string, query: RecordQuery = {}): StoredRecord[] {
+    const { index, args, filter, direction, limit, offset } = this.queryParts(scope, table, query)
     const columns = query.keysOnly ? "recordKey,'{}' AS body,version" : 'recordKey,body,version'
     const rows = this.database.prepare(`SELECT ${columns} FROM records WHERE scope=? AND tableName=?${filter} ORDER BY ${index} ${direction},recordKey ${direction} LIMIT ? OFFSET ?`).all(...args, limit, offset) as unknown as RawRecord[]
     return rows.map(row => query.keysOnly ? { key: row.recordKey, value: {}, version: row.version } : this.decode(table, row))
+  }
+  bulkGet(scope: string, table: string, keys: string[]): (StoredRecord | null)[] {
+    if (!keys.length) return []
+    const rows = this.database.prepare(`SELECT recordKey,body,version FROM records WHERE scope=? AND tableName=? AND recordKey IN (${keys.map(() => '?').join(',')})`).all(scope, table, ...keys) as unknown as RawRecord[]
+    const byKey = new Map(rows.map(row => [row.recordKey, this.decode(table, row)]))
+    return keys.map(key => structuredClone(byKey.get(key) ?? null))
   }
 
   scopeExists(scope: string) { return !!this.database.prepare('SELECT 1 FROM records WHERE scope=? LIMIT 1').get(scope) }

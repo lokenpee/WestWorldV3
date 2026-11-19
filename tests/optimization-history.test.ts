@@ -24,9 +24,9 @@ test('opt10：历史已经清理后完成一个人物，计量真实历史读取
   const reads: { table: string; action: string; query: unknown; rows: number; bytes: number; sessionIds: string[]; runIds: string[] }[] = []
   const call: StorageCall = async body => {
     const result = await store.execute(body)
-    if (collecting && ['query', 'get'].includes(String(body.action))) {
+    if (collecting && ['query', 'get', 'bulkGet'].includes(String(body.action))) {
       const records = (Array.isArray(result) ? result : result ? [result] : []) as { value?: Row }[]
-      const rows = records.map(row => row.value ?? {})
+      const rows = records.filter(Boolean).map(row => row.value ?? {})
       reads.push({ table: String(body.table), action: String(body.action), query: body.query ?? body.key, rows: rows.length, bytes: Buffer.byteLength(JSON.stringify(result ?? null)),
         sessionIds: [...new Set(rows.map(row => String(row.sessionId ?? (body.table === 'storySessions' ? row.id : ''))).filter(Boolean))], runIds: [...new Set(rows.map(row => String(row.runId ?? (body.table === 'pipelineRuns' ? row.id : ''))).filter(Boolean))] })
     }

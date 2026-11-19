@@ -141,7 +141,7 @@ export function createLocalStorageServer(directory: string, protector: Credentia
         return null
       } finally { release(tx) }
     }
-    const tx = body.transaction ? transaction(String(body.transaction), scope, table || undefined, ['put', 'add', 'remove', 'bulk'].includes(action)) : undefined
+    const tx = body.transaction ? transaction(String(body.transaction), scope, table || undefined, ['put', 'add', 'remove', 'bulk', 'bulkRemove', 'bulkUpdate'].includes(action)) : undefined
     if (action === 'commit' || action === 'abort') {
       if (!tx) throw new Error('缺少事务。')
       try {
@@ -155,6 +155,30 @@ export function createLocalStorageServer(directory: string, protector: Credentia
     }
     assertAddress(scope, table)
     if (action === 'query') return query(scope, table, (body.query ?? {}) as RecordQuery, tx)
+    if (action === 'count') return tx?.changes.get(table)?.size ? query(scope, table, { ...(body.query ?? {}) as RecordQuery, keysOnly: true }, tx).length : store.count(scope, table, (body.query ?? {}) as RecordQuery)
+    if (action === 'bulkGet') {
+      if (!Array.isArray(body.keys)) throw new Error('批量读取需要主键列表。')
+      const keys = body.keys.map(String), changes = tx?.changes.get(table)
+      const rows = store.bulkGet(scope, table, keys)
+      return rows.map((row, index) => changes?.has(keys[index]) ? get(scope, table, keys[index], tx) ?? null : row)
+    }
+    if (action === 'bulkRemove' || action === 'bulkUpdate') {
+      if (!tx?.write) throw new Error('批量修改需要写事务。')
+      if (action === 'bulkRemove') {
+        if (!Array.isArray(body.keys)) throw new Error('批量删除需要主键列表。')
+        for (const key of body.keys) await execute({ action: 'remove', scope, table, transaction: tx.id, key: String(key) })
+        return null
+      }
+      if (!Array.isArray(body.updates)) throw new Error('批量更新需要记录列表。')
+      let count = 0
+      for (const item of body.updates as { key: string; changes: StoredValue }[]) {
+        const row = get(scope, table, String(item.key), tx)
+        if (!row) continue
+        const value = { ...row.value, ...item.changes }
+        await execute({ action: 'put', scope, table, transaction: tx.id, key: String(value[schemaFor(scope)[table]]), value }); count++
+      }
+      return count
+    }
     if (action === 'bulk') {
       if (!tx || !tx.write || !Array.isArray(body.rows)) throw new Error('批量写入需要事务和记录。')
       for (const value of body.rows as StoredValue[]) {

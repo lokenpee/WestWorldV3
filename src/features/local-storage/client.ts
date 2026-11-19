@@ -3,6 +3,18 @@ import { bookSchema, settingsSchema, type RecordQuery, type QueryValue } from '.
 import type { StorageStatus, StoredRecord, StoredValue, StorageNotice, StorageInterest, StorageTarget } from './contracts'
 
 export type StorageCall = <T>(body: Record<string, unknown>) => Promise<T>
+const encoder = new TextEncoder()
+/** 为请求外壳预留1KiB；单条大记录独占一包，沿HTTP原上限处理。 */
+export function storageBatches<T>(items: T[]): T[][] {
+  const batches: T[][] = []; let batch: T[] = [], bytes = 1024
+  for (const item of items) {
+    const size = encoder.encode(JSON.stringify(item)).length + 1
+    if (batch.length && (batch.length >= 200 || bytes + size > 1024 * 1024)) { batches.push(batch); batch = []; bytes = 1024 }
+    batch.push(item); bytes += size
+  }
+  if (batch.length) batches.push(batch)
+  return batches
+}
 export function httpStorageCall(endpoint = '/api/storage'): StorageCall {
   return async <T>(body: Record<string, unknown>): Promise<T> => {
     let response: Response
@@ -61,7 +73,7 @@ class RemoteCollection {
   }
   async toArray() { return (await this.records()).map(row => row.value) }
   async primaryKeys() { return (await this.records(true)).map(row => row.key) }
-  async count() { return (await this.records(true)).length }
+  async count(): Promise<number> { return this.predicates.length ? (await this.records(true)).length : this.table.db.request<number>({ action: 'count', table: this.table.name, query: this.query }) }
   async first() { return (await this.limit(1).toArray())[0] }
   async last() { return this.reverse().first() }
   async sortBy(field: string) { return (await this.toArray()).sort((a, b) => a[field] === b[field] ? 0 : (a[field] as number) < (b[field] as number) ? -1 : 1) }
@@ -92,7 +104,11 @@ class RemoteTable extends RemoteCollection {
   orderBy(index: string) { return new RemoteCollection(this, { index }) }
   toCollection() { return new RemoteCollection(this) }
   async get(key: string) { return (await this.db.request<StoredRecord | null>({ action: 'get', table: this.name, key: String(key) }))?.value }
-  async bulkGet(keys: string[]) { return Promise.all(keys.map(key => this.get(key))) }
+  async bulkGet(keys: string[]) {
+    const rows: (StoredValue | undefined)[] = []
+    for (const batch of storageBatches(keys.map(String))) rows.push(...(await this.db.request<(StoredRecord | null)[]>({ action: 'bulkGet', table: this.name, keys: batch })).map(row => row?.value))
+    return rows
+  }
   async put(value: StoredValue) { return this.write('put', value) }
   async add(value: StoredValue) { return this.write('add', value) }
   private async write(action: string, value: StoredValue) {
@@ -101,12 +117,12 @@ class RemoteTable extends RemoteCollection {
     return this.db.atomic(db => db.request<string>({ action, table: this.name, key: String(key), value }))
   }
   private async bulk(values: StoredValue[], add: boolean) { return this.db.atomic(async db => {
-    for (let offset = 0; offset < values.length; offset += 200) await db.request({ action: 'bulk', table: this.name, rows: values.slice(offset, offset + 200), add })
+    for (const batch of storageBatches(values)) await db.request({ action: 'bulk', table: this.name, rows: batch, add })
     return values.length ? String(values.at(-1)![db.schema[this.name]]) : undefined
   }) }
   async bulkPut(values: StoredValue[]) { return this.bulk(values, false) }
   async bulkAdd(values: StoredValue[]) { return this.bulk(values, true) }
-  async bulkDelete(keys: string[]) { return this.db.atomic(async db => { for (const key of keys) await db.request({ action: 'remove', table: this.name, key: String(key) }) }) }
+  async bulkDelete(keys: string[]) { return this.db.atomic(async db => { for (const batch of storageBatches(keys.map(String))) await db.request({ action: 'bulkRemove', table: this.name, keys: batch }) }) }
   async delete(key?: string): Promise<number> { if (key === undefined) return super.delete(); await this.bulkDelete([key]); return 1 }
   async clear() { await super.delete() }
   async update(key: string, changes: StoredValue) {
@@ -118,7 +134,7 @@ class RemoteTable extends RemoteCollection {
   }
   async bulkUpdate(updates: { key: string; changes: StoredValue }[]) { return this.db.atomic(async db => {
     let count = 0
-    for (const item of updates) count += await db.table(this.name).update(item.key, item.changes)
+    for (const batch of storageBatches(updates)) count += await db.request<number>({ action: 'bulkUpdate', table: this.name, updates: batch })
     return count
   }) }
 }
