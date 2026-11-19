@@ -4,7 +4,7 @@
 
 ## 1. 当前数据只有一层
 
-数据生效行为见[资产维护](../../openspec/specs/asset-management/spec.md)。设置库3表、单书15表；库和索引由[共享存储](../../src/lib/storage/workspace.ts)定义，字段结构由[存储结构](resources/v2.2/storage.schema.json)维护。下文解释业务含义，精确类型以指定结构文件为准。
+数据生效行为见[资产维护](../../openspec/specs/asset-management/spec.md)。设置库3表、单书20表；库和索引由[共享存储](../../src/lib/storage/workspace.ts)定义，字段结构由[存储结构](resources/v2.2/storage.schema.json)维护。下文解释业务含义，精确类型以指定结构文件为准。
 
 ## 2. 逐表清单与索引
 
@@ -874,7 +874,7 @@ run为每次运行/手动合并一行；lease为资源互斥行；编排器和�
 
 > 缺陷修复补充：T02新增动态键book.lifecycle:{operationId}，详见本文件第11节；模型费用状态和引用歧义是新增明确字段。表数量不变。
 
-本节说明任务字段与生命周期，T20仍是一张表，不增加数据库/表数量。完整结构见[execution.schema.json](resources/v2.2/execution.schema.json)，已同步合入storage.schema及data-contract。旧2026-10-23表样例仅说明旧字段；新运行必须contractRevision=2026-10-24并初始化tasks/commandIntents/coverageItems=[]、nextTaskOrdinal=0、reconciliationPass=0、noProgressTasks=0。已有目标试验数据缺这些字段时只能保留历史/暂停重查，不能推断覆盖完成。
+本节说明Agent任务字段与生命周期，T20保存P2/P3内嵌任务；P1独立任务见第12节。完整结构见[execution.schema.json](resources/v2.2/execution.schema.json)，已同步合入storage.schema及data-contract。旧2026-10-23表样例仅说明旧字段；新Agent运行必须contractRevision=2026-10-24并初始化tasks/commandIntents/coverageItems=[]、nextTaskOrdinal=0、reconciliationPass=0、noProgressTasks=0。已有目标试验数据缺这些字段时只能保留历史/暂停重查，不能推断覆盖完成。
 
 ### TaskRecord 字段
 
@@ -1012,3 +1012,16 @@ characterReferences为人物关联的读取说明；节点actorIds与targetChara
 ### P3事件线概述与整理复用
 
 eventLines.summary为可选整线概述，旧cause/process/result保留；缺省时查询组合旧文本。P2组织状态identityChecks、reusedCount及P3分阶段checks/reusedChecks随pipelineRuns备份，无新表与版本迁移。字段含义和赋值规则见[实施设计](../../openspec/changes/p3-continuous-story-lines/design.md#字段变化)、[复用字段](../../openspec/changes/p3-continuous-story-lines/restart.md#字段变化)。
+
+## 12. P1独立任务与正文快照
+
+浏览器书库版本9新增以下两表，本机存储使用同名逻辑表。P1运行以taskStorage='separate'标记，nextTaskOrdinal分配序号，tasks数组不再写入主运行。任务和输入的完整结构见storage.schema.json中的ExtractionTask及ExtractionInput定义。
+
+| 表 | 主键与索引 | 内容与写入时机 |
+|---|---|---|
+| extractionTasks | id；runId、[runId+ordinal]、[runId+status] | id为runId/taskId的JSON数组；保留任务状态、次数、结果和输入指纹，input保存章节编号、当时章节名及snapshotId；请求前注册，结果与资产和凭证同事务保存 |
+| extractionInputs | id | 正文SHA-256为id，保存bookId、text和createdAt；注册任务时按正文去重，后续章节编辑不改历史输入 |
+
+两类提取可共享正文快照，但各自inputFingerprint继续使用原完整任务输入算法。读取详情才按snapshotId取正文；常规进度使用已保存的进度和凭证。旧内嵌任务在继续、中断恢复或取消写状态之前原子转换，失败保留旧记录可重试，不用当前章节正文替代旧输入。
+
+当前备份格式12包含两表；格式4–11补空表后沿旧兼容流程导入。校验任务属于本书P1运行、快照存在且归属正确。恢复副本重写bookId，保留原任务编号、正文、章节名和输入指纹；活动独立任务变为可恢复状态。浏览器旧库迁移在两新表均为空时保持原摘要，任一表有数据则一并计入摘要。相关实施与验证见[第4项设计](../../openspec/changes/optimize-pipeline-increments/design.md#第4项p1任务和正文快照独立保存)。

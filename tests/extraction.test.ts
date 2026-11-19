@@ -8,6 +8,8 @@ import { validateExtraction, promptOf } from '../src/features/extraction/contrac
 import { defaultConfig } from '../src/features/models/types'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
 import { createAssetService } from '../src/features/assets/service'
+import { readExtractionInput } from '../src/features/extraction/taskStore'
+import type { StoredTask } from '../src/features/extraction/recovery'
 
 const workspaces: ReturnType<typeof createWorkspace>[] = []
 const world = { characters: [{ name: '沈青', confidence: 1, profile: { ageText: null }, speech_style_sample: '你好' }, { name: '沈青', confidence: 0.5, identity: '送信人' }], locations: [{ name: '青石镇', confidence: 1 }] }
@@ -374,7 +376,9 @@ it('两次结构修正可以成功，记录真实修正次数并保持三次总�
   await service.start('a')
   expect(fetcher).toHaveBeenCalledTimes(4)
   const run = (await db.table('pipelineRuns').toArray()).find(row => row.stage === 'P1')!
-  expect(run.tasks[0]).toMatchObject({ status: 'completed', repairCount: 2, stepsUsed: 3 })
+  expect(run).toMatchObject({ taskStorage: 'separate', nextTaskOrdinal: 2 })
+  expect(run).not.toHaveProperty('tasks')
+  expect((await db.table('extractionTasks').where('runId').equals(run.id).sortBy('ordinal'))[0]).toMatchObject({ status: 'completed', repairCount: 2, stepsUsed: 3 })
   const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
   expect(await validateBookData({ book, tables })).toEqual([])
 })
@@ -617,4 +621,74 @@ it('关系依据不要求逐字匹配本章原文，有简明依据即可保存'
   expect(relations[0]).toMatchObject({ originCharacterId: 'C1-P001', targetName: '顾衡', evidence: [{ chapterIndex: '1', quote: '模型概括的父子关系依据' }] })
   expect(await db.table('extractionReceipts').get('1:worldAssets')).toBeTruthy()
   expect(service.state('a')?.results.find(row => row.step === 'worldAssets')?.ok).toBe(true)
+})
+
+it('两步骤独立记录共享快照，正常进度不读取任务历史和快照', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db } = await setup(fetcher)
+  await service.start('a')
+  const runId = (await db.table('compileProgress').get('P1')).runId
+  const run = await db.table('pipelineRuns').get(runId)
+  expect(run).toMatchObject({ taskStorage: 'separate', nextTaskOrdinal: 2 })
+  expect(run).not.toHaveProperty('tasks')
+  const tasks = await db.table('extractionTasks').where('runId').equals(runId).sortBy('ordinal')
+  expect(tasks.map(task => task.status)).toEqual(['completed', 'completed'])
+  expect(tasks[0].input.snapshotId).toBe(tasks[1].input.snapshotId)
+  expect(tasks[0].inputFingerprint).not.toBe(tasks[1].inputFingerprint)
+  expect(await db.table('extractionInputs').count()).toBe(1)
+  const rejectHistory = () => { throw new Error('普通进度不应读取任务正文历史') }
+  db.table('extractionTasks').hook('reading', rejectHistory)
+  db.table('extractionInputs').hook('reading', rejectHistory)
+  try { expect(await service.progress('a')).toMatchObject({ status: 'completed', completedSteps: 2 }) }
+  finally {
+    db.table('extractionTasks').hook('reading').unsubscribe(rejectHistory)
+    db.table('extractionInputs').hook('reading').unsubscribe(rejectHistory)
+  }
+})
+
+it('继续旧运行迁移失败不改原任务；重试保留历史正文并完成新任务', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => stream(JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters ? world : narrative))
+  const { service, db } = await setup(fetcher), timestamp = new Date().toISOString()
+  const original: StoredTask = { taskId: 'old-task', ordinal: 0, callId: 'old-call', phase: 'worldAssets', status: 'failed', workItemIds: ['P1:worldAssets:chapter:1'], input: { chapterIndex: '1', chapterName: '历史章名', text: '历史正文，不是现在的章节正文。' }, inputFingerprint: 'old-input-proof', promptHash: 'old-prompt', attempt: 1, repairCount: 0, stepsUsed: 1, appliedCommitIds: [], reviewedItems: [], readSet: { records: [], queries: [] }, createdAt: timestamp, updatedAt: timestamp, lastError: { code: 'network', message: '旧失败' } }
+  const legacy = { id: 'legacy-run', bookId: 'a', recordType: 'run', stage: 'P1', status: 'paused', startedAt: timestamp, planVersion: '2.2', tasks: [original] }
+  await db.table('pipelineRuns').put(legacy)
+  await db.table('compileProgress').update('P1', { status: 'paused', runId: legacy.id })
+  const rejectMigration = () => { throw new Error('模拟旧任务迁移失败') }
+  db.table('extractionTasks').hook('creating', rejectMigration)
+  await service.start('a')
+  expect(service.state('a')?.error).toContain('模拟旧任务迁移失败')
+  expect(fetcher).not.toHaveBeenCalled()
+  expect(await db.table('pipelineRuns').get(legacy.id)).toEqual(legacy)
+  expect(await db.table('extractionInputs').count()).toBe(0)
+  expect(await db.table('pipelineRuns').where('recordType').equals('lease').count()).toBe(0)
+  db.table('extractionTasks').hook('creating').unsubscribe(rejectMigration)
+  await service.start('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(fetcher).toHaveBeenCalledTimes(2)
+  expect(await db.table('pipelineRuns').get(legacy.id)).toMatchObject({ status: 'completed', taskStorage: 'separate', nextTaskOrdinal: 3 })
+  const tasks = await db.table('extractionTasks').where('runId').equals(legacy.id).sortBy('ordinal')
+  expect(tasks).toHaveLength(3)
+  expect(tasks[0]).toMatchObject({ inputFingerprint: original.inputFingerprint, lastError: original.lastError, status: 'failed' })
+  expect(await readExtractionInput(db, tasks[0])).toEqual(original.input)
+  expect(tasks.slice(1).map(task => task.status)).toEqual(['completed', 'completed'])
+})
+
+it('任务完成记录失败时资产与凭证一同回滚，失败任务仍可重试', async () => {
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => stream(world))
+  const { service, db } = await setup(fetcher)
+  const failCompletion = (changes: unknown) => {
+    if ((changes as { status?: string }).status === 'completed') throw Object.assign(new Error('模拟任务完成保存失败'), { name: 'ConstraintError' })
+  }
+  db.table('extractionTasks').hook('updating', failCompletion)
+  await service.retry('a', '1', 'worldAssets')
+  expect(await db.table('characters').count()).toBe(0)
+  expect(await db.table('locations').count()).toBe(0)
+  expect(await db.table('assetLifecycle').count()).toBe(0)
+  expect(await db.table('extractionReceipts').count()).toBe(0)
+  expect((await db.table('extractionTasks').toArray()).map(task => task.status)).toEqual(['failed'])
+  db.table('extractionTasks').hook('updating').unsubscribe(failCompletion)
+  await service.retry('a', '1', 'worldAssets')
+  expect(await db.table('extractionReceipts').get('1:worldAssets')).toBeDefined()
+  expect((await db.table('extractionTasks').toCollection().sortBy('ordinal')).map(task => task.status)).toEqual(['failed', 'completed'])
+  expect(await db.table('extractionInputs').count()).toBe(1)
 })

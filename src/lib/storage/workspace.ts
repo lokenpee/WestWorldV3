@@ -160,6 +160,10 @@ class BookDatabase extends Dexie {
         await transaction.table('nodes').put({ ...next, revision: Number(node.revision ?? 1) + 1 })
       }
     })
+    this.version(9).stores({
+      extractionTasks: 'id, runId, [runId+ordinal], [runId+status]',
+      extractionInputs: 'id',
+    })
     this.on('ready', () => this.transaction('rw', this.tables, async () => {
       await repairRelationBindings(dexieMergeStore(this), bookId)
     }))

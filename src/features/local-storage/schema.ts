@@ -5,6 +5,7 @@ export const bookSchema = {
   compileProgress: 'stage', storyEditorMemory: 'id', storyEditorNotes: 'id', storyEditorCheckpoints: 'id',
   storySessions: 'id', storySessionEntries: 'id', extractionReceipts: 'key', assetLifecycle: 'key', pipelineRuns: 'id',
   characterRelations: 'id', characterRelationEdits: 'pairKey', legacyRelationRecords: 'id',
+  extractionTasks: 'id', extractionInputs: 'id',
 } as const
 export type QueryValue = string | number | Array<string | number>
 export interface RecordQuery {

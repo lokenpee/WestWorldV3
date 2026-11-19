@@ -54,6 +54,7 @@ it('当前格式全流程备份恢复保留有效P2待办、P3完成状态和原
   const db = workspace.openBook(book.id)
   const originalMessages = JSON.parse(JSON.stringify((await db.table('storySessionEntries').toArray()).filter(row => row.type === 'message').map(row => row.message)))
   const originalRuns = await db.table('pipelineRuns').toArray()
+  const originalExtractionTasks = await db.table('extractionTasks').toArray()
   const backups = createBackupService(workspace, importer)
   const exported = await backups.exportBook(book.id)
   const restored = await backups.importBackup(exported.bytes)
@@ -62,7 +63,7 @@ it('当前格式全流程备份恢复保留有效P2待办、P3完成状态和原
   expect((await assets.read(restored.id)).characters.find(row => row.id === person.id)?.background).toBe('人工补充保留')
   expect((await copy.table('storySessionEntries').toArray()).filter(row => row.type === 'message').map(row => row.message)).toEqual(originalMessages)
   const runs = await copy.table('pipelineRuns').toArray()
-  expect(runs.find(row => row.stage === 'P1').tasks.map((task: { inputFingerprint: string }) => task.inputFingerprint)).toEqual(originalRuns.find(row => row.stage === 'P1').tasks.map((task: { inputFingerprint: string }) => task.inputFingerprint))
+  expect((await copy.table('extractionTasks').toArray()).map(task => task.inputFingerprint)).toEqual(originalExtractionTasks.map(task => task.inputFingerprint))
   for (const run of runs.filter(row => row.stage !== 'P1')) for (const task of run.tasks ?? []) expect(task.inputFingerprint).toBe(await hash(task.input))
   const restoredStory = createStoryService(workspace, models)
   expect((await restoredStory.read(restored.id)).reading?.complete).toBe(true)
@@ -78,6 +79,7 @@ it('当前格式全流程备份恢复保留有效P2待办、P3完成状态和原
   expect(await copy.table('eventLines').count()).toBe(1)
   expect((await backups.inspectBackup((await backups.exportBook(restored.id)).bytes)).ok).toBe(true)
   expect(await db.table('pipelineRuns').toArray()).toEqual(originalRuns)
+  expect(await db.table('extractionTasks').toArray()).toEqual(originalExtractionTasks)
 }, 30000)
 
 it('恢复只转换有效证明，已经失效的结论仍保留待核实', async () => {

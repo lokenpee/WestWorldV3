@@ -7,6 +7,7 @@ import { hasClearedEndpoints, repairRelationBindings } from '../assets/repair'
 
 export const tableSchemas = {
   chapters: 'Chapter', chapterTexts: 'ChapterText', characters: 'StoredCharacter', locations: 'StoredLocation', nodes: 'StoredNode', eventLines: 'StoredEventLine', characterRelations: 'StoredRelation', characterRelationEdits: 'CharacterRelationEdit', legacyRelationRecords: 'LegacyRelationRecord', compileProgress: 'CompileProgress', storyEditorMemory: 'StoryEditorMemory', storyEditorNotes: 'StoryEditorNote', storyEditorCheckpoints: 'StoryEditorCheckpoint', storySessions: 'StorySession', storySessionEntries: 'StorySessionEntry', extractionReceipts: 'ExtractionReceipt', assetLifecycle: 'AssetLifecycle', pipelineRuns: 'PipelineRun',
+  extractionTasks: 'ExtractionTask', extractionInputs: 'ExtractionInput',
 } as const
 export type TableName = keyof typeof tableSchemas
 export type Row = Record<string, unknown>
@@ -146,6 +147,14 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
   for (const entry of businessEntries) if (!sessions.has(entry.sessionId) || (entry.parentId !== null && (entries.get(entry.parentId)?.sessionId !== entry.sessionId || Number(entries.get(entry.parentId)?.ordinal) >= Number(entry.ordinal)))) fail(`storySessionEntries/${entry.id}`, '会话归属或父条目链不符。')
   for (const name of ['storyEditorMemory', 'storyEditorNotes', 'storyEditorCheckpoints', 'compileProgress'] as const) for (const row of tables[name]) if ((row.sessionId !== undefined && !sessions.has(row.sessionId)) || (row.editorSessionId !== undefined && !sessions.has(row.editorSessionId))) fail(`${name}/${row.id ?? row.stage}`, '引用的会话不存在。')
   const p1 = tables.compileProgress.find(row => row.stage === 'P1')
+  const runs = new Map(tables.pipelineRuns.map(row => [row.id, row]))
+  const extractionInputs = new Set(tables.extractionInputs.map(row => row.id))
+  for (const task of tables.extractionTasks) {
+    const run = runs.get(task.runId)
+    if (run?.recordType !== 'run' || run.stage !== 'P1' || run.taskStorage !== 'separate') fail(`extractionTasks/${task.id}/runId`, '提取任务所属的独立P1运行不存在。')
+    if (task.id !== JSON.stringify([task.runId, task.taskId])) fail(`extractionTasks/${task.id}/id`, '提取任务编号与所属运行不一致。')
+    if (!extractionInputs.has((task.input as Row).snapshotId)) fail(`extractionTasks/${task.id}/input/snapshotId`, '提取任务引用的原文快照不存在。')
+  }
   let currentMechanicalQueues = 0
   const runIds = new Set(tables.pipelineRuns.map(row => row.id))
   for (const run of tables.pipelineRuns) if (run.mechanicalQueue) {
@@ -191,6 +200,7 @@ export function pauseBookData(data: BookData): BookData {
   const result = structuredClone(data)
   for (const row of result.tables.compileProgress) delete row.completedSteps
   result.tables.pipelineRuns = result.tables.pipelineRuns.filter(row => row.recordType === 'run' || row.recordType === 'asset_edit')
+  for (const task of result.tables.extractionTasks) if (['pending', 'running', 'prepared'].includes(task.status as string)) task.status = 'partial'
   for (const name of ['storySessions', 'compileProgress', 'pipelineRuns'] as const) for (const row of result.tables[name]) {
     delete row.leaseOwner; delete row.leaseUntil; delete row.owner; delete row.expiresAt; delete row.lockKey
     if (row.status === 'running' || row.status === 'cancelling') row.status = 'paused'

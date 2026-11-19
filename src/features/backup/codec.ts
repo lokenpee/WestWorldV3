@@ -27,7 +27,7 @@ export async function encodeBackup(input: BookData, onProgress?: BackupProgress)
   const files: Record<string, Uint8Array> = { 'data/book.json': strToU8(JSON.stringify(data.book)) }
   for (const name of tableNames.filter(name => name !== 'chapterTexts')) files[`data/${name}.json`] = strToU8(JSON.stringify(data.tables[name]))
   for (const row of data.tables.chapterTexts) files[chapterFileName(row.chapterIndex as string)] = strToU8(row.text as string)
-  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: 11, appVersion: '0.4.3', exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
+  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: 12, appVersion: '0.4.3', exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
   files['manifest.json'] = strToU8(JSON.stringify(manifest))
   onProgress?.('正在压缩备份…')
   const bytes = await new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) => zip(files as Zippable, { level: 6 }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
@@ -49,7 +49,7 @@ export async function inspectBackup(bytes: Uint8Array, onProgress?: BackupProgre
     const parse = (name: string): unknown => { path = name; if (!files[name]) throw new Error('备份中缺少文件。'); return JSON.parse(strFromU8(files[name])) }
     const value = parse(path)
     if (!object(value) || value.format !== 'westworld-v2' || !Number.isInteger(value.formatVersion) || typeof value.appVersion !== 'string' || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)) || !object(value.book) || typeof value.book.id !== 'string' || typeof value.book.title !== 'string' || !Number.isInteger(value.book.chapterCount) || !Array.isArray(value.contents) || !value.contents.every(item => typeof item === 'string') || !Array.isArray(value.excludes) || !value.excludes.every(item => typeof item === 'string') || !object(value.checksums)) return fail('MANIFEST', path, '备份清单结构不完整。')
-    if (![4, 5, 6, 7, 8, 9, 10, 11].includes(value.formatVersion as number)) return fail('VERSION', path, Number(value.formatVersion) > 11 ? '备份版本较新，请使用支持该版本的应用。' : '备份版本不受支持。')
+    if (![4, 5, 6, 7, 8, 9, 10, 11, 12].includes(value.formatVersion as number)) return fail('VERSION', path, Number(value.formatVersion) > 12 ? '备份版本较新，请使用支持该版本的应用。' : '备份版本不受支持。')
     const manifest = value as unknown as BackupManifest
     onProgress?.('正在核对文件完整性…')
     for (const name of Object.keys(files)) if (name !== 'manifest.json' && !Object.hasOwn(manifest.checksums, name)) return fail('CHECKSUM', name, '文件缺少校验和。')
@@ -71,6 +71,7 @@ export async function inspectBackup(bytes: Uint8Array, onProgress?: BackupProgre
       if (!Array.isArray(value)) return fail('SCHEMA', path, '数据文件须为列表。')
       if (tableNames.includes(name as TableName) && name !== 'chapterTexts') {
         if (name === 'legacyRelationRecords' && manifest.formatVersion < 8) return fail('CONTENTS', path, `格式${manifest.formatVersion}不应包含旧关系归档表。`)
+        if (['extractionTasks', 'extractionInputs'].includes(name) && manifest.formatVersion < 12) return fail('CONTENTS', path, `格式${manifest.formatVersion}不应包含独立提取任务表。`)
         tables[name as TableName] = value as Row[]
       } else if (manifest.formatVersion === 4 && ['characterSnapshots', 'locationSnapshots'].includes(name)) legacy[name] = value
       else return fail('CONTENTS', path, '备份包含无法识别的数据表。')
@@ -86,7 +87,7 @@ export async function inspectBackup(bytes: Uint8Array, onProgress?: BackupProgre
     const historicalWithoutEdits = manifest.formatVersion === 7 && !manifest.contents.includes('characterRelationEdits')
     if (historicalWithoutEdits && hasCurrentRelationRows(tables.characterRelations)) return fail('CONTENTS', 'manifest.json', '当前结构的关系资料缺少关系编辑表。')
     if (historicalWithoutEdits && tables.characterRelations.some(row => !isLegacyRelationRow(row))) return fail('SCHEMA', 'data/characterRelations.json', '关系行既不是当前事实，也不是已知历史结构。')
-    const expected = ['book', ...tableNames.filter(name => name !== 'chapterTexts' && (
+    const expected = ['book', ...tableNames.filter(name => name !== 'chapterTexts' && (manifest.formatVersion >= 12 || !['extractionTasks', 'extractionInputs'].includes(name)) && (
       manifest.formatVersion < 5 ? !['extractionReceipts', 'assetLifecycle', 'pipelineRuns', 'characterRelations', 'characterRelationEdits', 'legacyRelationRecords'].includes(name)
         : manifest.formatVersion === 5 ? !['characterRelations', 'characterRelationEdits', 'legacyRelationRecords'].includes(name)
           : manifest.formatVersion === 6 ? !['characterRelationEdits', 'legacyRelationRecords'].includes(name)

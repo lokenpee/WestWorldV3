@@ -193,7 +193,7 @@ it('格式10备份保留人物整理会话、候选和进度，恢复为新书�
   try {
     const backups = createBackupService(workspace, importer)
     const exported = await backups.exportBook('a')
-    expect(exported.manifest.formatVersion).toBe(11)
+    expect(exported.manifest.formatVersion).toBe(12)
     const inspected = await backups.inspectBackup(exported.bytes)
     expect(inspected.errors).toEqual([])
     const imported = await backups.importBackup(exported.bytes)

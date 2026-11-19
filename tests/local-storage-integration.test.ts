@@ -17,7 +17,9 @@ import { createAssetService } from '../src/features/assets/service'
 import { DEFAULT_CHAPTER_PATTERN, splitChapters } from '../src/features/import/text'
 import { SqliteRecordStore } from '../src/features/local-storage/sqliteStore'
 import { readBookTrace } from '../src/features/agents/trace'
-import { character, createLegacyBook } from './support/legacy-book'
+import { character, createLegacyBook, bookSchemaV5 } from './support/legacy-book'
+import { checksumOf } from '../src/features/backup/codec'
+import { emptyTables } from '../src/features/backup/data'
 const protector = { protect: (text: string) => Buffer.from(text).toString('base64'), unprotect: (text: string) => Buffer.from(text, 'base64').toString() }
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => { vi.restoreAllMocks(); for (const cleanup of cleanups.splice(0)) await cleanup() })
@@ -103,6 +105,40 @@ test('legacy version 7 copies through validation without upgrading its source da
   expect((await workspace.openBook('legacy').table('characters').get('C1-P001')).name).toBe('沈青')
   const original = new Dexie(scope.bookPrefix + 'legacy')
   try { await original.open(); expect(original.verno).toBe(7); expect(await original.table('characters').count()).toBe(1) } finally { original.close() }
+})
+
+test('旧迁移摘要在8升9仅建空表后仍跳过，独立提取表有新记录时拒绝覆盖磁盘书', async () => {
+  const { workspace, call } = fixture()
+  const prefix = `migration-empty-v9-${crypto.randomUUID()}`, scope = { settingsName: `${prefix}-settings`, bookPrefix: `${prefix}-book-` }
+  const browser = createWorkspace(scope), book = { id: 'old-marker', title: '旧迁移标记', sourceFileName: 'old.txt', createdAt: '2026-11-19T00:00:00.000Z' }
+  cleanups.push(async () => { browser.close(); for (const name of await Dexie.getDatabaseNames()) if (name.startsWith(prefix)) await Dexie.delete(name) })
+  await browser.settings.books.put(book)
+  const old = new Dexie(scope.bookPrefix + book.id)
+  old.version(8).stores({ ...bookSchemaV5, characterRelations: 'id, bookId, originCharacterId, sourceId, targetName, *targetIds', characterRelationEdits: 'pairKey, aId, bId, state', legacyRelationRecords: 'id, bookId, disposition' })
+  const { extractionTasks: _tasks, extractionInputs: _inputs, ...tables } = emptyTables()
+  try {
+    await old.open()
+    await old.table('chapters').put({ bookId: book.id, chapterIndex: '1', chapterName: '第一章', order: 0, charCount: text.length })
+    await old.table('chapterTexts').put({ bookId: book.id, chapterIndex: '1', text })
+    for (const name of Object.keys(tables) as (keyof typeof tables)[]) tables[name] = await old.table(name).toArray()
+    expect(old.verno).toBe(8)
+  } finally { old.close() }
+  const legacyDigest = await checksumOf(new TextEncoder().encode(JSON.stringify({ book, tables })))
+  await migrateBrowserData(call, () => {}, scope)
+  expect((await workspace.settings.appSettings.get(`migration:book:${book.id}`))?.value).toMatchObject({ digest: legacyDigest })
+  await workspace.settings.books.update(book.id, { title: '磁盘保留的手动修改' })
+  const upgraded = browser.openBook(book.id); await upgraded.open()
+  expect(upgraded.verno).toBe(9)
+  expect(await upgraded.table('extractionTasks').count()).toBe(0)
+  expect(await upgraded.table('extractionInputs').count()).toBe(0)
+  const messages: string[] = []
+  await migrateBrowserData(call, message => messages.push(message), scope)
+  expect(messages.some(message => message.includes('已迁移，保留磁盘上的最新结果'))).toBe(true)
+  expect((await workspace.settings.books.get(book.id))?.title).toBe('磁盘保留的手动修改')
+  const snapshotText = '新增历史输入', snapshotId = (await checksumOf(new TextEncoder().encode(snapshotText))).slice('sha256:'.length)
+  await upgraded.table('extractionInputs').put({ id: snapshotId, bookId: book.id, text: snapshotText, createdAt: book.createdAt })
+  await expect(migrateBrowserData(call, () => {}, scope)).rejects.toThrow('相同编号')
+  expect((await workspace.settings.books.get(book.id))?.title).toBe('磁盘保留的手动修改')
 })
 
 test('disk trace pagination returns the requested page and only its referenced snapshots', async () => {

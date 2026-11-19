@@ -54,7 +54,7 @@ async function migratedBaseline() {
 describe('阶段A 历史关系原地升级', () => {
   it('A01/A02 历史7无编辑表可打开，按角色投影且不扩散同名', async () => {
     const { workspace, db } = await migratedBaseline()
-    expect(db.verno).toBe(8)
+    expect(db.verno).toBe(9)
     const archives = await db.table<LegacyRelationRecord>('legacyRelationRecords').toArray()
     expect(archives).toHaveLength(5)
     expect(await db.table('characterRelations').count()).toBe(0)
@@ -123,7 +123,7 @@ describe('阶段A 历史关系原地升级', () => {
       const { workspace, scope } = setup()
       await createLegacyBook(scope, { bookId: 'legacy', characters: [person('A', '甲')], relations: [] }, 7, false)
       const db = workspace.openBook('legacy'); await db.open()
-      expect(db.verno).toBe(8)
+      expect(db.verno).toBe(9)
       expect(await db.table('legacyRelationRecords').count()).toBe(0)
     }
     {
@@ -150,7 +150,7 @@ describe('阶段A 历史关系原地升级', () => {
       expect(await raw.table('characterRelations').count()).toBe(5)
       await raw.close(); workspace.closeBook('legacy')
       const retried = workspace.openBook('legacy'); await retried.open()
-      expect(retried.verno).toBe(8)
+      expect(retried.verno).toBe(9)
       expect(await retried.table('legacyRelationRecords').count()).toBe(5)
     }
     {
@@ -164,7 +164,7 @@ describe('阶段A 历史关系原地升级', () => {
       const retry = new Dexie(`${scope.bookPrefix}legacy`); await retry.open(); await retry.table('pipelineRuns').delete('lease:world'); await retry.close()
       workspace.closeBook('legacy')
       const reopened = workspace.openBook('legacy'); await reopened.open()
-      expect(reopened.verno).toBe(8)
+      expect(reopened.verno).toBe(9)
     }
   })
 
@@ -204,7 +204,7 @@ describe('阶段A 历史关系原地升级', () => {
 })
 
 function zipBook(data: BookData, formatVersion: 7 | 8, options: { omitEdits?: boolean; omitLegacy?: boolean } = {}) {
-  const tables = tableNames.filter(name => name !== 'chapterTexts' && !(options.omitEdits && name === 'characterRelationEdits') && !(options.omitLegacy && name === 'legacyRelationRecords'))
+  const tables = tableNames.filter(name => !['chapterTexts', 'extractionTasks', 'extractionInputs'].includes(name) && !(options.omitEdits && name === 'characterRelationEdits') && !(options.omitLegacy && name === 'legacyRelationRecords'))
   const files: Record<string, Uint8Array> = { 'data/book.json': strToU8(JSON.stringify(data.book)) }
   for (const name of tables) files[`data/${name}.json`] = strToU8(JSON.stringify(data.tables[name]))
   for (const row of data.tables.chapterTexts) files[`chapters/${String(row.chapterIndex).padStart(4, '0')}.txt`] = strToU8(String(row.text))
@@ -242,13 +242,13 @@ describe('阶段A 备份预检与往返', () => {
     expect(current.errors[0]).toMatchObject({ code: 'CONTENTS' })
   })
 
-  it('A07 格式8导出恢复保留旧归档、当前关系与删除状态', async () => {
+  it('A07 当前格式导出恢复保留旧归档、当前关系与删除状态', async () => {
     const { workspace } = await migratedBaseline()
     const db = workspace.openBook('legacy')
     const tables = emptyTables()
     for (const name of tableNames) tables[name] = await db.table(name).toArray()
     const exported = await encodeBackup({ book: { id: 'legacy', title: '旧书', sourceFileName: 'old.txt', createdAt: ts }, tables })
-    expect(exported.manifest.formatVersion).toBe(11)
+    expect(exported.manifest.formatVersion).toBe(12)
     const inspected = await inspectBackup(exported.bytes)
     expect(inspected.errors).toEqual([])
     expect(inspected.data!.tables.legacyRelationRecords).toHaveLength(5)

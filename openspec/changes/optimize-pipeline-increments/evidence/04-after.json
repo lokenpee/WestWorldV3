@@ -1,0 +1,10 @@
+{
+  "chapters": 12,
+  "completedTasks": 24,
+  "maxRunRowBytes": 367,
+  "maxWriteRequestBytes": 30338,
+  "taskHistoryWriteBytes": 475116,
+  "storedRunBytes": 367,
+  "elapsedMs": 1414.75,
+  "receipts": 24
+}

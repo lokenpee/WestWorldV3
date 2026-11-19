@@ -20,11 +20,11 @@ export async function migrateBrowserData(call: StorageCall, progress: (message: 
     if (!await Dexie.exists(scope.bookPrefix + book.id)) throw new Error(`《${book.title}》的浏览器书库缺失，原书架已保留。`)
     const source = new Dexie(scope.bookPrefix + book.id)
     let data = { book, tables: emptyTables() }
-    let version = 8
+    let version = 9
     try {
       await source.open()
       version = source.verno
-      if (source.verno < 5 || source.verno > 8) throw new Error(`《${book.title}》的旧库版本不支持直接迁移，请先使用对应版本导出整书备份。`)
+      if (source.verno < 5 || source.verno > 9) throw new Error(`《${book.title}》的旧库版本不支持直接迁移，请先使用对应版本导出整书备份。`)
       await source.transaction('r', source.tables, async tx => {
         for (const name of tableNames) if (source.tables.some(table => table.name === name)) data.tables[name] = await tx.table(name).toArray()
       })

@@ -88,12 +88,22 @@ it('恢复进行时拒绝重复确认，界面释放句柄不打断已经交给�
 it('迁移摘要仍取转换前资料，尚未确认迁移时不编码或解压', async () => {
   const data = sample(), original = structuredClone(data)
   const preparation = await prepareMigration(data, 8); handles.push(preparation)
-  expect(preparation.digest).toBe(await checksumOf(new TextEncoder().encode(JSON.stringify(original))))
+  const { extractionTasks: _tasks, extractionInputs: _inputs, ...legacyTables } = original.tables
+  expect(preparation.digest).toBe(await checksumOf(new TextEncoder().encode(JSON.stringify({ ...original, tables: legacyTables }))))
   expect(unzipSync).not.toHaveBeenCalled()
   data.tables.chapterTexts[0].text = '调用者随后改动'
   const normalized = await preparation.normalize()
   expect(normalized).toEqual(original)
   expect(unzipSync).toHaveBeenCalledTimes(1)
+})
+
+it.each(['extractionTasks', 'extractionInputs'] as const)('迁移摘要在%s有内容时同时纳入两张新表', async name => {
+  const data = sample(), empty = await prepareMigration(data, 9); handles.push(empty)
+  data.tables[name].push({ id: 'changed-source' })
+  const changed = await prepareMigration(data, 9); handles.push(changed)
+  expect(changed.digest).not.toBe(empty.digest)
+  expect(changed.digest).toBe(await checksumOf(new TextEncoder().encode(JSON.stringify(data))))
+  expect(unzipSync).not.toHaveBeenCalled()
 })
 
 it('导出准备在独立资料副本上执行，结果保持现有备份格式', async () => {

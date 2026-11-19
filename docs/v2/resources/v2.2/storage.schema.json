@@ -912,6 +912,9 @@
           "type": "object",
           "description": "P3主动阅读的页面、检查结果与当前位置；由程序持久化，旧记录可省略。",
           "additionalProperties": true
+        },
+        "taskStorage": {
+          "const": "separate"
         }
       },
       "required": [
@@ -929,7 +932,21 @@
           "if": {
             "required": [
               "contractRevision"
-            ]
+            ],
+            "not": {
+              "properties": {
+                "stage": {
+                  "const": "P1"
+                },
+                "taskStorage": {
+                  "const": "separate"
+                }
+              },
+              "required": [
+                "stage",
+                "taskStorage"
+              ]
+            }
           },
           "then": {
             "required": [
@@ -939,6 +956,23 @@
               "nextTaskOrdinal",
               "reconciliationPass",
               "noProgressTasks"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "taskStorage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "stage": {
+                "const": "P1"
+              }
+            },
+            "required": [
+              "nextTaskOrdinal"
             ]
           }
         }
@@ -9248,6 +9282,179 @@
       ],
       "additionalProperties": false,
       "description": "P3主动阅读阶段的内部任务；具体分配页和进度保存在PipelineRun.storyReading。"
+    },
+    "ExtractionTask": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "callId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "enum": [
+            "worldAssets",
+            "narrativeAssets"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "running",
+            "partial",
+            "completed",
+            "failed",
+            "cancelled",
+            "stale",
+            "prepared"
+          ]
+        },
+        "workItemIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "input": {
+          "type": "object",
+          "properties": {
+            "chapterIndex": {
+              "type": "string",
+              "minLength": 1
+            },
+            "chapterName": {
+              "type": "string"
+            },
+            "snapshotId": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "chapterIndex",
+            "chapterName",
+            "snapshotId"
+          ],
+          "additionalProperties": false
+        },
+        "inputFingerprint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promptHash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repairCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "stepsUsed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "appliedCommitIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "reviewedItems": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ReviewItem"
+          }
+        },
+        "readSet": {
+          "$ref": "#/$defs/ReadSet"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "lastError": {
+          "$ref": "#/$defs/TaskError"
+        }
+      },
+      "required": [
+        "id",
+        "bookId",
+        "runId",
+        "taskId",
+        "ordinal",
+        "callId",
+        "phase",
+        "status",
+        "workItemIds",
+        "input",
+        "inputFingerprint",
+        "promptHash",
+        "attempt",
+        "repairCount",
+        "stepsUsed",
+        "appliedCommitIds",
+        "reviewedItems",
+        "readSet",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "ExtractionInput": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bookId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "bookId",
+        "text",
+        "createdAt"
+      ],
+      "additionalProperties": false
     }
   }
 }

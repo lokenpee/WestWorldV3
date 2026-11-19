@@ -103,7 +103,7 @@ operationKey由Agent对同一逻辑命令复用，代码用(runId,operationKey)�
 
 本节说明任务身份和持久化约定。runId代表一次用户发起的阶段运行；taskId为应用在发请求前分配并持久化的UUID，代表一份固定分配清单。重连、模型网络重试、校验修正保持同runId/taskId；用户点击“重新检查”创建新runId；partial后的剩余项形成新taskId，但P3始终保持同一逻辑sessionId。
 
-每次请求前在T20.tasks追加TaskRecord，ordinal取nextTaskOrdinal后加1，冻结callId、phase、workItemIds、输入快照及其指纹、Prompt hash。输入必须通过05的具体调用Schema；Schema相符但callId不匹配同样拒绝。任务输入中的bookId/runId/taskId只能来自绑定上下文，不能读模型参数。相同run内每个工作项同时最多分配给一个running任务。
+每次请求前保存任务：P2/P3在T20.tasks追加TaskRecord，P1写入extractionTasks并引用extractionInputs正文快照，详见[存储第12节](03-Spec-数据与存储.md#12-p1独立任务与正文快照)。ordinal取nextTaskOrdinal后加1，冻结callId、phase、workItemIds、输入快照及其指纹、Prompt hash。输入必须通过05的具体调用Schema；Schema相符但callId不匹配同样拒绝。任务输入中的bookId/runId/taskId只能来自绑定上下文，不能读模型参数。相同run内每个工作项同时最多分配给一个running任务。
 
 | 状态 | 触发与下一状态 | 持久结果/恢复 |
 |---|---|---|

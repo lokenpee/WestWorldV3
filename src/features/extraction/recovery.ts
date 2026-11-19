@@ -17,7 +17,12 @@ export interface StoredTask {
   attempt: number; repairCount: number; stepsUsed: number; appliedCommitIds: string[]; reviewedItems: { workItemId: string; outcome: string; reason: string }[]
   readSet: { records: never[]; queries: never[] }; createdAt: string; updatedAt: string; lastError?: { code: string; message: string }
 }
-export interface Run { id: string; recordType: string; bookId: string; stage: string; status: string; usage?: SavedUsage; tasks?: StoredTask[]; finishedAt?: string }
+export interface ExtractionInput { id: string; bookId: string; text: string; createdAt: string }
+export interface ExtractionTask extends Omit<StoredTask, 'input'> {
+  id: string; bookId: string; runId: string
+  input: { chapterIndex: string; chapterName: string; snapshotId: string }
+}
+export interface Run { id: string; recordType: string; bookId: string; stage: string; status: string; usage?: SavedUsage; tasks?: StoredTask[]; taskStorage?: 'separate'; nextTaskOrdinal?: number; finishedAt?: string }
 export function coverage(chapters: Chapter[], receipts: Receipt[], failed: string[] = []) {
   const keys = new Set(receipts.map(row => row.key))
   const missing = (chapter: Chapter) => substeps.filter(step => !keys.has(`${chapter.chapterIndex}:${step}`))

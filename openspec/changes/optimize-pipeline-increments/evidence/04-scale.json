@@ -1,0 +1,8 @@
+{
+  "tasks": 3000,
+  "snapshots": 1500,
+  "oldRunBytes": 91377549,
+  "compactRunBytes": 131,
+  "maxWriteRequestBytes": 121738,
+  "elapsedMs": 2336.32
+}
