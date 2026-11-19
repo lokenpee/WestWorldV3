@@ -36,7 +36,7 @@ React 页面 / 面板
             ├─ P3 叙事整理（story + agents，Pi Agent）
             ├─ 模型配置与网关（models）
             └─ 导入 / 备份 / 存储（import、backup、lib/storage）
-                 └─ IndexedDB：设置库 + 每书库
+                 └─ 本机服务 → SQLite：设置范围 + 每书范围（凭据由 Windows 加密）
 ```
 
 关键边界：
@@ -119,7 +119,9 @@ P3 的八个工具直接开放，不使用工具发现。首个阅读页按最�
 
 | 文件 | 用途 |
 |---|---|
-| [src/lib/storage/workspace.ts](src/lib/storage/workspace.ts) | Dexie 设置库/书库、版本升级、表索引。 |
+| [src/lib/storage/workspace.ts](src/lib/storage/workspace.ts) | 磁盘工作空间、旧 Dexie 设置库/书库及版本升级。 |
+| [features/local-storage/server.ts](src/features/local-storage/server.ts) / [client.ts](src/features/local-storage/client.ts) | 同源本机存储接口、查询及事务适配。 |
+| [features/local-storage/migration.ts](src/features/local-storage/migration.ts) | 旧浏览器数据复制、核对及发布。 |
 | [src/lib/storage/importService.ts](src/lib/storage/importService.ts) | 导入事务、书籍和章节落库。 |
 | [features/import/parseInWorker.ts](src/features/import/parseInWorker.ts) | TXT 分章和编码处理 Worker。 |
 | [features/backup/service.ts](src/features/backup/service.ts) | `.wwv2` 导出、预检、恢复为副本。 |
@@ -166,8 +168,8 @@ npm run prompts:sync
 
 ## 数据与存储
 
-- 设置库：`westworld_settings`，保存书架、模型配置和凭据。
-- 每书库：`westworld_canon_<bookId>`，按书隔离原文、资产、进度、运行、会话和备份映射。
+- 主存储：`E:\WestWorldV3-data\workspace.sqlite`，按 `settings` 与 `book:<bookId>` 隔离设置和书籍；自动恢复副本位于同目录的 `backups`，保留最近5份。
+- 浏览器旧库 `westworld_settings` / `westworld_canon_<bookId>` 通过“迁移浏览器旧数据”复制、核对后发布到磁盘，来源保留。模型密钥以 Windows 当前用户加密落盘。
 - 主要表组：
   - 原文：`chapters`、`chapterTexts`
   - 世界资产：`characters`、`locations`、`characterRelations`、`characterRelationEdits`
@@ -177,7 +179,8 @@ npm run prompts:sync
   - P2/P3 会话：`storySessions`、`storySessionEntries`、`storyEditorMemory`、`storyEditorNotes`、`storyEditorCheckpoints`
   - 生命周期/旧数据：`assetLifecycle`、`legacyRelationRecords`
 - 数据库结构以 [workspace.ts](src/lib/storage/workspace.ts) 和 [storage.schema.json](docs/v2/resources/v2.2/storage.schema.json) 为准；表含义见 [03-数据与存储](docs/v2/03-Spec-数据与存储.md)。
-- 资料保存在当前浏览器 origin。改端口或主机名会打开另一个 IndexedDB；本地开发固定使用 `127.0.0.1:5173`。
+- 书籍与模型配置由本机数据目录决定，清浏览器站点数据不会删除磁盘主库。旧库迁移需使用原浏览器及原地址；入口继续固定为 `127.0.0.1:5173`。手动导出目录的浏览器授权句柄单独保存在浏览器，清站点数据后需重新选择，自动磁盘备份不依赖它。
+- 存储接口、迁移与失败恢复的实现及验收见[持久化设计](openspec/changes/durable-book-storage/design.md)和[验收记录](openspec/changes/durable-book-storage/acceptance.md)。
 - `.wwv2` 备份不包含设置库凭据；恢复为独立副本，不覆盖原书。正式书库和备份修改必须获得用户明确授权。
 
 ## 常用改动路径
@@ -207,10 +210,17 @@ Windows 下双击 [启动本地服务](scripts/启动本地服务.bat)，服务�
 
 入口固定为 `http://127.0.0.1:5173/`。继续使用原来的浏览器及用户配置，即可读取已保存资料。关闭服务前先结束页面中正在运行的提取或整理任务。
 
-首次使用先安装 Node.js 并执行 `npm install`。命令行启动方式：
+项目当前位于 `E:\WestWorldV3`。启动、关闭与提示词同步均从脚本自身位置定位项目；整个目录迁移后无需改盘符。运行时窗口显示实际项目目录，避免打开旧副本。若使用桌面快捷方式，目标应指向当前项目 `scripts` 下的对应 `.bat`。
+
+提示词在 [active 目录](docs/v2/resources/v2.2/prompts/active)，修改后运行 [提示词同步](scripts/提示词同步.bat)。源码按相对路径加载这些文件，不依赖原 D 盘路径。
+
+首次切换时先关闭再启动本地服务。页面会显示磁盘目录和浏览器旧书数量，点击“迁移浏览器旧数据”完成复制后进入磁盘书库；之后仍可在设置中迁移。迁移不调用模型，已有磁盘书籍不会被静默覆盖。
+
+首次使用安装支持 `node:sqlite` 的 Node.js（已验证24.14.0）并执行 `npm install`。命令行启动方式：
 
 ```powershell
 npm install
+$env:WESTWORLD_STORAGE_DIR = 'E:\WestWorldV3-data'
 npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```
 
@@ -230,6 +240,8 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 ```powershell
 npm run test:unit
 ```
+
+磁盘业务回归：`npm run test:disk`；浏览器关闭、服务重启、清站点数据与假Key验证：`npm run test:storage-browser`。这些检查仅创建临时目录及固定响应，不调用真实模型。
 
 完整检查：
 

@@ -1,3 +1,4 @@
+import { transact } from '../lib/storage/transaction'
 import storySeedJson from '../../tests/fixtures/F-跨窗口叙事.json?raw'
 import { createStoryService } from '../features/story/service'
 import worldSeedJson from '../../tests/fixtures/E-世界资产整理.json?raw'
@@ -51,14 +52,14 @@ export function createStage1Acceptance(stage: 1 | 2 | 'assets' | 'merge' | 'back
     await workspace.settings.appSettings.delete('acceptance.failReads')
     const first = workspace.openBook(sampleIds[0])
     await first.open()
-    await first.transaction('rw', first.tables, async () => {
+    await transact(first, 'rw', [first.tables], async (first) => {
       for (const table of first.tables) await table.clear()
       for (const [table, rows] of Object.entries(seed.tables)) await first.table(table).bulkPut(rows.map(row => ({ ...row, bookId: sampleIds[0] })))
     })
     const second = workspace.openBook(sampleIds[1])
     await second.open()
     const text = '第一章 山城清晨\n林遥沿着石阶走入山城。清晨有雾。'
-    await second.transaction('rw', second.tables, async () => {
+    await transact(second, 'rw', [second.tables], async (second) => {
       for (const table of second.tables) await table.clear()
       await second.chapters.put({ bookId: sampleIds[1], chapterIndex: '1', chapterName: '第一章 山城清晨', order: 0, charCount: text.length })
       await second.table('chapterTexts').put({ bookId: sampleIds[1], chapterIndex: '1', text })
@@ -76,7 +77,7 @@ export function createStage1Acceptance(stage: 1 | 2 | 'assets' | 'merge' | 'back
     for (const id of sampleIds) {
       const db = workspace.openBook(id)
       await db.open()
-      await db.transaction('rw', db.tables, async () => { for (const table of db.tables) await table.clear() })
+      await transact(db, 'rw', [db.tables], async (db) => { for (const table of db.tables) await table.clear() })
     }
   }
 

@@ -10,12 +10,12 @@ export interface ExportDirectory {
 type DirectoryWindow = Window & { showDirectoryPicker?: (options: { mode: 'readwrite' }) => Promise<ExportDirectory> }
 const directoryKey = 'assets.exportDirectory'
 export const supportsDirectory = () => typeof (window as DirectoryWindow).showDirectoryPicker === 'function'
-export async function rememberedDirectory(service: BackupService) { return (await service.settings.appSettings.get(directoryKey))?.value as ExportDirectory | undefined }
+export async function rememberedDirectory(service: BackupService) { return (await service.directorySettings.appSettings.get(directoryKey))?.value as ExportDirectory | undefined }
 export async function chooseDirectory(service: BackupService) {
   const picker = (window as DirectoryWindow).showDirectoryPicker
   if (!picker) throw new Error('当前浏览器支持下载备份，可通过下载选择保存位置。')
   const handle = await picker.call(window, { mode: 'readwrite' })
-  await service.settings.appSettings.put({ key: directoryKey, value: handle })
+  await service.directorySettings.appSettings.put({ key: directoryKey, value: handle })
   return handle
 }
 export async function authorizeDirectory(directory: ExportDirectory) {

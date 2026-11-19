@@ -26,6 +26,7 @@ cls
 echo ==========================================
 echo   WestWorldV3 Prompt Sync
 echo ==========================================
+echo   Project: %CD%
 echo   1. Preview changes (dry-run)
 echo   2. Sync hashes/examples + governance check
 echo   3. Sync + full checks (typecheck, unit tests, OpenSpec)

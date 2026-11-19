@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import Dexie from 'dexie'
 import type { Table, Transaction } from 'dexie'
 import type { createWorkspace } from '../../lib/storage/workspace'
@@ -14,7 +15,7 @@ export interface AgentStore {
   remove(table: string, id: string): Promise<void>
   wait<T>(promise: Promise<T>): Promise<T>
 }
-export interface AgentRepository { bookId: string; transaction<T>(write: boolean, work: (store: AgentStore) => Promise<T>, lease?: LeaseGuard): Promise<T>; tracePut(rows: Row[]): Promise<void>; traceRows(): Promise<Row[]> }
+export interface AgentRepository { bookId: string; storage?: 'disk'; transaction<T>(write: boolean, work: (store: AgentStore) => Promise<T>, lease?: LeaseGuard): Promise<T>; tracePut(rows: Row[]): Promise<void>; traceRows(): Promise<Row[]> }
 const visible = (table: string, row: Row | undefined) => !!row && (table !== 'storySessionEntries' || !isObservationEntry(row))
 const keyOf = (table: string, row: Row) => String(table === 'chapters' || table === 'chapterTexts' ? row.chapterIndex : table === 'assetLifecycle' || table === 'extractionReceipts' ? row.key : table === 'compileProgress' ? row.stage : table === 'characterRelationEdits' ? row.pairKey : row.id)
 // 心跳只更新续期时间；快照比较保留执行者身份，不把续期当成业务资料变化。
@@ -96,7 +97,7 @@ async function writeSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace
     }
     const tables = [...new Set([...full.keys(), ...points.keys(), ...changes.keys(), ...(sessions.size ? ['storySessionEntries'] : []), 'pipelineRuns'])]
     try {
-      await db.transaction('rw', tables.map(table => db.table(table)), async transaction => {
+      await transact(db, 'rw', [tables.map(table => db.table(table))], async (_db, transaction) => {
         for (const [sessionId, rows] of sessions) {
           const current = (await transaction.table('storySessionEntries').where('sessionId').equals(sessionId).toArray()).filter(row => visible('storySessionEntries', row))
           if (canonical(current) !== canonical(rows)) throw new SnapshotConflict()
@@ -122,7 +123,7 @@ async function readSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace>
   const tables = new Set<string>(), keys = new Map<string, Set<string>>()
   for (let attempt = 0; attempt < 5; attempt++) {
     const all = new Map<string, Row[]>(), points = new Map<string, Map<string, Row | undefined>>()
-    if (attempt) await db.transaction('r', [...new Set([...tables, ...keys.keys()])].map(name => db.table(name)), async () => {
+    if (attempt) await transact(db, 'r', [[...new Set([...tables, ...keys.keys()])].map(name => db.table(name))], async (db) => {
       for (const name of tables) all.set(name, await businessRows(db.table(name)))
       for (const [name, ids] of keys) {
         const values = all.has(name) ? [...ids].map(id => all.get(name)!.find(row => keyOf(name, row) === id)) : await db.table(name).bulkGet([...ids])
@@ -149,7 +150,7 @@ async function readSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace>
       if (attempt) return value
       const names = [...new Set([...tables, ...points.keys()])]
       if (!names.length) return value
-      const valid = await db.transaction('r', names.map(name => db.table(name)), async () => {
+      const valid = await transact(db, 'r', [names.map(name => db.table(name))], async (db) => {
         for (const name of tables) if (canonical(snapshotRows(name, await businessRows(db.table(name)))) !== canonical(snapshotRows(name, all.get(name)!))) return false
         for (const [name, values] of points) for (const [id, row] of values) if (!sameSnapshot(name, await db.table(name).get(id), row)) return false
         return true
@@ -162,7 +163,7 @@ async function readSnapshot<T>(db: ReturnType<ReturnType<typeof createWorkspace>
 export function createBookAgentRepository(workspace: ReturnType<typeof createWorkspace>, bookId: string): AgentRepository {
   const db = workspace.openBook(bookId)
   let tail = Promise.resolve()
-  return { bookId, async transaction(write, work, lease) {
+  return { bookId, ...(workspace.disk ? { storage: 'disk' as const } : {}), async transaction(write, work, lease) {
     return Dexie.ignoreTransaction(async () => {
       if (!await workspace.settings.books.get(bookId)) throw new Error('SCOPE:书籍不存在。')
       if (!write) return readSnapshot(db, work)

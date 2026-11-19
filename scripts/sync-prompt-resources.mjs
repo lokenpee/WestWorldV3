@@ -107,6 +107,8 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
 if (changes.hashes.length) writeJson(ownershipPath, ownership)
 
 console.log('提示词资源同步')
+console.log(`  项目目录：${root}`)
+console.log(`  提示词目录：${activePrompts}`)
 console.log(`  哈希更新：${changes.hashes.length}`)
 for (const item of changes.hashes) console.log(`    ${item.path}`)
 console.log(`  请求示例更新：${changes.examples.length}`)

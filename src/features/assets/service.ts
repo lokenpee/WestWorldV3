@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterPairResult, type CharacterRelation, type CharacterRelationEdit, type EventLine, type EventNode, type LegacyRelationRecord, type Lifecycle, type LocationAsset, type RelationEvidence } from './types'
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
@@ -132,7 +133,7 @@ export function createAssetService(workspace: Workspace) {
 
   async function previewMerge<K extends WorldKind>(bookId: string, kind: K, options: MergeOptions): Promise<MergePreview<K>> {
     const db = await database(bookId)
-    return db.transaction('r', db.tables, async () => {
+    return transact(db, 'r', [db.tables], async (db) => {
       const members = await mergeMembers(db, bookId, kind, options)
       const request: MergeRequest = { memberIds: [...options.memberIds], keepId: options.keepId, canonicalName: options.canonicalName.trim(), expectedRevisions: Object.fromEntries(members.map(row => [row.id, row.revision])) }
       return { kind, members, request, ...fuseWorldAssets(kind, members, request.keepId, request.canonicalName) }
@@ -142,7 +143,7 @@ export function createAssetService(workspace: Workspace) {
   async function confirmMerge<K extends WorldKind>(bookId: string, kind: K, request: MergeRequest, mode?: 'mechanical' | MechanicalMergeContext) {
     if (!request?.expectedRevisions || typeof request.expectedRevisions !== 'object' || Array.isArray(request.expectedRevisions)) throw new AssetError('VALIDATION', '请先查看合并预览。')
     const db = await database(bookId)
-    return db.transaction('rw', db.tables, async () => {
+    return transact(db, 'rw', [db.tables], async (db) => {
       const queued = typeof mode === 'object' ? mode : undefined
       const members = await mergeMembers(db, bookId, kind, request, request.expectedRevisions, queued)
       const timestamp = new Date().toISOString()
@@ -262,7 +263,7 @@ export function createAssetService(workspace: Workspace) {
     if (input) validateInput(kind, input)
     const db = await database(bookId)
     const timestamp = new Date().toISOString()
-    return db.transaction('rw', db.tables, async () => {
+    return transact(db, 'rw', [db.tables], async (db) => {
       const leases = await db.table<Lease>('pipelineRuns').toArray()
       const locks = lockState(leases, bookId)
       if (locks[worldKinds.has(kind) ? 'world' : 'narrative']) throw new AssetError('ASSET_DOMAIN_LOCKED', '该类资料正在由处理任务更新，请等待任务结束后编辑。')
@@ -320,7 +321,7 @@ export function createAssetService(workspace: Workspace) {
 
   async function getRelationPair(bookId: string, fromId: string, toId: string): Promise<CharacterPairResult> {
     const db = await database(bookId)
-    return db.transaction('r', db.tables, async () => {
+    return transact(db, 'r', [db.tables], async (db) => {
       const { characters, pairs } = await relationContext(db, bookId, fromId, toId)
       return pairFromPerspective(pairs, fromId, toId, characters)
     })
@@ -328,7 +329,7 @@ export function createAssetService(workspace: Workspace) {
 
   async function mutateRelationPair(bookId: string, input: RelationPairInput, action: 'save' | 'delete'): Promise<PairWriteResult> {
     const db = await database(bookId)
-    return db.transaction('rw', db.tables, async () => {
+    return transact(db, 'rw', [db.tables], async (db) => {
       const leases = await db.table<Lease>('pipelineRuns').where('recordType').equals('lease').toArray()
       if (lockState(leases, bookId).world) throw new AssetError('ASSET_DOMAIN_LOCKED', '世界资产正在处理，请等待任务结束后再保存关系。')
       if (input.operationKey) {
@@ -356,7 +357,7 @@ export function createAssetService(workspace: Workspace) {
 
   async function readContent(bookId: string): Promise<Omit<AssetSnapshot, 'locks'>> {
     const db = await database(bookId)
-    return db.transaction('r', db.tables, async () => {
+    return transact(db, 'r', [db.tables], async (db) => {
       const [storedCharacters, locations, storedNodes, eventLines, lifecycle, relationRows, editRows] = await Promise.all([
         db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<CharacterRelation>('characterRelations').toArray(), db.table<CharacterRelationEdit>('characterRelationEdits').toArray(),
       ])
@@ -399,14 +400,14 @@ export function createAssetService(workspace: Workspace) {
     getRelationPair,
     async listRelationPairs(bookId: string, ownerId: string, offset = 0, limit = 50) {
       const db = await database(bookId)
-      return db.transaction('r', db.tables, async () => {
+      return transact(db, 'r', [db.tables], async (db) => {
         const { characters, pairs } = await relationContext(db, bookId, ownerId, ownerId)
         return paginateCharacterPairs(pairs, characters, ownerId, offset, limit)
       })
     },
     async readLegacyRelations(bookId: string, options: { ids?: string[]; offset?: number; limit?: number } = {}) {
       const db = await database(bookId)
-      return db.transaction('r', db.tables, async () => {
+      return transact(db, 'r', [db.tables], async (db) => {
         const ids = options.ids ? new Set(options.ids) : undefined
         const rows = (await db.table<LegacyRelationRecord>('legacyRelationRecords').toArray()).filter(row => !ids || ids.has(row.id)).sort((a, b) => a.id.localeCompare(b.id))
         const offset = Math.max(0, Math.trunc(options.offset ?? 0) || 0), limit = Math.min(Math.max(1, Math.trunc(options.limit ?? 50) || 50), 50)

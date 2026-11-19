@@ -24,7 +24,7 @@ const navigation: { id: View; label: string }[] = [
   { id: 'assets', label: '资产' }, { id: 'play', label: '游玩' }, { id: 'settings', label: '设置' },
 ]
 
-export default function App({ repository, importer, assets, backups, models, extraction, world, story, acceptanceTools }: { repository: BookRepository; importer: ImportService; assets: AssetService; backups: BackupService; models: ModelService; extraction?: ExtractionService; world?: WorldService; story?: StoryService; acceptanceTools?: ReactNode }) {
+export default function App({ repository, importer, assets, backups, models, extraction, world, story, acceptanceTools, storageTools }: { repository: BookRepository; importer: ImportService; assets: AssetService; backups: BackupService; models: ModelService; extraction?: ExtractionService; world?: WorldService; story?: StoryService; acceptanceTools?: ReactNode; storageTools?: ReactNode }) {
   const [activeView, setActiveView] = useState<View>('assets')
   const [bookId, setBookId] = useState<string | null>(null)
   const [showImport, setShowImport] = useState(false)
@@ -65,7 +65,7 @@ export default function App({ repository, importer, assets, backups, models, ext
           {pendingSelection ? <p role="status">正在打开新导入的书籍…</p> : showImport || books.value.length === 0 ? <ImportPanel hasBooks={books.value.length > 0} importer={importer} onBusyChange={setImportBusy} onImported={book => { setPendingSelection(book.id); setShowImport(false) }} /> : selectedBook ? <BookOverview key={selectedBook.id} book={selectedBook} repository={repository} assets={assets} extraction={extraction} world={world} story={story} assetKind={assetKind} onAssetKindChange={setAssetKind} /> : <p role="status">正在选择书籍…</p>}
         </div></>}
       </>}
-      {activeView === 'settings' && <section className="placeholder-page"><p className="eyebrow">设置</p><h1>模型与存储设置</h1><p className="muted">管理模型连接和本地资料的地方。</p><ModelSettings service={models} /><BackupPanel service={backups} books={books.status === 'ready' ? books.value : []} selectedId={bookId} onExport={book => setBookAction({ kind: 'export', book })} onRestored={book => setPendingSelection(book.id)} /></section>}
+      {activeView === 'settings' && <section className="placeholder-page"><p className="eyebrow">设置</p><h1>模型与存储设置</h1><p className="muted">管理模型连接和本地资料的地方。</p><ModelSettings service={models} diskStorage={!!storageTools} />{storageTools}<BackupPanel service={backups} books={books.status === 'ready' ? books.value : []} selectedId={bookId} onExport={book => setBookAction({ kind: 'export', book })} onRestored={book => setPendingSelection(book.id)} /></section>}
       {activeView === 'play' && <section className="placeholder-page play-placeholder"><p className="eyebrow">游玩 · 预留入口</p><h1>故事尚未启程</h1><p className="muted">这里还没有接入故事引擎。</p><div className="placeholder-card"><h2>{selectedBook ? `当前书籍：${selectedBook.title}` : '尚未选择书籍'}</h2><p>本阶段不提供行动结算或对话，不调用模型，也不生成存档。</p><label htmlFor="player-action">玩家行动</label><textarea id="player-action" rows={3} placeholder="游玩能力尚未开放" disabled /><button className="primary-button" disabled>发送</button></div></section>}
     </main>
   </div>

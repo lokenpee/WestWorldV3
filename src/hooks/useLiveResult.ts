@@ -1,4 +1,4 @@
-import { liveQuery } from 'dexie'
+import { liveQuery } from '../lib/storage/observe'
 import { useEffect, useState } from 'react'
 
 type Result<T> = { status: 'loading' } | { status: 'ready'; value: T } | { status: 'error'; message: string }

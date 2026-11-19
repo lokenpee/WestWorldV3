@@ -3,6 +3,7 @@ param(
     [string]$Action = 'start',
     [ValidateRange(1, 65535)]
     [int]$Port = 5173,
+    [string]$DataDirectory = 'E:\WestWorldV3-data',
     [switch]$NoBrowser
 )
 
@@ -10,6 +11,9 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $vitePath = Join-Path $projectRoot 'node_modules\vite\bin\vite.js'
 $serviceUrl = "http://127.0.0.1:$Port/"
+Write-Host "Project: $projectRoot"
+$DataDirectory = [IO.Path]::GetFullPath($DataDirectory)
+Write-Host "Data: $DataDirectory"
 
 function Get-ProjectService {
     Get-CimInstance Win32_Process -Filter "name = 'node.exe'" | Where-Object {
@@ -25,7 +29,9 @@ function Get-ProjectService {
 function Test-ServiceReady {
     try {
         $response = Invoke-WebRequest -Uri ($serviceUrl + '@vite/client') -UseBasicParsing -TimeoutSec 2
-        return $response.StatusCode -eq 200
+        if ($response.StatusCode -ne 200) { return $false }
+        $storage = Invoke-RestMethod -Uri ($serviceUrl + 'api/storage') -Method Post -ContentType 'application/json' -Body '{"action":"status"}' -TimeoutSec 3
+        return $storage.ok -and [IO.Path]::GetFullPath($storage.result.dataDirectory) -eq $DataDirectory
     } catch { return $false }
 }
 
@@ -62,6 +68,9 @@ try {
         if ($listeners.Port -contains $Port) { throw "Port $Port is occupied by another service. Close that service before starting WestWorldV3." }
         if (!(Test-Path -LiteralPath $vitePath)) { throw 'Dependencies are missing. Run npm install in the project folder first.' }
         $node = (Get-Command node.exe -ErrorAction Stop).Source
+        & $node --no-warnings -e "require('node:sqlite')" 2>$null
+        if ($LASTEXITCODE -ne 0) { throw 'Node.js with node:sqlite is required (tested with Node 24.14.0).' }
+        $env:WESTWORLD_STORAGE_DIR = $DataDirectory
         $logFolder = Join-Path $projectRoot '.vite'
         New-Item -ItemType Directory -Path $logFolder -Force | Out-Null
         $stdout = Join-Path $logFolder "local-service-$Port.stdout.log"

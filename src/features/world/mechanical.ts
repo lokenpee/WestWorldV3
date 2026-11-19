@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import { AssetError, type Character, type LocationAsset } from '../assets/types'
 import type { AssetService } from '../assets/service'
@@ -20,11 +21,10 @@ const freshRun = (bookId: string, counts: Counts): WorldRun => ({ id: crypto.ran
 export function createMechanicalQueue(workspace: Workspace, assets: AssetService, notify: (bookId: string, state: MechanicalState) => void, aiRunning: (bookId: string) => boolean) {
   const active = new Set<string>()
   const dbFor = (bookId: string) => workspace.openBook(bookId)
-  async function latest(bookId: string) {
-    return (await dbFor(bookId).table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).find(run => run.phase === 'mechanical_queue' && run.mechanicalQueue?.current)
+  async function latest(bookId: string, db = dbFor(bookId)) {
+    return (await db.table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray()).find(run => run.phase === 'mechanical_queue' && run.mechanicalQueue?.current)
   }
-  async function available(bookId: string) {
-    const db = dbFor(bookId)
+  async function available(bookId: string, db = dbFor(bookId)) {
     const leases = await db.table('pipelineRuns').where('recordType').equals('lease').toArray()
     if (leases.some(row => ['world', 'extraction'].includes(row.lockKey) && (row.expiresAt === undefined || row.expiresAt > Date.now()))) throw new AssetError('ASSET_DOMAIN_LOCKED', '本书世界资产或提取任务正在运行。')
     if (!coverage(await db.chapters.toArray(), await db.table<Receipt>('extractionReceipts').toArray()).allCovered) throw new AssetError('VALIDATION', '请先完成全书逐章提取。')
@@ -40,8 +40,8 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
   }
   async function read(bookId: string) {
     const db = dbFor(bookId)
-    return db.transaction('r', db.table('pipelineRuns'), async () => {
-      const run = await latest(bookId), lease = await db.table('pipelineRuns').get('lease:world')
+    return transact(db, 'r', [db.table('pipelineRuns')], async (db) => {
+      const run = await latest(bookId, db), lease = await db.table('pipelineRuns').get('lease:world')
       const items = run?.mechanicalQueue?.items ?? []
       return { run, items, pending: items.filter(isPending).length, failed: items.filter(item => item.status === 'failed').length, completed: items.filter(item => item.status === 'completed').length, statisticsPending: run?.mechanicalQueue?.statisticsPending ?? false, running: !!run && run.status === 'running' && lease?.runId === run.id && (lease.expiresAt === undefined || lease.expiresAt > Date.now()) }
     })
@@ -53,11 +53,11 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
       if (request.memberIds.some(id => request.expectedRevisions?.[id] !== preview.request.expectedRevisions[id])) throw new AssetError('CONFLICT', '所选资料已变化，请重新核对后加入队列。')
       const approvalFingerprints = Object.fromEntries(await Promise.all(preview.members.map(async row => [row.id, await coverageFingerprint(kind === 'character' ? 'characters' : 'locations', row as unknown as Row)])))
       const db = dbFor(bookId)
-      return db.transaction('rw', db.tables, async () => {
-        await available(bookId)
+      return transact(db, 'rw', [db.tables], async (db) => {
+        await available(bookId, db)
         const current = await db.table(kind === 'character' ? 'characters' : 'locations').bulkGet(request.memberIds)
         if (current.some((row, index) => !row || row.revision !== preview.request.expectedRevisions[request.memberIds[index]])) throw new AssetError('CONFLICT', '资料在确认时已变化，请重新核对。')
-        let run = await latest(bookId)
+        let run = await latest(bookId, db)
         if (!run || run.mechanicalQueue!.items.every(item => item.status === 'completed') && !run.mechanicalQueue!.statisticsPending && run.mechanicalQueue!.items.length > 0) {
           if (run) await db.table('pipelineRuns').put({ ...run, mechanicalQueue: { ...run.mechanicalQueue!, current: false } })
           const counts = { characters: await db.table('characters').count(), locations: await db.table('locations').count() }
@@ -78,9 +78,9 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
     if (active.has(bookId) || aiRunning(bookId)) throw new AssetError('ASSET_DOMAIN_LOCKED', '本书正在处理，请等待结束。')
     await locked(bookId, async () => {
       const db = dbFor(bookId)
-      await db.transaction('rw', db.tables, async () => {
-        await available(bookId)
-        const run = await latest(bookId)
+      await transact(db, 'rw', [db.tables], async (db) => {
+        await available(bookId, db)
+        const run = await latest(bookId, db)
         if (!run) return
         const queue = run.mechanicalQueue!, item = queue.items.find(row => row.id === itemId)
         if (item?.status === 'completed') throw new AssetError('VALIDATION', '本组已经合并，可在合并记录中查看。')
@@ -92,8 +92,8 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
   }
   async function stop(bookId: string) {
     const db = dbFor(bookId)
-    await db.transaction('rw', db.table('pipelineRuns'), async () => {
-      const run = await latest(bookId)
+    await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
+      const run = await latest(bookId, db)
       if (run?.status === 'running') await db.table('pipelineRuns').put({ ...run, mechanicalQueue: { ...run.mechanicalQueue!, stopRequested: true } })
     })
   }
@@ -104,7 +104,7 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
     const run = await db.table<WorldRun>('pipelineRuns').get(lease.runId)
     if (run?.phase !== 'mechanical_queue' || !run.mechanicalQueue || run.status === 'running' && lease.expiresAt > Date.now()) return
     try {
-      await locked(bookId, () => db.transaction('rw', db.table('pipelineRuns'), async () => {
+      await locked(bookId, () => transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
         const currentLease = await db.table('pipelineRuns').get('lease:world')
         if (currentLease?.owner !== lease.owner || currentLease?.runId !== run.id) return
         const current = (await db.table<WorldRun>('pipelineRuns').get(run.id))!
@@ -122,14 +122,14 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
       const run = await db.table<WorldRun>('pipelineRuns').get(runId), items = run?.mechanicalQueue?.items ?? []
       notify(bookId, { running, phase, processed: items.filter(item => !isPending(item)).length, total: items.length, error: errorMessage, ...(running ? {} : { reportId: runId, reportType: 'code' as const }) })
     }
-    const check = async () => {
-      const lease = await db.table('pipelineRuns').get('lease:world')
+    const check = async (scopeDb = db) => {
+      const lease = await scopeDb.table('pipelineRuns').get('lease:world')
       if (lease?.owner !== owner || lease.runId !== runId) throw new AssetError('ASSET_DOMAIN_LOCKED', '机械合并队列的执行权已变化。')
-      const other = await db.table('pipelineRuns').get('lease:extraction')
+      const other = await scopeDb.table('pipelineRuns').get('lease:extraction')
       if (other && (other.expiresAt === undefined || other.expiresAt > Date.now())) throw new AssetError('ASSET_DOMAIN_LOCKED', '本书提取任务已取得执行权。')
-      await db.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 })
+      await scopeDb.table('pipelineRuns').update('lease:world', { expiresAt: Date.now() + 30000 })
     }
-    const renew = () => db.transaction('rw', db.table('pipelineRuns'), check)
+    const renew = () => transact(db, 'rw', [db.table('pipelineRuns')], (db) => check(db))
     async function statistics() {
       const run = (await db.table<WorldRun>('pipelineRuns').get(runId))!
       if (!run.mechanicalQueue!.statisticsPending) return
@@ -147,8 +147,8 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
       }
       const updates = [...pc.result().map((row, index) => ({ table: 'characters', row, before: people[index] })), ...lc.result().map((row, index) => ({ table: 'locations', row, before: places[index] }))].filter(({ row, before }) => JSON.stringify(row) !== JSON.stringify(before))
       await state(`保存出场统计：${updates.length}条`)
-      await db.transaction('rw', db.table('characters'), db.table('locations'), db.table('pipelineRuns'), async () => {
-        await check()
+      await transact(db, 'rw', [db.table('characters'), db.table('locations'), db.table('pipelineRuns')], async (db) => {
+        await check(db)
         for (const table of ['characters', 'locations']) {
           const selected = updates.filter(row => row.table === table)
           const currentRows = await db.table(table).bulkGet(selected.map(value => value.row.id))
@@ -160,9 +160,9 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
       })
     }
     try {
-      await db.transaction('rw', db.tables, async () => {
-        await available(bookId)
-        const run = await latest(bookId)
+      await transact(db, 'rw', [db.tables], async (db) => {
+        await available(bookId, db)
+        const run = await latest(bookId, db)
         if (!run || !run.mechanicalQueue!.items.some(item => isPending(item) && (!onlyIds || onlyIds.has(item.id))) && !run.mechanicalQueue!.statisticsPending) throw new AssetError('VALIDATION', '请先逐组核对并加入待合并队列。')
         runId = run.id
         const queue = run.mechanicalQueue!, items = queue.items.map(item => item.status === 'running' ? { ...item, status: 'pending' as const } : item)
@@ -197,8 +197,8 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
           preparing.delete(item.id)
           if ('error' in prepared) throw prepared.error
           const request = prepared.request
-          const proceed = await db.transaction('rw', db.table('pipelineRuns'), async () => {
-            await check()
+          const proceed = await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
+            await check(db)
             const current = (await db.table<WorldRun>('pipelineRuns').get(runId))!
             if (current.mechanicalQueue!.stopRequested) return false
             await db.table('pipelineRuns').put({ ...current, mechanicalQueue: { ...current.mechanicalQueue!, items: current.mechanicalQueue!.items.map(row => row.id === item.id ? { ...row, request, status: 'running' } : row) } })
@@ -208,8 +208,8 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
           await assets.confirmMerge(bookId, item.kind, request, { runId, itemId: item.id, owner, automatic: item.confirmation === 'exact_name' && !item.manualSelection })
         } catch (error) {
           if (!(error instanceof AssetError) || !['CONFLICT', 'VALIDATION', 'NOT_FOUND'].includes(error.code)) throw error
-          await db.transaction('rw', db.table('pipelineRuns'), async () => {
-            await check()
+          await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
+            await check(db)
             const current = (await db.table<WorldRun>('pipelineRuns').get(runId))!
             const items = current.mechanicalQueue!.items.map(row => row.id === item.id ? { ...row, status: 'failed' as const, error: error.message } : row)
             await db.table('pipelineRuns').put({ ...current, mechanicalQueue: { ...current.mechanicalQueue!, items }, report: { ...current.report, failed: failures(items) } })
@@ -222,15 +222,15 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
       if (acquired) {
         try { await renew(); await statistics() } catch (error) { errorMessage = error instanceof Error ? error.message : '统计尚未完成，请继续机械合并。' }
         try {
-          await db.transaction('rw', db.table('pipelineRuns'), async () => {
-            await check()
+          await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
+            await check(db)
             const run = (await db.table<WorldRun>('pipelineRuns').get(runId))!, queue = run.mechanicalQueue!
             const status = errorMessage || queue.items.some(isPending) || queue.statisticsPending ? 'paused' : queue.items.some(item => item.status === 'failed') ? 'degraded' : 'completed'
             await db.table('pipelineRuns').put({ ...run, status, finishedAt: new Date().toISOString(), report: { ...run.report, status, failed: [...failures(queue.items), ...(errorMessage ? [errorMessage] : [])] } })
           })
         } catch (error) { errorMessage ??= error instanceof Error ? error.message : '队列状态保存失败。' }
         clearInterval(timer)
-        await db.transaction('rw', db.table('pipelineRuns'), async () => { if ((await db.table('pipelineRuns').get('lease:world'))?.owner === owner) await db.table('pipelineRuns').delete('lease:world') }).catch(() => undefined)
+        await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => { if ((await db.table('pipelineRuns').get('lease:world'))?.owner === owner) await db.table('pipelineRuns').delete('lease:world') }).catch(() => undefined)
         active.delete(bookId)
         try { await state('机械合并已停稳', false) }
         catch { notify(bookId, { running: false, phase: '机械合并已停稳', processed: 0, total: 0, error: errorMessage ?? '队列已停稳，请重新读取进度。', reportId: runId, reportType: 'code' }) }
@@ -245,7 +245,7 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
     if (active.has(bookId) || aiRunning(bookId)) throw new AssetError('ASSET_DOMAIN_LOCKED', '本书正在处理，请等待结束。')
     return locked(bookId, async () => {
       const db = dbFor(bookId)
-      const snapshot = await db.transaction('r', db.table('characters'), db.table('locations'), db.table('pipelineRuns'), async () => ({ characters: await db.table<Character>('characters').toArray(), locations: await db.table<LocationAsset>('locations').toArray(), run: await latest(bookId) }))
+      const snapshot = await transact(db, 'r', [db.table('characters'), db.table('locations'), db.table('pipelineRuns')], async (db) => ({ characters: await db.table<Character>('characters').toArray(), locations: await db.table<LocationAsset>('locations').toArray(), run: await latest(bookId, db) }))
       const byId = new Map<string, Character | LocationAsset>([...snapshot.characters.map(row => [`character:${row.id}`, row] as const), ...snapshot.locations.map(row => [`location:${row.id}`, row] as const)])
       const previous = snapshot.run?.mechanicalQueue?.items ?? []
       const reserved = new Set(previous.filter(item => item.status !== 'completed' && (item.request.memberIds.some(id => !byId.has(`${item.kind}:${id}`)) || new Set(item.request.memberIds.map(id => byId.get(`${item.kind}:${id}`)?.name.trim())).size !== 1)).flatMap(item => item.request.memberIds.map(id => `${item.kind}:${id}`)))
@@ -260,9 +260,9 @@ export function createMechanicalQueue(workspace: Workspace, assets: AssetService
         const keepId = prior?.request.keepId ?? (protectedRows.length === 1 ? protectedRows[0].id : [...members].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))[0].id)
         return { id: prior?.id ?? crypto.randomUUID(), kind: group.kind, request: { memberIds: group.memberIds, keepId, canonicalName: prior?.request.canonicalName ?? members[0].name.trim(), expectedRevisions: Object.fromEntries(members.map(row => [row.id, row.revision])) }, memberNames: members.map(row => row.name), approvalFingerprints: Object.fromEntries(await Promise.all(members.map(async row => [row.id, await coverageFingerprint(group.kind === 'character' ? 'characters' : 'locations', row as unknown as Row)]))), status: 'pending' as const, confirmedAt: new Date().toISOString(), confirmation: 'exact_name' as const, protectionVersion: 1 as const, manualSelection: prior?.confirmation === 'manual' || prior?.manualSelection === true }
       })))
-      if (prepared.length) await db.transaction('rw', db.tables, async () => {
-        await available(bookId)
-        let run = await latest(bookId)
+      if (prepared.length) await transact(db, 'rw', [db.tables], async (db) => {
+        await available(bookId, db)
+        let run = await latest(bookId, db)
         if (run?.id !== snapshot.run?.id || canonical(run?.mechanicalQueue?.items) !== canonical(snapshot.run?.mechanicalQueue?.items)) throw new AssetError('CONFLICT', '待合并队列已更新，请重新点击代码整理。')
         for (const item of prepared) {
           const current = await db.table(item.kind === 'character' ? 'characters' : 'locations').bulkGet(item.request.memberIds)

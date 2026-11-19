@@ -1,4 +1,4 @@
-import Dexie from 'dexie'
+import { transact } from './transaction'
 import { assertPreview, type NovelPreview } from '../../features/import/text'
 import type { Book, createWorkspace } from './workspace'
 import { createImportOwnership } from './importOwnership'
@@ -34,15 +34,15 @@ export function createImportService(workspace: Workspace, environment: Environme
   const timers = new Set<ReturnType<typeof setInterval>>()
   let recovery: Promise<RecoveryReport> | undefined
 
-  async function owned(journal: ImportJournal) {
-    const row = (await settings.appSettings.get(keyOf(journal.operationId)))?.value
+  async function owned(journal: ImportJournal, scopeDb = settings) {
+    const row = (await scopeDb.appSettings.get(keyOf(journal.operationId)))?.value
     if (!isJournal(row) || row.owner !== journal.owner || row.bookId !== journal.bookId || row.action !== journal.action) throw new Error('书籍操作已由其他页面接管，请刷新书架。')
     return row
   }
 
   async function update(journal: ImportJournal, changes: Partial<ImportJournal>) {
-    return settings.transaction('rw', settings.appSettings, async () => {
-      const row = await owned(journal)
+    return transact(settings, 'rw', [settings.appSettings], async (settings) => {
+      const row = await owned(journal, settings)
       const next = { ...row, ...changes, updatedAt: new Date(now()).toISOString() }
       await settings.appSettings.put({ key: keyOf(row.operationId), value: next })
       return next
@@ -57,8 +57,8 @@ export function createImportService(workspace: Workspace, environment: Environme
   }
 
   async function publish(journal: ImportJournal) {
-    return settings.transaction('rw', settings.books, settings.appSettings, async () => {
-      const row = await owned(journal)
+    return transact(settings, 'rw', [settings.books, settings.appSettings], async (settings) => {
+      const row = await owned(journal, settings)
       if (row.state !== 'ready' || !row.book || row.book.id !== row.bookId || row.leaseUntil <= now()) throw new Error('导入尚未准备完成或租约已失效。')
       if (await settings.books.get(row.bookId)) throw new Error('书籍标识已存在，未覆盖原书。')
       const names = new Set((await settings.books.toArray()).map(book => book.title))
@@ -73,22 +73,21 @@ export function createImportService(workspace: Workspace, environment: Environme
   }
 
   async function clean(journal: ImportJournal) {
-    await settings.transaction('rw', settings.books, settings.appSettings, async () => {
-      await owned(journal)
+    await transact(settings, 'rw', [settings.books, settings.appSettings], async (settings) => {
+      await owned(journal, settings)
       if (await settings.books.get(journal.bookId)) throw new Error('已有可用书籍，停止清理并保留资料。')
     })
     await update(journal, { state: 'cleanup_pending' })
     await removeDatabase(journal.bookId)
-    await settings.transaction('rw', settings.appSettings, async () => { await owned(journal); await settings.appSettings.delete(keyOf(journal.operationId)) })
+    await transact(settings, 'rw', [settings.appSettings], async (settings) => { await owned(journal, settings); await settings.appSettings.delete(keyOf(journal.operationId)) })
   }
 
   async function removeDatabase(bookId: string) {
     workspace.closeBook(bookId)
-    const db = new Dexie(workspace.scope.bookPrefix + bookId)
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       await Promise.race([
-        db.delete(),
+        workspace.removeBookDatabase(bookId),
         new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('书库仍被其他页面占用，请关闭该页面后重试恢复。')), 1500) }),
       ])
     } finally { clearTimeout(timer) }
@@ -96,10 +95,10 @@ export function createImportService(workspace: Workspace, environment: Environme
 
   async function verifyReady(journal: ImportJournal) {
     if (!journal.book || journal.book.id !== journal.bookId || !journal.book.title?.trim() || !journal.book.createdAt) throw new Error('待恢复书籍信息不完整。')
-    if (!await Dexie.exists(workspace.scope.bookPrefix + journal.bookId)) throw new Error('待恢复书库不存在。')
+    if (!await workspace.bookExists(journal.bookId)) throw new Error('待恢复书库不存在。')
     const db = workspace.openBook(journal.bookId)
     await db.open()
-    const tables = await db.transaction('r', db.tables, async () => {
+    const tables = await transact(db, 'r', [db.tables], async (db) => {
       const tables = emptyTables()
       for (const name of tableNames) tables[name] = await db.table(name).toArray()
       return tables
@@ -111,7 +110,7 @@ export function createImportService(workspace: Workspace, environment: Environme
   async function importNovel(preview: NovelPreview): Promise<Book> {
     assertPreview(preview)
     return importPrepared((id, timestamp) => ({ id, title: preview.fileName.replace(/\.txt$/i, '').trim() || '未命名小说', sourceFileName: preview.fileName, createdAt: timestamp }), async (db, bookId, timestamp) => {
-      await db.transaction('rw', db.chapters, db.table('chapterTexts'), db.table('compileProgress'), async () => {
+      await transact(db, 'rw', [db.chapters, db.table('chapterTexts'), db.table('compileProgress')], async (db) => {
         await db.chapters.bulkAdd(preview.chapters.map(({ text: _text, ...chapter }) => ({ ...chapter, bookId })))
         await db.table('chapterTexts').bulkAdd(preview.chapters.map(chapter => ({ bookId, chapterIndex: chapter.chapterIndex, text: chapter.text })))
         await db.table('compileProgress').add({ bookId, stage: 'P1', status: 'idle', totalChapters: preview.chapters.length, completedChapters: [], failedChapters: [], updatedAt: timestamp, scope: 'fullBook', planVersion: '2.2', unit: 'chapter', validity: 'current' })
@@ -123,7 +122,7 @@ export function createImportService(workspace: Workspace, environment: Environme
     const bookId = crypto.randomUUID()
     const timestamp = new Date(now()).toISOString()
     const journal: ImportJournal = { operationId: crypto.randomUUID(), action: 'import', bookId, state: 'preparing', owner: crypto.randomUUID(), leaseUntil: now() + 300000, createdAt: timestamp, updatedAt: timestamp }
-    if (await Dexie.exists(workspace.scope.bookPrefix + bookId)) throw new Error('书籍标识已存在，请重试。')
+    if (await workspace.bookExists(bookId)) throw new Error('书籍标识已存在，请重试。')
     await settings.appSettings.add({ key: keyOf(journal.operationId), value: journal })
     const release = hold(journal)
     try {
@@ -148,30 +147,30 @@ export function createImportService(workspace: Workspace, environment: Environme
   }
 
   async function finishDelete(journal: ImportJournal) {
-    await settings.transaction('r', settings.books, settings.appSettings, async () => {
-      await owned(journal)
+    await transact(settings, 'r', [settings.books, settings.appSettings], async (settings) => {
+      await owned(journal, settings)
       if (await settings.books.get(journal.bookId)) throw new Error('书籍仍在书架中，保留资料并停止删除恢复。')
     })
     await removeDatabase(journal.bookId)
-    await settings.transaction('rw', settings.appSettings, async () => { await owned(journal); await settings.appSettings.delete(keyOf(journal.operationId)) })
+    await transact(settings, 'rw', [settings.appSettings], async (settings) => { await owned(journal, settings); await settings.appSettings.delete(keyOf(journal.operationId)) })
   }
 
   async function deleteBook(bookId: string) {
     if (!await settings.books.get(bookId)) throw new Error('书籍不存在，请刷新书架。')
     const timestamp = new Date(now()).toISOString()
     const journal: ImportJournal = { operationId: crypto.randomUUID(), action: 'delete', bookId, state: 'deleting', owner: crypto.randomUUID(), leaseUntil: now() + 300000, createdAt: timestamp, updatedAt: timestamp }
-    const exists = await Dexie.exists(workspace.scope.bookPrefix + bookId)
+    const exists = await workspace.bookExists(bookId)
     const db = exists ? workspace.openBook(bookId) : undefined
     let registered = false
     let release: (() => void) | undefined
     try {
-      if (db) await db.transaction('rw', db.tables, async () => {
+      if (db) await transact(db, 'rw', [db.tables], async (db) => {
         const leases = await db.table('pipelineRuns').toArray()
         const busy = leases.find(row => row.recordType === 'lease' && (typeof row.expiresAt !== 'number' || row.expiresAt > now()))
         if (busy) throw new Error(`本书正在处理（${busy.resource ?? busy.lockKey ?? busy.stage ?? '任务'}），请等待任务结束后删除。`)
         for (const resource of ['extraction', 'world', 'narrative']) await db.table('pipelineRuns').put({ id: `lease:${resource}`, recordType: 'lease', bookId, lockKey: resource, resource, owner: journal.owner, runId: journal.operationId, expiresAt: journal.leaseUntil })
       })
-      await settings.transaction('rw', settings.books, settings.appSettings, async () => {
+      await transact(settings, 'rw', [settings.books, settings.appSettings], async (settings) => {
         if (!await settings.books.get(bookId)) throw new Error('书籍已由其他页面删除。')
         await settings.appSettings.add({ key: keyOf(journal.operationId), value: journal })
         await settings.books.delete(bookId)
@@ -184,7 +183,7 @@ export function createImportService(workspace: Workspace, environment: Environme
         await update(journal, { error: messageOf(error), leaseUntil: 0 }).catch(() => undefined)
         throw new Error(`删除待完成：${messageOf(error)} 请重试书籍恢复。`)
       }
-      if (db?.isOpen()) await db.transaction('rw', db.table('pipelineRuns'), async () => {
+      if (db?.isOpen()) await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
         for (const row of await db.table('pipelineRuns').toArray()) if (row.recordType === 'lease' && row.owner === journal.owner) await db.table('pipelineRuns').delete(row.id)
       })
       throw error
@@ -199,7 +198,7 @@ export function createImportService(workspace: Workspace, environment: Environme
       const old = entry.value
       if (old.leaseUntil > now() || await isAlive(old.owner)) { report.pending += 1; continue }
       const owner = crypto.randomUUID()
-      const journal = await settings.transaction('rw', settings.appSettings, async () => {
+      const journal = await transact(settings, 'rw', [settings.appSettings], async (settings) => {
         const current = (await settings.appSettings.get(entry.key))?.value
         if (!isJournal(current) || current.owner !== old.owner || current.leaseUntil !== old.leaseUntil || current.leaseUntil > now()) return undefined
         const next = { ...current, owner, leaseUntil: now() + 300000 }
@@ -232,7 +231,7 @@ export function createImportService(workspace: Workspace, environment: Environme
         const tables = await prepare(bookId)
         const errors = await validateBookData({ book: { ...book, id: bookId }, tables })
         if (errors.length) throw new Error(`恢复校验失败：${errors[0].path} ${errors[0].message}`)
-        await db.transaction('rw', db.tables, async () => { for (const name of tableNames) await db.table(name).bulkAdd(tables[name]) })
+        await transact(db, 'rw', [db.tables], async (db) => { for (const name of tableNames) await db.table(name).bulkAdd(tables[name]) })
       })
     },
     deleteBook,

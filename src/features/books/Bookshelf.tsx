@@ -38,7 +38,7 @@ export function Bookshelf({ books, repository, selectedId, onSelect, onImport, b
 }) {
   return (
     <aside className="bookshelf" aria-label="资产书架">
-      <div className="shelf-heading"><h2>资产书架 <span>{books.length}</span></h2><p>你的小说，保存在这个浏览器</p></div>
+      <div className="shelf-heading"><h2>资产书架 <span>{books.length}</span></h2><p>你的小说与整理成果</p></div>
       <button disabled={busy} className="primary-button import-button" onClick={onImport}><span aria-hidden="true">＋ </span>导入小说</button>
       <div className="book-list">
         {books.length === 0 ? <div className="shelf-empty"><span aria-hidden="true">▤</span><p>还没有资产</p><small>导入小说后会出现在这里。</small></div> : books.map(book => <BookCard key={book.id} book={book} repository={repository} selected={book.id === selectedId} onSelect={onSelect} busy={busy} backups={backups} onExport={onExport} onDelete={onDelete} />)}

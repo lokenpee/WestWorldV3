@@ -302,6 +302,7 @@ export class TraceSession {
 
   private async prepare(inputRows: Row[]): Promise<Row[]> {
     const rows = inputRows.map(row => this.markFailedRefs(row))
+    if (this.repo.storage === 'disk') return rows
     const estimate = this.options.estimate ? await this.options.estimate() : typeof navigator !== 'undefined' && navigator.storage?.estimate ? await navigator.storage.estimate().then(value => value.quota ? { usage: value.usage ?? 0, quota: value.quota } : undefined).catch(() => undefined) : undefined
     if (!estimate) return rows
     const free = estimate.quota - estimate.usage
@@ -446,6 +447,13 @@ export async function readOrganizationRequests(workspace: ReturnType<typeof crea
   if (!run?.organization || !organization) return { requests: [], snapshots: new Map(), total: 0, hasEarlier: false }
   const mode = (organization.mode ?? 'full') as OrganizationMode
   const scope: 'fullBook' | 'character' = run.scope === 'character' ? 'character' : 'fullBook'
+  if (workspace.disk) {
+    if (scope === 'character' && (mode === 'profile' ? query.step !== 'profiles' : query.step !== 'relations')) return { requests: [], snapshots: new Map(), total: 0, hasEarlier: false }
+    const page = await workspace.disk<{ rows: Row[]; total: number; hasEarlier: boolean }>({ action: 'tracePage', scope: `book:${bookId}`, options: { runId: query.runId, ...(scope === 'character' ? {} : { unitId: query.objectKey }), before: query.before, limit: query.limit } })
+    const snapshots = await diskTraceSnapshots(db, page.rows)
+    const first = page.rows[0]
+    return { requests: page.rows, snapshots, total: page.total, hasEarlier: page.hasEarlier, ...(first ? { nextBefore: { startedAt: text(first.startedAt), requestId: traceRequestId(first) } } : {}) }
+  }
   const rows = (await db.table('storySessionEntries').toArray()).filter(row => row.type === 'request_trace' && row.runId === query.runId)
   const selected = rows.filter(row => {
     const unit = traceUnit(row)
@@ -498,6 +506,12 @@ export async function readExecutionChain(workspace: ReturnType<typeof createWork
 
 export async function readBookTrace(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId?: string, options: { limit?: number; offset?: number } = {}) {
   const db = workspace.openBook(bookId)
+  if (workspace.disk) {
+    const page = await workspace.disk<{ rows: Row[]; total: number }>({ action: 'tracePage', scope: `book:${bookId}`, options: { ...options, runId } })
+    const snapshots = await diskTraceSnapshots(db, page.rows)
+    const leases = await db.table('pipelineRuns').where('recordType').equals('lease').toArray()
+    return { requests: page.rows, snapshots, total: page.total, leaseActive: leases.some(row => (!runId || row.runId === runId) && Number(row.expiresAt ?? 0) > Date.now()), warning: '' }
+  }
   const rows = (await db.table('storySessionEntries').toArray()).filter(row => row.bookId === bookId && typeof row.type === 'string' && observationTypes.has(row.type))
   const requests = rows.filter(row => row.type === 'request_trace' && typeof row.requestId === 'string' && (!runId || row.runId === runId)).sort((a, b) => String(a.startedAt).localeCompare(String(b.startedAt)))
   const limit = Math.max(1, options.limit ?? 50), offset = Math.max(0, options.offset ?? 0)
@@ -510,4 +524,14 @@ export async function readBookTrace(workspace: ReturnType<typeof createWorkspace
   const snapshots = new Map(rows.filter(row => row.type !== 'request_trace' && referenced.has(String(row.snapshotId ?? row.id))).map(row => [String(row.snapshotId ?? row.id), row]))
   const leases = (await db.table('pipelineRuns').where('recordType').equals('lease').toArray()).filter(row => row.bookId === bookId && (!runId || row.runId === runId))
   return { requests: page, snapshots, total: requests.length, leaseActive: leases.some(row => Number(row.expiresAt ?? 0) > Date.now()), warning: '' }
+}
+
+async function diskTraceSnapshots(db: ReturnType<ReturnType<typeof createWorkspace>['openBook']>, requests: Row[]) {
+  const ids = new Set<string>()
+  for (const row of requests) {
+    const input = (row.input ?? {}) as Row
+    for (const field of ['systemPromptSnapshotId', 'businessPromptSnapshotId', 'toolSchemaSnapshotId']) if (typeof input[field] === 'string') ids.add(input[field] as string)
+  }
+  const rows = await db.table('storySessionEntries').bulkGet([...ids])
+  return new Map(rows.filter((row): row is Row => !!row).map(row => [String(row.snapshotId ?? row.id), row]))
 }

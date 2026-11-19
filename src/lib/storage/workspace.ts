@@ -1,4 +1,6 @@
+import { transact } from './transaction'
 import Dexie, { type Table } from 'dexie'
+import { remoteDatabase, type StorageCall } from '../../features/local-storage/client'
 import { migrateCharacterRelations, migrateNodeBindings } from '../../features/assets/migrate'
 import type { Character, CharacterRelationEdit, EventNode, LegacyRelationRecord, Lifecycle } from '../../features/assets/types'
 import { dexieMergeStore } from '../../features/assets/mergeCore'
@@ -164,15 +166,17 @@ class BookDatabase extends Dexie {
   }
 }
 
-export function createWorkspace(scope: DatabaseScope = MAIN_SCOPE) {
-  const settings = new SettingsDatabase(scope.settingsName)
+export function createWorkspace(scope: DatabaseScope = MAIN_SCOPE, disk?: StorageCall) {
+  const settings = disk ? remoteDatabase<SettingsDatabase>(disk, 'settings', scope.settingsName) : new SettingsDatabase(scope.settingsName)
+  // FileSystemDirectoryHandle is a browser permission object, not serializable book data.
+  const browserPermissions = disk ? new SettingsDatabase(`${scope.settingsName}-permissions`) : settings
   const bookDatabases = new Map<string, BookDatabase>()
 
   function openBook(bookId: string) {
     if (!bookId) throw new Error('缺少书籍标识')
     let db = bookDatabases.get(bookId)
     if (!db) {
-      db = new BookDatabase(`${scope.bookPrefix}${bookId}`, bookId)
+      db = disk ? remoteDatabase<BookDatabase>(disk, `book:${bookId}`, `${scope.bookPrefix}${bookId}`) : new BookDatabase(`${scope.bookPrefix}${bookId}`, bookId)
       bookDatabases.set(bookId, db)
     }
     return db
@@ -190,7 +194,7 @@ export function createWorkspace(scope: DatabaseScope = MAIN_SCOPE) {
     const db = openBook(bookId)
     await db.open()
     const names = ['chapters', 'characters', 'locations', 'nodes', 'eventLines'] as const
-    return db.transaction('r', names.map(name => db.table(name)), async () => {
+    return transact(db, 'r', [names.map(name => db.table(name))], async (db) => {
       const [chapters, characters, locations, nodes, eventLines] = await Promise.all(names.map(name => db.table(name).count()))
       return {
         bookId,
@@ -201,7 +205,13 @@ export function createWorkspace(scope: DatabaseScope = MAIN_SCOPE) {
   }
 
   return {
-    scope, settings, openBook, listBooks, getBookSummary,
+    scope, settings, browserPermissions, openBook, listBooks, getBookSummary, disk,
+    async bookExists(bookId: string) { return disk ? disk<boolean>({ action: 'exists', scope: `book:${bookId}` }) : Dexie.exists(scope.bookPrefix + bookId) },
+    async removeBookDatabase(bookId: string) {
+      if (!disk) { await new Dexie(scope.bookPrefix + bookId).delete(); return }
+      const db = openBook(bookId)
+      await transact(db, 'rw', [db.tables], async db => { for (const table of db.tables) await table.clear() })
+    },
     async listChapters(bookId: string) {
       if (!await settings.books.get(bookId)) throw new Error('书籍不存在，请重新选择。')
       const db = openBook(bookId)
@@ -221,6 +231,7 @@ export function createWorkspace(scope: DatabaseScope = MAIN_SCOPE) {
       for (const db of bookDatabases.values()) db.close()
       bookDatabases.clear()
       settings.close()
+      if (browserPermissions !== settings) browserPermissions.close()
     },
   }
 }

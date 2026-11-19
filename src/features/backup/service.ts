@@ -1,4 +1,4 @@
-import Dexie from 'dexie'
+import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import type { ImportService } from '../../lib/storage/importService'
 import { emptyTables, tableNames } from './data'
@@ -10,9 +10,9 @@ export function createBackupService(workspace: ReturnType<typeof createWorkspace
   async function exportBook(bookId: string) {
     const book = await workspace.settings.books.get(bookId)
     if (!book) throw new Error('书籍不存在，请刷新书架。')
-    if (!await Dexie.exists(workspace.scope.bookPrefix + bookId)) throw new Error('本书数据库缺失，无法导出。')
+    if (!await workspace.bookExists(bookId)) throw new Error('本书数据库缺失，无法导出。')
     const db = workspace.openBook(bookId)
-    const tables = await withTraceBarrier(async () => db.transaction('r', db.tables, async () => {
+    const tables = await withTraceBarrier(async () => transact(db, 'r', [db.tables], async (db) => {
       const snapshot = emptyTables()
       for (const name of tableNames) snapshot[name] = await db.table(name).toArray()
       return snapshot
@@ -29,11 +29,12 @@ export function createBackupService(workspace: ReturnType<typeof createWorkspace
     },
     async deletionBlockers(bookId: string): Promise<string[]> {
       if (!await workspace.settings.books.get(bookId)) return ['书籍已删除']
-      if (!await Dexie.exists(workspace.scope.bookPrefix + bookId)) return []
+      if (!await workspace.bookExists(bookId)) return []
       return (await workspace.openBook(bookId).table('pipelineRuns').toArray()).filter(row => row.recordType === 'lease' && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now())).map(row => String(row.resource ?? row.lockKey ?? row.stage ?? '任务'))
     },
     async deleteBook(bookId: string) { await importer.deleteBook(bookId); clearCharacterNetworkCache(bookId) },
     settings: workspace.settings,
+    directorySettings: workspace.browserPermissions,
   }
 }
 export type BackupService = ReturnType<typeof createBackupService>

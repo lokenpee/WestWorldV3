@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import { defaultConfig, modelApis, ModelError, type ModelConfig, type ModelSettings } from './types'
 
@@ -21,18 +22,21 @@ export function validateConfig(input: ModelConfig, requireModels = true): ModelC
 export function createModelConfigStore(workspace: Workspace) {
   const { settings } = workspace
   const credentials = settings.table<Credential>('credentials')
+  async function readFrom(settings: Workspace['settings']): Promise<ModelSettings> {
+    const stored = (await settings.appSettings.get(configKey))?.value
+    const config = validateConfig({ ...defaultConfig, ...(stored && typeof stored === 'object' ? stored : {}) }, false)
+    return { config, configured: !!(await settings.table<Credential>('credentials').get(config.providerId))?.key.trim() }
+  }
   async function read(): Promise<ModelSettings> {
-    return settings.transaction('r', settings.appSettings, credentials, async () => {
-      const stored = (await settings.appSettings.get(configKey))?.value
-      const config = validateConfig({ ...defaultConfig, ...(stored && typeof stored === 'object' ? stored : {}) }, false)
-      return { config, configured: !!(await credentials.get(config.providerId))?.key.trim() }
+    return transact(settings, 'r', [settings.appSettings, credentials], async (settings) => {
+      return readFrom(settings)
     })
   }
   async function persist(input: ModelConfig, apiKey: string, requireModels: boolean) {
     const config = validateConfig(input, requireModels)
-    await settings.transaction('rw', settings.appSettings, credentials, async () => {
+    await transact(settings, 'rw', [settings.appSettings, credentials], async (settings) => {
       await settings.appSettings.put({ key: configKey, value: config })
-      if (apiKey.trim()) await credentials.put({ providerId: config.providerId, type: 'api_key', key: apiKey.trim() })
+      if (apiKey.trim()) await settings.table<Credential>('credentials').put({ providerId: config.providerId, type: 'api_key', key: apiKey.trim() })
     })
     return read()
   }
@@ -43,9 +47,9 @@ export function createModelConfigStore(workspace: Workspace) {
     async isCredentialConfigured(providerId: string) { return !!(await credentials.get(providerId.trim().toLowerCase()))?.key.trim() },
     async clearCredential(providerId: string) { await credentials.delete(providerId); return read() },
     async load() {
-      return settings.transaction('r', settings.appSettings, credentials, async () => {
-        const state = await read()
-        const credential = await credentials.get(state.config.providerId)
+      return transact(settings, 'r', [settings.appSettings, credentials], async (settings) => {
+        const state = await readFrom(settings)
+        const credential = await settings.table<Credential>('credentials').get(state.config.providerId)
         return { ...state, apiKey: credential?.key.trim() ?? '' }
       })
     },

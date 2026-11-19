@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import { createFrequencyCounter } from '../assets/derive'
 import type { Character, LocationAsset } from '../assets/types'
@@ -44,7 +45,7 @@ export async function updateCharacterTiers(workspace: ReturnType<typeof createWo
   const guard = { lockKey: 'world', owner: scope.owner, runId: scope.runId }
   let acquired = false, heartbeat: ReturnType<typeof createLeaseHeartbeat> | undefined
   try {
-    await db.transaction('rw', db.table('pipelineRuns'), async () => {
+    await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
       const leases = await db.table('pipelineRuns').toArray()
       if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务，请等待完成后再进行人物自动分层。')
       controller.signal.throwIfAborted()
@@ -62,7 +63,7 @@ export async function updateCharacterTiers(workspace: ReturnType<typeof createWo
     return plan.summary
   } finally {
     heartbeat?.close()
-    if (acquired) await db.transaction('rw', db.table('pipelineRuns'), async () => {
+    if (acquired) await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
       const lease = await db.table('pipelineRuns').get('lease:world')
       if (lease?.owner === scope.owner && lease.runId === scope.runId) await db.table('pipelineRuns').delete('lease:world')
     })

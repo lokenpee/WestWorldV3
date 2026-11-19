@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import { records, strings, text } from '../agents/contracts'
 import type { Row } from '../agents/repository'
@@ -32,7 +33,7 @@ export async function readIdentityCandidates(workspace: Workspace, bookId: strin
 export async function dismissIdentityCandidate(workspace: Workspace, bookId: string, candidate: Candidate) {
   if (!candidate.ai) return
   const db = workspace.openBook(bookId)
-  await db.transaction('rw', db.table('pipelineRuns'), async () => {
+  await transact(db, 'rw', [db.table('pipelineRuns')], async (db) => {
     const runs = await db.table('pipelineRuns').toArray()
     if (runs.some(row => row.recordType === 'lease' && Number(row.expiresAt ?? 0) > Date.now())) throw new Error('本书正在处理，请结束后再确认候选。')
     const run = runs.find(row => row.id === candidate.ai!.runId)

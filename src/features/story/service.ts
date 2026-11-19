@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import Dexie from 'dexie'
 import type { Chapter, createWorkspace } from '../../lib/storage/workspace'
 import type { EventNode } from '../assets/types'
@@ -33,13 +34,13 @@ export function createWindowStoryService(workspace: Workspace, models: Pick<Mode
     let heartbeatFailure = ''
     let chapters: Chapter[] = [], windows: StoryWindow[] = [], activeWindow: StoryWindow | undefined
     set(bookId, { running: true, phase, window: 0, total: 0, processed: 0, nodeTotal: 0, error: undefined, message: undefined, sessionStatus: undefined })
-    const check = async () => {
+    const check = async (scopeDb = db) => {
       controller.signal.throwIfAborted()
-      const lease = await db.table('pipelineRuns').get('lease:narrative')
-      const session = await db.table('storySessions').get(sessionId)
+      const lease = await scopeDb.table('pipelineRuns').get('lease:narrative')
+      const session = await scopeDb.table('storySessions').get(sessionId)
       if (lease?.owner !== owner || lease.runId !== runId || lease.expiresAt <= Date.now() || session?.leaseOwner !== owner || session.leaseUntil <= Date.now()) throw new Error('本书叙事任务的执行权已失效。')
     }
-    const nodesFor = async (window: StoryWindow) => windowNodes(window, chapters, await db.table<EventNode>('nodes').toArray())
+    const nodesFor = async (window: StoryWindow, scopeDb = db) => windowNodes(window, chapters, await scopeDb.table<EventNode>('nodes').toArray())
     try {
       const [{ createAgentRuntime }, { records, text }, { resolveSession }] = await Promise.all([import('../agents/runtime'), import('../agents/contracts'), import('../agents/sessions')])
       if (!await workspace.settings.books.get(bookId)) throw new Error('书籍不存在。')
@@ -85,22 +86,22 @@ export function createWindowStoryService(workspace: Workspace, models: Pick<Mode
       await repo.transaction(true, store => recoverStoryCoverage(store, runId))
       if (phase === 'global_review') {
         const completed = await runGlobalReview(repo, runtime, { runId, sessionId, owner, signal: controller.signal, check, contextWindow: settings.config.aggregationContextWindow, onProgress: (processed, nodeTotal, queue) => set(bookId, { processed, nodeTotal, queue }) })
-        if (completed) await db.transaction('rw', db.tables, async () => {
-          await check()
+        if (completed) await transact(db, 'rw', [db.tables], async (db) => {
+          await check(db)
           for (const window of windows) {
             const id = checkpointId(sessionId, planKey, window)
             const checkpoint = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(id)
-            const nodes = await nodesFor(window)
+            const nodes = await nodesFor(window, db)
             if (checkpoint) await db.table('storyEditorCheckpoints').put({ ...checkpoint, scopeIds: nodes.map(row => row.id), sourceFingerprint: await Dexie.waitFor(windowFingerprint(window, nodes)), memberships: membershipsOf(nodes), updatedAt: new Date().toISOString() })
           }
         })
         set(bookId, { message: completed ? '全书复核完成。' : '本轮复核已保存，剩余项可继续。' })
         return
       }
-      const saveCheckpoint = async (window: StoryWindow, status: StoryCheckpoint['status']) => {
-        const nodes = await nodesFor(window)
+      const saveCheckpoint = async (window: StoryWindow, status: StoryCheckpoint['status'], scopeDb = db) => {
+        const nodes = await nodesFor(window, scopeDb)
         const sourceFingerprint = await Dexie.waitFor(windowFingerprint(window, nodes))
-        await db.table('storyEditorCheckpoints').put({ id: checkpointId(sessionId, planKey, window), bookId, sessionId, stage: 'P3', phase: 'window_link', scopeIds: nodes.map(row => row.id), sourceFingerprint, status, memberships: membershipsOf(nodes), updatedAt: new Date().toISOString(), window: { start: window.start, end: window.end } } satisfies StoryCheckpoint)
+        await scopeDb.table('storyEditorCheckpoints').put({ id: checkpointId(sessionId, planKey, window), bookId, sessionId, stage: 'P3', phase: 'window_link', scopeIds: nodes.map(row => row.id), sourceFingerprint, status, memberships: membershipsOf(nodes), updatedAt: new Date().toISOString(), window: { start: window.start, end: window.end } } satisfies StoryCheckpoint)
       }
       const windowCoverage = async (window: StoryWindow) => repo.transaction(false, async store => {
         const current = windowNodes(window, chapters, await store.rows('nodes') as unknown as EventNode[])
@@ -152,14 +153,14 @@ export function createWindowStoryService(workspace: Workspace, models: Pick<Mode
           })
         }
         if (complete) completedWindows++
-        await db.transaction('rw', db.tables, async () => { await check(); await saveCheckpoint(window, complete ? 'completed' : 'failed'); await db.table('compileProgress').update('P3', { lastWindowIndex: windowIndex, updatedAt: new Date().toISOString() }) })
+        await transact(db, 'rw', [db.tables], async (db) => { await check(db); await saveCheckpoint(window, complete ? 'completed' : 'failed', db); await db.table('compileProgress').update('P3', { lastWindowIndex: windowIndex, updatedAt: new Date().toISOString() }) })
       }
-      await db.transaction('rw', db.tables, async () => {
-        await check()
+      await transact(db, 'rw', [db.tables], async (db) => {
+        await check(db)
         const pendingWindows: string[] = []
         for (const window of windows) {
           const checkpoint = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(checkpointId(sessionId, planKey, window))
-          const nodes = await nodesFor(window)
+          const nodes = await nodesFor(window, db)
           if (checkpoint?.status !== 'completed' || ![await Dexie.waitFor(windowFingerprint(window, nodes)), await Dexie.waitFor(hash({ window, nodes }))].includes(checkpoint.sourceFingerprint)) pendingWindows.push(windowKey(window))
         }
         completedWindows = windows.length - pendingWindows.length
@@ -174,16 +175,16 @@ export function createWindowStoryService(workspace: Workspace, models: Pick<Mode
       if (!heartbeatFailure && /执行权|租约|会话/.test(detail) && !cancelled.has(bookId)) heartbeatFailure = detail
       const message = heartbeatFailure ? `整理已暂停：${heartbeatFailure}` : cancelled.has(bookId) ? '整理已取消，已提交的资料和依据保留。' : detail
       set(bookId, { error: message })
-      if (acquired) await db.transaction('rw', db.tables, async () => {
+      if (acquired) await transact(db, 'rw', [db.tables], async (db) => {
         if ((await db.table('pipelineRuns').get('lease:narrative'))?.owner !== owner) return
         const status = cancelled.has(bookId) ? 'cancelled' : 'paused'
-        if (activeWindow) { const previous = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(checkpointId(sessionId, planKey, activeWindow)); if (previous?.status !== 'completed') await db.table('storyEditorCheckpoints').put({ id: checkpointId(sessionId, planKey, activeWindow), bookId, sessionId, stage: 'P3', phase: 'window_link', scopeIds: (await nodesFor(activeWindow)).map(row => row.id), sourceFingerprint: '', status: status === 'cancelled' ? 'cancelled' : 'failed', memberships: membershipsOf(await nodesFor(activeWindow)), updatedAt: new Date().toISOString(), window: { start: activeWindow.start, end: activeWindow.end } } satisfies StoryCheckpoint) }
+        if (activeWindow) { const previous = await db.table<StoryCheckpoint>('storyEditorCheckpoints').get(checkpointId(sessionId, planKey, activeWindow)); if (previous?.status !== 'completed') await db.table('storyEditorCheckpoints').put({ id: checkpointId(sessionId, planKey, activeWindow), bookId, sessionId, stage: 'P3', phase: 'window_link', scopeIds: (await nodesFor(activeWindow, db)).map(row => row.id), sourceFingerprint: '', status: status === 'cancelled' ? 'cancelled' : 'failed', memberships: membershipsOf(await nodesFor(activeWindow, db)), updatedAt: new Date().toISOString(), window: { start: activeWindow.start, end: activeWindow.end } } satisfies StoryCheckpoint) }
         await db.table('compileProgress').update('P3', { status, phase, validity: 'stale', updatedAt: new Date().toISOString() })
         await db.table('pipelineRuns').update(runId, { status, phase, finishedAt: new Date().toISOString() })
       }).catch(() => set(bookId, { error: `${message} 进度保存失败，请检查本地存储。` }))
     } finally {
       clearInterval(timer)
-      if (acquired) await db.transaction('rw', db.table('pipelineRuns'), db.table('storySessions'), async () => {
+      if (acquired) await transact(db, 'rw', [db.table('pipelineRuns'), db.table('storySessions')], async (db) => {
         if ((await db.table('pipelineRuns').get('lease:narrative'))?.owner === owner) await db.table('pipelineRuns').delete('lease:narrative')
         const session = await db.table('storySessions').get(sessionId)
         if (session?.leaseOwner === owner) { const { leaseOwner: _owner, leaseUntil: _until, ...saved } = session; await db.table('storySessions').put(saved) }

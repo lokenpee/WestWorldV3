@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import Dexie from 'dexie'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import type { ModelService } from '../models/service'
@@ -28,7 +29,7 @@ export async function optimizeAsset(workspace: Workspace, models: Pick<ModelServ
     if (Date.now() - started >= 180000) throw new ModelError('budget', '本项整编已收尾，已保存的稿件可继续复核。')
   }
   async function save(draft?: OptimizationDraft, usage?: UsageSummary, error?: string, apply = false) {
-    await db.transaction('rw', db.tables, async () => {
+    await transact(db, 'rw', [db.tables], async (db) => {
       await lease()
       const run = (await db.table<WorldRun>('pipelineRuns').get(runId))!, report = run.report
       const total = usage ? { input: report.usage.input + usage.input, output: report.usage.output + usage.output, totalTokens: report.usage.totalTokens + usage.totalTokens, cost: report.usage.cost + (usage.cost ?? 0), costStatus: report.usage.costStatus === 'unknown' || usage.costStatus === 'unknown' ? 'unknown' as const : 'estimated' as const } : report.usage

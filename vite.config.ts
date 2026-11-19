@@ -1,9 +1,10 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import { localStoragePlugin } from './src/features/local-storage/vitePlugin.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), localStoragePlugin()],
   optimizeDeps: {
     include: [
       '@earendil-works/pi-ai/models',

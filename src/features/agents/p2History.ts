@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import type { WorldRun } from '../world/types'
 import type { Row } from './repository'
@@ -29,7 +30,7 @@ export function currentCharacter(runs: WorldRun[], step?: 'profiles' | 'relation
 /** 只替换已落库的新完成记录对应的旧详情；业务报告、回执、P3及续跑会话保留。 */
 export async function pruneOrganizationHistory(workspace: ReturnType<typeof createWorkspace>, bookId: string) {
   const db = workspace.openBook(bookId)
-  return withTraceBarrier(async () => db.transaction('rw', db.table('pipelineRuns'), db.table('storySessionEntries'), db.table('storySessions'), async () => {
+  return withTraceBarrier(async () => transact(db, 'rw', [db.table('pipelineRuns'), db.table('storySessionEntries'), db.table('storySessions')], async (db) => {
     const runs = (await db.table<WorldRun>('pipelineRuns').where('stage').equals('P2').toArray())
       .filter(run => run.workflow === 'character_organization_v1' && run.organization)
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))

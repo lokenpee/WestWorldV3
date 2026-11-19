@@ -1,3 +1,4 @@
+import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
 import type { Character, LocationAsset } from '../assets/types'
 import { records, text } from '../agents/contracts'
@@ -6,7 +7,7 @@ import type { MechanicalQueue, ProtectionRepair, WorldRun } from './types'
 
 export async function repairAutomaticProtection(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string, owner: string) {
   const db = workspace.openBook(bookId)
-  const snapshot = await db.transaction('r', db.table('pipelineRuns'), db.table('characters'), db.table('locations'), db.table('assetLifecycle'), async () => ({
+  const snapshot = await transact(db, 'r', [db.table('pipelineRuns'), db.table('characters'), db.table('locations'), db.table('assetLifecycle')], async (db) => ({
     runs: await db.table('pipelineRuns').where('stage').anyOf(['P2', 'manual_merge']).toArray(),
     characters: await db.table<Character>('characters').toArray(), locations: await db.table<LocationAsset>('locations').toArray(),
     lifecycle: await db.table('assetLifecycle').toArray(),
@@ -36,7 +37,7 @@ export async function repairAutomaticProtection(workspace: ReturnType<typeof cre
     changes.push({ row, kind })
   }
   if (!changes.length) return []
-  return db.transaction('rw', db.table('pipelineRuns'), db.table('characters'), db.table('locations'), async () => {
+  return transact(db, 'rw', [db.table('pipelineRuns'), db.table('characters'), db.table('locations')], async (db) => {
     const lease = await db.table('pipelineRuns').get('lease:world')
     if (lease?.owner !== owner || lease.runId !== runId || lease.expiresAt <= Date.now()) throw new Error('合并保护修复前执行权已变化。')
     const repaired: ProtectionRepair[] = []

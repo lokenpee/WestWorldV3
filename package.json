@@ -1,7 +1,7 @@
 {
   "name": "westworldv3",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:unit": "vitest run --exclude \"tests/live-*.test.ts\"",
+    "test:disk": "vitest run --config vitest.disk.config.ts",
+    "test:storage-browser": "playwright test --config playwright.storage.config.ts",
     "test:watch": "vitest",
     "test:browser": "playwright test && playwright test --config playwright.workspace.config.ts",
     "test:workspace": "playwright test --config playwright.workspace.config.ts",
