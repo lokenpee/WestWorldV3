@@ -8,7 +8,7 @@ export function ImportRecovery({ importer }: { importer: ImportService }) {
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(true)
   const query = useCallback(() => importer.pendingOperationsCount(), [importer])
-  const pending = useLiveResult(query)
+  const pending = useLiveResult(query, 0, [{ scope: 'settings', tables: ['appSettings'] }])
   const pendingCount = pending.status === 'ready' ? pending.value : 0
   useEffect(() => {
     let active = true

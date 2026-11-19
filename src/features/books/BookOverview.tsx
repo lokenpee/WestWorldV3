@@ -3,7 +3,7 @@ import type { StoryService } from '../story/service'
 import { WorldPanel } from '../world/WorldPanel'
 import type { WorldService } from '../world/service'
 import { useCallback, useEffect, useState } from 'react'
-import { useLiveResult } from '../../hooks/useLiveResult'
+import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import type { Book, BookRepository } from '../../lib/storage/workspace'
 import { formatImportDate } from './formatImportDate'
 import { ChapterBrowser } from './ChapterBrowser'
@@ -33,7 +33,7 @@ export function BookOverview({ book, repository, assets, extraction, world, stor
     return () => { for (const unsubscribe of unsubscribers) unsubscribe() }
   }, [world, story, extraction, book.id])
   const query = useCallback(() => repository.getBookSummary(book.id), [repository, book.id])
-  const summary = useLiveResult(query, attempt)
+  const summary = useLiveResult(query, attempt, bookInterests(book.id, ['chapters', 'characters', 'locations', 'nodes', 'eventLines']))
   const metrics = [['characters', '人物'], ['locations', '地点'], ['nodes', '事件节点'], ['eventLines', '事件线']] as const
   return (
     <section className="book-overview" aria-label="当前书籍概览">

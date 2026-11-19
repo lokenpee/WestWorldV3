@@ -44,7 +44,7 @@ function CallFeedback({ operation, mode, onCancel }: { operation: Operation; mod
 export function ModelSettings({ service, diskStorage = false }: { service: ModelService; diskStorage?: boolean }) {
   const [attempt, setAttempt] = useState(0)
   const query = useCallback(() => service.settings.read(), [service])
-  const stored = useLiveResult(query, attempt)
+  const stored = useLiveResult(query, attempt, [{ scope: 'settings', tables: ['appSettings', 'credentials'] }])
   const [baseline, setBaseline] = useState<SavedSettings>()
   const [form, setForm] = useState<Form>(() => formOf(defaultConfig))
   const [apiKey, setApiKey] = useState('')
@@ -62,7 +62,7 @@ export function ModelSettings({ service, diskStorage = false }: { service: Model
   useEffect(() => { mounted.current = true; const active = controllers.current; return () => { mounted.current = false; for (const controller of Object.values(active)) controller?.abort() } }, [])
   const dirty = !!baseline && (apiKey.length > 0 || JSON.stringify(form) !== JSON.stringify(formOf(baseline.config)))
   const credentialQuery = useCallback(() => service.settings.isCredentialConfigured(form.providerId), [service, form.providerId])
-  const credential = useLiveResult(credentialQuery)
+  const credential = useLiveResult(credentialQuery, 0, [{ scope: 'settings', tables: ['credentials'] }])
   const hasCredential = !!apiKey.trim() || (credential.status === 'ready' && credential.value)
   const scope = connectionKey(form)
   const modelIds = catalog?.scope === scope ? catalog.ids : []

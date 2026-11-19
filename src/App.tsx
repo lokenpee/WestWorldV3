@@ -35,7 +35,7 @@ export default function App({ repository, importer, assets, backups, models, ext
   const [bookAction, setBookAction] = useState<BookAction>()
   const [bookMessage, setBookMessage] = useState('')
   const query = useCallback(() => repository.listBooks(), [repository])
-  const books = useLiveResult(query, attempt)
+  const books = useLiveResult(query, attempt, [{ scope: 'settings', tables: ['books'] }])
 
   if (pendingSelection && books.status === 'ready' && books.value.some(book => book.id === pendingSelection)) {
     setBookId(pendingSelection); setPendingSelection(null)

@@ -127,6 +127,7 @@ export class SqliteRecordStore {
   scopeExists(scope: string) { return !!this.database.prepare('SELECT 1 FROM records WHERE scope=? LIMIT 1').get(scope) }
 
   executionPage(scope: string, options: ExecutionQuery) { return executionPage(this.database, scope, options, this.status().revision) }
+  notificationFields(scope: string, table: string, key: string): StoredValue | undefined { return this.database.prepare("SELECT json_extract(body,'$.type') AS type,json_extract(body,'$.recordType') AS recordType,json_extract(body,'$.stage') AS stage FROM records WHERE scope=? AND tableName=? AND recordKey=?").get(scope, table, key) }
   executionBody(scope: string, options: ExecutionQuery & { requestId: string; eventKey?: string }) { return executionBody(this.database, scope, options) }
 
   tracePage(scope: string, options: { runId?: string; unitId?: string; before?: { startedAt: string; requestId: string }; offset?: number; limit?: number }) {

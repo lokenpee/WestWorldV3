@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLiveResult } from '../../hooks/useLiveResult'
+import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import type { WorldService, Candidate } from './service'
 import type { AssetService } from '../assets/service'
 import type { MergeRequest } from '../assets/merge'
@@ -30,8 +30,8 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
   const drafts = useRef(new Map<string, { memberIds: string[]; prepared?: MergeRequest; chosenName: string }>())
   const submitting = useRef(false)
   const [leaseAttempt, retryLease] = useState(0)
-  const eligibility = useLiveResult(useCallback(() => service.eligibility(bookId), [service, bookId]), leaseAttempt)
-  const queue = useLiveResult(useCallback(() => service.mechanical.read(bookId), [service, bookId]), leaseAttempt)
+  const eligibility = useLiveResult(useCallback(() => service.eligibility(bookId), [service, bookId]), leaseAttempt, bookInterests(bookId, ['chapters', 'extractionReceipts', 'pipelineRuns', 'compileProgress']))
+  const queue = useLiveResult(useCallback(() => service.mechanical.read(bookId), [service, bookId]), leaseAttempt, bookInterests(bookId, ['pipelineRuns']))
   useEffect(() => {
     let live = true
     const recover = () => { void service.mechanical.recover(bookId).catch(failure => { if (live) setError(failure instanceof Error ? failure.message : '队列恢复失败。') }) }
@@ -44,9 +44,9 @@ export function WorldPanel({ bookId, service, assets, focusRunId }: { bookId: st
     const timer = setTimeout(() => retryLease(value => value + 1), Math.max(1, leaseExpiry - Date.now() + 50))
     return () => clearTimeout(timer)
   }, [leaseExpiry])
-  const reports = useLiveResult(useCallback(() => service.reports(bookId), [service, bookId]))
-  const snapshot = useLiveResult(useCallback(() => service.worldRows(bookId), [service, bookId]))
-  const aiCandidates = useLiveResult(useCallback(() => service.identityCandidates(bookId), [service, bookId]))
+  const reports = useLiveResult(useCallback(() => service.reports(bookId), [service, bookId]), 0, bookInterests(bookId, ['pipelineRuns'], 'run'))
+  const snapshot = useLiveResult(useCallback(() => service.worldRows(bookId), [service, bookId]), 0, bookInterests(bookId, ['characters', 'locations']))
+  const aiCandidates = useLiveResult(useCallback(() => service.identityCandidates(bookId), [service, bookId]), 0, [...bookInterests(bookId, ['characters', 'assetLifecycle']), { scope: `book:${bookId}`, tables: ['pipelineRuns'], category: 'run' }])
   const visibleCandidates = combineCandidates(candidates ?? [], aiCandidates.status === 'ready' ? aiCandidates.value : [])
   const state = service.state(bookId); const lastReport = useRef<string | undefined>(undefined)
   useEffect(() => { if (!focusRunId) return; setShowOrganization(true); setTraceRunId(focusRunId); setTraceOpen(true) }, [focusRunId])

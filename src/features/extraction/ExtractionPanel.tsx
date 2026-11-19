@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useLiveResult } from '../../hooks/useLiveResult'
+import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import type { ExtractionService } from './service'
 import { stepLabels, type Substep } from './types'
 import './ExtractionPanel.css'
@@ -26,7 +26,7 @@ export function ExtractionPanel({ bookId, service }: { bookId: string; service: 
     return () => { active = false; clearInterval(timer) }
   }, [service, bookId])
   const query = useCallback(() => service.progress(bookId), [service, bookId])
-  const progress = useLiveResult(query)
+  const progress = useLiveResult(query, 0, bookInterests(bookId, ['chapters', 'extractionReceipts', 'compileProgress', 'pipelineRuns', 'extractionTasks']))
   const state = service.state(bookId)
   const running = state?.running ?? false
   const saved = progress.status === 'ready' ? progress.value : undefined

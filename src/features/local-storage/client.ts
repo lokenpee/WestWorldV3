@@ -1,6 +1,6 @@
 import type Dexie from 'dexie'
 import { bookSchema, settingsSchema, type RecordQuery, type QueryValue } from './schema'
-import type { StorageStatus, StoredRecord, StoredValue } from './contracts'
+import type { StorageStatus, StoredRecord, StoredValue, StorageNotice, StorageInterest, StorageTarget } from './contracts'
 
 export type StorageCall = <T>(body: Record<string, unknown>) => Promise<T>
 export function httpStorageCall(endpoint = '/api/storage'): StorageCall {
@@ -14,9 +14,28 @@ export function httpStorageCall(endpoint = '/api/storage'): StorageCall {
     return payload.result
   }
 }
-const listeners = new Set<() => void>()
-export const storageChanged = () => { for (const listener of listeners) listener() }
-export const onStorageChanged = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
+type StorageChange = { targets: StorageTarget[] }
+const listeners = new Set<(change?: StorageChange) => void>()
+export const storageChanged = (change?: StorageChange) => { if (!change || change.targets.length) for (const listener of listeners) listener(change) }
+export const onStorageChanged = (listener: () => void, interests?: readonly StorageInterest[]) => {
+  const receive = (change?: StorageChange) => {
+    if (!change || !interests || interests.some(interest => change.targets.some(target => interest.scope === target.scope && (!interest.tables || !target.table || interest.tables.includes(target.table)) && (!interest.category || !target.category || interest.category === target.category)))) listener()
+  }
+  listeners.add(receive); return () => { listeners.delete(receive) }
+}
+const seenNotices = new WeakMap<StorageCall, Set<string>>()
+function noticeTargets(call: StorageCall, notices: StorageNotice[]) {
+  let seen = seenNotices.get(call)
+  if (!seen) { seen = new Set(); seenNotices.set(call, seen) }
+  const targets = new Map<string, StorageTarget>()
+  for (const notice of notices) {
+    const key = `${notice.epoch}:${notice.revision}`
+    if (seen.has(key) || !notice.targets.length) continue
+    seen.add(key); if (seen.size > 512) seen.delete(seen.values().next().value!)
+    for (const target of notice.targets) targets.set(JSON.stringify(target), target)
+  }
+  return [...targets.values()]
+}
 
 class RemoteCollection {
   readonly table: RemoteTable
@@ -145,8 +164,8 @@ export class RemoteDatabase {
     const db = new RemoteDatabase(this.call, this.scope, this.name, id, names)
     try {
       const result = await work({ db, table: name => db.table(name), storeNames: names })
-      await db.request({ action: 'commit' })
-      if (mode.startsWith('rw')) storageChanged()
+      const committed = await db.request<StorageStatus>({ action: 'commit' })
+      if (mode.startsWith('rw')) { if (committed?.change) storageChanged({ targets: noticeTargets(this.call, [committed.change]) }); else storageChanged() }
       return result
     } catch (error) { await db.request({ action: 'abort' }).catch(() => undefined); throw error }
   }
@@ -172,14 +191,22 @@ export function versionedTable(db: unknown, table: string) {
 }
 
 export function watchDiskRevision(call: StorageCall) {
-  let signature: string | undefined, stopped = false
+  let signature: string | undefined, stopped = false, connected = false, failed = false
+  let revision: number | undefined, epoch: string | undefined
   let timer: ReturnType<typeof setTimeout>
   const poll = async () => {
     try {
-      const state = await call<StorageStatus>({ action: 'status' }), next = JSON.stringify([state.revision, state.lastBackupAt, state.backupError])
-      if (signature !== next) { signature = next; storageChanged() }
+      const state = await call<StorageStatus>({ action: 'status', since: revision, epoch }), next = JSON.stringify([state.lastBackupAt, state.backupError])
+      if (stopped) return
+      if (!connected || state.reset || !state.epoch && state.revision !== revision) storageChanged()
+      else {
+        const targets = noticeTargets(call, state.notices ?? [])
+        if (signature !== next && !targets.some(target => target.scope === 'status')) targets.push({ scope: 'status' })
+        storageChanged({ targets })
+      }
+      signature = next; revision = state.revision; epoch = state.epoch; connected = true; failed = false
     }
-    catch { storageChanged() }
+    catch { if (!stopped && !failed) storageChanged(); connected = false; failed = true }
     if (!stopped) timer = setTimeout(() => void poll(), 1500)
   }
   void poll()

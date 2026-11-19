@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { RunTraceRun } from './AgentRunPanel'
 import { ExecutionChainView } from './ExecutionChainView'
 import { subscribeTraceHub, type ExecutionChain } from './trace'
+import { onStorageChanged } from '../local-storage/client'
 
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const when = (value: unknown) => text(value) ? new Date(text(value)).toLocaleString('zh-CN') : '未记录'
@@ -20,6 +21,7 @@ export function P3ExecutionPanel({ bookId, runId, sessionId, run, loadExecution,
   const [tick, setTick] = useState(0)
   useEffect(() => { const dialog = ref.current; dialog?.showModal(); return () => dialog?.close() }, [])
   useEffect(() => subscribeTraceHub(() => setTick(value => value + 1)), [])
+  useEffect(() => onStorageChanged(() => setTick(value => value + 1), [{ scope: `book:${bookId}`, tables: ['storySessionEntries', 'pipelineRuns'] }]), [bookId])
   useEffect(() => {
     if (!runId) { setChain({ entries: [], requests: [], snapshots: new Map() }); return }
     let live = true

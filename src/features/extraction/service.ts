@@ -156,7 +156,7 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
         const progress = await db.table<Progress>('compileProgress').get('P1')
         const currentRun = options.lane ? progress?.extractionJobs?.[options.lane]?.runId : progress?.runId
         return lease?.owner === owner && lease.runId === runId && currentRun === runId
-      }).subscribe({
+      }, [{ scope: `book:${bookId}`, tables: ['pipelineRuns', 'compileProgress'] }]).subscribe({
         next: valid => {
           if (valid || controller.signal.aborted) return
           heartbeatError = new ExecutionLost('提取执行权已撤销，已停止请求。')

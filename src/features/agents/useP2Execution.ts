@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { subscribeTraceHub, traceSessions, type ExecutionChain } from './trace'
 import type { Row } from './repository'
+import { onStorageChanged } from '../local-storage/client'
 
 const empty = (): ExecutionChain => ({ entries: [], requests: [], snapshots: new Map() })
 export type LoadP2Execution = (bookId: string, query: { runId: string; step: 'scan' | 'profiles' | 'relations'; objectKey: string }) => Promise<ExecutionChain>
@@ -10,6 +11,7 @@ export function useP2Execution(bookId: string, runId: string | undefined, step: 
   const [saved, setSaved] = useState<{ key: string; chain: ExecutionChain; error: string }>()
   const [tick, setTick] = useState(0)
   useEffect(() => subscribeTraceHub(() => setTick(value => value + 1)), [])
+  useEffect(() => onStorageChanged(() => setTick(value => value + 1), [{ scope: `book:${bookId}`, tables: ['storySessionEntries', 'pipelineRuns'] }]), [bookId])
   useEffect(() => {
     if (!runId || !objectKey) return
     let live = true

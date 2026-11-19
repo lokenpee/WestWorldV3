@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useLiveResult } from '../../hooks/useLiveResult'
+import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import type { Book, BookRepository } from '../../lib/storage/workspace'
 import { formatImportDate } from './formatImportDate'
 import './Bookshelf.css'
@@ -10,9 +10,9 @@ function BookCard({ book, repository, selected, onSelect, busy, backups, onExpor
   backups: BackupService; onExport: (book: Book) => void; onDelete: (book: Book) => void
 }) {
   const query = useCallback(() => repository.getBookSummary(book.id), [repository, book.id])
-  const summary = useLiveResult(query)
+  const summary = useLiveResult(query, 0, bookInterests(book.id, ['chapters', 'characters', 'locations', 'nodes', 'eventLines']))
   const blockerQuery = useCallback(() => backups.deletionBlockers(book.id), [backups, book.id])
-  const blockers = useLiveResult(blockerQuery)
+  const blockers = useLiveResult(blockerQuery, 0, bookInterests(book.id, ['pipelineRuns'], 'lease'))
   return (
     <article className={`book-card${selected ? ' is-selected' : ''}`}>
     <button disabled={busy} className="book-select" aria-label={`进入 ${book.title}`} aria-current={selected ? 'page' : undefined} onClick={() => onSelect(book.id)}>

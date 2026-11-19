@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SqliteRecordStore } from './sqliteStore.ts'
 import { assertAddress, indexValue, matches, schemaFor, type RecordQuery } from './schema.ts'
-import type { CredentialProtector, RecordWrite, StoredRecord, StoredValue } from './contracts.ts'
+import type { CredentialProtector, RecordWrite, StoredRecord, StoredValue, StorageNotice, StorageTarget } from './contracts.ts'
 
 interface TransactionState {
   id: string; scope: string; tables: Set<string>; write: boolean; touched: number
@@ -10,6 +10,24 @@ interface TransactionState {
 }
 export function createLocalStorageServer(directory: string, protector: CredentialProtector, backupInterval = 300000) {
   const store = new SqliteRecordStore(directory, protector)
+  const epoch = randomUUID(), notices: StorageNotice[] = []
+  const category = (table: string, value: StoredValue) => table === 'storySessionEntries'
+    ? ['request_trace', 'prompt_snapshot', 'tool_snapshot'].includes(String(value.type)) ? 'observation' as const : 'business' as const
+    : table === 'pipelineRuns' ? value.recordType === 'lease' ? 'lease' as const : value.recordType === 'history_index' ? 'history' as const : value.stage === 'manual_merge' ? 'merge' as const : 'run' as const : undefined
+  function commit(writes: RecordWrite[]) {
+    const targets = new Map<string, StorageTarget>()
+    for (const write of writes) {
+      const before = ['storySessionEntries', 'pipelineRuns'].includes(write.table) ? store.notificationFields(write.scope, write.table, write.key) : undefined
+      const nextCategory = write.value ? category(write.table, write.value) : before ? category(write.table, before) : undefined
+      const target: StorageTarget = { scope: write.scope, table: write.table, ...(nextCategory && (!before || !write.value || category(write.table, before) === nextCategory) ? { category: nextCategory } : {}) }
+      targets.set(JSON.stringify(target), target)
+    }
+    const status = store.commit(writes)
+    if (writes.length) targets.set('status', { scope: 'status' })
+    const change: StorageNotice = { epoch, revision: status.revision, targets: [...targets.values()] }
+    if (writes.length) { notices.push(change); if (notices.length > 256) notices.shift() }
+    return { ...status, change }
+  }
   const transactions = new Map<string, TransactionState>()
   const locks = new Map<string, string>()
   const waiters = new Set<() => void>()
@@ -71,7 +89,11 @@ export function createLocalStorageServer(directory: string, protector: Credentia
   async function execute(body: Record<string, unknown>): Promise<unknown> {
     if (closed) throw new Error('存储服务已关闭。')
     const action = String(body.action), scope = String(body.scope ?? ''), table = String(body.table ?? '')
-    if (action === 'status') return { ...store.status(), lastBackupAt, backupError }
+    if (action === 'status') {
+      const status = store.status(), since = typeof body.since === 'number' ? body.since : undefined
+      const reset = since === undefined || body.epoch !== epoch || since > status.revision || since < status.revision && (!notices.length || since < notices[0].revision - 1)
+      return { ...status, lastBackupAt, backupError, epoch, reset, notices: reset ? [] : notices.filter(notice => notice.revision > since!) }
+    }
     if (action === 'backup') { dirty = true; await makeBackup(); if (backupError) throw new Error(backupError); return { lastBackupAt } }
     // Never hold an HTTP connection while waiting for another transaction: browser connection
     // limits would prevent the owning transaction from sending its next read/commit request.
@@ -102,7 +124,7 @@ export function createLocalStorageServer(directory: string, protector: Credentia
         }
         writes.push({ scope: 'settings', table: 'books', key: id, value: book })
         writes.push({ scope: 'settings', table: 'appSettings', key: markerKey, value: { key: markerKey, value: { source: body.source, digest, counts, status: 'completed' } } })
-        store.commit(writes); saved()
+        commit(writes); saved()
         return { alreadyApplied: false }
       } finally { for (const tx of held) release(tx) }
     }
@@ -115,7 +137,7 @@ export function createLocalStorageServer(directory: string, protector: Credentia
           if (table === 'appSettings' && /^(book\.lifecycle:|migration:|assets\.exportDirectory$)/.test(key)) continue
           if (!store.get({ scope: 'settings', table, key })) writes.push({ scope: 'settings', table, key, value })
         }
-        store.commit(writes); if (writes.length) saved()
+        commit(writes); if (writes.length) saved()
         return null
       } finally { release(tx) }
     }
@@ -126,7 +148,7 @@ export function createLocalStorageServer(directory: string, protector: Credentia
         if (action === 'abort') return null
         const writes: RecordWrite[] = []
         for (const [name, changes] of tx.changes) for (const [key, value] of changes) writes.push({ scope, table: name, key, value })
-        const status = store.commit(writes)
+        const status = commit(writes)
         if (writes.length) saved()
         return status
       } finally { release(tx) }

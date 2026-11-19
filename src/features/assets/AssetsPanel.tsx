@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BookRepository } from '../../lib/storage/workspace'
-import { useLiveResult } from '../../hooks/useLiveResult'
+import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import type { AssetService } from './service'
 import { assetLabels, assetName, assetTables, roleWeights, type Asset, type AssetKind, type Character } from './types'
 import { AssetEditor, type AssetEditorHandle } from './AssetEditor'
@@ -48,10 +48,10 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
   }
   const query = useCallback(() => service.readContent(bookId), [service, bookId])
   const chapterQuery = useCallback(() => repository.listChapters(bookId), [repository, bookId])
-  const data = useLiveResult(query, attempt)
+  const data = useLiveResult(query, attempt, [...bookInterests(bookId, ['characters', 'locations', 'nodes', 'eventLines', 'assetLifecycle', 'characterRelations', 'characterRelationEdits']), { scope: `book:${bookId}`, tables: ['pipelineRuns'], category: 'merge' }])
   const locksQuery = useCallback(() => service.readLocks(bookId), [service, bookId])
-  const locks = useLiveResult(locksQuery, attempt)
-  const chapters = useLiveResult(chapterQuery, attempt)
+  const locks = useLiveResult(locksQuery, attempt, bookInterests(bookId, ['pipelineRuns'], 'lease'))
+  const chapters = useLiveResult(chapterQuery, attempt, bookInterests(bookId, ['chapters']))
   const navigate = useCallback((action: () => void) => { if (editorRef.current?.isDirty()) setPendingLeave({ action }); else action() }, [])
   useEffect(() => { setLeaveGuard(navigate); return () => setLeaveGuard(undefined) }, [navigate])
   async function leaveWithSave() {

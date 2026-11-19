@@ -8,7 +8,7 @@ export function StoragePanel({ call, onContinue }: { call: StorageCall; onContin
   const [attempt, setAttempt] = useState(0), [busy, setBusy] = useState(false), [message, setMessage] = useState('')
   const [oldCount, setOldCount] = useState<number>()
   const query = useCallback(() => call<StorageStatus & { lastBackupAt?: string; backupError?: string }>({ action: 'status' }), [call])
-  const status = useLiveResult(query, attempt)
+  const status = useLiveResult(query, attempt, [{ scope: 'status' }])
   useEffect(() => { void legacyBooks().then(rows => setOldCount(rows.length)).catch(() => setMessage('浏览器旧数据暂时无法读取，可重试或使用已有整书备份。')) }, [attempt])
   async function migrate() {
     setBusy(true)
@@ -18,7 +18,7 @@ export function StoragePanel({ call, onContinue }: { call: StorageCall; onContin
   }
   async function backup() {
     setBusy(true)
-    try { await call({ action: 'backup' }); setMessage('恢复副本已生成。'); storageChanged() }
+    try { await call({ action: 'backup' }); setMessage('恢复副本已生成。'); storageChanged({ targets: [{ scope: 'status' }] }) }
     catch (error) { setMessage(error instanceof Error ? error.message : '备份失败。') }
     finally { setBusy(false) }
   }

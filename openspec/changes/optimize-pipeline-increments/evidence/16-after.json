@@ -1,0 +1,22 @@
+{
+  "optimization": 16,
+  "sample": {
+    "observationCommits": 10,
+    "activeSubscriptions": 5
+  },
+  "queryRefreshes": {
+    "assetA": 0,
+    "assetB": 0,
+    "progressA": 0,
+    "settings": 0,
+    "observationA": 10
+  },
+  "emptyTransaction": {
+    "assetA": 0,
+    "assetB": 0,
+    "progressA": 0,
+    "settings": 0,
+    "observationA": 0
+  },
+  "storedObservations": 10
+}

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { useLiveResult } from '../../hooks/useLiveResult'
+import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import type { Row } from '../agents/repository'
 import type { StoryService } from './service'
 
@@ -11,7 +11,7 @@ function HistoryEntry({ entry }: { entry: Row }) {
 }
 export function SessionHistory({ bookId, service }: { bookId: string; service: StoryService }) {
   const [offset, setOffset] = useState(0)
-  const history = useLiveResult(useCallback(() => service.history(bookId, offset), [service, bookId, offset]))
+  const history = useLiveResult(useCallback(() => service.history(bookId, offset), [service, bookId, offset]), 0, [...bookInterests(bookId, ['storySessions']), { scope: `book:${bookId}`, tables: ['storySessionEntries'], category: 'business' }])
   if (history.status === 'loading') return <p>正在读取会话历史…</p>
   if (history.status === 'error') return <p role="alert">{history.message}</p>
   return <div className="story-history" aria-label="本书会话历史"><p>会话编号：{history.value.sessionId}</p><div className="story-history-pages"><button className="text-button" disabled={!offset} onClick={() => setOffset(Math.max(0, offset - 20))}>上一页记录</button><span>{history.value.total ? offset + 1 : 0}–{Math.min(offset + 20, history.value.total)} / {history.value.total}</span><button className="text-button" disabled={offset + 20 >= history.value.total} onClick={() => setOffset(offset + 20)}>下一页记录</button></div><div className="story-details-body">{history.value.entries.map(entry => <HistoryEntry key={String(entry.id)} entry={entry} />)}</div></div>
