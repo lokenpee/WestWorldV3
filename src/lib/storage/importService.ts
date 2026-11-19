@@ -1,5 +1,5 @@
 import { transact } from './transaction'
-import { assertPreview, type NovelPreview } from '../../features/import/text'
+import { assertPreview, chapterText, type ImportPreview } from '../../features/import/text'
 import type { Book, createWorkspace } from './workspace'
 import { createImportOwnership } from './importOwnership'
 import { emptyTables, tableNames, validateBookData, type BookTables } from '../../features/backup/data'
@@ -107,12 +107,14 @@ export function createImportService(workspace: Workspace, environment: Environme
     if (errors.length) throw new Error(`待恢复资料不完整：${errors[0].path} ${errors[0].message}`)
   }
 
-  async function importNovel(preview: NovelPreview): Promise<Book> {
+  async function importNovel(preview: ImportPreview): Promise<Book> {
     assertPreview(preview)
     return importPrepared((id, timestamp) => ({ id, title: preview.fileName.replace(/\.txt$/i, '').trim() || '未命名小说', sourceFileName: preview.fileName, createdAt: timestamp }), async (db, bookId, timestamp) => {
       await transact(db, 'rw', [db.chapters, db.table('chapterTexts'), db.table('compileProgress')], async (db) => {
-        await db.chapters.bulkAdd(preview.chapters.map(({ text: _text, ...chapter }) => ({ ...chapter, bookId })))
-        await db.table('chapterTexts').bulkAdd(preview.chapters.map(chapter => ({ bookId, chapterIndex: chapter.chapterIndex, text: chapter.text })))
+        await db.chapters.bulkAdd(preview.chapters.map(({ chapterIndex, chapterName, order, charCount }) => ({ chapterIndex, chapterName, order, charCount, bookId })))
+        for (let offset = 0; offset < preview.chapters.length; offset += 100) {
+          await db.table('chapterTexts').bulkAdd(preview.chapters.slice(offset, offset + 100).map(chapter => ({ bookId, chapterIndex: chapter.chapterIndex, text: chapterText(preview.text, chapter) })))
+        }
         await db.table('compileProgress').add({ bookId, stage: 'P1', status: 'idle', totalChapters: preview.chapters.length, completedChapters: [], failedChapters: [], updatedAt: timestamp, scope: 'fullBook', planVersion: '2.2', unit: 'chapter', validity: 'current' })
       })
     })

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import type { Book } from '../../lib/storage/workspace'
 import type { ImportService } from '../../lib/storage/importService'
 import { ChapterTextDialog } from '../books/ChapterTextDialog'
-import { DEFAULT_CHAPTER_PATTERN, type ChapterDraft, type EncodingChoice, type NovelPreview } from './text'
+import { chapterText, DEFAULT_CHAPTER_PATTERN, type PreviewChapter, type EncodingChoice, type ImportPreview } from './text'
 import { PreviewLoader } from './previewLoader'
 import { parseInWorker } from './parseInWorker'
 import './ImportPanel.css'
@@ -13,11 +13,12 @@ export function ImportPanel({ hasBooks, importer, onImported, onBusyChange }: {
   const [pattern, setPattern] = useState(DEFAULT_CHAPTER_PATTERN)
   const [file, setFile] = useState<File>()
   const [encoding, setEncoding] = useState<EncodingChoice>('auto')
-  const [preview, setPreview] = useState<NovelPreview | null>(null)
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [page, setPage] = useState(0)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState<'loading' | 'saving' | null>(null)
   const [dragging, setDragging] = useState(false)
-  const [reading, setReading] = useState<ChapterDraft>()
+  const [reading, setReading] = useState<PreviewChapter>()
   const active = useRef(true)
   const loadId = useRef(0)
   const saving = useRef(false)
@@ -30,7 +31,7 @@ export function ImportPanel({ hasBooks, importer, onImported, onBusyChange }: {
     if (saving.current) return
     const requestId = ++loadId.current
     setFile(files.length === 1 ? files[0] : undefined)
-    setEncoding(choice); setPreview(null); setReading(undefined); setError(''); setBusy('loading')
+    setEncoding(choice); setPreview(null); setPage(0); setReading(undefined); setError(''); setBusy('loading')
     try {
       const result = await loader.load(files, choice, regex)
       if (active.current && requestId === loadId.current && result) { setPreview(result); setBusy(null) }
@@ -69,9 +70,10 @@ export function ImportPanel({ hasBooks, importer, onImported, onBusyChange }: {
     {preview && <section className="import-preview" aria-label="分章预览">
       <div className="preview-heading"><div><h2>{preview.fileName}</h2><p>{preview.encoding} · {preview.byteLength.toLocaleString('zh-CN')} 字节 · {preview.chapters.length} 章 / 块 · {preview.text.length.toLocaleString('zh-CN')} 字符</p></div><button className="text-button" disabled={!!busy} onClick={() => { loader.reset(); setPreview(null); setFile(undefined); setReading(undefined); setError('') }}>换一个文件</button></div>
       <div className="import-actions"><button className="secondary-button" disabled={!!busy} onClick={() => file && void load([file], 'utf-8', pattern)}>按 UTF-8 重读</button><button className="secondary-button" disabled={!!busy} onClick={() => file && void load([file], 'gbk', pattern)}>按 GBK 重读</button><span>乱码时可切换编码后检查原文。</span></div>
-      <div className="preview-table-wrap"><table><thead><tr><th>编号</th><th>章节名称</th><th>字符数</th><th>原文</th></tr></thead><tbody>{preview.chapters.map(chapter => <tr key={chapter.chapterIndex}><td>{chapter.chapterIndex}</td><td>{chapter.chapterName}</td><td>{chapter.charCount.toLocaleString('zh-CN')}</td><td><button className="text-button" aria-label={`预览 ${chapter.chapterName}`} onClick={() => setReading(chapter)}>预览</button></td></tr>)}</tbody></table></div>
+      <div className="preview-table-wrap"><table><thead><tr><th>编号</th><th>章节名称</th><th>字符数</th><th>原文</th></tr></thead><tbody>{preview.chapters.slice(page * 100, (page + 1) * 100).map(chapter => <tr key={chapter.chapterIndex}><td>{chapter.chapterIndex}</td><td>{chapter.chapterName}</td><td>{chapter.charCount.toLocaleString('zh-CN')}</td><td><button className="text-button" aria-label={`预览 ${chapter.chapterName}`} onClick={() => setReading(chapter)}>预览</button></td></tr>)}</tbody></table></div>
+      {preview.chapters.length > 100 && <nav className="import-actions" aria-label="预览分页"><button className="secondary-button" aria-label="上一页预览" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button><span>第 {page + 1} / {Math.ceil(preview.chapters.length / 100)} 页 · 共 {preview.chapters.length} 章 / 块</span><button className="secondary-button" aria-label="下一页预览" disabled={(page + 1) * 100 >= preview.chapters.length} onClick={() => setPage(page + 1)}>下一页</button></nav>}
       <div className="import-submit"><p>确认章节内容后保存到本地书库。</p><div className="import-actions"><button className="primary-button" disabled={!!busy || stale} onClick={() => void save()}>{busy === 'saving' ? '正在导入…' : '仅导入'}</button><button className="secondary-button" disabled>导入并开始 P1 提取</button><span>P1 提取将在阶段 7 开放</span></div></div>
     </section>}
-    {reading && <ChapterTextDialog title={reading.chapterName} text={reading.text} onClose={() => setReading(undefined)} />}
+    {reading && preview && <ChapterTextDialog title={reading.chapterName} text={chapterText(preview.text, reading)} onClose={() => setReading(undefined)} />}
   </section>
 }

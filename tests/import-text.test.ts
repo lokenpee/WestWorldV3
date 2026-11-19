@@ -1,11 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_CHAPTER_PATTERN, decodeNovel, splitChapters, validateFiles } from '../src/features/import/text'
+import { DEFAULT_CHAPTER_PATTERN, chapterText, decodeNovel, splitChapters, splitChapterRanges, validateFiles } from '../src/features/import/text'
 import { PreviewLoader } from '../src/features/import/previewLoader'
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url))
 
 describe('阶段2：文本保全和分章', () => {
+  it.each(['A-三章短篇.txt', 'B-长章.txt', 'B-GBK.txt'])('偏移预览与兼容正文入口完全相同：%s', name => {
+    const text = decodeNovel(Uint8Array.from(fixture(name)).buffer, 'auto').text
+    const ranges = splitChapterRanges(text, DEFAULT_CHAPTER_PATTERN)
+    expect(ranges.map(({ start: _start, end: _end, ...chapter }, i) => ({ ...chapter, text: chapterText(text, ranges[i]) }))).toEqual(splitChapters(text, DEFAULT_CHAPTER_PATTERN))
+    expect(ranges.every(x => !('text' in x))).toBe(true)
+    expect(ranges.map(x => chapterText(text, x)).join('')).toBe(text)
+  })
   it.each([['第一章 测试\n', 10000], ['', 4000]] as const)('优先句段边界并保留闭引号：%s', (prefix, size) => {
     for (const boundary of ['\n', '。', '。”', '！』']) {
       const before = prefix + '甲'.repeat(size - 6 - prefix.length) + boundary

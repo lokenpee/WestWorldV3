@@ -1,7 +1,7 @@
-import { validateFiles, type EncodingChoice, type NovelPreview, type ParsedNovel } from './text'
+import { validateFiles, type EncodingChoice, type ImportPreview, type ParsedNovel, type PreviewChapter } from './text'
 
 export type PickedFile = Pick<File, 'name' | 'size' | 'arrayBuffer'>
-export type ParseNovel = (bytes: ArrayBuffer, encoding: EncodingChoice, pattern: string, signal: AbortSignal) => Promise<ParsedNovel>
+export type ParseNovel = (bytes: ArrayBuffer, encoding: EncodingChoice, pattern: string, signal: AbortSignal) => Promise<ParsedNovel<PreviewChapter>>
 
 export class PreviewLoader {
   private generation = 0
@@ -12,7 +12,7 @@ export class PreviewLoader {
 
   reset() { this.generation += 1; this.controller?.abort() }
 
-  async load(files: readonly PickedFile[], encoding: EncodingChoice, pattern: string): Promise<NovelPreview | null> {
+  async load(files: readonly PickedFile[], encoding: EncodingChoice, pattern: string): Promise<ImportPreview | null> {
     this.reset()
     const generation = this.generation
     const controller = new AbortController()

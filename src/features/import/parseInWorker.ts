@@ -1,5 +1,5 @@
 import type { ParseNovel } from './previewLoader'
-import type { ParsedNovel } from './text'
+import type { ParsedNovel, PreviewChapter } from './text'
 
 export const parseInWorker: ParseNovel = (bytes, encoding, pattern, signal) => new Promise((resolve, reject) => {
   signal.throwIfAborted()
@@ -8,7 +8,7 @@ export const parseInWorker: ParseNovel = (bytes, encoding, pattern, signal) => n
   const abort = () => { finish(); reject(new DOMException('预览已取消', 'AbortError')) }
   // User regex runs off the UI thread; a pathological expression can be stopped.
   const timer = setTimeout(() => { finish(); reject(new Error('分章处理耗时过长，请简化正则或减小文件后重试。')) }, 10000)
-  worker.onmessage = (event: MessageEvent<{ ok: true; value: ParsedNovel } | { ok: false; message: string }>) => {
+  worker.onmessage = (event: MessageEvent<{ ok: true; value: ParsedNovel<PreviewChapter> } | { ok: false; message: string }>) => {
     finish()
     if (event.data.ok) resolve(event.data.value)
     else reject(new Error(event.data.message))

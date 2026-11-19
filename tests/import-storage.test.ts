@@ -3,7 +3,7 @@ import Dexie from 'dexie'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createWorkspace } from '../src/lib/storage/workspace'
 import { createImportService } from '../src/lib/storage/importService'
-import { DEFAULT_CHAPTER_PATTERN, splitChapters, type NovelPreview } from '../src/features/import/text'
+import { DEFAULT_CHAPTER_PATTERN, splitChapters, splitChapterRanges, type NovelPreview } from '../src/features/import/text'
 
 const workspaces: ReturnType<typeof createWorkspace>[] = []
 const services: ReturnType<typeof createImportService>[] = []
@@ -27,6 +27,31 @@ afterEach(async () => {
 })
 
 describe('阶段2：持久导入与跨库恢复', () => {
+  it('偏移预览跨批导入全部章节，不把内存位置存入章节表', async () => {
+    const { workspace, service } = setup()
+    const text = Array.from({ length: 201 }, (_, i) => `第${i + 1}章 测试\n正文${i}\n`).join('')
+    const value = { ...preview(text), chapters: splitChapterRanges(text, DEFAULT_CHAPTER_PATTERN) }
+    const book = await service.importNovel(value)
+    const db = workspace.openBook(book.id)
+    const chapters = (await db.chapters.toArray()).sort((a, b) => a.order - b.order)
+    const bodies = new Map((await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()).map(x => [x.chapterIndex, x.text]))
+    expect(chapters).toHaveLength(201)
+    expect(chapters.every(x => !('start' in x) && !('end' in x))).toBe(true)
+    expect(chapters.map(x => bodies.get(x.chapterIndex)).join('')).toBe(text)
+    expect(await db.table('compileProgress').get('P1')).toMatchObject({ totalChapters: 201 })
+  })
+
+  it.each(['gap', 'overlap', 'end', 'count'])('偏移预览拒绝%s，尚未建库', async kind => {
+    const { workspace, service } = setup()
+    const value = preview()
+    const chapters = splitChapterRanges(value.text, value.pattern)
+    if (kind === 'gap') chapters[1].start++
+    if (kind === 'overlap') chapters[1].start--
+    if (kind === 'end') chapters.at(-1)!.end++
+    if (kind === 'count') chapters[0].charCount--
+    await expect(service.importNovel({ ...value, chapters })).rejects.toThrow('预览')
+    expect(await workspace.listBooks()).toEqual([])
+  })
   it('全部正文、元数据和P1初始进度先提交，成功后才发布书架', async () => {
     const { workspace, service } = setup(async point => {
       if (point === 'after-book-write') expect(await workspace.listBooks()).toEqual([])
