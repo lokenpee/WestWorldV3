@@ -8,6 +8,9 @@ import type { AgentRepository, Row } from './repository'
 import type { OrganizationMode, OrganizationState } from '../world/types'
 import { getCurrentTools, toToolDeclaration } from '@earendil-works/pi-ai/utils/transcript'
 import { sentMessages, toolDeclaration } from './requestPresentation'
+import { readPagedExecution } from './executionPaging'
+import type { ExecutionEvent } from './executionChain'
+import type { ExecutionSummary } from './executionPagingTypes'
 
 export interface OrganizationStepIndexEntry { runId: string; runStartedAt: string; runStatus: string; mode: OrganizationMode; scope: 'fullBook' | 'character'; step: 'scan' | 'profiles' | 'relations'; kind: 'directory' | 'candidate' | 'profile' | 'relations'; objectKey: string; label: string; status?: string; outcome?: string | null; characterId?: string; requestCount: number; hasTrace: boolean; detailReady?: boolean }
 export interface OrganizationRequestBefore { startedAt: string; requestId: string }
@@ -476,13 +479,21 @@ export async function readOrganizationRequests(workspace: ReturnType<typeof crea
   return { requests, snapshots: new Map(snapshots.map(row => [String(row.snapshotId ?? row.id), row])), total: selected.length, hasEarlier: older.length > requests.length, ...(first ? { nextBefore: { startedAt: text(first.startedAt), requestId: traceRequestId(first) } } : {}) }
 }
 
-export interface ExecutionChain { entries: Row[]; requests: Row[]; snapshots: Map<string, Row>; runStatus?: string }
+export interface ExecutionChain {
+  entries: Row[]; requests: Row[]; snapshots: Map<string, Row>; runStatus?: string
+  summary?: ExecutionSummary
+  paging?: { events: ExecutionEvent[]; hasEarlier: boolean; loadEarlier: () => Promise<ExecutionChain>; loadEvent: (event: ExecutionEvent) => Promise<ExecutionEvent>; loadRequest: (request: Row) => Promise<{ request: Row; snapshots: Map<string, Row> }> }
+}
 
 export async function readExecutionChain(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string, options: { unitId?: string; contextId?: string; sessionId?: string } = {}): Promise<ExecutionChain> {
   const db = workspace.openBook(bookId)
   const run = await db.table('pipelineRuns').get(runId)
   if (!run) return { entries: [], requests: [], snapshots: new Map() }
   const sessionId = text(options.sessionId) || text(run.sessionId)
+  if (workspace.disk) {
+    const paged = await readPagedExecution(workspace, bookId, { runId, ...(sessionId ? { sessionId } : {}), ...(options.unitId && run.scope !== 'character' ? { unitId: options.unitId } : {}) }, text(run.status))
+    if (paged) return paged
+  }
   const all = sessionId ? await db.table('storySessionEntries').where('sessionId').equals(sessionId).toArray() : await db.table('storySessionEntries').toArray()
   const unitId = text(options.unitId)
   const targeted = run.scope === 'character'

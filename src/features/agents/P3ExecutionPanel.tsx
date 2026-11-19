@@ -35,7 +35,7 @@ export function P3ExecutionPanel({ bookId, runId, sessionId, run, loadExecution,
       <div className="run-heading-line"><p>P3 叙事整理 · {run?.status ? when(run.startedAt) : '当前会话'}</p>{run?.status && <span>{run.status}</span>}</div>
       {error && <p role="alert">{error}</p>}
       {!chain && <p className="field-help">正在读取 Agent 执行过程…</p>}
-      {chain && <ExecutionChainView chain={chain} edits={edits} />}
+      {chain && <ExecutionChainView chain={chain} edits={edits} onChainChange={setChain} />}
     </div>
   </dialog>
 }

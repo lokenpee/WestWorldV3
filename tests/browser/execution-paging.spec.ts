@@ -1,0 +1,31 @@
+import { expect, test } from '@playwright/test'
+
+test('执行链默认折叠，展开才读正文，向前翻页保留已展开消息和累计用量', async ({ page }) => {
+  await page.goto('/')
+  await page.evaluate(async () => {
+    const path = '/tests/browser/execution-paging-probe.tsx'
+    const { mountExecutionProbe } = await import(/* @vite-ignore */ path)
+    Object.assign(window, { executionProbe: mountExecutionProbe() })
+  })
+  const panel = page.locator('#execution-probe')
+  await expect(panel).toContainText('API 请求 2 次')
+  await expect(panel.locator('details[open]')).toHaveCount(0)
+  const calls = () => page.evaluate(() => (window as unknown as { executionProbe: { calls: string[] } }).executionProbe.calls)
+  expect(await calls()).toEqual([])
+  await panel.locator('summary').filter({ hasText: /^ASSISTANT/ }).click()
+  await expect(panel).toContainText('模型原始答复')
+  expect(await calls()).toEqual(['r2:assistant'])
+  await panel.getByText('思考内容', { exact: true }).click()
+  await expect(panel).toContainText('完整思考')
+  await panel.getByRole('button', { name: '查看更早的调用' }).click()
+  await expect(panel).toContainText('USER · 程序注入')
+  await expect(panel).toContainText('模型原始答复')
+  await expect(panel).toContainText('API 请求 2 次')
+  await expect(panel.getByRole('button', { name: '查看更早的调用' })).toHaveCount(0)
+  expect(await calls()).toEqual(['r2:assistant', 'earlier'])
+  await panel.locator('.run-api-boundary > summary').filter({ hasText: 'API 02' }).click()
+  await expect.poll(calls).toEqual(['r2:assistant', 'earlier', 'request'])
+  await panel.locator('.run-api > summary').click()
+  await panel.locator('.run-api summary').filter({ hasText: /USER/ }).click()
+  await expect(panel).toContainText('原始请求内容')
+})

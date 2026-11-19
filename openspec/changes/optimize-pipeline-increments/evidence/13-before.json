@@ -1,0 +1,23 @@
+{
+  "optimization": 13,
+  "sample": {
+    "requests": 200,
+    "sessionRows": 400
+  },
+  "measurements": [
+    {
+      "name": "initial",
+      "requests": 2,
+      "returnedBytes": 7638992,
+      "returnedRows": 401,
+      "elapsedMs": 128.9
+    },
+    {
+      "name": "unchanged_refresh",
+      "requests": 2,
+      "returnedBytes": 7638992,
+      "returnedRows": 401,
+      "elapsedMs": 120.75
+    }
+  ]
+}

@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { StorageConflict, type CredentialProtector, type RecordAddress, type RecordPage, type RecordWrite, type StorageStatus, type StoredRecord, type StoredValue } from './contracts.ts'
 import type { RecordQuery } from './schema.ts'
+import { executionBody, executionPage } from './executionQueries.ts'
+import type { ExecutionQuery } from '../agents/executionPagingTypes.ts'
 
 const schemaVersion = 1
 const uniqueFields: Record<string, string[][]> = {
@@ -123,6 +125,9 @@ export class SqliteRecordStore {
   }
 
   scopeExists(scope: string) { return !!this.database.prepare('SELECT 1 FROM records WHERE scope=? LIMIT 1').get(scope) }
+
+  executionPage(scope: string, options: ExecutionQuery) { return executionPage(this.database, scope, options, this.status().revision) }
+  executionBody(scope: string, options: ExecutionQuery & { requestId: string; eventKey?: string }) { return executionBody(this.database, scope, options) }
 
   tracePage(scope: string, options: { runId?: string; unitId?: string; before?: { startedAt: string; requestId: string }; offset?: number; limit?: number }) {
     const args: (string | number)[] = [scope]

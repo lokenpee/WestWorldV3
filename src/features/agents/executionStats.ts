@@ -1,4 +1,4 @@
-import type { Row } from './repository'
+import type { ExecutionRow as Row } from './executionTypes.ts'
 
 export function executionStats(requests: Row[]) {
   const rows = [...new Map(requests.map(row => [String(row.requestId ?? row.id), row])).values()]

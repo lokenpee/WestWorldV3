@@ -30,7 +30,7 @@ export function P2OrganizationPanel({ bookId, loadIndex, loadExecution, loadMerg
   const completed = completedCharacters(indexes.filter(entry => entry.step === step))
   const matches = completed.filter(entry => entry.label.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
   const selected = (manual ? completed.find(entry => entry.characterId === manual.characterId) ?? manual : undefined) ?? (step !== 'scan' ? current : undefined) ?? completed.find(entry => entry.runId === initialRunId) ?? completed[0]
-  const { chain, loading: loadingChain, error } = useP2Execution(bookId, step === 'scan' ? undefined : selected?.runId, step, selected?.objectKey, loadExecution)
+  const { chain, loading: loadingChain, error, onChainChange } = useP2Execution(bookId, step === 'scan' ? undefined : selected?.runId, step, selected?.objectKey, loadExecution)
   const runKey = runs.map(run => `${run.id}:${run.status}`).join('|')
   useEffect(() => { const dialog = ref.current; dialog?.showModal(); return () => dialog?.close() }, [])
   useEffect(() => subscribeTraceHub(() => setTick(value => value + 1)), [])
@@ -85,7 +85,7 @@ export function P2OrganizationPanel({ bookId, loadIndex, loadExecution, loadMerg
           <p className="field-help">{new Date(selected.runStartedAt).toLocaleString('zh-CN')}</p>
           {error && <p role="alert">整理详情暂时无法读取：{error}</p>}
           {loadingChain && !chain.requests.length && <p>正在读取 Agent 执行过程…</p>}
-          <ExecutionChainView folded chain={{ ...chain, runStatus: selected.status === 'checked' ? 'completed' : selected.runStatus }} edits={edits} characterNames={names} />
+          <ExecutionChainView folded chain={{ ...chain, runStatus: selected.status === 'checked' ? 'completed' : selected.runStatus }} edits={edits} characterNames={names} onChainChange={onChainChange} />
         </section>}
       </>}
     </div>

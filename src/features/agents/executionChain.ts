@@ -1,6 +1,5 @@
-import type { Row } from './repository'
-import type { ExecutionChain } from './trace'
-import { displayContent, messageRows, toolResultContent } from './requestPresentation'
+import type { ExecutionRow as Row, ExecutionData as ExecutionChain } from './executionTypes.ts'
+import { displayContent, messageRows, toolResultContent } from './requestPresentation.ts'
 
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const record = (value: unknown): Row => value && typeof value === 'object' ? value as Row : {}

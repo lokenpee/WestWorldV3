@@ -25,12 +25,12 @@ export function useP2Execution(bookId: string, runId: string | undefined, step: 
   const base = saved?.key === key ? saved.chain : empty()
   const requests = new Map(base.requests.map(row => [String(row.requestId ?? row.id), row]))
   const snapshots = new Map(base.snapshots)
-  for (const session of traceSessions(bookId)) {
+  for (const session of base.paging ? [] : traceSessions(bookId)) {
     if (session.identity.runId !== runId || session.identity.workId !== objectKey) continue
     const snapshot = session.snapshot()
     for (const row of snapshot.records) requests.set(String(row.requestId ?? row.id), row)
     for (const row of snapshot.snapshots) snapshots.set(String(row.snapshotId ?? row.id), row)
   }
   const ordered: Row[] = [...requests.values()].sort((a, b) => String(a.startedAt).localeCompare(String(b.startedAt)) || Number(a.requestOrdinal) - Number(b.requestOrdinal))
-  return { chain: { ...base, requests: ordered, snapshots }, loading: !!runId && saved?.key !== key, error: saved?.key === key ? saved.error : '' }
+  return { chain: { ...base, requests: ordered, snapshots }, onChainChange: (chain: ExecutionChain) => setSaved(previous => previous?.key === key ? { key, chain, error: '' } : previous), loading: !!runId && saved?.key !== key, error: saved?.key === key ? saved.error : '' }
 }

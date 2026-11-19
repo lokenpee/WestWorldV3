@@ -1,0 +1,35 @@
+{
+  "optimization": 13,
+  "sample": {
+    "requests": 200,
+    "sessionRows": 400
+  },
+  "measurements": [
+    {
+      "name": "initial",
+      "requests": 2,
+      "returnedBytes": 26008,
+      "returnedRows": 2,
+      "elapsedMs": 37.2
+    },
+    {
+      "name": "unchanged_refresh",
+      "requests": 2,
+      "returnedBytes": 1996,
+      "returnedRows": 2,
+      "elapsedMs": 22.29
+    }
+  ],
+  "singleUpdateBytes": 3192,
+  "checks": {
+    "fullPagingRequests": 200,
+    "exactEventHeaders": 601,
+    "bodySamples": 4,
+    "fullRequest": true,
+    "updatedThinking": true,
+    "cumulativeStats": true,
+    "deletion": true,
+    "scopeIsolation": true,
+    "legacy": true
+  }
+}

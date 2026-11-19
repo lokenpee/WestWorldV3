@@ -15,7 +15,7 @@
 - [x] 10. P2按完成人物清理旧详情。见 acceptance 第10项及 evidence/10-*.json；HTTP批量删除随第17项验证。
 - [x] 11. P3专用轻量状态及页核对复用。见 acceptance 第11项及 evidence/11-*.json。
 - [x] 12. P3长线目录与关联预算处理。见 acceptance 第12项及 evidence/12-*.json。
-- [ ] 13. 执行链分页及增量刷新。
+- [x] 13. 执行链分页及增量刷新。见 acceptance 第13项及 evidence/13-*.json；36项回归与1项浏览器交互通过。
 - [ ] 14. Agent正常上下文移除观测正文读取。
 - [ ] 15. 压缩分块权重修正。
 - [ ] 16. 存储通知按范围刷新。

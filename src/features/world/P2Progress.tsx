@@ -11,7 +11,7 @@ export function P2Progress({ bookId, run, load, phase, candidateCount, error }: 
   const step = organization.runStep ?? (organization.mode === 'profile' || organization.step === 'profiles' ? 'profiles' : organization.mode === 'relations' || organization.step === 'relations' ? 'relations' : 'scan')
   const current = currentCharacter([run])
   const { chain } = useP2Execution(bookId, current?.runId, step, current?.objectKey, load)
-  const stats = executionStats(chain.requests)
+  const stats = chain.summary?.stats ?? executionStats(chain.requests)
   const items = step === 'profiles' ? organization.profileItems : organization.relationItems
   const completed = items.filter(item => item.status === 'checked').length
   const workId = step === 'scan' ? 'directory:identity' : current?.objectKey

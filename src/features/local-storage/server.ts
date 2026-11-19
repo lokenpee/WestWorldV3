@@ -78,6 +78,8 @@ export function createLocalStorageServer(directory: string, protector: Credentia
     if (action === 'begin') return locks.has(scope) ? null : begin(scope, body.tables as string[], body.write === true)
     if (action === 'exists') { assertAddress(scope, Object.keys(schemaFor(scope))[0]); return store.scopeExists(scope) }
     if (action === 'tracePage') { assertAddress(scope, 'storySessionEntries'); return store.tracePage(scope, body.options as Parameters<typeof store.tracePage>[1]) }
+    if (action === 'executionPage') { assertAddress(scope, 'storySessionEntries'); return store.executionPage(scope, body.options as Parameters<typeof store.executionPage>[1]) }
+    if (action === 'executionBody') { assertAddress(scope, 'storySessionEntries'); return store.executionBody(scope, body.options as Parameters<typeof store.executionBody>[1]) }
     if (action === 'publishMigration') {
       const book = body.book as StoredValue, id = String(book?.id ?? ''), digest = String(body.digest ?? '')
       if (!id || !digest) throw new Error('迁移信息不完整。')

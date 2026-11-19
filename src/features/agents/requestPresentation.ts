@@ -1,4 +1,4 @@
-import type { Row } from './repository'
+import type { ExecutionRow as Row } from './executionTypes.ts'
 
 export const requestRecord = (value: unknown): Row => value && typeof value === 'object' && !Array.isArray(value) ? value as Row : {}
 export const requestRows = (value: unknown): Row[] => Array.isArray(value) ? value.filter(item => item && typeof item === 'object') as Row[] : []
