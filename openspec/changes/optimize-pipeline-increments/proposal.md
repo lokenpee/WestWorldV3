@@ -28,3 +28,5 @@ book-import（分章、预览）、book-backup（准备与恢复）、extraction
 
 ## 接手说明
 先读[设计](design.md)、[任务](tasks.md)、[验收](acceptance.md)及审查文档。环境E:/WestWorldV3、Node24、Windows；只用临时库、固定模型响应。已有大量磁盘存储改动先整体形成基线。每一项开始前核对上一次Git和工作树，新增字段/迁移在设计写清后再实施。对应主规格在openspec/specs，用户验收前不归档。
+
+当前接手状态：第1–21项已逐项实施、量化并提交；[最终开发检查](evidence/22-final-checks.md)通过，REQ-030待用户小说副本验收。任务22.2/22.3为剩余事项，不重复实施已保留的优化。

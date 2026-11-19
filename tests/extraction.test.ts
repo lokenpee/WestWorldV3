@@ -10,6 +10,16 @@ import { emptyTables, tableNames, validateBookData } from '../src/features/backu
 import { createAssetService } from '../src/features/assets/service'
 import { readExtractionInput } from '../src/features/extraction/taskStore'
 import type { StoredTask } from '../src/features/extraction/recovery'
+import { RemoteDatabase } from '../src/features/local-storage/client'
+
+function interceptDisk(db: RemoteDatabase, check: (body: Record<string, unknown>) => void) {
+  const request = RemoteDatabase.prototype.request
+  const spy = vi.spyOn(RemoteDatabase.prototype, 'request').mockImplementation(function<T>(this: RemoteDatabase, body: Record<string, unknown>): Promise<T> {
+    if (this.name === db.name) check(body)
+    return request.call(this, body) as Promise<T>
+  })
+  return () => spy.mockRestore()
+}
 
 const workspaces: ReturnType<typeof createWorkspace>[] = []
 const world = { characters: [{ name: '沈青', confidence: 1, profile: { ageText: null }, speech_style_sample: '你好' }, { name: '沈青', confidence: 0.5, identity: '送信人' }], locations: [{ name: '青石镇', confidence: 1 }] }
@@ -637,13 +647,18 @@ it('两步骤独立记录共享快照，正常进度不读取任务历史和快�
   expect(tasks[0].inputFingerprint).not.toBe(tasks[1].inputFingerprint)
   expect(await db.table('extractionInputs').count()).toBe(1)
   const rejectHistory = () => { throw new Error('普通进度不应读取任务正文历史') }
-  db.table('extractionTasks').hook('reading', rejectHistory)
-  db.table('extractionInputs').hook('reading', rejectHistory)
+  const restore = db instanceof RemoteDatabase ? interceptDisk(db, body => {
+    if (['extractionTasks', 'extractionInputs'].includes(String(body.table)) && ['get', 'bulkGet', 'query'].includes(String(body.action)) && !(body.query as { keysOnly?: boolean })?.keysOnly) rejectHistory()
+  }) : (() => {
+    db.table('extractionTasks').hook('reading', rejectHistory)
+    db.table('extractionInputs').hook('reading', rejectHistory)
+    return () => {
+      db.table('extractionTasks').hook('reading').unsubscribe(rejectHistory)
+      db.table('extractionInputs').hook('reading').unsubscribe(rejectHistory)
+    }
+  })()
   try { expect(await service.progress('a')).toMatchObject({ status: 'completed', completedSteps: 2 }) }
-  finally {
-    db.table('extractionTasks').hook('reading').unsubscribe(rejectHistory)
-    db.table('extractionInputs').hook('reading').unsubscribe(rejectHistory)
-  }
+  finally { restore() }
 })
 
 it('继续旧运行迁移失败不改原任务；重试保留历史正文并完成新任务', async () => {
@@ -654,14 +669,16 @@ it('继续旧运行迁移失败不改原任务；重试保留历史正文并完�
   await db.table('pipelineRuns').put(legacy)
   await db.table('compileProgress').update('P1', { status: 'paused', runId: legacy.id })
   const rejectMigration = () => { throw new Error('模拟旧任务迁移失败') }
-  db.table('extractionTasks').hook('creating', rejectMigration)
+  const restore = db instanceof RemoteDatabase ? interceptDisk(db, body => {
+    if (body.table === 'extractionTasks' && (body.action === 'add' || body.action === 'bulk' && body.add)) rejectMigration()
+  }) : (() => { db.table('extractionTasks').hook('creating', rejectMigration); return () => db.table('extractionTasks').hook('creating').unsubscribe(rejectMigration) })()
   await service.start('a')
   expect(service.state('a')?.error).toContain('模拟旧任务迁移失败')
   expect(fetcher).not.toHaveBeenCalled()
   expect(await db.table('pipelineRuns').get(legacy.id)).toEqual(legacy)
   expect(await db.table('extractionInputs').count()).toBe(0)
   expect(await db.table('pipelineRuns').where('recordType').equals('lease').count()).toBe(0)
-  db.table('extractionTasks').hook('creating').unsubscribe(rejectMigration)
+  restore()
   await service.start('a')
   expect(service.state('a')?.error).toBeUndefined()
   expect(fetcher).toHaveBeenCalledTimes(2)
@@ -679,14 +696,16 @@ it('任务完成记录失败时资产与凭证一同回滚，失败任务仍可�
   const failCompletion = (changes: unknown) => {
     if ((changes as { status?: string }).status === 'completed') throw Object.assign(new Error('模拟任务完成保存失败'), { name: 'ConstraintError' })
   }
-  db.table('extractionTasks').hook('updating', failCompletion)
+  const restore = db instanceof RemoteDatabase ? interceptDisk(db, body => {
+    if (body.table === 'extractionTasks' && body.action === 'put') failCompletion(body.value)
+  }) : (() => { db.table('extractionTasks').hook('updating', failCompletion); return () => db.table('extractionTasks').hook('updating').unsubscribe(failCompletion) })()
   await service.retry('a', '1', 'worldAssets')
   expect(await db.table('characters').count()).toBe(0)
   expect(await db.table('locations').count()).toBe(0)
   expect(await db.table('assetLifecycle').count()).toBe(0)
   expect(await db.table('extractionReceipts').count()).toBe(0)
   expect((await db.table('extractionTasks').toArray()).map(task => task.status)).toEqual(['failed'])
-  db.table('extractionTasks').hook('updating').unsubscribe(failCompletion)
+  restore()
   await service.retry('a', '1', 'worldAssets')
   expect(await db.table('extractionReceipts').get('1:worldAssets')).toBeDefined()
   expect((await db.table('extractionTasks').toCollection().sortBy('ordinal')).map(task => task.status)).toEqual(['failed', 'completed'])

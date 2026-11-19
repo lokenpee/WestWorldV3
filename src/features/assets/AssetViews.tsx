@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ComponentProps } from 'react'
+import { useCallback, useState, type ComponentProps } from 'react'
 import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import { AssetEditor } from './AssetEditor'
 import type { AssetService } from './service'
@@ -8,7 +8,7 @@ import { EventNetwork } from '../network/EventNetwork'
 import type { Chapter } from '../../lib/storage/workspace'
 import { MergeHistory } from './MergeHistory'
 
-export function assetViewInterests(bookId: string, kind: AssetKind, network = false) {
+function assetViewInterests(bookId: string, kind: AssetKind, network = false) {
   const tables = kind === 'location' ? ['locations'] : kind === 'character' ? ['characters', 'characterRelations', 'characterRelationEdits'] : kind === 'node' ? ['characters', 'nodes', ...(network ? ['eventLines'] : [])] : ['characters', 'nodes', 'eventLines']
   return bookInterests(bookId, [...tables, 'assetLifecycle'])
 }
@@ -18,12 +18,12 @@ export function AssetDetails({ selectedId, confirmed, locks, ...props }: Omit<Co
   const detailId = kind === 'character' ? undefined : selectedId
   const query = useCallback(() => service.readContent(bookId, { kind, selectedId: detailId }), [service, bookId, kind, detailId])
   const data = useLiveResult(query, attempt, assetViewInterests(bookId, kind))
-  const observed = useRef<Asset | undefined>(undefined)
+  const [observed, setObserved] = useState<Asset>()
   if (data.status === 'loading') return <p role="status">正在读取资产详情…</p>
   if (data.status === 'error') return <div role="alert">{data.message}<button onClick={() => retry(value => value + 1)}>重新读取详情</button></div>
   const current = data.value[assetTables[kind]].find(row => row.id === selectedId)
-  if (confirmed && current && current.revision >= confirmed.revision) observed.current = confirmed
-  const asset = confirmed && observed.current !== confirmed && (!current || confirmed.revision > current.revision) ? confirmed : current
+  if (confirmed && current && current.revision >= confirmed.revision && observed !== confirmed) setObserved(confirmed)
+  const asset = confirmed && observed !== confirmed && (!current || confirmed.revision > current.revision) ? confirmed : current
   return <AssetEditor key={selectedId ?? 'new'} {...props} asset={asset} snapshot={{ ...data.value, locks }} />
 }
 
