@@ -4,7 +4,7 @@ import { strFromU8, unzipSync } from 'fflate'
 
 async function readRows(page: Page, bookId: string, table: string) {
   return page.evaluate(async ({ bookId, table }) => {
-    const request = indexedDB.open(`westworld_canon_${bookId}`)
+    const request = indexedDB.open(`westworld_acceptance_stage1_book_${bookId}`)
     const db = await new Promise<IDBDatabase>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
     const rows = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
       const request = db.transaction(table).objectStore(table).getAll()
@@ -14,16 +14,16 @@ async function readRows(page: Page, bookId: string, table: string) {
   }, { bookId, table })
 }
 
-test('身份关系按当前人物生成双向箭头，旧称呼未知并保留原文，编辑刷新方向正确', async ({ page }) => {
+test('身份关系按当前人物生成双向箭头，旧称呼按原值显示并保留原文，编辑刷新方向正确', async ({ page }) => {
   const support = '林黛玉是宝玉的妹妹，宝玉是她的兄长。'
   const clue = '黛玉凝了凝罥烟眉，清眸中却是不由浮现起那青衫少年的身影。'
-  await page.goto('/')
+  await page.goto('/?acceptance=stage1')
   await page.getByLabel('小说TXT文件').setInputFiles({ name: '关系身份.txt', mimeType: 'text/plain', buffer: Buffer.from(`第一章 关系\n${support}\n${clue}`) })
   await page.getByRole('button', { name: '仅导入', exact: true }).click()
   await expect(page.getByRole('heading', { name: '关系身份', exact: true })).toBeVisible()
   const bookId = await page.evaluate(async ({ clue }) => {
-    const name = (await indexedDB.databases()).find(db => db.name?.startsWith('westworld_canon_'))!.name!
-    const bookId = name.slice('westworld_canon_'.length)
+    const name = (await indexedDB.databases()).find(db => db.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!
+    const bookId = name.slice('westworld_acceptance_stage1_book_'.length)
     const request = indexedDB.open(name)
     const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
     await new Promise<void>((resolve, reject) => {
@@ -38,8 +38,8 @@ test('身份关系按当前人物生成双向箭头，旧称呼未知并保留�
   await page.reload()
   await page.getByRole('button', { name: '编辑 林黛玉', exact: true }).click()
   const relations = page.getByRole('region', { name: '人物关系', exact: true })
-  await expect(relations).toContainText('林黛玉--未知-->宝玉')
-  await expect(relations).toContainText('林黛玉<--未知--宝玉')
+  await expect(relations).toContainText('林黛玉--宝二哥-->宝玉')
+  await expect(relations).toContainText('林黛玉<--林妹妹--宝玉')
   await relations.getByText('查看相关原文与原标签', { exact: true }).click()
   await expect(relations).toContainText(clue)
   await expect(relations).toContainText('原正向标签：宝二哥')
@@ -62,12 +62,12 @@ test('身份关系按当前人物生成双向箭头，旧称呼未知并保留�
 })
 
 test('旧资料打开修复，地点合并与节点移除可保存，备份副本保留编辑及修复记录', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?acceptance=stage1')
   await page.getByLabel('小说TXT文件').setInputFiles({ name: '基础修复.txt', mimeType: 'text/plain', buffer: Buffer.from('第一章 开始\n张三记得张蕾。') })
   await page.getByRole('button', { name: '仅导入', exact: true }).click()
   await expect(page.getByRole('heading', { name: '基础修复', exact: true })).toBeVisible()
   const bookId = await page.evaluate(async () => {
-    const name = (await indexedDB.databases()).find(db => db.name?.startsWith('westworld_canon_'))!.name!, bookId = name.slice('westworld_canon_'.length)
+    const name = (await indexedDB.databases()).find(db => db.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!, bookId = name.slice('westworld_acceptance_stage1_book_'.length)
     const request = indexedDB.open(name), db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
     const now = new Date().toISOString()
     await new Promise<void>((resolve, reject) => {
@@ -115,7 +115,7 @@ test('旧资料打开修复，地点合并与节点移除可保存，备份副�
   await expect(page.getByRole('status').filter({ hasText: '已恢复：基础修复（导入）' })).toBeVisible()
   await page.getByRole('button', { name: '资产', exact: true }).click()
   await expect(page.getByRole('heading', { name: '基础修复（导入）', exact: true })).toBeVisible()
-  const restoredId = await page.evaluate(async original => (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_') && row.name !== `westworld_canon_${original}`)!.name!.slice('westworld_canon_'.length), bookId)
+  const restoredId = await page.evaluate(async original => (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_acceptance_stage1_book_') && row.name !== `westworld_acceptance_stage1_book_${original}`)!.name!.slice('westworld_acceptance_stage1_book_'.length), bookId)
   expect((await readRows(page, restoredId, 'nodes'))[0]).toMatchObject({ actorIds: [], legacyActorIds: [] })
   expect((await readRows(page, restoredId, 'characterRelationEdits')).map(row => row.state).sort()).toEqual(['active', 'deleted'])
   expect((await readRows(page, restoredId, 'pipelineRuns')).filter(row => row.recordType === 'asset_edit')).toHaveLength(1)

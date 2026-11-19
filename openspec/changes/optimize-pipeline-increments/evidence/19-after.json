@@ -1,0 +1,26 @@
+{
+  "optimization": 19,
+  "sample": {
+    "characters": 300,
+    "locations": 1000,
+    "nodes": 600,
+    "eventLines": 100,
+    "firstPage": 100
+  },
+  "returnedBytes": 130706,
+  "reads": [
+    {
+      "action": "get",
+      "table": "books"
+    },
+    {
+      "action": "status",
+      "table": ""
+    },
+    {
+      "action": "assetPage",
+      "table": ""
+    }
+  ],
+  "items": 100
+}

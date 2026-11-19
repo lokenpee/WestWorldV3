@@ -1,0 +1,54 @@
+{
+  "optimization": 19,
+  "sample": {
+    "characters": 300,
+    "locations": 1000,
+    "nodes": 600,
+    "eventLines": 100,
+    "firstPage": 100
+  },
+  "returnedBytes": 8857326,
+  "reads": [
+    {
+      "action": "get",
+      "table": "books"
+    },
+    {
+      "action": "status",
+      "table": ""
+    },
+    {
+      "action": "query",
+      "table": "assetLifecycle"
+    },
+    {
+      "action": "query",
+      "table": "characterRelations"
+    },
+    {
+      "action": "query",
+      "table": "characterRelationEdits"
+    },
+    {
+      "action": "query",
+      "table": "characters"
+    },
+    {
+      "action": "query",
+      "table": "locations"
+    },
+    {
+      "action": "query",
+      "table": "nodes"
+    },
+    {
+      "action": "query",
+      "table": "eventLines"
+    },
+    {
+      "action": "query",
+      "table": "pipelineRuns"
+    }
+  ],
+  "items": 100
+}

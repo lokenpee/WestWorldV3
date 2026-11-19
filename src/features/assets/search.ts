@@ -1,5 +1,9 @@
-import type { Chapter } from '../../lib/storage/workspace'
-import { assetName, type Asset, type Character } from './types'
+/** 搜索只依赖这些字段，供浏览器与本机分页共用同一排序。 */
+export interface SearchAsset { id: string; name?: string; title?: string; aliases?: string[]; chapters?: string[]; sourceChapters?: string[]; chapterIndex?: string; summary?: string; identity?: string; description?: string; cause?: string; process?: string; result?: string; roleWeight?: string }
+interface Chapter { chapterIndex: string; order: number }
+type Asset = SearchAsset
+interface Character extends SearchAsset { name: string }
+const assetName = (row: SearchAsset) => row.title ?? row.name ?? ''
 
 const normalize = (value: string) => value.normalize('NFKC').trim().toLowerCase()
 type Rank = [tier: number, field: number, offset: number, excess: number]
@@ -17,7 +21,7 @@ function rankAsset(row: Asset, query: string): Rank | undefined {
   }
   if (matches.length) return matches.sort(compareRank)[0]
   const body = 'title' in row ? [row.cause, row.process, row.result] : 'summary' in row ? [row.summary] : 'identity' in row ? [row.identity ?? ''] : 'description' in row ? [row.description ?? ''] : []
-  if (body.some(value => normalize(value).includes(query))) return [4, 0, 0, 0]
+  if (body.some(value => normalize(value ?? '').includes(query))) return [4, 0, 0, 0]
   return undefined
 }
 
@@ -27,7 +31,7 @@ export function searchAssets<T extends Asset>(rows: T[], queryText: string, chap
   if (!query) return [...rows].sort((a, b) => byName(a, b) || a.id.localeCompare(b.id))
   const chapterOrder = new Map(chapters.map(chapter => [chapter.chapterIndex, chapter.order]))
   const firstChapter = (row: T) => {
-    const ids = 'title' in row ? row.chapters : [...('sourceChapters' in row ? row.sourceChapters ?? [] : []), ...('chapterIndex' in row && row.chapterIndex ? [row.chapterIndex] : [])]
+    const ids = 'title' in row ? row.chapters ?? [] : [...('sourceChapters' in row ? row.sourceChapters ?? [] : []), ...('chapterIndex' in row && row.chapterIndex ? [row.chapterIndex] : [])]
     return Math.min(Infinity, ...ids.map(id => chapterOrder.get(id) ?? Infinity))
   }
   return rows.flatMap(row => {
@@ -42,7 +46,7 @@ const nameCollator = new Intl.Collator('zh-CN')
 const idCollator = new Intl.Collator('zh-CN', { numeric: true })
 
 /** 人物专用搜索：只匹配主名和别名；空查询按层级、拼音和编号排序。 */
-export function searchCharacters(rows: Character[], queryText: string, chapters: Chapter[] = []): Character[] {
+export function searchCharacters<T extends Character>(rows: T[], queryText: string, chapters: Chapter[] = []): T[] {
   const query = normalize(queryText)
   const byName = (a: Character, b: Character) => pinyinCollator.compare(a.name, b.name) || nameCollator.compare(a.name, b.name)
   if (!query) return [...rows].sort((a, b) => (roleOrder[a.roleWeight ?? 'NPC'] ?? 2) - (roleOrder[b.roleWeight ?? 'NPC'] ?? 2) || byName(a, b) || idCollator.compare(a.id, b.id))

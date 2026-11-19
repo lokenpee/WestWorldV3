@@ -6,6 +6,8 @@ import { StorageConflict, type CredentialProtector, type RecordAddress, type Rec
 import type { RecordQuery } from './schema.ts'
 import { executionBody, executionPage } from './executionQueries.ts'
 import type { ExecutionQuery } from '../agents/executionPagingTypes.ts'
+import { assetPageFields, makeAssetPage, pageTables, type AssetPageOptions, type PageKind } from '../assets/assetPage.ts'
+import type { SearchAsset } from '../assets/search.ts'
 
 const schemaVersion = 1
 const uniqueFields: Record<string, string[][]> = {
@@ -138,6 +140,15 @@ export class SqliteRecordStore {
   scopeExists(scope: string) { return !!this.database.prepare('SELECT 1 FROM records WHERE scope=? LIMIT 1').get(scope) }
 
   executionPage(scope: string, options: ExecutionQuery) { return executionPage(this.database, scope, options, this.status().revision) }
+  assetPage(scope: string, kind: PageKind, options: AssetPageOptions) {
+    if (!Object.hasOwn(pageTables, kind)) throw new Error('未知资产栏目。')
+    const columns = assetPageFields(kind, !!options.query?.trim()).map(field => `'${field}',json_extract(body,'$.${field}')`).join(',')
+    const rows = this.database.prepare(`SELECT json_object(${columns}) AS value FROM records WHERE scope=? AND tableName=?`).all(scope, pageTables[kind]).map(row => JSON.parse(String(row.value))) as (SearchAsset & StoredValue)[]
+    // 缺失字段不投影成null，保持原搜索的字段分支与数组默认值。
+    for (const row of rows) for (const key of Object.keys(row)) if (row[key] === null) delete row[key]
+    const chapters = options.query?.trim() ? this.database.prepare("SELECT json_extract(body,'$.chapterIndex') AS chapterIndex,json_extract(body,'$.order') AS 'order' FROM records WHERE scope=? AND tableName='chapters'").all(scope) as unknown as { chapterIndex: string; order: number }[] : []
+    return makeAssetPage(kind, rows, chapters, options)
+  }
   notificationFields(scope: string, table: string, key: string): StoredValue | undefined { return this.database.prepare("SELECT json_extract(body,'$.type') AS type,json_extract(body,'$.recordType') AS recordType,json_extract(body,'$.stage') AS stage FROM records WHERE scope=? AND tableName=? AND recordKey=?").get(scope, table, key) }
   executionBody(scope: string, options: ExecutionQuery & { requestId: string; eventKey?: string }) { return executionBody(this.database, scope, options) }
 

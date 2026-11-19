@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function prepare(page: Page) {
-  await page.goto('/')
+  await page.goto('/?acceptance=stage1')
   await page.getByLabel('小说TXT文件').setInputFiles({ name: '搜索样本.txt', mimeType: 'text/plain', buffer: Buffer.from('第一章 开始\n薛蟠案起。\n第二章 后续\n宝钗探问。') })
   await page.getByRole('button', { name: '仅导入', exact: true }).click()
   await expect(page.getByRole('heading', { name: '搜索样本', exact: true })).toBeVisible()
   await page.evaluate(async () => {
-    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!
-    const bookId = name.slice('westworld_canon_'.length), request = indexedDB.open(name)
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!
+    const bookId = name.slice('westworld_acceptance_stage1_book_'.length), request = indexedDB.open(name)
     const db = await new Promise<IDBDatabase>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
     const common = { bookId, revision: 1, createdBy: 'P1', confidence: 1, chapterIndex: '1', chapterName: '第一章 开始' }
     const rows = {
@@ -82,7 +82,7 @@ test('地点别名、事件概述和事件线正文均可搜，标题匹配优�
     await expect(panel.locator('.asset-list code')).toHaveText(['E2'])
   }
   const revisions = await page.evaluate(async () => {
-    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!, request = indexedDB.open(name)
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!, request = indexedDB.open(name)
     const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
     const result: number[] = []
     for (const table of ['characters', 'locations', 'nodes', 'eventLines']) result.push(...await new Promise<number[]>(resolve => { const read = db.transaction(table).objectStore(table).getAll(); read.onsuccess = () => resolve(read.result.map(row => row.revision)) }))

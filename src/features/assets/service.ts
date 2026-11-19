@@ -10,6 +10,10 @@ import { deleteCharacterPair, saveCharacterPair, type PairWriteInput, type PairW
 import { effectivePairs, paginateCharacterPairs, pairFromPerspective, pairView, projectRelations, relationView, syncRelations } from './relations'
 import type { LegacyMigrationReport } from './legacyRelations'
 import type { WorldRun } from '../world/types'
+import { makeAssetPage, type AssetPage, type AssetPageOptions } from './assetPage'
+import { versionedTable } from '../local-storage/client'
+import type { Chapter } from '../../lib/storage/workspace'
+import type { SearchAsset } from './search'
 
 type Workspace = ReturnType<typeof createWorkspace>
 type Database = ReturnType<Workspace['openBook']>
@@ -106,6 +110,7 @@ async function invalidateProgressBatch(db: Database, changes: { kind: AssetKind;
 const invalidateProgress = (db: Database, kind: AssetKind, id: string, timestamp: string) => invalidateProgressBatch(db, [{ kind, id }], timestamp)
 
 export function createAssetService(workspace: Workspace) {
+  const viewCache = new WeakMap<Database, Map<string, { versions: string; value: Omit<AssetSnapshot, 'locks'> }>>()
   async function database(bookId: string) {
     if (!await workspace.settings.books.get(bookId)) throw new AssetError('NOT_FOUND', '书籍不存在，请重新选择。')
     const db = workspace.openBook(bookId); await db.open(); return db
@@ -355,18 +360,33 @@ export function createAssetService(workspace: Workspace) {
     })
   }
 
-  async function readContent(bookId: string): Promise<Omit<AssetSnapshot, 'locks'>> {
+  async function readContent(bookId: string, view?: { kind: AssetKind; selectedId?: string; network?: boolean }): Promise<Omit<AssetSnapshot, 'locks'>> {
     const db = await database(bookId)
-    return transact(db, 'r', [db.tables], async (db) => {
+    const charactersNeeded = !view || view.kind !== 'location', nodesNeeded = !view || ['node', 'eventLine'].includes(view.kind), linesNeeded = !view || view.kind === 'eventLine' || view.kind === 'node' && view.network
+    const relationsNeeded = !view || view.kind === 'character', locationsNeeded = !view || view.kind === 'location'
+    const tables = [...(charactersNeeded ? ['characters'] : []), ...(nodesNeeded ? ['nodes'] : []), ...(linesNeeded ? ['eventLines'] : []), ...(relationsNeeded ? ['characterRelations', 'characterRelationEdits'] : []), ...(locationsNeeded ? ['locations'] : []), ...(!view || view.kind === 'character' || view.selectedId ? ['assetLifecycle'] : []), ...(!view ? ['pipelineRuns'] : [])]
+    const key = JSON.stringify(view?.kind === 'character' ? { kind: 'character' } : view), cache = viewCache.get(db) ?? new Map<string, { versions: string; value: Omit<AssetSnapshot, 'locks'> }>()
+    viewCache.set(db, cache)
+    return transact(db, 'r', [tables.map(table => db.table(table))], async (db) => {
+      let versions: string | undefined
+      if (view && workspace.disk) {
+        const values = await Promise.all(tables.map(table => versionedTable(db, table)!.versions()))
+        if (values.every(rows => rows.every(row => row.version > 0))) versions = JSON.stringify(values)
+        const prior = cache.get(key)
+        if (versions && prior?.versions === versions) return structuredClone(prior.value)
+      }
+      const selectedRows = async <T>(table: string): Promise<T[]> => view && !view.network && assetTables[view.kind] === table ? view.selectedId ? (await db.table<T>(table).bulkGet([view.selectedId])).filter((row): row is T => !!row) : [] : db.table<T>(table).toArray()
       const [storedCharacters, locations, storedNodes, eventLines, lifecycle, relationRows, editRows] = await Promise.all([
-        db.table<Character>('characters').toArray(), db.table<LocationAsset>('locations').toArray(), db.table<EventNode>('nodes').toArray(), db.table<EventLine>('eventLines').toArray(), db.table<Lifecycle>('assetLifecycle').toArray(), db.table<CharacterRelation>('characterRelations').toArray(), db.table<CharacterRelationEdit>('characterRelationEdits').toArray(),
+        charactersNeeded ? db.table<Character>('characters').toArray() : [], locationsNeeded ? selectedRows<LocationAsset>('locations') : [], nodesNeeded ? selectedRows<EventNode>('nodes') : [], linesNeeded ? selectedRows<EventLine>('eventLines') : [],
+        !view || view.kind === 'character' ? db.table<Lifecycle>('assetLifecycle').toArray() : view.selectedId ? db.table<Lifecycle>('assetLifecycle').bulkGet([`${view.kind}:${view.selectedId}`]).then(rows => rows.filter((row): row is Lifecycle => !!row)) : [],
+        relationsNeeded ? db.table<CharacterRelation>('characterRelations').toArray() : [], relationsNeeded ? db.table<CharacterRelationEdit>('characterRelationEdits').toArray() : [],
       ])
       const characters = storedCharacters
       const relations = relationRows
       const pairs = effectivePairs(relations, editRows, characters)
-      const view = pairView(pairs, characters)
+      const pairProjection = pairView(pairs, characters)
       const types = new Map(relations.map(relation => [relation.id, relation.relationType]))
-      const edges = view.edges.map(edge => ({ ...edge, types: [...new Set(edge.relationIds.flatMap(id => types.get(id) ?? []))] }))
+      const edges = pairProjection.edges.map(edge => ({ ...edge, types: [...new Set(edge.relationIds.flatMap(id => types.get(id) ?? []))] }))
       const unresolved = relationView(relations, characters, false).unresolved
       const byId = new Map(characters.map(person => [person.id, person]))
       const relationEdges = Object.fromEntries(characters.map(person => [person.id, [] as typeof edges]))
@@ -378,8 +398,10 @@ export function createAssetService(workspace: Workspace) {
       const nodes = storedNodes.map(node => node.actorIds === undefined ? bindNodeCharacters(node, characters) : node)
       const references = resolveReferences(nodes, characters)
       const lineCharacterIds = Object.fromEntries(eventLines.map(line => [line.id, [...new Set(line.nodeIds.flatMap(id => references[id]?.actorIds ?? []))]]))
-      const manualMerges = (await db.table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
-      return { characters: projected, locations, nodes, eventLines, lifecycle, references, lineCharacterIds, relations, relationEdges, unresolvedRelations: unresolved, pairs, manualMerges }
+      const manualMerges = view ? [] : (await db.table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
+      const value = { characters: projected, locations, nodes, eventLines, lifecycle, references, lineCharacterIds, relations, relationEdges, unresolvedRelations: unresolved, pairs, manualMerges }
+      if (versions) { cache.set(key, { versions, value: structuredClone(value) }); if (cache.size > 8) cache.delete(cache.keys().next().value!) }
+      return value
     })
   }
 
@@ -390,6 +412,19 @@ export function createAssetService(workspace: Workspace) {
 
   return {
     readContent, readLocks,
+    async readAssetPage(bookId: string, kind: AssetKind, options: AssetPageOptions = {}): Promise<AssetPage> {
+      const db = await database(bookId)
+      if (workspace.disk) return workspace.disk<AssetPage>({ action: 'assetPage', scope: `book:${bookId}`, kind, options })
+      return transact(db, 'r', [db.table(assetTables[kind]), db.chapters], async db => makeAssetPage(kind, await db.table(assetTables[kind]).toArray() as (SearchAsset & Record<string, unknown>)[], await db.chapters.toArray() as Chapter[], options))
+    },
+    async assetCounts(bookId: string) {
+      const db = await database(bookId)
+      return transact(db, 'r', [Object.values(assetTables).map(table => db.table(table)), db.table('pipelineRuns')], async db => ({
+        ...Object.fromEntries(await Promise.all(Object.entries(assetTables).map(async ([kind, table]) => [kind, await db.table(table).count()]))),
+        manualMerges: await db.table('pipelineRuns').where('stage').equals('manual_merge').count(),
+      }) as Record<AssetKind | 'manualMerges', number>)
+    },
+    async readMergeHistory(bookId: string) { return (await (await database(bookId)).table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id)) },
     async read(bookId: string): Promise<AssetSnapshot> {
       const [content, locks] = await Promise.all([readContent(bookId), readLocks(bookId)])
       return { ...content, locks }

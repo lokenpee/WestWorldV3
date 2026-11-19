@@ -1030,3 +1030,7 @@ P2关系完成时，relationItems.contentFingerprint保存提交后人物及相�
 
 ### P2历史详情位置
 T20中recordType=history_index为可重建位置记录，结构见storage.schema的PipelineRun定义。每个人物每一步一条，historyUnit保存profile:人物编号或relations:人物编号，historyRunIds只保留最新及尚未完成清理的运行编号，historyIndexVersion固定1。人物完成事务登记运行编号，随后等待最终日志落盘并按该人物清理旧详情；运行/暂停会话、有效执行权、共享快照和消息父链继续保留。位置与删除同事务提交；失败仍可重试。备份只携带业务运行和修改记录，省略该派生位置，恢复后首次维护重建。
+
+### 资产列表与详情读取
+
+本机assetPage只返回当前栏目一页的编号、名称、短预览、来源和修订，默认100条、最多200条；query与role采用原搜索排序，响应含total、matched、offset、limit及missingIds。missingIds按完整当前栏目判断，未显示的跨页合并选择仍有效。列表投影不写回资产；选中对象后读取完整详情和编辑所需依赖，保存进入原事务重新核对修订。数量使用标量计数，合并历史打开后读取，网络首次打开才读取。视图缓存以所依赖表的记录版本失效，不参与保存。原全量读取兼容入口和备份字段不变。

@@ -3,7 +3,7 @@ import { largeNetworkRows } from '../support/character-network'
 
 const cachePrefix = 'wwv3:character-network:v1:'
 async function prepare(page: Page, large = false) {
-  await page.goto('/')
+  await page.goto('/?acceptance=stage1')
   await page.getByLabel('小说TXT文件').setInputFiles({ name: '人物网络验收.txt', mimeType: 'text/plain', buffer: Buffer.from('第一章 开始\n样本正文。') })
   await page.getByRole('button', { name: '仅导入', exact: true }).click()
   await expect(page.getByRole('heading', { name: '人物网络验收', exact: true })).toBeVisible()
@@ -14,8 +14,8 @@ async function prepare(page: Page, large = false) {
     { ...rows.characterRelationEdits[1], aToBLabels: ['朋友'], bToALabels: [] },
   ]
   const bookId = await page.evaluate(async ({ characters, edits, prefix, large }) => {
-    const name = (await indexedDB.databases()).find(db => db.name?.startsWith('westworld_canon_'))!.name!
-    const bookId = name.slice('westworld_canon_'.length), request = indexedDB.open(name)
+    const name = (await indexedDB.databases()).find(db => db.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!
+    const bookId = name.slice('westworld_acceptance_stage1_book_'.length), request = indexedDB.open(name)
     const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(['characters', 'characterRelationEdits'], 'readwrite')

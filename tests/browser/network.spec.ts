@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test'
 
 async function prepare(page: Page) {
-  await page.goto('/')
+  await page.goto('/?acceptance=stage1')
   await page.getByLabel('小说TXT文件').setInputFiles({ name: '网络样本.txt', mimeType: 'text/plain', buffer: Buffer.from('第一章 开始\n甲乙会面。\n第二章 后续\n后续事件。') })
   await page.getByRole('button', { name: '仅导入', exact: true }).click()
   await expect(page.getByRole('heading', { name: '网络样本', exact: true })).toBeVisible()
   await page.evaluate(async () => {
-    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!
-    const bookId = name.slice('westworld_canon_'.length), request = indexedDB.open(name)
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!
+    const bookId = name.slice('westworld_acceptance_stage1_book_'.length), request = indexedDB.open(name)
     const db = await new Promise<IDBDatabase>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
     const nodes = ['发现线索', '共同节点', '后续事件', '独立日常'].map((name, i) => ({ id: `N${i + 1}`, bookId, name, summary: `${name}的实际经过`, actors: [], quote: '', chapterIndex: i < 2 ? '1' : '2', chapterName: i < 2 ? '第一章 开始' : '第二章 后续', order: i % 2, revision: 1, confidence: 1, createdBy: 'P1', eventLineIds: i === 0 ? ['L1'] : i === 1 ? ['L1', 'L2'] : i === 2 ? ['L2'] : [] }))
     await new Promise<void>((resolve, reject) => {
@@ -67,7 +67,7 @@ test('手机网络可缩放、按章节筛选并定位节点，布局不改资�
   await network.screenshot({ path: testInfo.outputPath('network-mobile.png') })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   const revisions = await page.evaluate(async () => {
-    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!, request = indexedDB.open(name)
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!, request = indexedDB.open(name)
     const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
     const rows = await new Promise<{ revision: number }[]>(resolve => { const request = db.transaction('nodes').objectStore('nodes').getAll(); request.onsuccess = () => resolve(request.result) }); db.close()
     return rows.map(row => row.revision)
@@ -100,7 +100,7 @@ test('千节点网络可搜索定位末项，筛选后保持实际总数', async
   test.setTimeout(60000)
   await prepare(page)
   await page.evaluate(async () => {
-    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_canon_'))!.name!, bookId = name.slice('westworld_canon_'.length), request = indexedDB.open(name)
+    const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!, bookId = name.slice('westworld_acceptance_stage1_book_'.length), request = indexedDB.open(name)
     const db = await new Promise<IDBDatabase>(resolve => { request.onsuccess = () => resolve(request.result) })
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(['nodes', 'eventLines'], 'readwrite'), nodes = tx.objectStore('nodes'), lines = tx.objectStore('eventLines')
