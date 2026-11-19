@@ -1,5 +1,6 @@
 import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
+import { credentialPresent } from '../local-storage/client'
 import { defaultConfig, modelApis, ModelError, type ModelConfig, type ModelSettings } from './types'
 
 type Workspace = ReturnType<typeof createWorkspace>
@@ -22,14 +23,16 @@ export function validateConfig(input: ModelConfig, requireModels = true): ModelC
 export function createModelConfigStore(workspace: Workspace) {
   const { settings } = workspace
   const credentials = settings.table<Credential>('credentials')
-  async function readFrom(settings: Workspace['settings']): Promise<ModelSettings> {
+  async function readConfig(settings: Workspace['settings']) {
     const stored = (await settings.appSettings.get(configKey))?.value
     const config = validateConfig({ ...defaultConfig, ...(stored && typeof stored === 'object' ? stored : {}) }, false)
-    return { config, configured: !!(await settings.table<Credential>('credentials').get(config.providerId))?.key.trim() }
+    return config
   }
   async function read(): Promise<ModelSettings> {
     return transact(settings, 'r', [settings.appSettings, credentials], async (settings) => {
-      return readFrom(settings)
+      const config = await readConfig(settings)
+      const configured = await credentialPresent(settings, config.providerId) ?? !!(await settings.table<Credential>('credentials').get(config.providerId))?.key.trim()
+      return { config, configured }
     })
   }
   async function persist(input: ModelConfig, apiKey: string, requireModels: boolean) {
@@ -44,13 +47,14 @@ export function createModelConfigStore(workspace: Workspace) {
     read,
     save: (input: ModelConfig, apiKey = '') => persist(input, apiKey, true),
     saveDraft: (input: ModelConfig, apiKey = '') => persist(input, apiKey, false),
-    async isCredentialConfigured(providerId: string) { return !!(await credentials.get(providerId.trim().toLowerCase()))?.key.trim() },
+    async isCredentialConfigured(providerId: string) { const id = providerId.trim().toLowerCase(); return await credentialPresent(settings, id) ?? !!(await credentials.get(id))?.key.trim() },
     async clearCredential(providerId: string) { await credentials.delete(providerId); return read() },
     async load() {
       return transact(settings, 'r', [settings.appSettings, credentials], async (settings) => {
-        const state = await readFrom(settings)
-        const credential = await settings.table<Credential>('credentials').get(state.config.providerId)
-        return { ...state, apiKey: credential?.key.trim() ?? '' }
+        const config = await readConfig(settings)
+        const credential = await settings.table<Credential>('credentials').get(config.providerId)
+        const apiKey = credential?.key.trim() ?? ''
+        return { config, configured: !!apiKey, apiKey }
       })
     },
   }

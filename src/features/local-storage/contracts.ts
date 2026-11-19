@@ -4,7 +4,7 @@ export interface StoredRecord { key: string; value: StoredValue; version: number
 export interface RecordAddress { scope: string; table: string; key: string }
 export interface RecordWrite extends RecordAddress { value?: StoredValue; expectedVersion?: number | null }
 export interface RecordPage { records: StoredRecord[]; nextKey?: string }
-export interface CredentialProtector { protect(value: string): string; unprotect(value: string): string }
+export interface CredentialProtector { protect(value: string): string; unprotect(value: string): string; protectAsync?(value: string): Promise<string>; unprotectAsync?(value: string): Promise<string> }
 export type StorageCategory = 'business' | 'observation' | 'lease' | 'run' | 'merge' | 'history'
 export interface StorageTarget { scope: string; table?: string; category?: StorageCategory }
 export interface StorageNotice { epoch: string; revision: number; targets: StorageTarget[] }

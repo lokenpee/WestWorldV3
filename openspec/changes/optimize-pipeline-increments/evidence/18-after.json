@@ -1,0 +1,27 @@
+{
+  "optimization": 18,
+  "fakeCredential": true,
+  "measurements": [
+    {
+      "name": "configured",
+      "decrypts": 0,
+      "syncDecrypts": 0,
+      "elapsedMs": 2.43,
+      "maxTimerIntervalMs": 23.07
+    },
+    {
+      "name": "firstLoad",
+      "decrypts": 1,
+      "syncDecrypts": 0,
+      "elapsedMs": 614.51,
+      "maxTimerIntervalMs": 20.2
+    },
+    {
+      "name": "warmLoad",
+      "decrypts": 0,
+      "syncDecrypts": 0,
+      "elapsedMs": 0.72,
+      "maxTimerIntervalMs": 14.89
+    }
+  ]
+}

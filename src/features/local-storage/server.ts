@@ -9,12 +9,26 @@ interface TransactionState {
   changes: Map<string, Map<string, StoredValue | undefined>>
 }
 export function createLocalStorageServer(directory: string, protector: CredentialProtector, backupInterval = 300000) {
-  const store = new SqliteRecordStore(directory, protector)
+  // HTTP服务在事务外异步处理凭据；SQLite只接收密文。
+  const store = new SqliteRecordStore(directory, { protect: value => value, unprotect: value => value })
+  const credentials = new Map<string, { version: number; ciphertext: string; value: Promise<string> }>()
+  async function decode(table: string, row: StoredRecord | null | undefined): Promise<StoredRecord | undefined> {
+    if (!row || table !== 'credentials' || row.value.key === undefined) return row ?? undefined
+    const ciphertext = String(row.value.key), previous = credentials.get(row.key)
+    let cached = previous?.version === row.version && previous.ciphertext === ciphertext ? previous : undefined
+    if (!cached) {
+      const value = Promise.resolve().then(() => protector.unprotectAsync ? protector.unprotectAsync(ciphertext) : protector.unprotect(ciphertext))
+      cached = { version: row.version, ciphertext, value }; credentials.set(row.key, cached)
+      const current = cached
+      void value.catch(() => { if (credentials.get(row.key) === current) credentials.delete(row.key) })
+    }
+    return { ...row, value: { ...row.value, key: await cached.value } }
+  }
   const epoch = randomUUID(), notices: StorageNotice[] = []
   const category = (table: string, value: StoredValue) => table === 'storySessionEntries'
     ? ['request_trace', 'prompt_snapshot', 'tool_snapshot'].includes(String(value.type)) ? 'observation' as const : 'business' as const
     : table === 'pipelineRuns' ? value.recordType === 'lease' ? 'lease' as const : value.recordType === 'history_index' ? 'history' as const : value.stage === 'manual_merge' ? 'merge' as const : 'run' as const : undefined
-  function commit(writes: RecordWrite[]) {
+  async function commit(writes: RecordWrite[]) {
     const targets = new Map<string, StorageTarget>()
     for (const write of writes) {
       const before = ['storySessionEntries', 'pipelineRuns'].includes(write.table) ? store.notificationFields(write.scope, write.table, write.key) : undefined
@@ -22,7 +36,16 @@ export function createLocalStorageServer(directory: string, protector: Credentia
       const target: StorageTarget = { scope: write.scope, table: write.table, ...(nextCategory && (!before || !write.value || category(write.table, before) === nextCategory) ? { category: nextCategory } : {}) }
       targets.set(JSON.stringify(target), target)
     }
-    const status = store.commit(writes)
+    const encrypted: RecordWrite[] = []
+    for (const write of writes) {
+      if (write.table !== 'credentials' || !write.value) { encrypted.push(write); continue }
+      if (typeof write.value.key !== 'string') throw new Error('本机凭据保护尚未配置或密钥格式错误。')
+      const key = protector.protectAsync ? await protector.protectAsync(write.value.key) : protector.protect(write.value.key)
+      encrypted.push({ ...write, value: { ...write.value, key } })
+    }
+    if (closed) throw new Error('存储服务已关闭。')
+    const status = store.commit(encrypted)
+    for (const write of writes) if (write.table === 'credentials') credentials.delete(write.key)
     if (writes.length) targets.set('status', { scope: 'status' })
     const change: StorageNotice = { epoch, revision: status.revision, targets: [...targets.values()] }
     if (writes.length) { notices.push(change); if (notices.length > 256) notices.shift() }
@@ -67,15 +90,15 @@ export function createLocalStorageServer(directory: string, protector: Credentia
     tx.touched = Date.now()
     return tx
   }
-  function get(scope: string, table: string, key: string, tx?: TransactionState): StoredRecord | undefined {
+  async function get(scope: string, table: string, key: string, tx?: TransactionState): Promise<StoredRecord | undefined> {
     const changes = tx?.changes.get(table)
     if (changes?.has(key)) { const value = changes.get(key); return value ? { key, value: structuredClone(value), version: 0 } : undefined }
-    return store.get({ scope, table, key })
+    return decode(table, store.get({ scope, table, key }))
   }
-  function query(scope: string, table: string, options: RecordQuery, tx?: TransactionState) {
+  async function query(scope: string, table: string, options: RecordQuery, tx?: TransactionState) {
     const changes = tx?.changes.get(table)
-    if (!changes?.size) return store.query(scope, table, options)
-    const rows = new Map(store.query(scope, table, { ...options, offset: 0, limit: -1, keysOnly: false }).map(row => [row.key, row]))
+    if (!changes?.size) return Promise.all(store.query(scope, table, options).map(async row => (await decode(table, row))!))
+    const rows = new Map((await Promise.all(store.query(scope, table, { ...options, offset: 0, limit: -1, keysOnly: false }).map(async row => (await decode(table, row))!))).map(row => [row.key, row]))
     for (const [key, value] of changes) {
       if (value && matches(indexValue(value, key, options.index), options)) rows.set(key, { key, value, version: 0 })
       else rows.delete(key)
@@ -124,7 +147,7 @@ export function createLocalStorageServer(directory: string, protector: Credentia
         }
         writes.push({ scope: 'settings', table: 'books', key: id, value: book })
         writes.push({ scope: 'settings', table: 'appSettings', key: markerKey, value: { key: markerKey, value: { source: body.source, digest, counts, status: 'completed' } } })
-        commit(writes); saved()
+        await commit(writes); saved()
         return { alreadyApplied: false }
       } finally { for (const tx of held) release(tx) }
     }
@@ -137,7 +160,7 @@ export function createLocalStorageServer(directory: string, protector: Credentia
           if (table === 'appSettings' && /^(book\.lifecycle:|migration:|assets\.exportDirectory$)/.test(key)) continue
           if (!store.get({ scope: 'settings', table, key })) writes.push({ scope: 'settings', table, key, value })
         }
-        commit(writes); if (writes.length) saved()
+        await commit(writes); if (writes.length) saved()
         return null
       } finally { release(tx) }
     }
@@ -148,19 +171,19 @@ export function createLocalStorageServer(directory: string, protector: Credentia
         if (action === 'abort') return null
         const writes: RecordWrite[] = []
         for (const [name, changes] of tx.changes) for (const [key, value] of changes) writes.push({ scope, table: name, key, value })
-        const status = commit(writes)
+        const status = await commit(writes)
         if (writes.length) saved()
         return status
       } finally { release(tx) }
     }
     assertAddress(scope, table)
     if (action === 'query') return query(scope, table, (body.query ?? {}) as RecordQuery, tx)
-    if (action === 'count') return tx?.changes.get(table)?.size ? query(scope, table, { ...(body.query ?? {}) as RecordQuery, keysOnly: true }, tx).length : store.count(scope, table, (body.query ?? {}) as RecordQuery)
+    if (action === 'count') return tx?.changes.get(table)?.size ? (await query(scope, table, { ...(body.query ?? {}) as RecordQuery, keysOnly: true }, tx)).length : store.count(scope, table, (body.query ?? {}) as RecordQuery)
     if (action === 'bulkGet') {
       if (!Array.isArray(body.keys)) throw new Error('批量读取需要主键列表。')
       const keys = body.keys.map(String), changes = tx?.changes.get(table)
       const rows = store.bulkGet(scope, table, keys)
-      return rows.map((row, index) => changes?.has(keys[index]) ? get(scope, table, keys[index], tx) ?? null : row)
+      return Promise.all(rows.map(async (row, index) => (changes?.has(keys[index]) ? await get(scope, table, keys[index], tx) : await decode(table, row)) ?? null))
     }
     if (action === 'bulkRemove' || action === 'bulkUpdate') {
       if (!tx?.write) throw new Error('批量修改需要写事务。')
@@ -172,7 +195,7 @@ export function createLocalStorageServer(directory: string, protector: Credentia
       if (!Array.isArray(body.updates)) throw new Error('批量更新需要记录列表。')
       let count = 0
       for (const item of body.updates as { key: string; changes: StoredValue }[]) {
-        const row = get(scope, table, String(item.key), tx)
+        const row = await get(scope, table, String(item.key), tx)
         if (!row) continue
         const value = { ...row.value, ...item.changes }
         await execute({ action: 'put', scope, table, transaction: tx.id, key: String(value[schemaFor(scope)[table]]), value }); count++
@@ -190,10 +213,16 @@ export function createLocalStorageServer(directory: string, protector: Credentia
     }
     const key = String(body.key ?? '')
     if (!key) throw new Error('缺少记录主键。')
-    if (action === 'get') return get(scope, table, key, tx) ?? null
+    if (action === 'credentialPresent') {
+      if (table !== 'credentials') throw new Error('凭据状态只适用于凭据表。')
+      const pending = tx?.changes.get(table)
+      const row = pending?.has(key) ? pending.get(key) : store.get({ scope, table, key })?.value
+      return typeof row?.key === 'string' && !!row.key.trim()
+    }
+    if (action === 'get') return await get(scope, table, key, tx) ?? null
     if (!tx || !tx.write) throw new Error('写入需要事务。')
     if (!['put', 'add', 'remove'].includes(action)) throw new Error('未知存储操作。')
-    if (action === 'add' && get(scope, table, key, tx)) throw new Error('ConstraintError:记录已存在。')
+    if (action === 'add' && await get(scope, table, key, tx)) throw new Error('ConstraintError:记录已存在。')
     const value = action === 'remove' ? undefined : body.value as StoredValue
     if (value && String(value[schemaFor(scope)[table]]) !== key) throw new Error('主键与记录不一致。')
     if (!tx.changes.has(table)) tx.changes.set(table, new Map())
@@ -223,6 +252,6 @@ export function createLocalStorageServer(directory: string, protector: Credentia
   }
   return {
     handle, execute,
-    async close() { closed = true; clearInterval(cleanup); clearTimeout(backupTimer); for (const tx of [...transactions.values()]) release(tx); await makeBackup(); store.close() },
+    async close() { closed = true; credentials.clear(); clearInterval(cleanup); clearTimeout(backupTimer); for (const tx of [...transactions.values()]) release(tx); await makeBackup(); store.close() },
   }
 }

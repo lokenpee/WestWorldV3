@@ -206,6 +206,10 @@ export function versionedTable(db: unknown, table: string) {
   }
 }
 
+export function credentialPresent(db: unknown, providerId: string): Promise<boolean> | undefined {
+  return db instanceof RemoteDatabase ? db.request<boolean>({ action: 'credentialPresent', table: 'credentials', key: providerId }) : undefined
+}
+
 export function watchDiskRevision(call: StorageCall) {
   let signature: string | undefined, stopped = false, connected = false, failed = false
   let revision: number | undefined, epoch: string | undefined
