@@ -11,30 +11,35 @@ export interface BackupManifest {
 }
 export interface BackupInspection { ok: boolean; errors: BackupError[]; manifest?: BackupManifest; stats?: { chapters: number; characters: number; locations: number; nodes: number; eventLines: number }; data?: BookData }
 export interface ExportResult { fileName: string; bytes: Uint8Array<ArrayBuffer>; manifest: BackupManifest; processing: boolean }
+export type BackupProgress = (message: string) => void
 export const checksumOf = async (bytes: Uint8Array) => `sha256:${Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new Uint8Array(bytes)))).map(value => value.toString(16).padStart(2, '0')).join('')}`
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
 const fail = (code: string, path: string, message: string): BackupInspection => ({ ok: false, errors: [{ code, path, message }] })
 
-export async function encodeBackup(input: BookData): Promise<ExportResult> {
+export async function encodeBackup(input: BookData, onProgress?: BackupProgress): Promise<ExportResult> {
+  onProgress?.('正在核对导出资料…')
   const processing = input.tables.pipelineRuns.some(row => row.recordType === 'lease' || row.status === 'running') || input.tables.compileProgress.some(row => row.status === 'running')
   const data = pauseBookData(input)
   const errors = await repairValidatedBookData(data)
   if (errors.length) throw new Error(`备份资料校验失败：${errors[0].path} ${errors[0].message}`)
+  onProgress?.('正在编码备份资料…')
   const contents = ['book', ...tableNames.filter(name => name !== 'chapterTexts')]
   const files: Record<string, Uint8Array> = { 'data/book.json': strToU8(JSON.stringify(data.book)) }
   for (const name of tableNames.filter(name => name !== 'chapterTexts')) files[`data/${name}.json`] = strToU8(JSON.stringify(data.tables[name]))
   for (const row of data.tables.chapterTexts) files[chapterFileName(row.chapterIndex as string)] = strToU8(row.text as string)
   const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: 11, appVersion: '0.4.3', exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
   files['manifest.json'] = strToU8(JSON.stringify(manifest))
+  onProgress?.('正在压缩备份…')
   const bytes = await new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) => zip(files as Zippable, { level: 6 }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
   const title = Array.from(data.book.title.replace(/[<>:"/\\|?*]/g, '_')).map(character => character.charCodeAt(0) < 32 ? '_' : character).join('').slice(0, 80)
   return { bytes, manifest, processing, fileName: `${title}-${manifest.exportedAt.replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}.wwv2` }
 }
 
-export async function inspectBackup(bytes: Uint8Array): Promise<BackupInspection> {
+export async function inspectBackup(bytes: Uint8Array, onProgress?: BackupProgress): Promise<BackupInspection> {
   let path = 'manifest.json'
   try {
     if (bytes.length > 128 * 1024 * 1024) return fail('SIZE', '', '备份文件超过128MB。')
+    onProgress?.('正在解压备份…')
     let expanded = 0; let count = 0
     const files = unzipSync(bytes, { filter: file => {
       expanded += file.originalSize; count++
@@ -46,12 +51,14 @@ export async function inspectBackup(bytes: Uint8Array): Promise<BackupInspection
     if (!object(value) || value.format !== 'westworld-v2' || !Number.isInteger(value.formatVersion) || typeof value.appVersion !== 'string' || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)) || !object(value.book) || typeof value.book.id !== 'string' || typeof value.book.title !== 'string' || !Number.isInteger(value.book.chapterCount) || !Array.isArray(value.contents) || !value.contents.every(item => typeof item === 'string') || !Array.isArray(value.excludes) || !value.excludes.every(item => typeof item === 'string') || !object(value.checksums)) return fail('MANIFEST', path, '备份清单结构不完整。')
     if (![4, 5, 6, 7, 8, 9, 10, 11].includes(value.formatVersion as number)) return fail('VERSION', path, Number(value.formatVersion) > 11 ? '备份版本较新，请使用支持该版本的应用。' : '备份版本不受支持。')
     const manifest = value as unknown as BackupManifest
+    onProgress?.('正在核对文件完整性…')
     for (const name of Object.keys(files)) if (name !== 'manifest.json' && !Object.hasOwn(manifest.checksums, name)) return fail('CHECKSUM', name, '文件缺少校验和。')
     for (const [name, checksum] of Object.entries(manifest.checksums)) {
       if (!/^(?:data\/[A-Za-z]+\.json|chapters\/\d+(?:\.\d+)*\.txt)$/.test(name)) return fail('PATH', name, '备份文件路径不符合格式。')
       if (!files[name]) return fail('MISSING_FILE', name, '备份中缺少文件。')
       if (typeof checksum !== 'string' || checksum !== await checksumOf(files[name])) return fail('CHECKSUM', name, '文件校验和不符。')
     }
+    onProgress?.('正在解析书籍资料…')
     const bookValue = parse('data/book.json')
     if (!object(bookValue) || bookValue.id !== manifest.book.id || bookValue.title !== manifest.book.title) return fail('BOOK', path, '书籍信息与清单不符。')
     const book = bookValue as unknown as Book
@@ -89,6 +96,7 @@ export async function inspectBackup(bytes: Uint8Array): Promise<BackupInspection
     const expectedFiles = new Set(['manifest.json', ...manifest.contents.map(name => `data/${name}.json`), ...tables.chapters.map(row => chapterFileName(row.chapterIndex as string))])
     for (const name of Object.keys(files)) if (!expectedFiles.has(name)) return fail('CONTENTS', name, '文件未登记在数据表或章节清单中。')
     let data: BookData = { book, tables }
+    onProgress?.('正在转换并核对资料…')
     markMissingTraceRefs(data.tables)
     if (manifest.formatVersion === 4) data = migrateLegacy(data, legacy)
     if (manifest.formatVersion < 6) data = migrateRelationsData(data)
@@ -129,7 +137,8 @@ export function markMissingTraceRefs(tables: BookTables) {
   }
 }
 
-export async function restoredTables(data: BookData, bookId: string) {
+export async function restoredTables(data: BookData, bookId: string, onProgress?: BackupProgress) {
+  onProgress?.('正在准备恢复资料…')
   const copy = pauseBookData(data)
   const rewrite = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(rewrite)
@@ -139,6 +148,7 @@ export async function restoredTables(data: BookData, bookId: string) {
   const tables = rewrite(copy.tables) as typeof copy.tables
   tables.storySessionEntries = tables.storySessionEntries.map((row, index) => ({ ...row, ...(copy.tables.storySessionEntries[index].message ? { message: copy.tables.storySessionEntries[index].message } : {}), ...(copy.tables.storySessionEntries[index].systemMessage ? { systemMessage: copy.tables.storySessionEntries[index].systemMessage } : {}) }))
   markMissingTraceRefs(tables)
+  onProgress?.('正在换算整理进度…')
   const { rebaseRestoredProgress } = await import('./rebase')
   await rebaseRestoredProgress(copy, tables, bookId)
   return tables

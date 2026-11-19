@@ -112,3 +112,31 @@ test('原生连接阻塞删除时显示待完成，释放后可手动重试', as
   await expect.poll(() => page.evaluate(async () => (await indexedDB.databases()).map(row => row.name))).not.toContain('westworld_acceptance_backup_book_stage1-book-a')
   await expect(page.getByRole('button', { name: '进入 山城来客', exact: true })).toBeVisible()
 })
+
+test('备份面板换服务会清空旧预览和忙碌状态，旧预检晚到时释放结果', async ({ page }) => {
+  await page.goto('/?acceptance=backup')
+  await page.evaluate(async () => {
+    const path = '/tests/browser/backup-preparation-probe.tsx'
+    const { mountBackupPreparationProbe } = await import(/* @vite-ignore */ path)
+    Object.assign(window, { backupPreparationProbe: mountBackupPreparationProbe() })
+  })
+  type Probe = ReturnType<typeof import('./backup-preparation-probe').mountBackupPreparationProbe>
+  const panel = page.locator('#backup-preparation-probe')
+  const input = panel.getByLabel('选择备份文件（.wwv2）', { exact: true })
+  await input.setInputFiles({ name: 'A.wwv2', mimeType: 'application/zip', buffer: Buffer.from('A') })
+  await expect(panel.getByRole('region', { name: '备份预检' })).toContainText('文件 A')
+  await page.evaluate(() => (window as unknown as { backupPreparationProbe: Probe }).backupPreparationProbe.render('文件 B', true))
+  await expect(panel.getByRole('region', { name: '备份预检' })).toHaveCount(0)
+  await expect(input).toBeEnabled()
+  expect(await page.evaluate(() => (window as unknown as { backupPreparationProbe: Probe }).backupPreparationProbe.disposed)).toEqual(['文件 A'])
+  await input.setInputFiles({ name: 'B.wwv2', mimeType: 'application/zip', buffer: Buffer.from('B') })
+  await expect(panel.getByRole('status')).toContainText('正在准备 文件 B')
+  await expect(input).toBeDisabled()
+  await page.evaluate(() => (window as unknown as { backupPreparationProbe: Probe }).backupPreparationProbe.render('文件 C'))
+  await expect(input).toBeEnabled()
+  await expect(panel.getByRole('status')).toHaveCount(0)
+  await page.evaluate(() => (window as unknown as { backupPreparationProbe: Probe }).backupPreparationProbe.finish('文件 B'))
+  await expect.poll(() => page.evaluate(() => (window as unknown as { backupPreparationProbe: Probe }).backupPreparationProbe.disposed)).toEqual(['文件 A', '文件 B'])
+  await expect(panel.getByRole('region', { name: '备份预检' })).toHaveCount(0)
+  await page.evaluate(() => (window as unknown as { backupPreparationProbe: Probe }).backupPreparationProbe.unmount())
+})

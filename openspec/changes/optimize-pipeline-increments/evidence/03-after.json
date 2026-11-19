@@ -1,0 +1,9 @@
+{
+  "chapters": 200,
+  "sourceCharacters": 1601892,
+  "compressedBytes": 49363,
+  "unzipCalls": 1,
+  "prepareMs": 89.41,
+  "restoreMs": 264.4,
+  "intact": true
+}

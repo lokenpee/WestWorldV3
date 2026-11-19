@@ -1,0 +1,29 @@
+{
+  "chapters": 200,
+  "nodes": 2000,
+  "lines": 100,
+  "compressedBytes": 126717,
+  "medianPrepareMs": 387.7,
+  "medianPrepareMaxTimerGapMs": 387.9,
+  "medianRestoreMs": 1542.9,
+  "samples": [
+    {
+      "prepareMs": 499.1,
+      "prepareMaxTimerGapMs": 500.4,
+      "restoreMs": 1542.9,
+      "intact": true
+    },
+    {
+      "prepareMs": 375.1,
+      "prepareMaxTimerGapMs": 375.3,
+      "restoreMs": 1767,
+      "intact": true
+    },
+    {
+      "prepareMs": 387.7,
+      "prepareMaxTimerGapMs": 387.9,
+      "restoreMs": 1429.4,
+      "intact": true
+    }
+  ]
+}
