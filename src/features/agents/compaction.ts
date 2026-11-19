@@ -25,7 +25,7 @@ export async function sessionProjection(repo: AgentRepository, sessionId: string
     if (!session || session.bookId !== repo.bookId) throw new Error('会话不属于当前书籍。')
     const entries = unitId && store.sessionEntries ? await store.sessionEntries(sessionId) : (await store.rows('storySessionEntries')).filter(row => row.sessionId === sessionId)
     const projectedEntries = lightweightStory ? entries.map(row => row.type === 'message' && (row.message as AgentMessage).role !== 'system' ? { ...row, message: storyMessages([row.message as AgentMessage])[0] } : row) : entries
-    return { ...(unitId ? projectWorkSession(entries, unitId) : projectSession(projectedEntries, text(session.leafId) || undefined)), session, allEntries: unitId ? entries : [...entries, ...(await repo.traceRows()).filter(row => row.sessionId === sessionId)] }
+    return { ...(unitId ? projectWorkSession(entries, unitId) : projectSession(projectedEntries, text(session.leafId) || undefined)), session, allEntries: entries }
   })
 }
 function withTask(messages: AgentMessage[], prompt: string) {

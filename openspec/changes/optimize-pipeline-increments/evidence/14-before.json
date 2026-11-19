@@ -1,0 +1,28 @@
+{
+  "optimization": 14,
+  "sample": {
+    "observationRows": 200,
+    "businessMessages": 2
+  },
+  "results": [
+    {
+      "name": "identity",
+      "observationReads": 0,
+      "observationBytes": 0,
+      "projectedMessages": 2
+    },
+    {
+      "name": "normal",
+      "observationReads": 1,
+      "observationBytes": 8428091,
+      "projectedMessages": 2
+    },
+    {
+      "name": "story_pages",
+      "observationReads": 1,
+      "observationBytes": 8428091,
+      "projectedMessages": 2
+    }
+  ],
+  "observationsPreserved": 200
+}
