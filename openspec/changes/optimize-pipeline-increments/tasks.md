@@ -10,7 +10,7 @@
 - [x] 5. P1关系及节点受影响范围重建。见 acceptance 第5项及 evidence/05-*.json。
 - [x] 6. 单章提取收尾统计复用。见 acceptance 第6项及 evidence/06-*.json。
 - [x] 7. P2关系完成指纹与复用修复。见 acceptance 第7项及 evidence/07-*.json。
-- [ ] 8. P2继续启动失败清理。
+- [x] 8. P2继续启动失败清理。见 acceptance 第8项及 evidence/08-*.json。
 - [ ] 9. P2事务内关系快照及增量计算。
 - [ ] 10. P2按完成人物清理旧详情。
 - [ ] 11. P3专用轻量状态及页核对复用。

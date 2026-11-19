@@ -476,34 +476,61 @@ export function createWorldService(workspace: Workspace, models: Pick<ModelServi
     if (!run || run.status !== 'paused') throw new Error('没有可继续的暂停任务。')
     const currentLease = await db.table('pipelineRuns').get('lease:world')
     if (currentLease && currentLease.runId === run.id && Number(currentLease.expiresAt ?? 0) > Date.now()) throw new Error('人物整理正在其他窗口运行或暂停，请先关闭其他窗口。')
+    if (controllers.has(bookId) || mechanical.isRunning(bookId)) throw new Error('本书已有处理任务。')
     const controller = new AbortController(), owner = crypto.randomUUID()
     pauseRequests.delete(run.id); hardCancelled.delete(run.id)
     controllers.set(bookId, controller); activeRuns.set(bookId, run.id)
-    await transact(db, 'rw', [db.tables], async (db) => {
-      const leases = await db.table('pipelineRuns').toArray()
-      if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()) && row.runId !== run.id)) throw new Error('本书已有处理任务。')
-      const current = (await db.table<WorldRun>('pipelineRuns').get(run.id))!
-      const organization = current.organization as (Record<string, unknown> & { pauseRequested?: boolean }) | undefined
-      if (organization) {
-        organization.pauseRequested = false
-        // 用户明确继续时重试未完成项；历史任务错误留在原记录中。
-        for (const field of ['scanPages', 'profileItems', 'relationItems', 'candidateGroups']) {
-          for (const item of records(organization[field])) if (item.status !== 'checked' && item.status !== 'resolved') delete item.lastError
+    const ownsStartup = () => controllers.get(bookId) === controller && activeRuns.get(bookId) === run.id
+    const assertStarting = () => {
+      controller.signal.throwIfAborted()
+      if (hardCancelled.has(run.id) || !ownsStartup()) throw new Error('人物整理启动已取消。')
+    }
+    let sessionId = '', committed = false
+    try {
+      await transact(db, 'rw', [db.tables], async (db) => {
+        assertStarting()
+        const leases = await db.table('pipelineRuns').toArray()
+        if (leases.some(row => row.recordType === 'lease' && ['world', 'narrative', 'extraction', 'extraction:worldAssets', 'extraction:narrativeAssets'].includes(row.lockKey) && (typeof row.expiresAt !== 'number' || row.expiresAt > Date.now()))) throw new Error('本书已有处理任务。')
+        const current = await db.table<WorldRun>('pipelineRuns').get(run.id)
+        if (!current || current.bookId !== bookId || current.status !== 'paused') throw new Error('人物整理状态已变化，请重新读取后继续。')
+        const organization = current.organization as (Record<string, unknown> & { pauseRequested?: boolean }) | undefined
+        if (organization) {
+          organization.pauseRequested = false
+          // 用户明确继续时重试未完成项；历史任务错误留在原记录中。
+          for (const field of ['scanPages', 'profileItems', 'relationItems', 'candidateGroups']) {
+            for (const item of records(organization[field])) if (item.status !== 'checked' && item.status !== 'resolved') delete item.lastError
+          }
+          delete organization.pauseNotice
         }
-        delete organization.pauseNotice
+        await db.table('pipelineRuns').put({ ...current, ...(organization ? { organization } : {}), status: 'running', finishedAt: undefined })
+        await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId: run.id, expiresAt: Date.now() + 30000 })
+        await db.table('compileProgress').update('P2', { status: 'running', validity: 'current', updatedAt: new Date().toISOString() })
+        sessionId = text(current.sessionId)
+        if (sessionId) {
+          const session = await db.table('storySessions').get(sessionId)
+          if (!session || session.bookId !== bookId || session.runId !== run.id || session.profile !== 'asset_editor') throw new Error('人物整理会话与当前任务不一致，请重新读取后继续。')
+          await db.table('storySessions').put({ ...session, leaseOwner: owner, leaseUntil: Date.now() + 30000 })
+        }
+        assertStarting()
+      })
+      committed = true
+      assertStarting()
+      set(bookId, { running: true, paused: false, phase: '继续人物整理', error: undefined, runId: run.id, organizationStep: run.organization?.runStep })
+      void executeStep(bookId, run.id, owner, controller, sessionId)
+      return run.id
+    } catch (error) {
+      // 取消流程负责自己的落库；晚返回的旧启动不能清理或覆盖新执行器。
+      let saveFailure = ''
+      try {
+        if (committed && ownsStartup() && controller.signal.aborted && !hardCancelled.has(run.id)) await finalizeStepRun(bookId, run.id, owner, controller, sessionId)
+      } catch (saveError) { saveFailure = saveError instanceof Error ? saveError.message : '启动状态保存失败。' }
+      if (ownsStartup()) {
+        controllers.delete(bookId); activeRuns.delete(bookId)
+        const message = error instanceof Error ? error.message : '人物整理继续启动失败。'
+        if (!hardCancelled.has(run.id)) set(bookId, { running: false, paused: true, phase: '已暂停', runId: run.id, organizationStep: run.organization?.runStep, error: saveFailure ? `${message}；启动状态保存失败：${saveFailure}` : message })
       }
-      await db.table('pipelineRuns').put({ ...current, ...(organization ? { organization } : {}), status: 'running', finishedAt: undefined })
-      await db.table('pipelineRuns').put({ id: 'lease:world', recordType: 'lease', bookId, lockKey: 'world', owner, runId: run.id, expiresAt: Date.now() + 30000 })
-      await db.table('compileProgress').update('P2', { status: 'running', validity: 'current', updatedAt: new Date().toISOString() })
-    })
-    const sessionId = text(run.sessionId)
-    if (sessionId) await transact(db, 'rw', [db.table('storySessions')], async (db) => {
-      const session = await db.table('storySessions').get(sessionId)
-      if (session) await db.table('storySessions').put({ ...session, leaseOwner: owner, leaseUntil: Date.now() + 30000 })
-    })
-    set(bookId, { running: true, paused: false, phase: '继续人物整理', error: undefined, runId: run.id, organizationStep: run.organization?.runStep })
-    void executeStep(bookId, run.id, owner, controller, sessionId)
-    return run.id
+      throw error
+    }
   }
 
   async function characterOrganizationRun(bookId: string, characterId: string) {
