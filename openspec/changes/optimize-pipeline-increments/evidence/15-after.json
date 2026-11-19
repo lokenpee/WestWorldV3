@@ -1,0 +1,63 @@
+{
+  "optimization": 15,
+  "measurements": [
+    {
+      "name": "ascii",
+      "sourceCharacters": 40000,
+      "transcriptTokens": 10024,
+      "budget": 2958,
+      "compressionRequests": 4,
+      "partTokens": [
+        2958,
+        2958,
+        2958,
+        1150
+      ]
+    },
+    {
+      "name": "cjk",
+      "sourceCharacters": 20000,
+      "transcriptTokens": 30024,
+      "budget": 2958,
+      "compressionRequests": 11,
+      "partTokens": [
+        2957,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        445
+      ]
+    },
+    {
+      "name": "mixed",
+      "sourceCharacters": 45000,
+      "transcriptTokens": 27524,
+      "budget": 2958,
+      "compressionRequests": 10,
+      "partTokens": [
+        2957,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        2958,
+        906
+      ]
+    }
+  ],
+  "checks": {
+    "exactText": true,
+    "budgetPreserved": true,
+    "surrogatePairs": true,
+    "originalHistory": true
+  }
+}

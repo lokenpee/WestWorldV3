@@ -6,7 +6,7 @@ import { ModelError, type UsageSummary } from '../models/types'
 import { appendEntry, checkLease } from './commands'
 import { TraceSession } from './trace'
 import { appendRequestLedger } from './ledger'
-import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, entryMessages, findCutPoint, projectSession, projectWorkSession, settingsForWindow } from './context'
+import { estimateContextTokens, estimateMessageTokens, estimateTextTokens, textTokenWeight, entryMessages, findCutPoint, projectSession, projectWorkSession, settingsForWindow } from './context'
 import { text, validate } from './contracts'
 import type { AgentRepository, Row } from './repository'
 import type { Scope } from './queries'
@@ -67,7 +67,7 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
     const chunks: string[] = []; let chunk = '', tokens = 0
     const chunkBudget = Math.max(256, Math.floor(options.contextWindow * 0.45) - estimateTextTokens(compactPrompt))
     for (const char of transcript) {
-      const cost = estimateTextTokens(char)
+      const cost = textTokenWeight(char)
       if (tokens + cost > chunkBudget && chunk) { chunks.push(chunk); chunk = ''; tokens = 0 }
       chunk += char; tokens += cost
     }

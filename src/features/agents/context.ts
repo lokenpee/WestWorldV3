@@ -9,11 +9,12 @@ import { identityMessages } from './assetViews'
 export const observationTypes = new Set(['request_trace', 'prompt_snapshot', 'tool_snapshot'])
 export const isObservationEntry = (row: Row) => observationTypes.has(String(row.type))
 
-export function estimateTextTokens(value: string): number {
+export function textTokenWeight(value: string): number {
   let weight = 0
   for (const char of value) weight += /[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/u.test(char) ? 1.5 : char.codePointAt(0)! > 127 ? 1 : 0.25
-  return Math.ceil(weight)
+  return weight
 }
+export const estimateTextTokens = (value: string): number => Math.ceil(textTokenWeight(value))
 export const estimateMessageTokens = (message: AgentMessage) => 16 + estimateTextTokens(JSON.stringify(message, (key, value) => key === 'usage' ? undefined : value))
 export function settingsForWindow(window: number) {
   const reserve = Math.min(32768, Math.max(128, Math.floor(window / 4)))

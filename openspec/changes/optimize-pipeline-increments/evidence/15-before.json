@@ -1,0 +1,85 @@
+{
+  "optimization": 15,
+  "measurements": [
+    {
+      "name": "ascii",
+      "sourceCharacters": 40000,
+      "transcriptTokens": 10024,
+      "budget": 2958,
+      "compressionRequests": 14,
+      "partTokens": [
+        747,
+        740,
+        740,
+        740,
+        740,
+        740,
+        740,
+        740,
+        740,
+        740,
+        740,
+        740,
+        740,
+        404
+      ]
+    },
+    {
+      "name": "cjk",
+      "sourceCharacters": 20000,
+      "transcriptTokens": 30024,
+      "budget": 2958,
+      "compressionRequests": 14,
+      "partTokens": [
+        2198,
+        2219,
+        2219,
+        2219,
+        2219,
+        2219,
+        2219,
+        2219,
+        2219,
+        2219,
+        2219,
+        2219,
+        2219,
+        1204
+      ]
+    },
+    {
+      "name": "mixed",
+      "sourceCharacters": 45000,
+      "transcriptTokens": 27524,
+      "budget": 2958,
+      "compressionRequests": 19,
+      "partTokens": [
+        1472,
+        1480,
+        1480,
+        1479,
+        1480,
+        1480,
+        1480,
+        1480,
+        1478,
+        1478,
+        1480,
+        1480,
+        1479,
+        1480,
+        1480,
+        1480,
+        1480,
+        1478,
+        910
+      ]
+    }
+  ],
+  "checks": {
+    "exactText": true,
+    "budgetPreserved": true,
+    "surrogatePairs": true,
+    "originalHistory": true
+  }
+}
