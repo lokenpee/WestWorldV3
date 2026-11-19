@@ -14,6 +14,7 @@ import { stepLabels, substeps, type ExtractionData, type ExtractedRow, type Subs
 import { checkReceiptSources, coverage, withExtractionLock, type Lease, type ExtractionJob, type Progress, type Receipt, type ReExtractScope, type Run, type SavedUsage, type StoredTask } from './recovery'
 import { clearReExtractData, previewReExtractData } from './reextract'
 import { createExtractionInput, interruptExtractionTasks, readExtractionTasks, registerExtractionTask, updateExtractionTask } from './taskStore'
+import { addedCharacterBindingScope } from './affectedBindings'
 
 type Workspace = ReturnType<typeof createWorkspace>
 export interface StepResult { chapterIndex: string; step: Substep; ok: boolean; message: string; attempts: number; tokens: number; cost?: number; elapsedMs: number }
@@ -269,22 +270,24 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
             if (step === 'worldAssets') {
               const people = await db.table<Character>('characters').toArray()
               const mappings = await db.table<Lifecycle>('assetLifecycle').toArray()
+              const affected = addedCharacterBindingScope(beforeCharacters, people, mappings)
               const created = pendingRelations.map(item => extractedRelation(item.person, item.input, people, mappings, timestamp))
               const existing = await db.table<CharacterRelation>('characterRelations').toArray()
               const known = new Map(existing.map(row => [row.id, row]))
               const fresh = created.filter(row => !known.has(row.id))
               if (fresh.length) await db.table('characterRelations').bulkPut(fresh)
-              const synced = syncRelations([...existing, ...fresh], people, mappings, timestamp)
-              if (synced.changed.length) await db.table('characterRelations').bulkPut(synced.changed)
-              const nodes = await db.table<EventNode>('nodes').toArray()
-              const changedNodes = remapCharacterLinks(nodes, beforeCharacters, people).filter((node, i) => node !== nodes[i])
+              const affectedRelations = [...existing.filter(affected.relation), ...fresh]
+              const changedRelations = affectedRelations.length ? syncRelations(affectedRelations, people, mappings, timestamp).changed : []
+              if (changedRelations.length) await db.table('characterRelations').bulkPut(changedRelations)
+              const nodes = affected.added.length ? (await db.table<EventNode>('nodes').toArray()).filter(affected.node) : []
+              const changedNodes = nodes.length ? remapCharacterLinks(nodes, beforeCharacters, people).filter((node, i) => node !== nodes[i]) : []
               for (const node of changedNodes) await db.table('nodes').put({ ...node, revision: node.revision + 1 })
               const changes: AssetChange[] = changedNodes.map(node => ({ kind: 'node', id: node.id }))
-              for (const relation of [...fresh, ...synced.changed]) {
+              for (const relation of [...fresh, ...changedRelations]) {
                 const before = known.get(relation.id)
                 for (const id of [before?.sourceId, ...(before?.targetIds ?? []), relation.sourceId, ...relation.targetIds]) if (id) changes.push({ kind: 'character', id })
               }
-              for (const person of people) if (!bindingContext.people.has(person.id)) changes.push({ kind: 'character', id: person.id })
+              for (const person of affected.added) changes.push({ kind: 'character', id: person.id })
               const dependentRuns = await db.table('pipelineRuns').where('stage').anyOf(['P2', 'P3']).toArray()
               await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp, dependentRuns)
             }

@@ -1,0 +1,10 @@
+{
+  "peopleBefore": 300,
+  "nodes": 2000,
+  "relations": 6000,
+  "reboundNodes": 2,
+  "reboundRelations": 2,
+  "changedNodes": 2,
+  "changedRelations": 2,
+  "elapsedMs": 1174.47
+}
