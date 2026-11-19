@@ -97,12 +97,36 @@ export function splitChapters(text: string, pattern: string): ChapterDraft[] {
 
 function splitCharacters(text: string, size: number) {
   const chunks: string[] = []
+  // Backward capacity includes every future surrogate boundary, not just raw lengths.
+  const minimumStarts = [text.length]
+  while (minimumStarts.at(-1)! > 0) {
+    const end = minimumStarts.at(-1)!
+    let start = Math.max(0, end - size)
+    if (start > 0 && /[\uD800-\uDBFF]/.test(text[start - 1]) && /[\uDC00-\uDFFF]/.test(text[start])) start++
+    minimumStarts.push(start)
+  }
   for (let offset = 0; offset < text.length;) {
-    let end = Math.min(offset + size, text.length)
-    if (end < text.length && /[\uD800-\uDBFF]/.test(text[end - 1]) && /[\uDC00-\uDFFF]/.test(text[end])) end--
+    const minimumEnd = minimumStarts[Math.max(0, minimumStarts.length - chunks.length - 2)]
+    const end = findChunkBoundary(text, offset, size, minimumEnd)
     chunks.push(text.slice(offset, end)); offset = end
   }
   return chunks
+}
+
+function findChunkBoundary(text: string, offset: number, size: number, minimumEnd: number) {
+  let end = Math.min(offset + size, text.length)
+  if (end === text.length) return end
+  if (/[\uD800-\uDBFF]/.test(text[end - 1]) && /[\uDC00-\uDFFF]/.test(text[end])) end--
+  // Keep the planned number of chunks: moving a boundary must not add model work.
+  const minimum = Math.max(offset + 1, end - Math.min(1000, Math.floor(size / 10)), minimumEnd)
+  for (let i = end - 1; i >= minimum - 1; i--) if (text[i] === '\n') return i + 1
+  for (let i = end - 1; i >= minimum - 1; i--) {
+    if (!'。！？!?'.includes(text[i])) continue
+    let boundary = i + 1
+    while (boundary < text.length && '”’」』）】'.includes(text[boundary])) boundary++
+    if (boundary <= end) return boundary
+  }
+  return end
 }
 
 export function assertPreview(preview: NovelPreview) {

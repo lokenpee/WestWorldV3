@@ -6,6 +6,38 @@ import { PreviewLoader } from '../src/features/import/previewLoader'
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url))
 
 describe('阶段2：文本保全和分章', () => {
+  it.each([['第一章 测试\n', 10000], ['', 4000]] as const)('优先句段边界并保留闭引号：%s', (prefix, size) => {
+    for (const boundary of ['\n', '。', '。”', '！』']) {
+      const before = prefix + '甲'.repeat(size - 6 - prefix.length) + boundary
+      const text = before + '众人见到贾蓉走进房间。' + '乙'.repeat(60)
+      const chapters = splitChapters(text, DEFAULT_CHAPTER_PATTERN)
+      expect(chapters).toHaveLength(2)
+      expect(chapters[0].text).toBe(before)
+      expect(chapters[1].text).toContain('贾蓉')
+      expect(chapters.map(x => x.text).join('')).toBe(text)
+      expect(chapters.every(x => x.charCount === x.text.length && x.charCount <= size)).toBe(true)
+    }
+  })
+
+  it('不为自然边界增加分块，也不退回远处标题行', () => {
+    const prefix = '第一章 测试\n'
+    for (const text of [prefix + '甲'.repeat(9990 - prefix.length) + '。' + '乙'.repeat(10009), prefix + '甲'.repeat(10020)]) {
+      const chapters = splitChapters(text, DEFAULT_CHAPTER_PATTERN)
+      expect(chapters).toHaveLength(2)
+      expect(chapters[0].charCount).toBe(10000)
+      expect(chapters.map(x => x.text).join('')).toBe(text)
+    }
+  })
+
+  it.each([['第一章 测试\n', 10000], ['', 4000]] as const)('后续代理对占用边界时仍保持块数：%s', (prefix, size) => {
+    const text = prefix + '甲'.repeat(size - 2 - prefix.length) + '\n' + '乙'.repeat(size - 1) + '😀' + '丙'.repeat(size - 1)
+    const chapters = splitChapters(text, DEFAULT_CHAPTER_PATTERN)
+    expect(text.length).toBe(size * 3 - 1)
+    expect(chapters).toHaveLength(3)
+    expect(chapters.every(x => x.charCount <= size)).toBe(true)
+    expect(chapters.map(x => new TextDecoder().decode(new TextEncoder().encode(x.text))).join('')).toBe(text)
+  })
+
   it('默认正则与冻结契约一致，序文及全部正文精确保留', () => {
     const golden = JSON.parse(readFileSync(new URL('../docs/v2/resources/golden-results.json', import.meta.url), 'utf8'))
     expect(DEFAULT_CHAPTER_PATTERN).toBe(golden.regex)
