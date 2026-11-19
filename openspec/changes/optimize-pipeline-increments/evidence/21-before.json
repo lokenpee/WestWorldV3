@@ -1,0 +1,61 @@
+{
+  "phase": "before",
+  "method": "fixed HTTP SSE responses with isolated fake-indexeddb; no real model calls",
+  "fixture": "three thinking-only length replies, then a completion tool if requested; 10 input / 20 output tokens per thinking reply",
+  "samples": [
+    {
+      "kind": "directory",
+      "requests": 4,
+      "lowRequests": 4,
+      "reasoningEfforts": [
+        "low"
+      ],
+      "thinkingEnabled": true,
+      "runStatus": "completed",
+      "activeWorkKind": null,
+      "activeCharacterId": null,
+      "preservedThinkingMessages": 3,
+      "traceRequests": 4,
+      "inputTokens": 30,
+      "outputTokens": 60,
+      "fallbackCompletionRequested": true,
+      "directedContinuationRequests": 0
+    },
+    {
+      "kind": "profile",
+      "requests": 4,
+      "lowRequests": 0,
+      "reasoningEfforts": [
+        "high"
+      ],
+      "thinkingEnabled": true,
+      "runStatus": "completed",
+      "activeWorkKind": null,
+      "activeCharacterId": null,
+      "preservedThinkingMessages": 3,
+      "traceRequests": 4,
+      "inputTokens": 30,
+      "outputTokens": 60,
+      "fallbackCompletionRequested": true,
+      "directedContinuationRequests": 0
+    },
+    {
+      "kind": "relations",
+      "requests": 4,
+      "lowRequests": 0,
+      "reasoningEfforts": [
+        "high"
+      ],
+      "thinkingEnabled": true,
+      "runStatus": "completed",
+      "activeWorkKind": null,
+      "activeCharacterId": null,
+      "preservedThinkingMessages": 3,
+      "traceRequests": 4,
+      "inputTokens": 30,
+      "outputTokens": 60,
+      "fallbackCompletionRequested": true,
+      "directedContinuationRequests": 0
+    }
+  ]
+}

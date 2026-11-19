@@ -322,7 +322,7 @@ TaskRecord.input保存首次创建任务的不可变快照。固定工作项流�
 | 兼容工作项末轮 | system撤回全部业务工具，仅保留submit_result；结束约束和可执行白名单由代码同时收窄，变量commitIds来自本task账本，remainingIds来自分配清单。当前P3不按5分钟预算进入此末轮，按阅读进度结束阶段 |
 | 探测 | 使用probe_system及probe_asset/probe_story；完整业务工具声明可发送，但回调接隔离fixture；完成门槛见AI-15 |
 
-所有模型生成请求由`models/gateway.ts`在发送前统一追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)中的文学资料处理说明，放在system内容末尾且只保留一份；覆盖P1/P2/P3、压缩、复核、探测及重试/修正。各任务不再自行拼接，P2第一步和第二步也使用此说明。公共说明要求客观忠实处理小说资料，允许保留含义的归并精简，不禁止普通说明；输出形式与工具要求由各任务规定。P2 Agent 对模型目录声明支持思考的模型启用思考：第一步疑似人物初筛使用 Pi `reasoning: low`，第二、三步沿用 `medium`。DeepSeek V4能力映射补齐low，使实际发送的reasoning_effort保持low；其他档位沿用适配器映射，目录外模型不猜测能力。详情保存并展示 API 实际返回的正文与可见思考，空最终字段不清除已收到片段，重试不混用不同尝试的内容。
+所有模型生成请求由`models/gateway.ts`在发送前统一追加[output-discipline.txt](resources/v2.2/prompts/active/output-discipline.txt)中的文学资料处理说明，放在system内容末尾且只保留一份；覆盖P1/P2/P3、压缩、复核、探测及重试/修正。各任务不再自行拼接，P2第一步和第二步也使用此说明。公共说明要求客观忠实处理小说资料，允许保留含义的归并精简，不禁止普通说明；输出形式与工具要求由各任务规定。P2 Agent 对模型目录声明支持思考的模型启用思考：第一步疑似人物初筛、第二步人物资料及第三步人物关系统一使用 Pi `reasoning: low`。DeepSeek V4能力映射补齐low，使实际发送的reasoning_effort保持low；其他档位沿用适配器映射，目录外模型不猜测能力。详情保存并展示 API 实际返回的正文与可见思考，空最终字段不清除已收到片段，重试不混用不同尝试的内容。P2及当前P3遇到仅有思考的输出长度截断时，先定向续做一次；没有成功工具执行又发生同类截断则暂停并保留当前人物或页面、已有提交和用量。普通说明不占用也不重置该次数，正常正文及工具截断沿用原处理；用户继续重新获得一次续做机会。
 
 角色和阶段约束由各 prompt md 描述；bookId/runId/taskId/phase 由调用上下文和持久化任务记录绑定，不写入 system，也不写入P2人物整理的结构化任务简报，不能由工具参数切换。
 

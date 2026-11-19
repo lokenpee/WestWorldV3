@@ -330,12 +330,13 @@ export async function runCharacterOrganization(workspace: Workspace, bookId: str
     }
     const global = /执行权|会话|租约|密钥|存储|网络|Connection|连接|超时|SCOPE|CONFLICT:任务|取消/.test(message)
     if (global) throw new Error(message)
-    const recoverable = /CONFLICT:资料在提交前持续变化|CONFLICT:读取范围持续变化|PAUSED:任务已暂停/.test(message)
+    const thinkingTruncated = message.startsWith('THINKING_TRUNCATED:')
+    const recoverable = thinkingTruncated || /CONFLICT:资料在提交前持续变化|CONFLICT:读取范围持续变化|PAUSED:任务已暂停/.test(message)
     await repo.transaction(true, async store => {
       await renewOrganizationLease(store, { bookId, runId: options.runId, owner: options.owner })
       const current = (await store.get('pipelineRuns', options.runId))!
       const state = current.organization as unknown as OrganizationState
-      const error = { code: 'WORK_ERROR', message, action: 'defer' as const, ...(result.itemFailure ? { tool: result.itemFailure.split(':')[0] } : {}) }
+      const error = { code: thinkingTruncated ? 'THINKING_TRUNCATED' : 'WORK_ERROR', message, action: 'defer' as const, ...(!thinkingTruncated && result.itemFailure ? { tool: result.itemFailure.split(':')[0] } : {}) }
       if (state.activeWork) { state.activeWork.status = 'error'; state.activeWork.lastError = error }
       if (recoverable) {
         // 保留当前工作项和目标人物，继续时从同一人物重新读取；已完成提交仍由 appliedCommands 去重。

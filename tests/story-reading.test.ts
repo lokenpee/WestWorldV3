@@ -37,6 +37,14 @@ async function setup(count = 25, fetcher: typeof fetch = vi.fn(async (_url, init
 const bodyOf = (init?: RequestInit) => JSON.parse(init?.body as string)
 const reading = async (service: ReturnType<typeof createStoryService>) => (await service.read('a')).reading
 const messageText = (value: unknown) => typeof value === 'string' ? value : Array.isArray(value) ? value.map(part => typeof part?.text === 'string' ? part.text : '').join('') : ''
+function thinkingLengthStream(thinking: string, content?: string) {
+  const chunk = (delta: unknown, finish_reason: string | null, usage?: object) => ({ id: 'story-thinking-truncated', object: 'chat.completion.chunk', created: 1, model: 'test-agent', choices: [{ index: 0, delta, finish_reason }], ...(usage ? { usage } : {}) })
+  const chunks = [
+    chunk({ role: 'assistant', reasoning_content: thinking, ...(content === undefined ? {} : { content }) }, null),
+    chunk({}, 'length', { prompt_tokens: 7, completion_tokens: 13, total_tokens: 20 }),
+  ]
+  return new Response(chunks.map(value => `data: ${JSON.stringify(value)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'Content-Type': 'text/event-stream' } })
+}
 
 it('翻页回执重放不会跳过下一页，过期页号返回当前页而不丢进度', async () => {
   const nodes = Array.from({ length: 21 }, (_, i) => ({ id: `N${i}`, bookId: 'a', name: `信件${i}`, summary: '独立进展', chapterIndex: '1', revision: 1, order: i }))
@@ -289,6 +297,92 @@ it.each(['window_link', 'global_review'])('%s普通说明后继续查询、保�
   expect(await db.table('eventLines').count()).toBe(1)
   expect(JSON.stringify(await db.table('storySessionEntries').toArray())).toContain('先核对这条故事线的前因后果')
 })
+
+it.each(['window_link', 'global_review'] as const)('%s连续两次仅思考被截断后暂停，保留当前页、思考和用量，继续可以完成', async phase => {
+  let resuming = false
+  const interruptedBodies: Row[] = [], resumedPages: string[] = []
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = bodyOf(init), { input } = storyTask(body)
+    if (input.phase === phase) {
+      if (resuming) resumedPages.push(input.page.id)
+      else {
+        interruptedBodies.push(body)
+        if (interruptedBodies.length <= 2) return thinkingLengthStream(`截断思考-${phase}-${interruptedBodies.length}：正在判断信件流转。`, phase === 'global_review' ? ' \n ' : undefined)
+        return new Response(JSON.stringify({ error: { message: 'fixture stopped unexpected third request' } }), { status: 402 })
+      }
+    }
+    return storyResponse(body)
+  })
+  const { db, service, workspace, models } = await setup(2, fetcher)
+  const modelCalls = vi.spyOn(models, 'agent')
+  if (phase === 'global_review') await service.start('a')
+  await (phase === 'window_link' ? service.start('a') : service.review('a'))
+  expect(interruptedBodies).toHaveLength(2)
+  expect(modelCalls.mock.calls.every(([, options]) => options?.reasoning === undefined)).toBe(true)
+  expect(service.state('a')?.error).toContain('THINKING_TRUNCATED')
+  const pageId = storyTask(interruptedBodies[0]).input.page.id
+  expect(storyTask(interruptedBodies[1]).input.page.id).toBe(pageId)
+  expect(await reading(service)).toMatchObject({ checked: 0, pageNumber: 1, complete: false })
+  const progress = await db.table('compileProgress').get('P3'), run = await db.table('pipelineRuns').get(progress.runId)
+  expect(progress).toMatchObject({ status: 'paused', phase })
+  expect(run.storyReading[phase].currentPageId).toBe(pageId)
+  expect(run.storyReading[phase].pages.every((page: Row) => page.checkedFingerprint !== page.fingerprint)).toBe(true)
+  expect(run.usage).toMatchObject({ input: 14, output: 26, totalTokens: 40 })
+  const entries = await db.table('storySessionEntries').toArray()
+  const traces = entries.filter(row => row.type === 'request_trace' && String(row.thinking).includes(`截断思考-${phase}`))
+  expect(traces).toHaveLength(2)
+  expect(traces.map(row => row.usage)).toEqual([expect.objectContaining({ input: 7, output: 13, totalTokens: 20 }), expect.objectContaining({ input: 7, output: 13, totalTokens: 20 })])
+  const assistants = entries.filter(row => row.type === 'message' && row.message?.role === 'assistant' && row.message.stopReason === 'length')
+  expect(assistants).toHaveLength(2)
+  expect(JSON.stringify(assistants)).toContain(`截断思考-${phase}-1`)
+  expect(JSON.stringify(assistants)).toContain(`截断思考-${phase}-2`)
+  resuming = true
+  const resumed = createStoryService(workspace, models)
+  await (phase === 'window_link' ? resumed.start('a') : resumed.review('a'))
+  expect(resumedPages[0]).toBe(pageId)
+  expect(resumed.state('a')?.error).toBeUndefined()
+  expect((await resumed.read('a')).progress?.status).toBe('completed')
+  expect(await reading(resumed)).toMatchObject({ complete: true })
+  expect(await db.table('eventLines').count()).toBe(1)
+}, 30000)
+
+it('成功保存事件线清除此前的思考截断计数，后续两次截断暂停并保留提交，继续不重复创建', async () => {
+  let resuming = false, interruptedRequests = 0, savedLineId = ''
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = bodyOf(init), { input } = storyTask(body)
+    if (resuming) {
+      expect(JSON.stringify(body.messages)).toContain(savedLineId)
+      return agentStream([{ name: 'navigate_story_pages', args: { direction: 'next', currentPageId: input.page.id } }])
+    }
+    interruptedRequests++
+    if (interruptedRequests === 2) return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: 'create', title: '信件流转', summary: '交信与传信接成一条完整的线。', nodeIds: input.workItems.map((item: Row) => item.id) }] } }])
+    if (interruptedRequests <= 4) return thinkingLengthStream(`已保存前后的截断思考-${interruptedRequests}`)
+    return new Response(JSON.stringify({ error: { message: 'fixture stopped unexpected fifth request' } }), { status: 402 })
+  })
+  const { db, service, workspace, models } = await setup(2, fetcher)
+  await service.start('a')
+  expect(interruptedRequests).toBe(4)
+  expect(service.state('a')?.error).toContain('THINKING_TRUNCATED')
+  expect(await reading(service)).toMatchObject({ checked: 0, complete: false })
+  const lines = await db.table('eventLines').toArray()
+  expect(lines).toHaveLength(1)
+  expect(lines[0].nodeIds).toEqual(['N001', 'N002'])
+  savedLineId = lines[0].id
+  const progress = await db.table('compileProgress').get('P3'), beforeRun = await db.table('pipelineRuns').get(progress.runId)
+  expect(beforeRun.appliedCommands).toHaveLength(1)
+  expect(beforeRun.usage).toMatchObject({ input: 21, output: 39, totalTokens: 60 })
+  const commitId = beforeRun.appliedCommands[0].commitId
+  resuming = true
+  const resumed = createStoryService(workspace, models)
+  await resumed.start('a')
+  expect(resumed.state('a')?.error).toBeUndefined()
+  expect(await reading(resumed)).toMatchObject({ complete: true })
+  expect(await db.table('eventLines').toArray()).toEqual(lines)
+  const afterRun = await db.table('pipelineRuns').get(progress.runId)
+  expect(afterRun.appliedCommands).toHaveLength(1)
+  expect(afterRun.appliedCommands[0].commitId).toBe(commitId)
+  expect(JSON.stringify(await db.table('storySessionEntries').toArray())).toContain('已保存前后的截断思考-4')
+}, 30000)
 
 it.each([
   { name: 'navigate_story_pages', args: { direction: 'invalid-direction' }, detail: 'direction' },

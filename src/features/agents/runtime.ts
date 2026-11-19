@@ -65,6 +65,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     let deferredAfterValidation = false
     const failedSignatures = new Set<string>()
     let organizationConflicts = 0
+    let thinkingTruncations = 0
     let adapter: ReturnType<typeof createAgentTools> | undefined
     try {
       controller.signal.throwIfAborted()
@@ -256,6 +257,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
             if (call?.type !== 'toolCall') continue
             if (!result.isError) {
               failedSignatures.clear()
+              thinkingTruncations = 0
               if ((organizationWriteTools as readonly string[]).includes(call.name)) organizationConflicts = 0
               continue
             }
@@ -270,6 +272,18 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
             } else organizationConflicts = 0
           }
           if (options.shouldPause?.() || options.shouldCancel?.() || tools.summary || tools.completed || outcome.itemFailure || deferredAfterValidation || usedRequests >= maxRequests || resumable && timeLeft() === 0 || message.stopReason === 'error' || message.stopReason === 'aborted') return { action: 'end' }
+          // 只有思考耗尽输出且没有正文/工具时才使用这一次续做；正常说明不消耗或重置它。
+          const thinkingOnlyTruncated = message.stopReason === 'length'
+            && message.content.some(part => part.type === 'thinking' && part.thinking.trim())
+            && !message.content.some(part => part.type === 'toolCall' || part.type === 'text' && part.text.trim())
+          if (!scope.probe && (organization || scope.workflow === 'story_pages_v3') && thinkingOnlyTruncated) {
+            if (++thinkingTruncations >= 2) {
+              outcome.itemFailure = 'THINKING_TRUNCATED:模型两次仅返回思考并耗尽输出长度，期间没有成功工具执行。已保存进度并暂停，可继续当前工作。'
+              return { action: 'end' }
+            }
+            agent?.steer({ role: 'user', content: '上次回复仅返回思考，并因输出长度上限被截断。请继续当前工作，缩短本轮分析，先处理一个可完成的小部分；需要资料时查询，已有结论可分次保存，完成后按任务说明结束。此前成功保存的修改已保留，无需重复提交。', timestamp: Date.now() })
+            return { action: 'continue' }
+          }
           // 一轮普通说明结束不代表业务完成；保留原回复，继续同一任务。
           if (!message.content.some(part => part.type === 'toolCall')) {
             agent?.steer({ role: 'user', content: '当前任务尚未收到完成确认。请继续处理；需要查阅或保存时使用已提供的工具，完成后按任务说明确认结束。', timestamp: Date.now() })
@@ -281,7 +295,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           if (tools.completed || tools.summary || options.shouldPause?.() || options.shouldCancel?.() || outcome.itemFailure || deferredAfterValidation || resumable && (usedRequests >= maxRequests || timeLeft() === 0)) return
           throw new ModelError(usedRequests >= maxRequests ? 'budget' : 'validation', usedRequests >= maxRequests ? 'BUDGET:子任务预算已用完，剩余工作交后续批次。' : '当前任务尚未收到工具的完成确认，已保存进度。')
         },
-      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(organization && !scope.probe ? { reasoning: (['directory', 'candidate'].includes(scope.workKind ?? '') ? 'low' : 'medium') as 'low' | 'medium' } : {}), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
+      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(organization && !scope.probe ? { reasoning: 'low' as const } : {}), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
       outcome.summary = adapter.summary
       if (resumable && !outcome.itemFailure && outcome.result.error && ['validation', 'context_length', 'content_policy'].includes(outcome.result.error.kind)) outcome.itemFailure = outcome.result.error.message
       if (resumable && !outcome.summary && (outcome.result.ok || outcome.itemFailure || outcome.result.error?.kind === 'budget')) {

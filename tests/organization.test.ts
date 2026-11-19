@@ -139,8 +139,7 @@ it('P2运行经真实请求组装启用已知模型的思考，按模型支持�
   expect(fetcher.mock.calls.length).toBeGreaterThan(0)
   for (const [, init] of fetcher.mock.calls) {
     const body = JSON.parse(init?.body as string)
-    const work = body.messages.map((message: { content: unknown }) => organizationPromptParts(message.content)).find(Boolean)
-    expect(body).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: work?.kind === 'directory' || work?.kind === 'candidate' ? 'low' : 'high' })
+    expect(body).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: 'low' })
   }
 })
 
@@ -992,5 +991,5 @@ it.each(['profiles', 'relations'] as const)('%s原文耗尽正常返回后仍能
   expect(run.organization.originalReadUnits).toHaveLength(4)
   expect([...counts.values()]).toEqual([3, 3, 3, 3])
   expect(run.tasks.every((task: { lastError?: unknown }) => !task.lastError)).toBe(true)
-  expect(agent.mock.calls.every(call => call[1]?.reasoning === 'medium')).toBe(true)
+  expect(agent.mock.calls.every(call => call[1]?.reasoning === 'low')).toBe(true)
 }, 20000)

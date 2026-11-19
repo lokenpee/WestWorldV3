@@ -1,0 +1,111 @@
+{
+  "phase": "after",
+  "method": "fixed HTTP SSE responses with isolated fake-indexeddb; no real model calls",
+  "fixture": "three thinking-only length replies, then a completion tool if requested; 10 input / 20 output tokens per thinking reply",
+  "samples": [
+    {
+      "kind": "directory",
+      "requests": 2,
+      "lowRequests": 2,
+      "reasoningEfforts": [
+        "low"
+      ],
+      "thinkingEnabled": true,
+      "runStatus": "paused",
+      "activeWorkKind": "directory",
+      "activeCharacterId": null,
+      "preservedThinkingMessages": 2,
+      "traceRequests": 2,
+      "inputTokens": 20,
+      "outputTokens": 40,
+      "fallbackCompletionRequested": false,
+      "directedContinuationRequests": 1
+    },
+    {
+      "kind": "profile",
+      "requests": 2,
+      "lowRequests": 2,
+      "reasoningEfforts": [
+        "low"
+      ],
+      "thinkingEnabled": true,
+      "runStatus": "paused",
+      "activeWorkKind": "profile",
+      "activeCharacterId": "A",
+      "preservedThinkingMessages": 2,
+      "traceRequests": 2,
+      "inputTokens": 20,
+      "outputTokens": 40,
+      "fallbackCompletionRequested": false,
+      "directedContinuationRequests": 1
+    },
+    {
+      "kind": "relations",
+      "requests": 2,
+      "lowRequests": 2,
+      "reasoningEfforts": [
+        "low"
+      ],
+      "thinkingEnabled": true,
+      "runStatus": "paused",
+      "activeWorkKind": "relations",
+      "activeCharacterId": "A",
+      "preservedThinkingMessages": 2,
+      "traceRequests": 2,
+      "inputTokens": 20,
+      "outputTokens": 40,
+      "fallbackCompletionRequested": false,
+      "directedContinuationRequests": 1
+    }
+  ],
+  "resumedSamples": [
+    {
+      "kind": "directory",
+      "requestsAfterUserResume": 2,
+      "totalRequests": 4,
+      "runStatus": "completed",
+      "inputTokens": 30,
+      "outputTokens": 60
+    },
+    {
+      "kind": "profile",
+      "requestsAfterUserResume": 2,
+      "totalRequests": 4,
+      "runStatus": "completed",
+      "inputTokens": 30,
+      "outputTokens": 60
+    },
+    {
+      "kind": "relations",
+      "requestsAfterUserResume": 2,
+      "totalRequests": 4,
+      "runStatus": "completed",
+      "inputTokens": 30,
+      "outputTokens": 60
+    }
+  ],
+  "singleTruncationSamples": [
+    {
+      "kind": "directory",
+      "requests": 2,
+      "runStatus": "completed",
+      "inputTokens": 10,
+      "outputTokens": 20
+    },
+    {
+      "kind": "profile",
+      "requests": 2,
+      "runStatus": "completed",
+      "inputTokens": 10,
+      "outputTokens": 20
+    },
+    {
+      "kind": "relations",
+      "requests": 2,
+      "runStatus": "completed",
+      "inputTokens": 10,
+      "outputTokens": 20
+    }
+  ],
+  "interpretation": "Automatic request counts verify the pause threshold, not equal-outcome model cost or quality. User resume completes the same fixture in four total requests."
+}
