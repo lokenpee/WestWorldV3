@@ -5,6 +5,7 @@ import { storyContent, validStoryCoverage } from './coverage'
 import { storyView } from './views'
 import { readingCheck, usableReadingChecks, type ReadingCheck } from './reuse'
 import { buildStoryContext, selectStoryBatch } from './retrieval'
+import { readingSourceFingerprint as sourceFingerprint } from './sourceFingerprint'
 
 export interface ReadingPage extends Row { id: string; type: string; queue: string; ids: string[]; fingerprint: string; checkedFingerprint?: string; sourceFingerprints?: Record<string, string>; reason?: string }
 export interface ReadingState extends Row { pages: ReadingPage[]; currentPageId: string | null; receipts: string[]; checks?: ReadingCheck[]; reusedChecks?: ReadingCheck[] }
@@ -16,10 +17,6 @@ const batches = (rows: Row[]) => {
 }
 const checked = (page: ReadingPage) => page.checkedFingerprint === page.fingerprint
 const portable = (value: unknown): unknown => Array.isArray(value) ? value.map(portable) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([key]) => !['bookId', 'sessionId', 'basisFingerprint'].includes(key)).map(([key, item]) => [key, portable(item)])) : value
-const sourceFingerprint = async (store: AgentStore, chapter: string) => {
-  const source = await store.get('chapterTexts', chapter)
-  return store.wait(hash(source ? text(source.text) : null))
-}
 async function pageSources(store: AgentStore, page: ReadingPage) {
   const chapters = new Set<string>()
   const addNode = async (id: string) => { const node = await store.get('nodes', id); if (node?.chapterIndex) chapters.add(text(node.chapterIndex)) }
@@ -43,13 +40,15 @@ export async function refreshReading(store: AgentStore, runId: string, sessionId
   const reusedChecks = await usableReadingChecks(store, saved?.reusedChecks ?? [])
   const reused = (type: string, id: string) => reusedChecks.some(check => check.type === type && check.id === id)
   const nodes = await store.rows('nodes'), lines = await store.rows('eventLines')
+  const nodeById = new Map(nodes.map(node => [text(node.id), node]))
+  const previousById = new Map(saved?.pages.map(page => [page.id, page]) ?? [])
   const chapterOrder = new Map((await store.rows('chapters')).map(row => [text(row.chapterIndex), Number(row.order)]))
   nodes.sort((a, b) => (chapterOrder.get(text(a.chapterIndex)) ?? 0) - (chapterOrder.get(text(b.chapterIndex)) ?? 0) || Number(a.order ?? 0) - Number(b.order ?? 0) || text(a.id).localeCompare(text(b.id)))
   const pages: ReadingPage[] = []
   const add = async (type: string, queue: string, rows: Row[], extra: Row = {}, basis: unknown = rows.map(row => storyContent(type === 'note_page' ? 'storyEditorNotes' : 'nodes', row))) => {
     const id = `${type}:${text(extra.lineId) || text(rows[0]?.id)}:${Number(extra.segment ?? 0)}`
     const fingerprint = await store.wait(hash({ type, basis: portable(basis) }))
-    const previous = saved?.pages.find(page => page.id === id)
+    const previous = previousById.get(id)
     pages.push({ ...previous, ...extra, id, type, queue, ids: rows.map(row => text(row.id)), fingerprint })
   }
   if (phase === 'window_link') {
@@ -58,7 +57,7 @@ export async function refreshReading(store: AgentStore, runId: string, sessionId
     if (!saved) for (const page of pages) {
       let valid = true
       for (const id of page.ids) {
-        const row = nodes.find(node => node.id === id)!
+        const row = nodeById.get(id)!
         const candidates = records(run.coverageItems).filter(item => item.phase === 'window_link' && item.kind === 'node' && item.id === id)
         if (!(await Promise.all(candidates.map(item => validStoryCoverage(store, item, row)))).some(Boolean)) { valid = false; break }
       }
@@ -70,7 +69,7 @@ export async function refreshReading(store: AgentStore, runId: string, sessionId
     lines.sort((a, b) => text(a.id).localeCompare(text(b.id)))
     for (const [lineIndex, line] of lines.entries()) {
       if (reused('line_summary', text(line.id))) continue
-      const members = strings(line.nodeIds).map(id => nodes.find(node => node.id === id)).filter((row): row is Row => !!row)
+      const members = strings(line.nodeIds).map(id => nodeById.get(id)).filter((row): row is Row => !!row)
       const segments = batches(members)
       for (const [index, group] of segments.entries()) await add('line_segment', 'event_lines', group, { lineId: line.id, lineIndex: lineIndex + 1, totalLines: lines.length, segment: index + 1, totalSegments: segments.length })
       await add('line_summary', 'event_lines', [line], { lineId: line.id, lineIndex: lineIndex + 1, totalLines: lines.length }, { line: storyContent('eventLines', line), nodes: members.map(row => storyContent('nodes', row)) })

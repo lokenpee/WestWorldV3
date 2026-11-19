@@ -1,4 +1,5 @@
 import { briefItems } from './views'
+import { readReadingStatus } from './readingStatus'
 import { inheritedReadingChecks } from './reuse'
 import type { RestartMode } from '../world/reuse'
 import type { createWorkspace } from '../../lib/storage/workspace'
@@ -107,6 +108,8 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
     }
   }
   async function read(bookId: string) {
+    const current = await readReadingStatus(workspace, bookId)
+    if (current) return current
     const value = await legacy.read(bookId)
     if (!value.progress?.runId) return { ...value, activityTasks: [] as Row[], reading: undefined as ReturnType<typeof readingProgress> & { pages: Row[]; lineTitle: string } | undefined }
     return createBookAgentRepository(workspace, bookId).transaction(false, async store => {

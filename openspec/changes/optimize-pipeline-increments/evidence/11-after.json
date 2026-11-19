@@ -1,0 +1,274 @@
+{
+  "optimization": 11,
+  "sample": {
+    "chapters": 25,
+    "sourceCharacters": 200000,
+    "nodes": 25,
+    "lines": 2,
+    "checkedPages": 1
+  },
+  "measurements": [
+    {
+      "phase": "window_link",
+      "name": "initial_status",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1,
+        "eventLines:content": 1,
+        "nodes:content": 1,
+        "chapterTexts:content": 10
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25,
+        "eventLines:content": 2,
+        "nodes:content": 25,
+        "chapterTexts:content": 10
+      },
+      "responseBytes": {
+        "nodes:metadata": 951,
+        "eventLines:metadata": 73,
+        "chapterTexts:metadata": 892,
+        "eventLines:content": 561,
+        "nodes:content": 7979,
+        "chapterTexts:content": 240852
+      },
+      "sourceCharacters": 80000,
+      "checkedPages": 1,
+      "totalPages": 3
+    },
+    {
+      "phase": "window_link",
+      "name": "heartbeat_only",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25
+      },
+      "responseBytes": {
+        "nodes:metadata": 951,
+        "eventLines:metadata": 73,
+        "chapterTexts:metadata": 892
+      },
+      "sourceCharacters": 0,
+      "checkedPages": 1,
+      "totalPages": 3
+    },
+    {
+      "phase": "window_link",
+      "name": "node_metadata_only",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1,
+        "nodes:content": 1
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25,
+        "nodes:content": 1
+      },
+      "responseBytes": {
+        "nodes:metadata": 952,
+        "eventLines:metadata": 73,
+        "chapterTexts:metadata": 892,
+        "nodes:content": 357
+      },
+      "sourceCharacters": 0,
+      "checkedPages": 1,
+      "totalPages": 3
+    },
+    {
+      "phase": "window_link",
+      "name": "node_content_changed",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1,
+        "nodes:content": 1
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25,
+        "nodes:content": 1
+      },
+      "responseBytes": {
+        "nodes:metadata": 952,
+        "eventLines:metadata": 73,
+        "chapterTexts:metadata": 892,
+        "nodes:content": 333
+      },
+      "sourceCharacters": 0,
+      "checkedPages": 0,
+      "totalPages": 3
+    },
+    {
+      "phase": "window_link",
+      "name": "source_changed_same_length",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1,
+        "nodes:content": 1,
+        "chapterTexts:content": 1
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25,
+        "nodes:content": 1,
+        "chapterTexts:content": 1
+      },
+      "responseBytes": {
+        "nodes:metadata": 952,
+        "eventLines:metadata": 73,
+        "chapterTexts:metadata": 893,
+        "nodes:content": 318,
+        "chapterTexts:content": 24086
+      },
+      "sourceCharacters": 8000,
+      "checkedPages": 0,
+      "totalPages": 3
+    },
+    {
+      "phase": "global_review",
+      "name": "initial_status",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1,
+        "eventLines:content": 1,
+        "nodes:content": 1,
+        "chapterTexts:content": 5
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25,
+        "eventLines:content": 2,
+        "nodes:content": 25,
+        "chapterTexts:content": 5
+      },
+      "responseBytes": {
+        "nodes:metadata": 976,
+        "eventLines:metadata": 75,
+        "chapterTexts:metadata": 917,
+        "eventLines:content": 567,
+        "nodes:content": 8054,
+        "chapterTexts:content": 120450
+      },
+      "sourceCharacters": 40000,
+      "checkedPages": 1,
+      "totalPages": 5
+    },
+    {
+      "phase": "global_review",
+      "name": "heartbeat_only",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25
+      },
+      "responseBytes": {
+        "nodes:metadata": 976,
+        "eventLines:metadata": 75,
+        "chapterTexts:metadata": 917
+      },
+      "sourceCharacters": 0,
+      "checkedPages": 1,
+      "totalPages": 5
+    },
+    {
+      "phase": "global_review",
+      "name": "node_metadata_only",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1,
+        "nodes:content": 1
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25,
+        "nodes:content": 1
+      },
+      "responseBytes": {
+        "nodes:metadata": 976,
+        "eventLines:metadata": 75,
+        "chapterTexts:metadata": 917,
+        "nodes:content": 358
+      },
+      "sourceCharacters": 0,
+      "checkedPages": 1,
+      "totalPages": 5
+    },
+    {
+      "phase": "global_review",
+      "name": "node_content_changed",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1,
+        "nodes:content": 1
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25,
+        "nodes:content": 1
+      },
+      "responseBytes": {
+        "nodes:metadata": 976,
+        "eventLines:metadata": 75,
+        "chapterTexts:metadata": 917,
+        "nodes:content": 334
+      },
+      "sourceCharacters": 0,
+      "checkedPages": 0,
+      "totalPages": 5
+    },
+    {
+      "phase": "global_review",
+      "name": "source_changed_same_length",
+      "reads": {
+        "nodes:metadata": 1,
+        "eventLines:metadata": 1,
+        "chapterTexts:metadata": 1,
+        "nodes:content": 1,
+        "chapterTexts:content": 1
+      },
+      "rows": {
+        "nodes:metadata": 25,
+        "eventLines:metadata": 2,
+        "chapterTexts:metadata": 25,
+        "nodes:content": 1,
+        "chapterTexts:content": 1
+      },
+      "responseBytes": {
+        "nodes:metadata": 976,
+        "eventLines:metadata": 75,
+        "chapterTexts:metadata": 917,
+        "nodes:content": 319,
+        "chapterTexts:content": 24090
+      },
+      "sourceCharacters": 8000,
+      "checkedPages": 0,
+      "totalPages": 5
+    }
+  ]
+}

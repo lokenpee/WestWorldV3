@@ -1,0 +1,226 @@
+{
+  "optimization": 11,
+  "sample": {
+    "chapters": 25,
+    "sourceCharacters": 200000,
+    "nodes": 25,
+    "lines": 2,
+    "checkedPages": 1
+  },
+  "measurements": [
+    {
+      "phase": "window_link",
+      "name": "initial_status",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4,
+        "chapterTexts:content": 20
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8,
+        "chapterTexts:content": 20
+      },
+      "responseBytes": {
+        "nodes:content": 31916,
+        "eventLines:content": 2244,
+        "chapterTexts:content": 481704
+      },
+      "sourceCharacters": 160000,
+      "checkedPages": 1,
+      "totalPages": 3
+    },
+    {
+      "phase": "window_link",
+      "name": "heartbeat_only",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4,
+        "chapterTexts:content": 20
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8,
+        "chapterTexts:content": 20
+      },
+      "responseBytes": {
+        "nodes:content": 31916,
+        "eventLines:content": 2244,
+        "chapterTexts:content": 481704
+      },
+      "sourceCharacters": 160000,
+      "checkedPages": 1,
+      "totalPages": 3
+    },
+    {
+      "phase": "window_link",
+      "name": "node_metadata_only",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4,
+        "chapterTexts:content": 20
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8,
+        "chapterTexts:content": 20
+      },
+      "responseBytes": {
+        "nodes:content": 32076,
+        "eventLines:content": 2244,
+        "chapterTexts:content": 481704
+      },
+      "sourceCharacters": 160000,
+      "checkedPages": 1,
+      "totalPages": 3
+    },
+    {
+      "phase": "window_link",
+      "name": "node_content_changed",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8
+      },
+      "responseBytes": {
+        "nodes:content": 31980,
+        "eventLines:content": 2244
+      },
+      "sourceCharacters": 0,
+      "checkedPages": 0,
+      "totalPages": 3
+    },
+    {
+      "phase": "window_link",
+      "name": "source_changed_same_length",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4,
+        "chapterTexts:content": 2
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8,
+        "chapterTexts:content": 2
+      },
+      "responseBytes": {
+        "nodes:content": 31920,
+        "eventLines:content": 2244,
+        "chapterTexts:content": 48172
+      },
+      "sourceCharacters": 16000,
+      "checkedPages": 0,
+      "totalPages": 3
+    },
+    {
+      "phase": "global_review",
+      "name": "initial_status",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4,
+        "chapterTexts:content": 10
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8,
+        "chapterTexts:content": 10
+      },
+      "responseBytes": {
+        "nodes:content": 32216,
+        "eventLines:content": 2268,
+        "chapterTexts:content": 240900
+      },
+      "sourceCharacters": 80000,
+      "checkedPages": 1,
+      "totalPages": 5
+    },
+    {
+      "phase": "global_review",
+      "name": "heartbeat_only",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4,
+        "chapterTexts:content": 10
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8,
+        "chapterTexts:content": 10
+      },
+      "responseBytes": {
+        "nodes:content": 32216,
+        "eventLines:content": 2268,
+        "chapterTexts:content": 240900
+      },
+      "sourceCharacters": 80000,
+      "checkedPages": 1,
+      "totalPages": 5
+    },
+    {
+      "phase": "global_review",
+      "name": "node_metadata_only",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4,
+        "chapterTexts:content": 10
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8,
+        "chapterTexts:content": 10
+      },
+      "responseBytes": {
+        "nodes:content": 32372,
+        "eventLines:content": 2268,
+        "chapterTexts:content": 240900
+      },
+      "sourceCharacters": 80000,
+      "checkedPages": 1,
+      "totalPages": 5
+    },
+    {
+      "phase": "global_review",
+      "name": "node_content_changed",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8
+      },
+      "responseBytes": {
+        "nodes:content": 32276,
+        "eventLines:content": 2268
+      },
+      "sourceCharacters": 0,
+      "checkedPages": 0,
+      "totalPages": 5
+    },
+    {
+      "phase": "global_review",
+      "name": "source_changed_same_length",
+      "reads": {
+        "nodes:content": 4,
+        "eventLines:content": 4,
+        "chapterTexts:content": 2
+      },
+      "rows": {
+        "nodes:content": 100,
+        "eventLines:content": 8,
+        "chapterTexts:content": 2
+      },
+      "responseBytes": {
+        "nodes:content": 32216,
+        "eventLines:content": 2268,
+        "chapterTexts:content": 48180
+      },
+      "sourceCharacters": 16000,
+      "checkedPages": 0,
+      "totalPages": 5
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { hash, records, strings, text } from '../agents/contracts'
 import type { AgentStore, Row } from '../agents/repository'
+import { readingSourceFingerprint } from './sourceFingerprint'
 import { storyContent } from './coverage'
 
 export interface ReadingCheck extends Row { id: string; type: string; fingerprint: string }
@@ -10,7 +11,7 @@ export async function readingCheck(store: AgentStore, type: string, id: string, 
   const nodes = table === 'eventLines' ? (await Promise.all(strings(row?.nodeIds).map(id => store.get('nodes', id)))).filter((item): item is Row => !!item) : table === 'nodes' && row ? [row] : []
   const source: [string, string][] = []
   for (const chapter of new Set(nodes.map(node => text(node.chapterIndex)))) {
-    if (!sources.has(chapter)) sources.set(chapter, await store.wait(hash(text((await store.get('chapterTexts', chapter))?.text))))
+    if (!sources.has(chapter)) sources.set(chapter, await readingSourceFingerprint(store, chapter, 'empty'))
     source.push([chapter, sources.get(chapter)!])
   }
   return { type, id, fingerprint: await store.wait(hash(portable({ row: storyContent(table, row ?? null), nodes: nodes.map(node => storyContent('nodes', node)), source }))) }
