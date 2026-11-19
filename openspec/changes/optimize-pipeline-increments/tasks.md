@@ -11,7 +11,7 @@
 - [x] 6. 单章提取收尾统计复用。见 acceptance 第6项及 evidence/06-*.json。
 - [x] 7. P2关系完成指纹与复用修复。见 acceptance 第7项及 evidence/07-*.json。
 - [x] 8. P2继续启动失败清理。见 acceptance 第8项及 evidence/08-*.json。
-- [ ] 9. P2事务内关系快照及增量计算。
+- [x] 9. P2事务内关系快照及增量计算。见 acceptance 第9项及 evidence/09-*.json。
 - [ ] 10. P2按完成人物清理旧详情。
 - [ ] 11. P3专用轻量状态及页核对复用。
 - [ ] 12. P3长线目录与关联预算处理。

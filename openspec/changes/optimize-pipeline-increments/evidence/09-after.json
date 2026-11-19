@@ -1,0 +1,78 @@
+{
+  "optimization": 9,
+  "sample": {
+    "characters": 120,
+    "relationFacts": 120,
+    "currentCharacterNeighbors": 12,
+    "unresolvedRelations": 2,
+    "deletedPairs": 1
+  },
+  "measurements": [
+    {
+      "name": "submit_1_pairs",
+      "reviewContexts": 3,
+      "syncRelations": 3,
+      "syncRelationRows": 360,
+      "effectivePairs": 5,
+      "fullGraphBuilds": 3,
+      "effectiveRelationRows": 362,
+      "effectiveCharacterRows": 364,
+      "tableReads": {
+        "characters": 3,
+        "characterRelations": 3,
+        "assetLifecycle": 3,
+        "characterRelationEdits": 3
+      },
+      "tableRows": {
+        "characters": 360,
+        "characterRelations": 360,
+        "assetLifecycle": 0,
+        "characterRelationEdits": 5
+      }
+    },
+    {
+      "name": "query_one_character",
+      "reviewContexts": 1,
+      "syncRelations": 1,
+      "syncRelationRows": 120,
+      "effectivePairs": 1,
+      "fullGraphBuilds": 1,
+      "effectiveRelationRows": 120,
+      "effectiveCharacterRows": 120,
+      "tableReads": {
+        "characters": 1,
+        "characterRelations": 1,
+        "assetLifecycle": 1,
+        "characterRelationEdits": 1
+      },
+      "tableRows": {
+        "characters": 120,
+        "characterRelations": 120,
+        "assetLifecycle": 0,
+        "characterRelationEdits": 1
+      }
+    },
+    {
+      "name": "submit_8_pairs",
+      "reviewContexts": 3,
+      "syncRelations": 3,
+      "syncRelationRows": 360,
+      "effectivePairs": 19,
+      "fullGraphBuilds": 3,
+      "effectiveRelationRows": 376,
+      "effectiveCharacterRows": 392,
+      "tableReads": {
+        "characters": 3,
+        "characterRelations": 3,
+        "assetLifecycle": 3,
+        "characterRelationEdits": 3
+      },
+      "tableRows": {
+        "characters": 360,
+        "characterRelations": 360,
+        "assetLifecycle": 0,
+        "characterRelationEdits": 19
+      }
+    }
+  ]
+}

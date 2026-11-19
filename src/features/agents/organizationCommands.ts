@@ -5,8 +5,8 @@ import type { Basis, Character, EventLine, EventNode, LocationAsset, RelationEvi
 import { mergeWorldAssets } from '../assets/mergeCore'
 import { applyAssetPatch } from '../assets/assetPatch'
 import { navigateIdentityPages, saveIdentityGroups } from '../world/identityCandidates'
-import { pairFromPerspective, resolveLifecycleId } from '../assets/relations'
-import { deleteCharacterPair, evidenceProblems, saveCharacterPair } from '../assets/relationEdits'
+import { pairFingerprint, pairFromPerspective, pairKeyOf, resolveLifecycleId } from '../assets/relations'
+import { createPairWriteContext, deleteCharacterPair, evidenceProblems, saveCharacterPair } from '../assets/relationEdits'
 
 const relationFailureSignatures = new Map<string, { signature: string; count: number }>()
 type RelationFailure = { targetId: string; code: string; message: string; recoverable: boolean; repeated: boolean; action: string }
@@ -386,11 +386,16 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
   const appliedNow = new Set<string>()
   let acceptedChanges = 0
   const changedTargets = new Set<string>()
-  let applyContext = context
+  const writeContext = createPairWriteContext(store, context.people, context.raw, context.edits)
   for (const change of prepared) {
-    // 同一人物的 revision 会随前一条关系写入变化；每条写入前刷新指纹，避免同批合法修改互相判冲突。
-    if (changedTargets.size) applyContext = await reviewContext(store)
-    const livePair = pairFromPerspective(applyContext.pairs, id, change.targetId, applyContext.people)
+    // 本批已写端点沿用最新修订号；关系内容仍使用本次核查的解析结果。
+    const key = pairKeyOf(id, change.targetId), existing = context.pairByKey.get(key)
+    const endpoints = [id, change.targetId].map(endpoint => writeContext.people.get(endpoint)!).filter(Boolean)
+    const [aId, bId] = JSON.parse(key) as [string, string]
+    const canonicalPair = pairFromPerspective(existing ? [existing] : [], existing ? aId : id, existing ? bId : change.targetId, endpoints)
+    canonicalPair.endpointRevisions = Object.fromEntries([canonicalPair.fromId, canonicalPair.toId].map(endpoint => [endpoint, Number(writeContext.people.get(endpoint)?.revision ?? 0)]))
+    canonicalPair.fingerprint = pairFingerprint(canonicalPair)
+    const livePair = pairFromPerspective([canonicalPair], id, change.targetId, endpoints)
     const knownFailure = [...relationErrorSignatures.entries()].find(([key, record]) => key.startsWith(`${failureKey}:error:${change.targetId}:`) && record.fingerprint === livePair.fingerprint && record.count >= 2)
     if (knownFailure) {
       const record = knownFailure[1]
@@ -406,13 +411,13 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
             allowUnverifiedEvidence: change.allowUnverified, evidenceStatus: change.evidenceStatus,
             expectedFingerprint: livePair.fingerprint, actor: 'agent', commitId, tool: 'submit_relation_review',
             operationKey: `${text(args.operationKey)}:${change.targetId}`, runId: scope.runId,
-          })
+          }, writeContext)
         : await deleteCharacterPair(store, {
             bookId: scope.bookId, fromId: id, toId: change.targetId, forwardLabels: [], reverseLabels: [], directionUnclear: false,
             evidence: change.evidence, basis: change.basis, reason: change.reason, allowUnverifiedEvidence: false, evidenceStatus: change.evidenceStatus,
             expectedFingerprint: livePair.fingerprint, actor: 'agent', commitId, tool: 'submit_relation_review',
             operationKey: `${text(args.operationKey)}:${change.targetId}`, runId: scope.runId,
-          })
+          }, writeContext)
       changed = result.changed
       acceptedChanges++
     } catch (error) {
@@ -438,7 +443,7 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
   const after = await reviewContext(store)
   const latestRun = (await store.get('pipelineRuns', scope.runId))!
   const changeByTarget = new Map(prepared.map(change => [change.targetId, change]))
-  const relevantPairs = after.pairs.filter(row => row.fromId === id || row.toId === id)
+  const relevantPairs = after.pairsByPerson.get(id) ?? []
   const editsByPair = new Map<string, Row[]>()
   for (const pair of relevantPairs) {
     const edits = actualReviewEdits(latestRun, 'relation', pair.pairKey)

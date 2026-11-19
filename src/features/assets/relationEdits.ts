@@ -1,4 +1,4 @@
-import type { AssetEditRecord, Basis, Character, CharacterPairResult, CharacterRelationEdit, RelationEvidence } from './types'
+import type { AssetEditRecord, Basis, Character, CharacterPairResult, CharacterRelation, CharacterRelationEdit, RelationEvidence } from './types'
 import { effectivePairs, pairEndpointIds, pairFingerprint, pairFromPerspective, pairKeyOf } from './relations'
 import type { MergeStore, Row } from './mergeCore'
 
@@ -28,16 +28,48 @@ export interface PairWriteResult {
 
 const cleaned = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))]
 
+/** 仅供一次提交事务使用；原始事实与核查时解析后的事实分别保留。 */
+export function createPairWriteContext(store: MergeStore, characters: Character[], relations: CharacterRelation[], edits: CharacterRelationEdit[]) {
+  const people = new Map(characters.map(row => [row.id, row]))
+  const editByKey = new Map(edits.map(row => [row.pairKey, row]))
+  const factsByKey = new Map<string, CharacterRelation[]>()
+  for (const row of relations) if (row.sourceId) for (const targetId of new Set(row.targetIds)) {
+    if (targetId === row.sourceId) continue
+    const key = pairKeyOf(row.sourceId, targetId)
+    if (!factsByKey.has(key)) factsByKey.set(key, [])
+    factsByKey.get(key)!.push(row)
+  }
+  return {
+    store, people,
+    load(fromId: string, toId: string) {
+      const key = pairKeyOf(fromId, toId)
+      const characters = [people.get(fromId), people.get(toId)].filter((row): row is Character => !!row)
+      const relations = factsByKey.get(key) ?? []
+      const edit = editByKey.get(key), edits = edit ? [edit] : []
+      return { characters, relations, edits, current: pairFromPerspective(effectivePairs(relations, edits, characters), fromId, toId, characters) }
+    },
+    update(edit: CharacterRelationEdit, characters: Character[]) {
+      editByKey.set(edit.pairKey, edit)
+      for (const person of characters) people.set(person.id, person)
+    },
+  }
+}
+type PairWriteContext = ReturnType<typeof createPairWriteContext>
+
 export function validatePairLabels(forward: string[], reverse: string[], state: 'active' | 'deleted' = 'active') {
   const a = cleaned(forward), b = cleaned(reverse)
   if (state === 'active' && !a.length && !b.length) throw new Error('INVALID_ARGS:有效人物对至少一个方向要有标签；双向清空请使用删除工具。')
   return { forward: a, reverse: b }
 }
 
-async function loadPair(store: MergeStore, bookId: string, fromId: string, toId: string) {
+async function loadPair(store: MergeStore, bookId: string, fromId: string, toId: string, context?: PairWriteContext) {
   const [from, to] = await Promise.all([store.get('characters', fromId), store.get('characters', toId)])
   if (!from || !to || from.bookId !== bookId || to.bookId !== bookId) throw new Error('NOT_FOUND:人物不存在或不属于当前书籍。')
   if (fromId === toId) throw new Error('INVALID_ARGS:人物对需要两个不同的人物编号。')
+  if (context) {
+    if (context.store !== store) throw new Error('人物对写入快照不属于当前事务。')
+    return context.load(fromId, toId)
+  }
   const characters = await store.rows('characters') as unknown as Character[]
   const relations = await store.rows('characterRelations')
   const edits = await store.rows('characterRelationEdits') as unknown as CharacterRelationEdit[]
@@ -85,9 +117,9 @@ async function appendRecord(store: MergeStore, bookId: string, actors: PairWrite
 
 function sameLabels(a: string[], b: string[]) { return JSON.stringify(a) === JSON.stringify(b) }
 
-async function writePair(store: MergeStore, input: PairWriteInput, state: 'active' | 'deleted'): Promise<PairWriteResult> {
+async function writePair(store: MergeStore, input: PairWriteInput, state: 'active' | 'deleted', context?: PairWriteContext): Promise<PairWriteResult> {
   const { bookId, fromId, toId } = input
-  const { characters, relations, edits, current } = await loadPair(store, bookId, fromId, toId)
+  const { characters, relations, edits, current } = await loadPair(store, bookId, fromId, toId, context)
   if (input.expectedFingerprint && input.expectedFingerprint !== current.fingerprint) throw new Error('CONFLICT:人物对已被更新，请重新读取后提交。')
   const labels = state === 'active' ? validatePairLabels(input.forwardLabels, input.reverseLabels) : { forward: [], reverse: [] }
   const evidence = input.evidence ?? []
@@ -146,17 +178,18 @@ async function writePair(store: MergeStore, input: PairWriteInput, state: 'activ
   const afterCharacters = characters.map(person => affected.find(row => row.id === person.id) ? { ...person, revision: affected.find(row => row.id === person.id)!.revision } : person)
   const afterEdits = [...edits.filter(row => row.pairKey !== pairKey), edit]
   const pair = pairFromPerspective(effectivePairs(relations as never, afterEdits, afterCharacters), fromId, toId, afterCharacters)
+  context?.update(edit, afterCharacters)
   return { changed: true, pair, affected, record }
 }
 
 /** 人工或 AI 共用：保存一个人物对的当前关系；active 可新增、覆盖或恢复。 */
-export function saveCharacterPair(store: MergeStore, input: PairWriteInput): Promise<PairWriteResult> {
-  return writePair(store, input, 'active')
+export function saveCharacterPair(store: MergeStore, input: PairWriteInput, context?: PairWriteContext): Promise<PairWriteResult> {
+  return writePair(store, input, 'active', context)
 }
 
 /** 删除双向整组；已删除或不存在时返回合法无变化结果。 */
-export function deleteCharacterPair(store: MergeStore, input: PairWriteInput): Promise<PairWriteResult> {
-  return writePair(store, input, 'deleted')
+export function deleteCharacterPair(store: MergeStore, input: PairWriteInput, context?: PairWriteContext): Promise<PairWriteResult> {
+  return writePair(store, input, 'deleted', context)
 }
 
 export { pairFingerprint }

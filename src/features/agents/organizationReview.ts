@@ -22,7 +22,8 @@ export async function reviewContext(store: AgentStore) {
   const raw = await store.rows('characterRelations') as unknown as CharacterRelation[]
   const lifecycle = await store.rows('assetLifecycle') as unknown as Lifecycle[]
   const relations = syncRelations(raw, people, lifecycle).relations
-  const pairs = effectivePairs(relations, await store.rows('characterRelationEdits') as unknown as CharacterRelationEdit[], people)
+  const edits = await store.rows('characterRelationEdits') as unknown as CharacterRelationEdit[]
+  const pairs = effectivePairs(relations, edits, people)
   const pairByKey = new Map(pairs.map(pair => [pair.pairKey, pair]))
   const pairsByPerson = new Map<string, typeof pairs>()
   for (const pair of pairs) for (const id of [pair.fromId, pair.toId]) {
@@ -57,7 +58,15 @@ export async function reviewContext(store: AgentStore) {
     unresolved: (unresolvedByPerson.get(id) ?? [])
       .map(row => ({ id: row.id, sourceName: row.sourceName, targetName: row.targetName, forwardLabel: row.forwardLabel, reverseLabel: row.reverseLabel, direction: row.direction, evidence: row.evidence })),
   }))
-  return { people, byId, pairs, profile, pair, scan }
+  const rawUnresolvedByPerson = new Map<string, typeof raw>()
+  for (const relation of raw) {
+    const ids = relation.sourceId && !relation.targetIds.length ? [relation.sourceId] : !relation.sourceId ? relation.targetIds : []
+    for (const id of new Set(ids)) {
+      if (!rawUnresolvedByPerson.has(id)) rawUnresolvedByPerson.set(id, [])
+      rawUnresolvedByPerson.get(id)!.push(relation)
+    }
+  }
+  return { people, byId, pairs, pairByKey, pairsByPerson, raw, edits, rawUnresolvedByPerson, profile, pair, scan }
 }
 type ReviewContext = Awaited<ReturnType<typeof reviewContext>>
 
