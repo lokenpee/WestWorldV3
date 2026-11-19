@@ -156,6 +156,21 @@ export class RemoteDatabase {
 export function remoteDatabase<D extends Dexie>(call: StorageCall, scope: string, name: string): D {
   return new RemoteDatabase(call, scope, name) as unknown as D
 }
+
+/** 读取正文缓存所需的存储版本；保留传入数据库句柄的事务视图。 */
+export function versionedTable(db: unknown, table: string) {
+  if (!(db instanceof RemoteDatabase)) return undefined
+  const rows = db.table(table)
+  return {
+    async versions(): Promise<Pick<StoredRecord, 'key' | 'version'>[]> {
+      return (await rows.records(true)).map(({ key, version }) => ({ key, version }))
+    },
+    async get(key: string): Promise<StoredRecord | undefined> {
+      return (await db.request<StoredRecord | null>({ action: 'get', table, key })) ?? undefined
+    },
+  }
+}
+
 export function watchDiskRevision(call: StorageCall) {
   let signature: string | undefined, stopped = false
   let timer: ReturnType<typeof setTimeout>

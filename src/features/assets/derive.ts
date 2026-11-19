@@ -61,6 +61,22 @@ export function createFrequencyCounter<T extends Character | LocationAsset>(asse
       stat.mentions += 1; stat.chapters.add(row.chapterIndex.split('.')[0])
     }
   }
+  // 保留歧义词的命中，归属变化时可以用同一份词项计数重新汇总。
+  function countTerms(text: string): ReadonlyMap<string, number> {
+    const terms = new Map<string, number>()
+    if (expression) for (const match of text.toLowerCase().matchAll(expression)) terms.set(match[0], (terms.get(match[0]) ?? 0) + 1)
+    return terms
+  }
+  function addTerms(chapterIndex: string, terms: ReadonlyMap<string, number>) {
+    const chapter = chapterIndex.split('.')[0]
+    scope.add(chapter)
+    for (const [name, count] of terms) {
+      const ids = owners.get(name)
+      if (ids?.size !== 1) continue
+      const stat = stats.get([...ids][0])!
+      stat.mentions += count; stat.chapters.add(chapter)
+    }
+  }
   function result(): T[] {
     const scopeChapters = scope.size
     const measured = assets.map(asset => {
@@ -86,7 +102,7 @@ export function createFrequencyCounter<T extends Character | LocationAsset>(asse
       return result
     })
   }
-  return { add, result }
+  return { names, add, countTerms, addTerms, result }
 }
 
 export function updateFrequencies<T extends Character | LocationAsset>(assets: T[], texts: { chapterIndex: string; text: string }[], characters: boolean): T[] {

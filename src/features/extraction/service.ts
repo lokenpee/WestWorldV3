@@ -8,7 +8,8 @@ import { bindNodeCharacters, createNodeBindingContext, remapCharacterLinks } fro
 import { dexieMergeStore } from '../assets/mergeCore'
 import { invalidateAssetProgress, type AssetChange } from '../assets/invalidate'
 import { extractedRelation, syncRelations, type ExtractedRelationInput } from '../assets/relations'
-import { rebuildFacts, updateFrequencies, createFrequencyCounter } from '../assets/derive'
+import { rebuildFacts } from '../assets/derive'
+import { readBookFrequencies } from '../assets/frequency'
 import type { Character, CharacterRelation, EventNode, Lifecycle, LocationAsset } from '../assets/types'
 import { stepLabels, substeps, type ExtractionData, type ExtractedRow, type Substep } from './types'
 import { checkReceiptSources, coverage, withExtractionLock, type Lease, type ExtractionJob, type Progress, type Receipt, type ReExtractScope, type Run, type SavedUsage, type StoredTask } from './recovery'
@@ -292,12 +293,12 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
               await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp, dependentRuns)
             }
             if (step === 'worldAssets' && !options.lane) {
-            const texts = await db.table<{ chapterIndex: string; text: string }>('chapterTexts').toArray()
-            for (const [table, people] of [['characters', true], ['locations', false]] as const) {
-              const before = await db.table<Character | LocationAsset>(table).toArray()
-              const after = updateFrequencies(before, texts, people)
-              for (const [index, row] of after.entries()) if (JSON.stringify(row) !== JSON.stringify(before[index])) await db.table(table).put({ ...row, revision: row.revision + 1 })
-            }
+              const people = await db.table<Character>('characters').toArray()
+              const places = await db.table<LocationAsset>('locations').toArray()
+              const measured = await readBookFrequencies(db, people, places, { signal: controller.signal, cacheOwner: workspace.openBook(bookId), yieldToUi: false })
+              for (const [table, before, after] of [['characters', people, measured.people], ['locations', places, measured.places]] as const) {
+                for (const [index, row] of after.entries()) if (JSON.stringify(row) !== JSON.stringify(before[index])) await db.table(table).put({ ...row, revision: row.revision + 1 })
+              }
             }
             await db.table('extractionReceipts').add({ key, bookId, chapterIndex: chapter.chapterIndex, substep: step, inputFingerprint, originIds, committedAt: timestamp, runId })
             await finishTask(db)
@@ -321,16 +322,10 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
         update({ progress: undefined, chapter: '正在更新出场统计' })
         const people = await db.table<Character>('characters').toArray()
         const places = await db.table<LocationAsset>('locations').toArray()
-        const personCounter = createFrequencyCounter(people, true), placeCounter = createFrequencyCounter(places, false)
-        for (const chapter of chapters) {
-          controller.signal.throwIfAborted()
-          const text = await db.table<{ text: string }>('chapterTexts').get(chapter.chapterIndex)
-          if (text) { personCounter.add({ chapterIndex: chapter.chapterIndex, text: text.text }); placeCounter.add({ chapterIndex: chapter.chapterIndex, text: text.text }) }
-          await new Promise<void>(resolve => setTimeout(resolve, 0))
-        }
+        const measured = await readBookFrequencies(db, people, places, { chapterIndices: chapters.map(chapter => chapter.chapterIndex), signal: controller.signal })
         await transact(db, 'rw', [db.tables], async (db) => {
           await checkLease(db)
-          for (const [table, before, after] of [['characters', people, personCounter.result()], ['locations', places, placeCounter.result()]] as const) {
+          for (const [table, before, after] of [['characters', people, measured.people], ['locations', places, measured.places]] as const) {
             const changed = after.filter((row, index) => JSON.stringify(row) !== JSON.stringify(before[index])).map(row => ({ ...row, revision: row.revision + 1 }))
             if (changed.length) await db.table(table).bulkPut(changed)
           }

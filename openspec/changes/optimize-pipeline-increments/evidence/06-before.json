@@ -1,0 +1,71 @@
+{
+  "chunks": 200,
+  "sourceChapters": 100,
+  "textCharacters": 1600000,
+  "fixedModelCalls": 6,
+  "samples": [
+    {
+      "name": "cold_single_chapter_extract",
+      "textReadRequests": 202,
+      "textRows": 202,
+      "textCharacters": 1616000,
+      "textResponseBytes": 4864528,
+      "metadataRequests": 0,
+      "elapsedMs": 3305.82
+    },
+    {
+      "name": "same_chapter_reextract",
+      "textReadRequests": 204,
+      "textRows": 204,
+      "textCharacters": 1632000,
+      "textResponseBytes": 4912688,
+      "metadataRequests": 0,
+      "elapsedMs": 3162.88
+    },
+    {
+      "name": "cross_window_same_length_text_change",
+      "textReadRequests": 204,
+      "textRows": 204,
+      "textCharacters": 1632000,
+      "textResponseBytes": 4912689,
+      "metadataRequests": 0,
+      "elapsedMs": 3124.59
+    },
+    {
+      "name": "new_long_name_in_old_chapters",
+      "textReadRequests": 204,
+      "textRows": 204,
+      "textCharacters": 1632000,
+      "textResponseBytes": 4912689,
+      "metadataRequests": 0,
+      "elapsedMs": 3091.1
+    },
+    {
+      "name": "same_names_owner_becomes_ambiguous",
+      "textReadRequests": 204,
+      "textRows": 204,
+      "textCharacters": 1632000,
+      "textResponseBytes": 4912689,
+      "metadataRequests": 0,
+      "elapsedMs": 3134.41
+    },
+    {
+      "name": "unrelated_asset_edit",
+      "textReadRequests": 204,
+      "textRows": 204,
+      "textCharacters": 1632000,
+      "textResponseBytes": 4912689,
+      "metadataRequests": 0,
+      "elapsedMs": 3128.01
+    },
+    {
+      "name": "manual_tiers_reference",
+      "textReadRequests": 2,
+      "textRows": 400,
+      "textCharacters": 3200000,
+      "textResponseBytes": 9633140,
+      "metadataRequests": 0,
+      "elapsedMs": 200.23
+    }
+  ]
+}

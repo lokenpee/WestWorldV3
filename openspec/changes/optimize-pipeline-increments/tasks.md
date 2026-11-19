@@ -8,7 +8,7 @@
 - [x] 3. 备份准备移出主线程、复用预检结果。见 acceptance 第3项及 evidence/03-*.json。
 - [x] 4. P1任务独立记录与输入快照兼容。见 acceptance 第4项及 evidence/04-*.json。
 - [x] 5. P1关系及节点受影响范围重建。见 acceptance 第5项及 evidence/05-*.json。
-- [ ] 6. 单章提取收尾统计复用。
+- [x] 6. 单章提取收尾统计复用。见 acceptance 第6项及 evidence/06-*.json。
 - [ ] 7. P2关系完成指纹与复用修复。
 - [ ] 8. P2继续启动失败清理。
 - [ ] 9. P2事务内关系快照及增量计算。
