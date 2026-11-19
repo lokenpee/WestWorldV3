@@ -1,0 +1,46 @@
+{
+  "optimization": 7,
+  "sample": {
+    "characters": 2,
+    "completedCharacters": 1,
+    "changedPairs": 1
+  },
+  "submission": {
+    "ok": true,
+    "changed": true,
+    "complete": true,
+    "outcome": "changed"
+  },
+  "expectedUnchanged": {
+    "reusedCharacters": 1,
+    "reusedPairs": 1
+  },
+  "fingerprints": {
+    "characterContentMatches": true,
+    "pairContentMatches": true
+  },
+  "unchanged": {
+    "reusedCharacters": 1,
+    "reusedPairs": 1,
+    "aStatus": "checked",
+    "bStatus": "pending"
+  },
+  "reloaded": {
+    "reusedCharacters": 1,
+    "reusedPairs": 1,
+    "aStatus": "checked",
+    "bStatus": "pending"
+  },
+  "relationChanged": {
+    "reusedCharacters": 0,
+    "reusedPairs": 0,
+    "aStatus": "pending",
+    "bStatus": "pending"
+  },
+  "profileChanged": {
+    "reusedCharacters": 0,
+    "reusedPairs": 0,
+    "aStatus": "pending",
+    "bStatus": "pending"
+  }
+}

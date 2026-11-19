@@ -474,7 +474,7 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
     const retainedStatus = retainedUncertain || explicitNoChange ? text(existing?.evidenceStatus) : ''
     const evidenceStatus = (latestStatus || retainedStatus) as 'verified' | 'unverified' | 'partial' | ''
     nextPairChecks.set(pair.pairKey, {
-      ...(existing ?? {}), pairKey: pair.pairKey, fingerprint: pair.fingerprint,
+      ...(existing ?? {}), pairKey: pair.pairKey, fingerprint: await after.pair(pair.pairKey),
       outcome: pairOutcome, reason, basis: pairBasis, commitIds: pairCommitIds,
       ...(evidenceStatus ? { evidenceStatus } : {}),
     })
@@ -491,6 +491,7 @@ async function submitRelationReview(store: AgentStore, scope: Scope, args: Row, 
   const completed = done && failures.length === 0
   if (completed) {
     item.status = 'checked'; item.outcome = outcome; item.reason = description; item.commitIds = commitIds
+    item.contentFingerprint = await after.scan(id)
     delete item.lastError
     organization.activeWork = null
     const pairs = records(organization.pairChecks)

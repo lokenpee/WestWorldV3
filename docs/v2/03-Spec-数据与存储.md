@@ -1013,6 +1013,8 @@ characterReferences为人物关联的读取说明；节点actorIds与targetChara
 
 eventLines.summary为可选整线概述，旧cause/process/result保留；缺省时查询组合旧文本。P2组织状态identityChecks、reusedCount及P3分阶段checks/reusedChecks随pipelineRuns备份，无新表与版本迁移。字段含义和赋值规则见[实施设计](../../openspec/changes/p3-continuous-story-lines/design.md#字段变化)、[复用字段](../../openspec/changes/p3-continuous-story-lines/restart.md#字段变化)。
 
+P2关系完成时，relationItems.contentFingerprint保存提交后人物及相关关系的内容哈希，pairChecks.fingerprint保存提交后人物对及两端资料的内容哈希，与构建清单和复用判断共用算法。关系写入的expectedFingerprint仍含修订号，用于并发冲突检查；旧缺失或错误内容指纹重新核查一次后再参与复用。
+
 ## 12. P1独立任务与正文快照
 
 浏览器书库版本9新增以下两表，本机存储使用同名逻辑表。P1运行以taskStorage='separate'标记，nextTaskOrdinal分配序号，tasks数组不再写入主运行。任务和输入的完整结构见storage.schema.json中的ExtractionTask及ExtractionInput定义。
