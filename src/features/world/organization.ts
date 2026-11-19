@@ -310,7 +310,7 @@ export async function runCharacterOrganization(workspace: Workspace, bookId: str
         await store.put('pipelineRuns', { ...current, organization: state })
       })
       // 此时业务完成和runtime日志均已保存；历史维护失败不撤销成功提交。
-      if (unit.kind === 'profile' || unit.kind === 'relations') await pruneOrganizationHistory(workspace, bookId).catch(() => undefined)
+      if ((unit.kind === 'profile' || unit.kind === 'relations') && unit.characterId) await pruneOrganizationHistory(workspace, bookId, { runId: options.runId, step: unit.kind === 'profile' ? 'profiles' : 'relations', characterId: unit.characterId }).catch(() => undefined)
       const completed = await organizationOf(repo, options.runId)
       const nextDone = completed.organization.scanPages.filter(item => item.status === 'checked').length + completed.organization.candidateDecisions.length + completed.organization.profileItems.filter(item => item.status === 'checked').length + completed.organization.relationItems.filter(item => item.status === 'checked').length
       options.onProgress?.(nextDone, total)

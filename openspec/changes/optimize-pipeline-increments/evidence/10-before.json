@@ -1,0 +1,44 @@
+{
+  "fixture": "真实本机存储适配器和SQLite临时目录；40人物、3轮，先完成全量维护，再新增P000完成记录",
+  "people": 40,
+  "historyRounds": 3,
+  "pipelineRuns": 122,
+  "completedNow": 1,
+  "pipelineRunReads": {
+    "requests": 1,
+    "returnedRows": 122,
+    "returnedBytes": 67289,
+    "sessionsRead": 122,
+    "runsRead": 122,
+    "emptyReads": 0
+  },
+  "sessionReads": {
+    "requests": 82,
+    "returnedRows": 82,
+    "returnedBytes": 7734,
+    "sessionsRead": 82,
+    "runsRead": 0,
+    "emptyReads": 0
+  },
+  "entryReads": {
+    "requests": 121,
+    "returnedRows": 91,
+    "returnedBytes": 22581,
+    "sessionsRead": 44,
+    "runsRead": 44,
+    "emptyReads": 77
+  },
+  "totalReadRequests": 204,
+  "totalReadBytes": 97604,
+  "elapsedMs": 37.5,
+  "preserved": {
+    "unrelatedPeople": true,
+    "activeSession": true,
+    "partialNewDetailAndOldCompleteDetail": true,
+    "sharedSnapshot": true,
+    "parentChain": true,
+    "sessionLeaf": true,
+    "businessReceipts": true,
+    "p3": true
+  }
+}

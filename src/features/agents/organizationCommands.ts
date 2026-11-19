@@ -7,6 +7,7 @@ import { applyAssetPatch } from '../assets/assetPatch'
 import { navigateIdentityPages, saveIdentityGroups } from '../world/identityCandidates'
 import { pairFingerprint, pairFromPerspective, pairKeyOf, resolveLifecycleId } from '../assets/relations'
 import { createPairWriteContext, deleteCharacterPair, evidenceProblems, saveCharacterPair } from '../assets/relationEdits'
+import { registerCompletedHistory } from './p2HistoryIndex'
 
 const relationFailureSignatures = new Map<string, { signature: string; count: number }>()
 type RelationFailure = { targetId: string; code: string; message: string; recoverable: boolean; repeated: boolean; action: string }
@@ -22,6 +23,7 @@ async function organizationOf(store: AgentStore, scope: Scope) {
 }
 
 async function saveOrganization(store: AgentStore, run: Row, organization: Row) {
+  await registerCompletedHistory(store, run, organization)
   await store.put('pipelineRuns', { ...run, organization: { ...organization, revision: Number(organization.revision ?? 1) + 1 } })
 }
 

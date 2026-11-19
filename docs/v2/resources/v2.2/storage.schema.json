@@ -661,7 +661,8 @@
         "recordType": {
           "enum": [
             "run",
-            "asset_edit"
+            "asset_edit",
+            "history_index"
           ]
         },
         "id": {
@@ -915,6 +916,21 @@
         },
         "taskStorage": {
           "const": "separate"
+        },
+        "historyIndexVersion": {
+          "const": 1
+        },
+        "historyUnit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "historyRunIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       },
       "required": [
@@ -974,6 +990,33 @@
             "required": [
               "nextTaskOrdinal"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "recordType": {
+                "const": "history_index"
+              }
+            },
+            "required": [
+              "recordType"
+            ]
+          },
+          "then": {
+            "required": [
+              "historyIndexVersion",
+              "historyUnit",
+              "historyRunIds"
+            ],
+            "properties": {
+              "stage": {
+                "const": "P2"
+              },
+              "status": {
+                "const": "completed"
+              }
+            }
           }
         }
       ]

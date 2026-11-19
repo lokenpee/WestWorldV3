@@ -1027,3 +1027,6 @@ P2关系完成时，relationItems.contentFingerprint保存提交后人物及相�
 两类提取可共享正文快照，但各自inputFingerprint继续使用原完整任务输入算法。读取详情才按snapshotId取正文；常规进度使用已保存的进度和凭证。旧内嵌任务在继续、中断恢复或取消写状态之前原子转换，失败保留旧记录可重试，不用当前章节正文替代旧输入。
 
 当前备份格式12包含两表；格式4–11补空表后沿旧兼容流程导入。校验任务属于本书P1运行、快照存在且归属正确。恢复副本重写bookId，保留原任务编号、正文、章节名和输入指纹；活动独立任务变为可恢复状态。浏览器旧库迁移在两新表均为空时保持原摘要，任一表有数据则一并计入摘要。相关实施与验证见[第4项设计](../../openspec/changes/optimize-pipeline-increments/design.md#第4项p1任务和正文快照独立保存)。
+
+### P2历史详情位置
+T20中recordType=history_index为可重建位置记录，结构见storage.schema的PipelineRun定义。每个人物每一步一条，historyUnit保存profile:人物编号或relations:人物编号，historyRunIds只保留最新及尚未完成清理的运行编号，historyIndexVersion固定1。人物完成事务登记运行编号，随后等待最终日志落盘并按该人物清理旧详情；运行/暂停会话、有效执行权、共享快照和消息父链继续保留。位置与删除同事务提交；失败仍可重试。备份只携带业务运行和修改记录，省略该派生位置，恢复后首次维护重建。

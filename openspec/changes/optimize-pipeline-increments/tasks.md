@@ -12,7 +12,7 @@
 - [x] 7. P2关系完成指纹与复用修复。见 acceptance 第7项及 evidence/07-*.json。
 - [x] 8. P2继续启动失败清理。见 acceptance 第8项及 evidence/08-*.json。
 - [x] 9. P2事务内关系快照及增量计算。见 acceptance 第9项及 evidence/09-*.json。
-- [ ] 10. P2按完成人物清理旧详情。
+- [x] 10. P2按完成人物清理旧详情。见 acceptance 第10项及 evidence/10-*.json；HTTP批量删除随第17项验证。
 - [ ] 11. P3专用轻量状态及页核对复用。
 - [ ] 12. P3长线目录与关联预算处理。
 - [ ] 13. 执行链分页及增量刷新。

@@ -4303,7 +4303,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "ff82971b6d435dbcf78f19b09c8bbaa3718bbe8095ba96c6504f721d4073d621"
+      "sha256": "6473b622d04f6f1b15df606e27564d6b1345c1f43abd5a72cd4cabde59ea66e7"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
