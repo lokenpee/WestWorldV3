@@ -4970,6 +4970,16 @@
                     },
                     "statement": {
                       "type": "string"
+                    },
+                    "memberCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "membersTruncated": {
+                      "type": "boolean"
+                    },
+                    "summaryTruncated": {
+                      "type": "boolean"
                     }
                   },
                   "additionalProperties": false

@@ -10,6 +10,20 @@ export function storyView(row: Row, kind: string): Row {
   if (kind === 'eventLine') return { id: row.id, kind, title: row.title, summary: lineSummary(row), nodeIds: strings(row.nodeIds), lineStatus: row.lineStatus ?? row.status ?? 'open' }
   return { id: row.id, kind: 'note', key: row.key ?? row.title, status: row.status, statement: row.statement ?? row.summary, nodeIds: strings(row.nodeIds), lineIds: strings(row.lineIds) }
 }
+/** 目录只提供定位信息；完整概述和完整成员通过详情工具分页读取。 */
+export function storyCatalogView(row: Row, kind: string, focusIds: ReadonlySet<string> = new Set()): Row {
+  const view = storyView(row, kind)
+  if (kind !== 'eventLine') return view
+  view.title = text(view.title).slice(0, 120)
+  const full = text(view.summary)
+  view.summary = full.slice(0, 600)
+  if (full.length > 600) view.summaryTruncated = true
+  const members = strings(row.nodeIds)
+  view.nodeIds = [...new Set([...members.filter(id => focusIds.has(id)), ...members])].slice(0, 12)
+  view.memberCount = members.length
+  view.membersTruncated = members.length > 12
+  return view
+}
 export const briefItems = (brief: Row | null | undefined): Row[] => brief ? [...records(brief.workItems), ...records(brief.related), ...(brief.line ? [brief.line as Row] : []), ...(brief.previousNode ? [brief.previousNode as Row] : [])] : []
 
 /** 仅登记实际送出的资产；版本指纹留在程序中，不交给模型填写。 */
@@ -31,7 +45,7 @@ function compactValue(value: Row, tool: string): Row {
     if (typeof row.text === 'string' && row.charOffset !== undefined) return { id: row.id, hint: '历史分段详情可用当前详情工具重新读取。' }
     const kind = text(row.kind) || (row.statement !== undefined || row.key !== undefined ? 'note' : row.title !== undefined && row.name === undefined && row.nodeIds !== undefined ? 'eventLine' : 'node')
     return { ...storyView(row, kind),
-      ...Object.fromEntries(['process', 'charOffset', 'totalChars', 'truncated', 'nextCharOffset', 'memberOffset', 'memberCount', 'membersTruncated', 'nextMemberOffset'].filter(key => row[key] !== undefined && (key !== 'process' || kind === 'node')).map(key => [key, row[key]])) }
+      ...Object.fromEntries(['process', 'charOffset', 'totalChars', 'truncated', 'nextCharOffset', 'memberOffset', 'memberCount', 'membersTruncated', 'nextMemberOffset', 'summaryTruncated'].filter(key => row[key] !== undefined && (key !== 'process' || kind === 'node')).map(key => [key, row[key]])) }
   }
   if (Array.isArray(value.data)) return { ...value, data: records(value.data).map(project) }
   if (Array.isArray(value.workItems)) return { ...value, workItems: records(value.workItems).map(project), related: records(value.related).map(project), ...(value.line ? { line: project(value.line as Row) } : {}), ...(value.previousNode ? { previousNode: project(value.previousNode as Row) } : {}) }

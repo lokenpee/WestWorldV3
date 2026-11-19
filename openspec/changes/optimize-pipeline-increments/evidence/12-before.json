@@ -1,0 +1,49 @@
+{
+  "optimization": 12,
+  "sample": {
+    "nodes": 2501,
+    "longLineMembers": 2501,
+    "shortLineMembers": 1,
+    "relevantLines": 2,
+    "contextBudget": 3000
+  },
+  "rawLongLineTokens": 6296,
+  "directory": {
+    "candidates": [
+      {
+        "id": "A-long",
+        "tokens": 6296,
+        "nodeIds": 2501,
+        "memberCount": null
+      },
+      {
+        "id": "B-short",
+        "tokens": 47,
+        "nodeIds": 1,
+        "memberCount": null
+      }
+    ],
+    "estimatedTokens": 6358,
+    "responseBytes": 25348
+  },
+  "context": {
+    "returnedRelated": 0,
+    "relatedIds": [],
+    "estimatedTokens": 1,
+    "totalRelated": 2,
+    "truncated": true
+  },
+  "oversizedSummary": {
+    "rawTokens": 12047,
+    "returnedRelated": 0,
+    "relatedIds": [],
+    "estimatedTokens": 1,
+    "truncated": true
+  },
+  "detail": {
+    "pages": 26,
+    "restoredMembers": 2501,
+    "exact": true
+  },
+  "elapsedMs": 155.35
+}

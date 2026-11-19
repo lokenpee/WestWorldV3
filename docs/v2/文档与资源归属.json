@@ -4319,7 +4319,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "446497d7e85c8f5d34a4d5e72e50bb812f0b30a9fd8c0fb6fecc90f4dcc57b97"
+      "sha256": "8a286dafdec10f3e0cb5b7fd24420812cf19e4cfbf9eb2d0d56528a69e307fef"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",

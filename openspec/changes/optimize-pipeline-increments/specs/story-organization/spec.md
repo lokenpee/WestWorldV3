@@ -1,5 +1,12 @@
 ## ADDED Requirements
 
+### Requirement: STORY-CATALOG-BOUNDED 长事件线目录提供可读摘要
+系统 SHALL 在P3搜索目录和关联候选中显示事件线概述、完整成员数量和少量相关成员，详情仍基于完整数据分页。
+
+#### Scenario: 长线不遮挡后续短线
+- **WHEN** 相关长事件线有大量成员，或某个候选超过上下文预算
+- **THEN** 显示长线的有限目录并继续检查其他候选；成员及概述的部分展示有标记，完整详情和存储内容不被截短。
+
 ### Requirement: STORY-STATUS-READING 分页进度按业务版本刷新
 系统 SHALL 为P3分页运行单独读取进度，复用未变业务数据的核查结果，旧窗口运行继续兼容读取。
 

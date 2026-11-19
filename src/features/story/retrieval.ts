@@ -1,7 +1,7 @@
 import { estimateTextTokens } from '../agents/context'
 import { records, strings, text } from '../agents/contracts'
 import type { AgentStore, Row } from '../agents/repository'
-import { storyView } from './views'
+import { storyCatalogView, storyView } from './views'
 
 const excerpt = (value: unknown, size: number) => text(value).slice(0, size)
 export const storyBatchBudget = (contextWindow = 65536) => Math.min(8000, Math.max(512, Math.floor(contextWindow * 0.12)))
@@ -58,7 +58,7 @@ export async function searchStoryContext(store: AgentStore, bookId: string, sess
     return { ...item, matched, score }
   }).filter(item => !terms.length || item.score > 0).sort((a, b) => b.score - a.score || text(a.row.id).localeCompare(text(b.row.id)))
   const offset = Number(args.offset ?? 0), limit = Math.min(Number(args.limit ?? 12), 20)
-  const data: Row[] = ranked.slice(offset, offset + limit).map(item => lightweight ? storyView(item.row, item.kind) : ({ ...storyDigest(item.row, item.kind), matchedTerms: item.matched.slice(0, 8) }))
+  const data: Row[] = ranked.slice(offset, offset + limit).map(item => lightweight ? storyCatalogView(item.row, item.kind, ids) : ({ ...storyDigest(item.row, item.kind), matchedTerms: item.matched.slice(0, 8) }))
   const truncated = offset + data.length < ranked.length
   return { data, totalCount: ranked.length, truncated, nextOffset: truncated ? offset + data.length : null }
 }
@@ -71,7 +71,7 @@ export async function buildStoryContext(store: AgentStore, bookId: string, sessi
   const related: Row[] = []; let used = 0
   for (const row of result.data) {
     const cost = estimateTextTokens(JSON.stringify(row))
-    if (used + cost > 3000) break
+    if (used + cost > 3000) continue
     related.push(row); used += cost
   }
   return { assigned, related, totalRelated: result.totalCount, truncated: result.truncated || related.length < result.data.length }
