@@ -2,10 +2,13 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import type { BookRepository, Chapter } from '../../lib/storage/workspace'
 import { ChapterTextDialog } from '../books/ChapterTextDialog'
 import type { AssetService } from './service'
-import { AssetError, assetLabels, assetName, roleWeights, type Asset, type AssetInput, type AssetKind, type AssetSnapshot, type Character } from './types'
+import { AssetError, assetLabels, assetName, roleWeights, type Asset, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type EventLine } from './types'
+import { usesOutline } from '../story/outline'
+import { OutlineEventMembers } from '../story/OutlineViews'
 import { formInput, formValues, labels, memberIds, type FormValues } from './form'
 import { RelationEditor, type RelationEditorHandle } from './RelationEditor'
 import { NodeCharacters } from './NodeCharacters'
+import { NodeStoryMemberships } from '../story/NodeStoryMemberships'
 
 function DeleteDialog({ name, busy, onConfirm, onClose }: { name: string; busy: boolean; onConfirm: () => void; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -71,6 +74,8 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
   const mapping = baseline ? snapshot.lifecycle.find(row => row.key === `${kind}:${baseline.id}`) : undefined
   const locked = snapshot.locks[kind === 'character' || kind === 'location' ? 'world' : 'narrative']
   const disabled = busy || locked || missing
+  const outlineLine = kind === 'eventLine' && baseline && usesOutline(baseline as EventLine) ? baseline as EventLine : undefined
+  const memberships = kind === 'node' && baseline ? snapshot.storyMemberships?.[baseline.id] ?? [] : []
 
   const update = (key: keyof FormValues, value: string) => { setValues(current => ({ ...current, [key]: value, ...(key === 'actors' ? { actorIds: '' } : key === 'targets' ? { targetCharacterIds: '' } : {}) })); setFieldError(undefined); setSavedMessage('') }
   const error = (failure: unknown) => { setFieldError({ field: failure instanceof AssetError ? failure.field : undefined, message: failure instanceof Error ? failure.message : '操作失败，请重试。' }) }
@@ -88,6 +93,7 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
         saveBaseline = latest
       }
       const input = formInput(kind, values, creating)
+      if (outlineLine) delete input.nodeIds
       const saved = creating ? await service.create(bookId, kind, input) : await service.update(bookId, kind, saveBaseline!.id, saveBaseline!.revision, input)
       loadValues(saved); setSavedMessage('已保存'); onSaved(saved); return true
     } catch (failure) { error(failure); return false }
@@ -151,7 +157,14 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
           {field('identity', true)}{field('ageText')}{field('appearance', true)}{field('personality', true)}{field('background', true)}{field('speechStyleSample', true)}
         </> : field('description', true)}
       </> : kind === 'node' ? <>
-        {field('name')}{field('summary', true)}{chapterField(true)}{field('quote', true)}
+        {field('name')}
+        <div className="asset-field">
+          <NodeStoryMemberships memberships={memberships}
+            lineTitle={id => snapshot.eventLines.find(item => item.id === id)?.title}
+            eventTitle={id => snapshot.storyEvents?.find(item => item.id === id)?.title}
+          />
+        </div>
+        {field('summary', true)}{chapterField(true)}{field('quote', true)}
         <p className="field-help">参考引文可留空。与原文匹配时自动定位，未匹配也可保存。</p>
         {baseline && 'quoteStatus' in baseline && baseline.quoteStatus === 'unmatched' && <p className="asset-warning" role="status">参考引文未能在所选章节中定位，节点已保存，可对照原文调整。</p>}
         <button className="text-button" type="button" disabled={!values.chapterIndex || busy} onClick={() => {
@@ -162,12 +175,14 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
           setValues(current => ({ ...current, participantIds: ids.join('\n'), unlinkedParticipants: names }))
           setFieldError(undefined); setSavedMessage('')
         }} />
+        {field('locationNames', true)}
+        <p className="field-help">多处地点可每行填写一处。</p>
         {field('time_text')}{field('time_hint')}{field('world_delta', true)}{field('new_facts', true)}{field('started_actions', true)}
         <p className="field-help">状态变化、事实与行动可每行一项。</p>
       </> : <>
         {field('title')}
         <div className="asset-field"><label htmlFor="asset-lineStatus">事件线状态</label><select id="asset-lineStatus" value={values.lineStatus} disabled={disabled || conflict} onChange={event => void immediate('lineStatus', event.target.value)}><option value="open">进行中</option><option value="closed">已结束</option></select><small>{creating ? '保存事件线时生效' : '选择后立即保存'}</small></div>
-        <fieldset className="node-choices" disabled={disabled}><legend>成员节点</legend>{snapshot.nodes.length === 0 && <p>请先新增事件节点。</p>}{snapshot.nodes.map(node => <label key={node.id}><input type="checkbox" checked={memberIds(values.nodeIds).includes(node.id)} onChange={event => update('nodeIds', (event.target.checked ? [...memberIds(values.nodeIds), node.id] : memberIds(values.nodeIds).filter(id => id !== node.id)).join('\n'))} />{node.name}<small>{node.chapterName}</small></label>)}{memberIds(values.nodeIds).filter(id => !snapshot.nodes.some(node => node.id === id)).map(id => <button type="button" className="text-button" key={id} onClick={() => update('nodeIds', memberIds(values.nodeIds).filter(value => value !== id).join('\n'))}>移除失效节点 {id}</button>)}</fieldset>
+        {outlineLine ? <OutlineEventMembers line={outlineLine} nodes={snapshot.nodes} events={snapshot.storyEvents ?? []} disabled={disabled || conflict || dirty} save={(event, nodeIds) => service.updateOutlineEventNodes(bookId, outlineLine.id, event.id, event.revision, nodeIds)} /> : <fieldset className="node-choices" disabled={disabled}><legend>成员节点</legend>{snapshot.nodes.length === 0 && <p>请先新增事件节点。</p>}{snapshot.nodes.map(node => <label key={node.id}><input type="checkbox" checked={memberIds(values.nodeIds).includes(node.id)} onChange={event => update('nodeIds', (event.target.checked ? [...memberIds(values.nodeIds), node.id] : memberIds(values.nodeIds).filter(id => id !== node.id)).join('\n'))} />{node.name}<small>{node.chapterName}</small></label>)}{memberIds(values.nodeIds).filter(id => !snapshot.nodes.some(node => node.id === id)).map(id => <button type="button" className="text-button" key={id} onClick={() => update('nodeIds', memberIds(values.nodeIds).filter(value => value !== id).join('\n'))}>移除失效节点 {id}</button>)}</fieldset>}
         {fieldError?.field === 'nodeIds' && <p role="alert" className="field-error">{fieldError.message}</p>}
         {field('summary', true)}
         <details><summary>原有起因、经过与结果</summary>{field('cause', true)}{field('process', true)}{field('result', true)}</details>

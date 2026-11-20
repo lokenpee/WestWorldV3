@@ -1,5 +1,6 @@
 import type { Chapter, createWorkspace } from '../../lib/storage/workspace'
-import type { Character, CharacterRelation, CharacterRelationEdit, EventLine, EventNode, Lifecycle, LocationAsset } from '../assets/types'
+import type { Character, CharacterRelation, CharacterRelationEdit, EventLine, EventNode, Lifecycle, LocationAsset, StoryEvent } from '../assets/types'
+import { synchronizeOutline, usesOutline } from '../story/outline'
 import { dexieMergeStore, type Row } from '../assets/mergeCore'
 import { invalidateAssetProgress, type AssetChange } from '../assets/invalidate'
 import { syncRelations } from '../assets/relations'
@@ -8,7 +9,7 @@ import type { Receipt, ReExtractScope, Run } from './recovery'
 type Database = ReturnType<ReturnType<typeof createWorkspace>['openBook']>
 const unique = (values: string[]) => [...new Set(values.filter(Boolean))]
 
-export interface ReExtractCounts { characters: number; locations: number; relations: number; nodes: number; eventLines: number }
+export interface ReExtractCounts { characters: number; locations: number; relations: number; nodes: number; eventLines: number; storyEvents?: number }
 
 export async function previewReExtractData(db: Database, scope: ReExtractScope, chapters: Chapter[]): Promise<ReExtractCounts> {
   const chapterSet = scope.scope === 'all' ? new Set(chapters.map(row => row.chapterIndex)) : new Set([scope.chapterIndex ?? ''])
@@ -31,10 +32,13 @@ export async function previewReExtractData(db: Database, scope: ReExtractScope, 
   const nodes = await db.table<EventNode>('nodes').toArray()
   const removedNodes = new Set(nodes.filter(row => scope.scope === 'all' || originIds.has(row.id)).map(row => row.id))
   const lines = await db.table<EventLine>('eventLines').toArray()
+  const events = await db.table<StoryEvent>('storyEvents').toArray()
+  const affectedEvents = new Set(events.filter(event => scope.scope === 'all' || event.nodeIds.some(id => removedNodes.has(id))).map(event => event.id))
   return {
     characters: 0, locations: 0, relations: 0,
     nodes: removedNodes.size,
-    eventLines: scope.scope === 'all' ? lines.length : lines.filter(line => line.nodeIds.some(id => removedNodes.has(id))).length,
+    eventLines: scope.scope === 'all' ? lines.length : lines.filter(line => line.nodeIds.some(id => removedNodes.has(id)) || line.eventIds?.some(id => affectedEvents.has(id))).length,
+    ...(affectedEvents.size ? { storyEvents: affectedEvents.size } : {}),
   }
 }
 
@@ -118,6 +122,7 @@ export async function clearReExtractData(db: Database, scope: ReExtractScope, ch
     const lines = await db.table<EventLine>('eventLines').toArray()
     if (all) {
       for (const line of lines) await db.table('eventLines').delete(line.id)
+      await db.table('storyEvents').clear()
       for (const node of removedNodes) await db.table('nodes').delete(node.id)
       const runs = await db.table<Run>('pipelineRuns').where('stage').equals('P3').toArray()
       for (const run of runs) await db.table('pipelineRuns').delete(run.id)
@@ -127,7 +132,8 @@ export async function clearReExtractData(db: Database, scope: ReExtractScope, ch
       for (const line of lines) {
         const remaining = line.nodeIds.filter(id => !removedNodeIds.has(id))
         if (remaining.length === line.nodeIds.length) continue
-        if (!remaining.length) {
+        if (usesOutline(line)) { changes.push({ kind: 'eventLine', id: line.id }); continue }
+        if (!remaining.length && !Array.isArray(line.eventIds)) {
           await db.table('eventLines').delete(line.id)
           const mapping = await db.table<Lifecycle>('assetLifecycle').get(`eventLine:${line.id}`)
           if (mapping) await db.table('assetLifecycle').put({ ...mapping, state: 'deleted', revision: mapping.revision + 1, updatedAt: timestamp })
@@ -151,6 +157,7 @@ export async function clearReExtractData(db: Database, scope: ReExtractScope, ch
           changes.push({ kind: 'node', id: node.id })
         }
       }
+      await synchronizeOutline(dexieMergeStore(db), timestamp)
       for (const id of removedNodeIds) changes.push({ kind: 'node', id })
       const runs = await db.table<Run>('pipelineRuns').where('stage').anyOf(['P2', 'P3']).toArray()
       await invalidateAssetProgress(dexieMergeStore(db), changes, timestamp, runs as unknown as Row[])

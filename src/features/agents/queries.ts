@@ -1,4 +1,5 @@
 import type { AgentStore, Row } from './repository'
+import { readOutlineDetail } from '../story/outlineDetail'
 import { hash, records, strings, text, type AgentProfile } from './contracts'
 import { characterCandidates } from '../assets/characterLinks'
 import { effectivePairs, pairFromPerspective, resolveLifecycleId, syncRelations } from '../assets/relations'
@@ -11,7 +12,7 @@ import { storyProcessSegments } from './storyCommands'
 import { characterDetails, relationOverview } from './assetViews'
 import { storyView } from '../story/views'
 
-export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; contextId?: string; unitId?: string; workKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string }
+export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; outline?: boolean; contextId?: string; unitId?: string; workKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
 const canonicalCursor = (value: unknown) => JSON.stringify(Array.isArray(value) ? value.map(String) : [])
@@ -83,6 +84,7 @@ async function references(store: AgentStore, scope: Scope, names: string[], ids:
 }
 export async function readTool(store: AgentStore, scope: Scope, name: string, args: Row, maxResults = 100): Promise<Row> {
   if (name === 'get_story_detail') {
+    if (scope.outline) return readOutlineDetail(store, scope.bookId, args, maxResults)
     if (scope.profile !== 'story_editor') throw new Error('SCOPE:故事详情仅供故事编辑使用。')
     if (scope.workflow === 'story_pages_v3') {
       const kind = text(args.kind), table = ({ node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[kind]
@@ -138,7 +140,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
   }
   if (name === 'search_story_context') {
     if (scope.profile !== 'story_editor') throw new Error('SCOPE:相关叙事检索仅供故事编辑使用。')
-    return searchStoryContext(store, scope.bookId, scope.sessionId, { ...args, include_future: args.include_future ?? scope.phase === 'global_review' }, scope.workflow === 'story_pages_v3')
+    return searchStoryContext(store, scope.bookId, scope.sessionId, { ...args, include_future: args.include_future ?? scope.phase === 'global_review' }, scope.workflow === 'story_pages_v3', scope.outline)
   }
   if (name === 'read_original') {
     const assetIds = strings(args.asset_ids), range = strings(args.chapter_range), requested = strings(args.chapter_indices)

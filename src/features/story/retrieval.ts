@@ -30,9 +30,10 @@ function termsOf(value: string) {
 }
 const searchable = (row: Row) => [row.name, row.title, row.summary, row.statement, row.cause, row.result, row.process, ...strings(row.actors), ...strings(row.targets), ...strings(row.world_delta), ...strings(row.new_facts)].map(text).join(' ').toLowerCase()
 
-export async function searchStoryContext(store: AgentStore, bookId: string, sessionId: string | undefined, args: Row, lightweight = false) {
+export async function searchStoryContext(store: AgentStore, bookId: string, sessionId: string | undefined, args: Row, lightweight = false, outline = false) {
   const nodes = (await store.rows('nodes')).filter(row => row.bookId === bookId)
   const lines = (await store.rows('eventLines')).filter(row => row.bookId === bookId)
+  const events = outline ? (await store.rows('storyEvents')).filter(row => row.bookId === bookId) : []
   const notes = (await store.rows('storyEditorNotes')).filter(row => row.bookId === bookId && row.sessionId === sessionId && (row.status === 'active' || args.include_resolved === true || args.status === 'resolved'))
   const focus = nodes.filter(row => strings(args.node_ids).includes(text(row.id)))
   const explicit = strings(args.terms).map(value => value.trim().toLowerCase().slice(0, 128)).filter(Boolean)
@@ -40,7 +41,10 @@ export async function searchStoryContext(store: AgentStore, bookId: string, sess
   const terms = [...new Set([...explicit, ...names, ...focus.flatMap(row => termsOf([row.name, row.summary, ...strings(row.world_delta), ...strings(row.new_facts)].map(text).join(' ').slice(0, 2000)))])].slice(0, 64)
   const ids = new Set(focus.map(row => text(row.id)))
   const latestChapter = focus.map(row => text(row.chapterIndex)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).at(-1)
-  const candidates = [...nodes.map(row => ({ row, kind: 'node' })), ...lines.map(row => ({ row, kind: 'eventLine' })), ...notes.map(row => ({ row, kind: 'note' }))].filter(item => !ids.has(text(item.row.id)) && (!args.kind || item.kind === args.kind) && (args.include_future === true || !latestChapter || item.kind !== 'node' || text(item.row.chapterIndex).localeCompare(latestChapter, undefined, { numeric: true }) <= 0))
+  const nodeById = new Map(nodes.map(node => [text(node.id), node]))
+  const members = (row: Row) => strings(row.nodeIds).flatMap(id => nodeById.has(id) ? [nodeById.get(id)!] : [])
+  const linkedNodes = new Set([...events, ...lines.filter(line => !Array.isArray(line.eventIds) || line.outlinePending)].flatMap(row => strings(row.nodeIds)))
+  const candidates = [...nodes.map(row => ({ row, kind: 'node' })), ...lines.map(row => ({ row, kind: 'eventLine' })), ...events.map(row => ({ row, kind: 'event' })), ...notes.map(row => ({ row, kind: 'note' }))].filter(item => !ids.has(text(item.row.id)) && (!args.kind || item.kind === args.kind) && (args.unassignedOnly !== true || item.kind === 'node' && !linkedNodes.has(text(item.row.id))) && (args.include_future === true || !latestChapter || item.kind !== 'node' || text(item.row.chapterIndex).localeCompare(latestChapter, undefined, { numeric: true }) <= 0))
   const range = strings(args.chapter_range)
   const documents = candidates.filter(({ row, kind }) => {
     if (args.status && (kind === 'eventLine' ? row.lineStatus : row.status) !== args.status) return false
@@ -49,27 +53,39 @@ export async function searchStoryContext(store: AgentStore, bookId: string, sess
       if (!chapters.some(chapter => chapter.localeCompare(range[0], undefined, { numeric: true }) >= 0 && chapter.localeCompare(range[1], undefined, { numeric: true }) <= 0)) return false
     }
     return true
-  }).map(item => ({ ...item, content: searchable(item.row) }))
+  }).map(item => ({ ...item, content: [searchable(item.row), ...(item.kind === 'event' ? members(item.row).map(node => [searchable(node), ...strings(node.started_actions)].join(' ')) : [])].join(' ') }))
   const frequency = new Map(terms.map(term => [term, documents.filter(item => item.content.includes(term)).length]))
   const ranked = documents.map(item => {
     const matched = terms.filter(term => item.content.includes(term))
     const linked = strings(item.row.nodeIds).some(id => ids.has(id))
-    const score = matched.reduce((sum, term) => sum + (explicit.includes(term) ? 6 : 1) * Math.log2(2 + documents.length / Math.max(1, frequency.get(term)!)), 0) + (linked ? 30 : 0)
+    const score = matched.reduce((sum, term) => sum + (explicit.includes(term) ? 6 : outline && names.includes(term) ? 0.5 : 1) * Math.log2(2 + documents.length / Math.max(1, frequency.get(term)!)), 0) + (linked ? 30 : 0)
     return { ...item, matched, score }
   }).filter(item => !terms.length || item.score > 0).sort((a, b) => b.score - a.score || text(a.row.id).localeCompare(text(b.row.id)))
   const offset = Number(args.offset ?? 0), limit = Math.min(Number(args.limit ?? 12), 20)
-  const data: Row[] = ranked.slice(offset, offset + limit).map(item => lightweight ? storyCatalogView(item.row, item.kind, ids) : ({ ...storyDigest(item.row, item.kind), matchedTerms: item.matched.slice(0, 8) }))
+  const data: Row[] = ranked.slice(offset, offset + limit).map(item => {
+    if (!outline) return lightweight ? storyCatalogView(item.row, item.kind, ids) : ({ ...storyDigest(item.row, item.kind), matchedTerms: item.matched.slice(0, 8) })
+    const { row, kind, matched } = item
+    if (kind === 'node') return storyView({ ...row, unassigned: !linkedNodes.has(text(row.id)) }, kind, true)
+    const evidenceNodes = () => members(row).map(node => ({ node, score: matched.filter(term => searchable(node).includes(term)).length }))
+      .sort((a, b) => b.score - a.score).slice(0, 3).map(({ node }) => ({ ...storyView(node, 'node', true), summary: text(node.summary).slice(0, 500) }))
+    if (kind === 'event') {
+      const parents = lines.filter(line => strings(line.eventIds).includes(text(row.id)))
+      return storyView({ ...row, nodeIds: undefined, lineIds: parents.slice(0, 12).map(line => line.id), lineCount: parents.length, lineId: parents[0]?.id, lineTitle: parents[0]?.title, eventId: row.id, eventTitle: row.title, memberCount: strings(row.nodeIds).length, evidenceNodes: evidenceNodes() }, kind, true)
+    }
+    if (kind === 'eventLine') return { ...storyView(row, kind, true), nodeIds: strings(row.nodeIds).slice(0, 12), eventIds: strings(row.eventIds).slice(0, 12), memberCount: strings(row.eventIds).length, evidenceNodes: row.outlinePending || !Array.isArray(row.eventIds) ? evidenceNodes() : [] }
+    return storyView(row, kind, true)
+  })
   const truncated = offset + data.length < ranked.length
   return { data, totalCount: ranked.length, truncated, nextOffset: truncated ? offset + data.length : null }
 }
 
-export async function buildStoryContext(store: AgentStore, bookId: string, sessionId: string, rows: Row[], kind: string, includeFuture = false, lightweight = false) {
+export async function buildStoryContext(store: AgentStore, bookId: string, sessionId: string, rows: Row[], kind: string, includeFuture = false, lightweight = false, outline = false) {
   const nodeIds = kind === 'node' ? rows.map(row => text(row.id)) : [...new Set(rows.flatMap(row => strings(row.nodeIds)))].slice(0, 20)
-  const terms = rows.flatMap(row => termsOf([row.name, row.title, row.summary, row.statement, row.cause].map(text).join(' ').slice(0, 800))).slice(0, 12)
-  const result = await searchStoryContext(store, bookId, sessionId, { node_ids: nodeIds, terms, limit: 12, include_future: includeFuture }, lightweight)
-  const assigned = rows.map(row => lightweight ? storyView(row, kind) : storyDigest(row, kind))
+  const terms = rows.flatMap(row => termsOf([...(outline ? [...strings(row.started_actions), ...strings(row.new_facts)] : []), row.name, row.title, row.summary, row.statement, row.cause].map(text).join(' ').slice(0, 800))).slice(0, 12)
+  const result = await searchStoryContext(store, bookId, sessionId, { node_ids: nodeIds, terms, limit: 12, include_future: includeFuture }, lightweight, outline)
+  const assigned = rows.map(row => lightweight ? storyView(row, kind, outline) : storyDigest(row, kind))
   const related: Row[] = []; let used = 0
-  for (const row of result.data) {
+  for (const row of (outline ? [...result.data].sort((a, b) => Number(b.kind === 'event') - Number(a.kind === 'event')) : result.data)) {
     const cost = estimateTextTokens(JSON.stringify(row))
     if (used + cost > 3000) continue
     related.push(row); used += cost

@@ -77,13 +77,14 @@ describe('阶段 1：真实数据仓储契约', () => {
     } finally { subscription.unsubscribe() }
   })
 
-  it('新书库包含目标20表；旧v4不会被阶段1静默升级', async () => {
+  it('新书库包含目标21表；旧v4不会被阶段1静默升级', async () => {
     const workspace = setup()
     await workspace.settings.books.bulkPut(books)
     const fresh = workspace.openBook('a')
     opened.push(fresh)
     await fresh.open()
-    expect(fresh.tables).toHaveLength(20)
+    expect(fresh.tables).toHaveLength(21)
+    expect(fresh.table('storyEvents').name).toBe('storyEvents')
     const legacy = new Dexie(`${workspace.scope.bookPrefix}b`)
     legacy.version(4).stores({ characters: 'id', characterSnapshots: 'id' })
     await legacy.table('characterSnapshots').put({ id: 'keep-me', name: '旧资料' })

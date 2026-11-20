@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { fitNetwork, layoutNetwork, nodeHeight } from '../src/features/network/layout'
-import type { EventLine, EventNode } from '../src/features/assets/types'
+import type { EventLine, EventNode, StoryEvent } from '../src/features/assets/types'
 import type { Chapter } from '../src/lib/storage/workspace'
 
 const nodes = ['A', 'B', 'C', 'D'].map((id, i) => ({ id, name: id, summary: id, chapterIndex: i < 2 ? '1' : '2', order: i, revision: 1 })) as EventNode[]
@@ -24,4 +24,16 @@ it('筛选结果能适配视口，空图有有效初始视图', () => {
     expect(row.y + nodeHeight).toBeLessThanOrEqual(view.y + 300 / view.zoom)
   }
   expect(fitNetwork([], 320, 300)).toEqual({ x: 0, y: 0, zoom: 1 })
+})
+
+it('同一条故事线逐事件连边，旧线继续按旧成员连边', () => {
+  const outline = { ...lines[0], nodeIds: ['A', 'B', 'C', 'D'], eventIds: ['audit', 'search'] }
+  const events = [{ id: 'audit', nodeIds: ['B', 'A'] }, { id: 'search', nodeIds: ['D', 'C'] }] as StoryEvent[]
+  const layout = layoutNetwork(nodes, [outline, lines[1]], chapters, events)
+  expect(layout.edges.map(edge => [edge.lineId, edge.source, edge.target, edge.eventIds])).toEqual([
+    ['L1', 'A', 'B', ['audit']], ['L1', 'C', 'D', ['search']], ['L2', 'B', 'C', undefined],
+  ])
+  const draft = layoutNetwork(nodes, [{ ...outline, outlinePending: true }], chapters, events)
+  expect(draft.edges.map(edge => [edge.source, edge.target])).toEqual([['A', 'B'], ['B', 'C'], ['C', 'D']])
+  expect(layout.nodes.filter(node => node.id === 'B')).toHaveLength(1)
 })

@@ -1,26 +1,94 @@
 import { expect, test, type Page } from '@playwright/test'
+import { storyResponse } from '../support/story-protocol'
 
-async function prepare(page: Page) {
+async function prepare(page: Page, outlined = false) {
   await page.goto('/?acceptance=stage1')
   await page.getByLabel('小说TXT文件').setInputFiles({ name: '网络样本.txt', mimeType: 'text/plain', buffer: Buffer.from('第一章 开始\n甲乙会面。\n第二章 后续\n后续事件。') })
   await page.getByRole('button', { name: '仅导入', exact: true }).click()
   await expect(page.getByRole('heading', { name: '网络样本', exact: true })).toBeVisible()
-  await page.evaluate(async () => {
+  await page.evaluate(async outlined => {
     const name = (await indexedDB.databases()).find(row => row.name?.startsWith('westworld_acceptance_stage1_book_'))!.name!
     const bookId = name.slice('westworld_acceptance_stage1_book_'.length), request = indexedDB.open(name)
     const db = await new Promise<IDBDatabase>((resolve, reject) => { request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error) })
     const nodes = ['发现线索', '共同节点', '后续事件', '独立日常'].map((name, i) => ({ id: `N${i + 1}`, bookId, name, summary: `${name}的实际经过`, actors: [], quote: '', chapterIndex: i < 2 ? '1' : '2', chapterName: i < 2 ? '第一章 开始' : '第二章 后续', order: i % 2, revision: 1, confidence: 1, createdBy: 'P1', eventLineIds: i === 0 ? ['L1'] : i === 1 ? ['L1', 'L2'] : i === 2 ? ['L2'] : [] }))
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(['nodes', 'eventLines'], 'readwrite')
+      const tx = db.transaction(['nodes', 'eventLines', 'storyEvents'], 'readwrite')
       for (const row of nodes) tx.objectStore('nodes').put(row)
       for (const [i, title] of ['调查主线', '人物支线'].entries()) tx.objectStore('eventLines').put({ id: `L${i + 1}`, bookId, title, nodeIds: i ? ['N2', 'N3'] : ['N1', 'N2'], chapters: i ? ['1', '2'] : ['1'], cause: '线索出现', process: '调查经过', result: '继续调查', lineStatus: 'open', revision: 1, createdBy: 'P3', updatedAt: new Date().toISOString() })
+      if (outlined) {
+        tx.objectStore('storyEvents').put({ id: 'E1', bookId, title: '前期清查', nodeIds: ['N1', 'N2'], revision: 1 })
+        tx.objectStore('storyEvents').put({ id: 'E2', bookId, title: '后期查抄', nodeIds: ['N3', 'N4'], revision: 1 })
+        tx.objectStore('storyEvents').put({ id: 'E3', bookId, title: '单独核对', nodeIds: ['N2'], revision: 1 })
+        const lines = tx.objectStore('eventLines'), line = lines.get('L1')
+        line.onsuccess = () => lines.put({ ...line.result, eventIds: ['E1', 'E2'], nodeIds: ['N1', 'N2', 'N3', 'N4'], chapters: ['1', '2'] })
+      }
       tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error)
     }); db.close()
-  })
+  }, outlined)
   await page.reload()
   await page.getByRole('button', { name: /^事件节点 4$/ }).click()
   await page.getByRole('button', { name: '事件网络', exact: true }).click()
 }
+
+test('大纲事件分段沿用故事线高亮，旧线和节点归属继续可查', async ({ page }) => {
+  await prepare(page, true)
+  const network = page.getByRole('region', { name: '事件网络', exact: true })
+  await expect(network.locator('[data-network-edge="L1:N2:N3"]')).toHaveCount(0)
+  await expect(network.locator('[data-network-edge="L2:N2:N3"]')).toHaveCount(1)
+  await expect(network.locator('[data-network-node="N2"]')).toHaveCount(1)
+  await network.getByRole('button', { name: '查看节点 发现线索 N1', exact: true }).click()
+  await network.getByRole('button', { name: '查看全图', exact: true }).click()
+  await expect(network.locator('[data-network-edge="L1:N1:N2"]')).toHaveAttribute('stroke-width', '3')
+  await expect(network.locator('[data-network-edge="L1:N3:N4"]')).toHaveAttribute('stroke-width', '3')
+  const details = page.getByRole('region', { name: '编辑事件节点', exact: true })
+  for (const scope of [network, details]) {
+    const membership = scope.getByRole('table', { name: '剧情归属', exact: true })
+    await expect(membership.getByRole('columnheader')).toHaveText(['所属故事线', '所属事件'])
+    await expect(membership.getByRole('cell')).toHaveText(['调查主线', '前期清查'])
+  }
+  await network.getByLabel('定位事件节点').selectOption('N2')
+  for (const scope of [network, details]) {
+    const membership = scope.getByRole('table', { name: '剧情归属', exact: true })
+    await expect(membership.getByRole('cell')).toHaveText(['调查主线', '前期清查', '人物支线', '', '', '单独核对'])
+  }
+})
+
+test('P3 从节点建立三层大纲，展开事件可回到原节点', async ({ page }) => {
+  await page.route('**/story-outline-fixture/v1/chat/completions', async route => {
+    await route.fulfill({ contentType: 'text/event-stream', body: await storyResponse(route.request().postDataJSON()).text() })
+  })
+  await page.goto('/?acceptance=story')
+  await page.getByRole('button', { name: '装载跨窗口样本', exact: true }).click()
+  await page.getByRole('button', { name: '进入 跨窗口信件样本', exact: true }).click()
+  await page.getByRole('button', { name: '设置', exact: true }).click()
+  await page.getByLabel('服务基础地址', { exact: true }).fill(`${new URL(page.url()).origin}/story-outline-fixture/v1`)
+  await page.getByLabel('API Key（密钥）', { exact: true }).fill('story-outline-fixture')
+  await page.getByRole('button', { name: '保存模型配置', exact: true }).click()
+  await expect(page.getByRole('status').filter({ hasText: '模型配置已保存' })).toBeVisible()
+  await page.getByRole('button', { name: '资产', exact: true }).click()
+   await page.getByRole('button', { name: '串联事件线', exact: true }).click()
+  await expect.poll(() => page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('westworld_acceptance_story_book_stage1-book-a')
+      request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error)
+    })
+    try {
+      return await new Promise((resolve, reject) => {
+        const request = db.transaction('compileProgress').objectStore('compileProgress').get('P3')
+        request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error)
+      })
+    } finally { db.close() }
+  }), { timeout: 20000 }).toMatchObject({ status: 'completed', phase: 'window_link_complete' })
+  await expect(page.getByRole('region', { name: '事件线窗口串联' })).toContainText('串联完成', { timeout: 20000 })
+  await page.getByRole('button', { name: '事件线 1', exact: true }).click()
+  await page.getByText('剧情大纲', { exact: true }).click()
+  const outline = page.getByLabel('剧情大纲内容')
+  await outline.getByText('信件流转', { exact: true }).click()
+  await outline.getByText('传递信件', { exact: true }).click()
+  await outline.getByRole('button').first().click()
+  const details = page.getByRole('region', { name: '编辑事件节点', exact: true })
+  await expect(details.getByRole('table', { name: '剧情归属', exact: true }).getByRole('cell')).toHaveText(['信件流转', '传递信件'])
+})
 
 test('网络展示共享节点和孤点，高亮、详情、搜索与列表切换保持结果', async ({ page }, testInfo) => {
   await prepare(page)
@@ -47,6 +115,13 @@ test('网络展示共享节点和孤点，高亮、详情、搜索与列表切�
   await network.getByLabel('只看孤立节点').check()
   await expect(network.locator('[data-network-node]')).toHaveCount(1)
   await expect(network.locator('[data-network-node]')).toHaveAttribute('opacity', '1')
+  await network.getByLabel('定位事件节点').selectOption('N4')
+  const details = page.getByRole('region', { name: '编辑事件节点', exact: true })
+  for (const scope of [network, details]) {
+    const membership = scope.getByRole('table', { name: '剧情归属', exact: true })
+    await expect(membership.getByRole('columnheader')).toHaveText(['所属故事线', '所属事件'])
+    await expect(membership.getByRole('cell')).toHaveText(['', ''])
+  }
   await network.getByLabel('只看孤立节点').uncheck()
   await network.getByRole('button', { name: '查看全图', exact: true }).click()
   await network.screenshot({ path: testInfo.outputPath('network-desktop.png') })

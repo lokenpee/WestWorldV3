@@ -1196,6 +1196,13 @@
               "empty"
             ],
             "description": "参考引文定位状态。"
+          },
+          "locationNames": {
+            "description": "行动实际发生的地点，按原文可确定的精度及出现顺序记录。",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -1290,6 +1297,29 @@
               "manual",
               "P2"
             ]
+          },
+          "eventIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "outlinePending": {
+            "type": "boolean"
+          },
+          "role": {
+            "enum": [
+              "main",
+              "sub"
+            ]
+          },
+          "legacyNodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
           }
         }
       },
@@ -3277,7 +3307,8 @@
               "storyEditorMemory",
               "storyEditorNotes",
               "chapterTexts",
-              "assetLifecycle"
+              "assetLifecycle",
+              "storyEvents"
             ]
           },
           "id": {
@@ -4490,6 +4521,42 @@
             }
           }
         ]
+      },
+      "StoryEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "bookId",
+          "title",
+          "nodeIds",
+          "revision"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bookId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
       }
     }
   },

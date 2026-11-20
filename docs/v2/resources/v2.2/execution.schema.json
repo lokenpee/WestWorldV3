@@ -659,7 +659,8 @@
             "storyEditorMemory",
             "storyEditorNotes",
             "chapterTexts",
-            "assetLifecycle"
+            "assetLifecycle",
+            "storyEvents"
           ]
         },
         "id": {

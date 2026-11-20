@@ -7,6 +7,7 @@ import { createExtractionService } from '../src/features/extraction/service'
 import { validateExtraction, promptOf } from '../src/features/extraction/contracts'
 import { defaultConfig } from '../src/features/models/types'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
+import { encodeBackup, inspectBackup, restoredTables } from '../src/features/backup/codec'
 import { createAssetService } from '../src/features/assets/service'
 import { readExtractionInput } from '../src/features/extraction/taskStore'
 import type { StoredTask } from '../src/features/extraction/recovery'
@@ -47,6 +48,32 @@ afterEach(async () => { for (const workspace of workspaces.splice(0)) { workspac
 
 const extractionMessage = (value: unknown) => ({ content: [{ type: 'toolCall', name: 'submit_result', arguments: value }] }) as unknown as Parameters<typeof validateExtraction>[1]
 const relationWorld = (quote: string) => ({ characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'friend', relation_label: '朋友', reverse_label: '朋友', direction: 'bidirectional', quote }] }], locations: [] })
+
+it('节点地点按出现顺序保存、可更正，并兼容省略与无效输入', async () => {
+  const locations = [' 荣庆堂 ', '', '荣庆堂', '宁国府前院厢房']
+  const input = { nodes: [{ ...narrative.nodes[0], locationNames: locations }, narrative.nodes[1]] }
+  expect(() => validateExtraction('narrativeAssets', extractionMessage({ nodes: [{ ...input.nodes[0], locationNames: '荣庆堂' }] }))).toThrow('字段、类型或置信度不符合要求')
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const fields = JSON.parse(init?.body as string).tools[0].function.parameters.properties
+    if (fields.characters) return stream(world)
+    expect(fields.nodes.items.properties.locationNames.type).toBe('array')
+    return stream(input)
+  })
+  const { service, db, workspace, book } = await setup(fetcher)
+  await service.start(book.id)
+  const [located, unlocated] = await db.table('nodes').toArray()
+  expect(located.locationNames).toEqual(['荣庆堂', '宁国府前院厢房'])
+  expect(unlocated.locationNames).toBeUndefined()
+  await createAssetService(workspace).update(book.id, 'node', located.id, located.revision, { locationNames: [' 宁国府 '] })
+  expect((await db.table('nodes').get(located.id))?.locationNames).toEqual(['宁国府'])
+  const tables = emptyTables()
+  for (const table of tableNames) tables[table] = await db.table(table).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
+  const backup = await encodeBackup({ book, tables })
+  const inspected = await inspectBackup(backup.bytes)
+  expect(inspected.ok).toBe(true)
+  expect((await restoredTables(inspected.data!, 'copy')).nodes.find(node => node.id === located.id)?.locationNames).toEqual(['宁国府'])
+})
 
 it('人物关系依据只要求有内容，不要求长度或逐字匹配本章原文', () => {
   expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('二人是多年朋友，这是模型概括的依据。')))).not.toThrow()

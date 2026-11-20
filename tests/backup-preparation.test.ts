@@ -88,7 +88,7 @@ it('恢复进行时拒绝重复确认，界面释放句柄不打断已经交给�
 it('迁移摘要仍取转换前资料，尚未确认迁移时不编码或解压', async () => {
   const data = sample(), original = structuredClone(data)
   const preparation = await prepareMigration(data, 8); handles.push(preparation)
-  const { extractionTasks: _tasks, extractionInputs: _inputs, ...legacyTables } = original.tables
+  const { extractionTasks: _tasks, extractionInputs: _inputs, storyEvents: _events, ...legacyTables } = original.tables
   expect(preparation.digest).toBe(await checksumOf(new TextEncoder().encode(JSON.stringify({ ...original, tables: legacyTables }))))
   expect(unzipSync).not.toHaveBeenCalled()
   data.tables.chapterTexts[0].text = '调用者随后改动'
@@ -102,7 +102,8 @@ it.each(['extractionTasks', 'extractionInputs'] as const)('迁移摘要在%s有�
   data.tables[name].push({ id: 'changed-source' })
   const changed = await prepareMigration(data, 9); handles.push(changed)
   expect(changed.digest).not.toBe(empty.digest)
-  expect(changed.digest).toBe(await checksumOf(new TextEncoder().encode(JSON.stringify(data))))
+  const { storyEvents: _events, ...previousTables } = data.tables
+  expect(changed.digest).toBe(await checksumOf(new TextEncoder().encode(JSON.stringify({ ...data, tables: previousTables }))))
   expect(unzipSync).not.toHaveBeenCalled()
 })
 

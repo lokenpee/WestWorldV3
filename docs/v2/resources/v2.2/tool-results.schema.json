@@ -5040,6 +5040,38 @@
           "message"
         ],
         "additionalProperties": false
+      },
+      "outlineSuccess": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextOffset": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "required": [
+          "data",
+          "totalCount",
+          "truncated",
+          "nextOffset"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -6364,6 +6396,30 @@
           "nextOffset"
         ],
         "additionalProperties": false
+      },
+      "outlineSuccess": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "missingIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "data",
+          "missingIds"
+        ],
+        "additionalProperties": false
       }
     },
     {
@@ -7097,6 +7153,123 @@
           "summary"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "name": "save_story_outline",
+      "success": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "const": true
+              },
+              "commitId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "changed": {
+                "type": "boolean"
+              },
+              "alreadyApplied": {
+                "type": "boolean"
+              },
+              "created": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "changes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "opIndex": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "kind": {
+                      "enum": [
+                        "eventLine",
+                        "event"
+                      ]
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "action": {
+                      "enum": [
+                        "created",
+                        "updated",
+                        "deleted"
+                      ]
+                    },
+                    "addedIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    },
+                    "removedIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "uniqueItems": true
+                    }
+                  },
+                  "required": [
+                    "opIndex",
+                    "kind",
+                    "id",
+                    "action"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "ok",
+              "commitId",
+              "changed",
+              "alreadyApplied",
+              "created",
+              "changes"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "const": false
+              },
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "opIndex": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "ok",
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        ]
       }
     }
   ],

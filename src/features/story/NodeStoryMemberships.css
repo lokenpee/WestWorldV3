@@ -1,0 +1,17 @@
+.node-story-memberships {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.node-story-memberships th,
+.node-story-memberships td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.node-story-memberships th { font-weight: 500; }
+.node-story-memberships td { height: 28px; }

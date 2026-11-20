@@ -4161,6 +4161,20 @@
       "path": "docs/v2/scripts/__pycache__/complete-spec.cpython-310.pyc",
       "role": "历史重建维护脚本",
       "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-outline-story.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/readingService.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-outline-review.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/readingService.ts"
+      ]
     }
   ],
   "runtimeAssets": [
@@ -4180,7 +4194,7 @@
         "src/features/extraction/contracts.ts",
         "src/features/world/optimization.ts"
       ],
-      "sha256": "99e8d4ea9ccca17816d89a61052c161e93204892061c202736991cb598d8d927"
+      "sha256": "2edf6669abfb16a980e1142133a03d73f475d88b546158043114c1e659542cc1"
     },
     {
       "path": "docs/v2/resources/v2.2/model-output-contract.json",
@@ -4229,7 +4243,7 @@
       "consumers": [
         "src/features/extraction/contracts.ts"
       ],
-      "sha256": "f95fc180a3f1beca217d74efb59b1c1ea06f5f350eb61a2331c43cf42740adc0"
+      "sha256": "7fe1bce092cc5ae092d8730db094a8b2b180164662f796e153468d530959a4ec"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p1-world.md",
@@ -4303,7 +4317,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "6473b622d04f6f1b15df606e27564d6b1345c1f43abd5a72cd4cabde59ea66e7"
+      "sha256": "ba864f47d7af6b12b6397a82b2250d3ae4b73ec039eebf1eafe79f3a7931398c"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4311,7 +4325,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "46a063f1bffa84bb4bbb3253910152f8fbc8e2a7e0067bf7f02a247bc956bdc5"
+      "sha256": "91478db4d4e0cc60fc563cb90b7066ab925b7b69f3112d78131c9601599684f2"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4319,7 +4333,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "8a286dafdec10f3e0cb5b7fd24420812cf19e4cfbf9eb2d0d56528a69e307fef"
+      "sha256": "5e9cc0b2e7661ee5cc147dad9f292687d86516d19921d9138c7ceb87b69dca89"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",
@@ -4360,6 +4374,22 @@
         "src/features/world/organization.ts"
       ],
       "sha256": "06e686deb25ac864ecb685813d5e08594af7fe8657fc9a0572556a8d56f506d8"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-outline-story.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/readingService.ts"
+      ],
+      "sha256": "0bdc049ab9495f4426c07782940bc872af178968f785023d6847086a07d5f2d0"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-outline-review.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/readingService.ts"
+      ],
+      "sha256": "5f0126cdfed003710a51a1993a24b7f78fcc789f355b55085b2e308a8afe9c38"
     }
   ],
   "decisions": [

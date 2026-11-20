@@ -37,6 +37,15 @@ export function storyResponse(body: Item, options: { inputMemory?: boolean; reus
     const next = () => agentStream([{ name: 'navigate_story_pages', args: { direction: 'next', currentPageId: input.page.id, reason: '当前页已核对，继续阅读。' } }])
     if (input.phase === 'global_review' || options.readOnly || !input.workItems.length) return next()
     if (commit) return next()
+    if ((body.tools as { function: { name: string } }[]).some(tool => tool.function.name === 'save_story_outline')) {
+      if (results.some(result => result.ok === false)) throw new Error(JSON.stringify(results.find(result => result.ok === false)))
+      const eventId = input.related?.find((item: Item) => item.kind === 'event')?.id
+      const nodeIds = input.workItems.map((item: Item) => item.id)
+      return agentStream([{ name: 'save_story_outline', args: { operations: eventId ? [{ op: 'attach_nodes', eventId, nodeIds }] : [
+        { op: 'create_line', ref: 'letter', title: '信件流转' },
+        { op: 'create_event', ref: 'delivery', title: '传递信件', lineId: '$letter', nodeIds },
+      ] } }])
+    }
     if (candidate && !line) return agentStream([{ name: 'get_story_detail', args: { kind: 'eventLine', ids: [candidate.id] } }])
     if (nodes.length) return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: line ? 'append' : 'create', ...(line ? { lineId: line.id } : { title: '信件流转' }), nodeIds: input.workItems.map((item: Item) => item.id), summary: '交信、传信与归还，信件持续流转。', reason: '同一封信的连续事件' }] } }])
     return agentStream([

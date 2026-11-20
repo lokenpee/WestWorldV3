@@ -8,8 +8,8 @@ import { EventNetwork } from '../network/EventNetwork'
 import type { Chapter } from '../../lib/storage/workspace'
 import { MergeHistory } from './MergeHistory'
 
-function assetViewInterests(bookId: string, kind: AssetKind, network = false) {
-  const tables = kind === 'location' ? ['locations'] : kind === 'character' ? ['characters', 'characterRelations', 'characterRelationEdits'] : kind === 'node' ? ['characters', 'nodes', ...(network ? ['eventLines'] : [])] : ['characters', 'nodes', 'eventLines']
+function assetViewInterests(bookId: string, kind: AssetKind) {
+  const tables = kind === 'location' ? ['locations'] : kind === 'character' ? ['characters', 'characterRelations', 'characterRelationEdits'] : ['characters', 'nodes', 'eventLines', 'storyEvents']
   return bookInterests(bookId, [...tables, 'assetLifecycle'])
 }
 export function AssetDetails({ selectedId, confirmed, locks, ...props }: Omit<ComponentProps<typeof AssetEditor>, 'asset' | 'snapshot'> & { selectedId?: string; confirmed?: Asset; locks: AssetSnapshot['locks'] }) {
@@ -34,11 +34,11 @@ export function AssetNetwork({ bookId, service, kind, chapters, selectedId, acti
   const viewKind = kind === 'character' ? 'character' : 'node'
   const query = useCallback(() => service.readContent(bookId, { kind: viewKind, network: true }), [service, bookId, viewKind])
   const [attempt, retry] = useState(0)
-  const data = useLiveResult(query, attempt, assetViewInterests(bookId, kind, true))
+  const data = useLiveResult(query, attempt, assetViewInterests(bookId, kind))
   if (data.status === 'loading') return <p role="status">正在读取网络…</p>
   if (data.status === 'error') return <div role="alert">{data.message}<button onClick={() => retry(value => value + 1)}>重新读取网络</button></div>
   return kind === 'character' ? <CharacterNetwork bookId={bookId} characters={data.value.characters} pairs={data.value.pairs} selectedId={selectedId} onSelect={id => onNavigate(() => onSelect(id))} />
-    : <EventNetwork bookId={bookId} nodes={data.value.nodes} lines={data.value.eventLines} chapters={chapters} active={active} mode={kind === 'eventLine' ? 'eventLine' : 'node'} selectedId={kind === 'node' ? selectedId : undefined} onNavigate={onNavigate} onSelectNode={onSelect} onEditLine={onSelect} onClearSelection={onClear} />
+    : <EventNetwork bookId={bookId} nodes={data.value.nodes} lines={data.value.eventLines} events={data.value.storyEvents} chapters={chapters} active={active} mode={kind === 'eventLine' ? 'eventLine' : 'node'} selectedId={kind === 'node' ? selectedId : undefined} onNavigate={onNavigate} onSelectNode={onSelect} onEditLine={onSelect} onClearSelection={onClear} />
 }
 
 export function AssetMergeHistory({ bookId, service, initialId, onClose }: { bookId: string; service: AssetService; initialId?: string; onClose: () => void }) {

@@ -11,6 +11,8 @@ import { createBookAgentRepository, createMemoryAgentRepository } from '../src/f
 import { appendEntry } from '../src/features/agents/commands'
 import { sessionProjection } from '../src/features/agents/compaction'
 import { navigateStoryReading, readingBrief, refreshReading, saveReading } from '../src/features/story/reading'
+import { emptyTables, tableNames } from '../src/features/backup/data'
+import { encodeBackup, inspectBackup, restoredTables } from '../src/features/backup/codec'
 
 type Row = Record<string, unknown>
 const opened: ReturnType<typeof createWorkspace>[] = []
@@ -163,16 +165,18 @@ it('同一条模型回复调用两次下一页，只推进一次并返回尚未�
   expect(await reading(service)).toMatchObject({ checked: 1, pageNumber: 2, complete: false })
 })
 
-it('同一会话由AI翻过三页，多次保存持续续接原线并维护短概述', async () => {
+it('同一会话由AI翻过三页，多次保存持续续接原事件', async () => {
   const bodies: Row[] = []
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => { const body = bodyOf(init); bodies.push(body); return storyResponse(body) })
-  const { service, db } = await setup(25, fetcher)
+  const { service, db, workspace } = await setup(25, fetcher)
   await service.start('a')
   expect(service.state('a')?.error).toBeUndefined()
   const lines = await db.table('eventLines').toArray()
   expect(lines).toHaveLength(1)
   expect(lines[0].nodeIds).toHaveLength(25)
-  expect(lines[0].summary).toBe('交信、传信与归还，信件持续流转。')
+  expect(lines[0].summary).toBeUndefined()
+  const events = await db.table('storyEvents').toArray()
+  expect(events).toMatchObject([{ title: '传递信件', nodeIds: lines[0].nodeIds }])
   expect(lines[0].process).toBe('')
   expect(await reading(service)).toMatchObject({ checked: 3, totalPages: 3, complete: true })
   expect([...new Set(bodies.map(body => storyTask(body).input.page.pageNumber))]).toEqual([1, 2, 3])
@@ -181,6 +185,15 @@ it('同一会话由AI翻过三页，多次保存持续续接原线并维护短�
   expect(await db.table('storySessions').count()).toBe(1)
   const progress = await db.table('compileProgress').get('P3'), run = await db.table('pipelineRuns').get(progress.runId)
   expect(run.appliedCommands).toHaveLength(3)
+  const book = (await workspace.settings.books.get('a'))!
+  const tables = emptyTables()
+  for (const name of tableNames) if (name !== 'extractionReceipts') tables[name] = await db.table(name).toArray()
+  const backup = await encodeBackup({ book, tables })
+  expect(backup.manifest.formatVersion).toBe(13)
+  const inspected = await inspectBackup(backup.bytes)
+  expect(inspected.ok).toBe(true)
+  const restored = await restoredTables(inspected.data!, 'copy')
+  expect(restored.storyEvents).toMatchObject([{ id: events[0].id, bookId: 'copy', nodeIds: lines[0].nodeIds }])
 }, 30000)
 
 it('第二页上下文超长且翻页回执被压缩掉后，重建精确当前页并继续到第三页', async () => {
@@ -355,7 +368,10 @@ it('成功保存事件线清除此前的思考截断计数，后续两次截断�
       return agentStream([{ name: 'navigate_story_pages', args: { direction: 'next', currentPageId: input.page.id } }])
     }
     interruptedRequests++
-    if (interruptedRequests === 2) return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: 'create', title: '信件流转', summary: '交信与传信接成一条完整的线。', nodeIds: input.workItems.map((item: Row) => item.id) }] } }])
+    if (interruptedRequests === 2) return agentStream([{ name: 'save_story_outline', args: { operations: [
+      { op: 'create_line', ref: 'letter', title: '信件流转' },
+      { op: 'create_event', ref: 'delivery', title: '传递信件', lineId: '$letter', nodeIds: input.workItems.map((item: Row) => item.id) },
+    ] } }])
     if (interruptedRequests <= 4) return thinkingLengthStream(`已保存前后的截断思考-${interruptedRequests}`)
     return new Response(JSON.stringify({ error: { message: 'fixture stopped unexpected fifth request' } }), { status: 402 })
   })
@@ -459,16 +475,20 @@ it('P3重新开始显式开新轮：复用不发模型请求，全量重新检�
 
 
 it('首次目录和翻页目录直接构成读取依据，不用查详情就能保存', async () => {
-  let lineId = '', savedPage = '', requests = 0
+  let eventId = '', savedPage = '', requests = 0
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     requests++
     const { input, messages } = storyTask(bodyOf(init))
     for (const message of messages.filter(message => message.role === 'tool')) {
-      try { const result = JSON.parse(messageText(message.content)); if (result.lineIds?.length) lineId = result.lineIds[0] } catch { /* 只读取写回执 */ }
+      try { const result = JSON.parse(messageText(message.content)); if (result.created?.delivery) eventId = result.created.delivery } catch { /* 只读取写回执 */ }
     }
     if (savedPage === input.page.id) return agentStream([{ name: 'navigate_story_pages', args: { direction: 'next' } }])
     savedPage = input.page.id
-    return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: lineId ? 'append' : 'create', ...(lineId ? { lineId } : { title: '连续的信件', summary: '前后信件彼此承接。' }), nodeIds: input.workItems.map((item: Row) => item.id) }] } }])
+    const nodeIds = input.workItems.map((item: Row) => item.id)
+    return agentStream([{ name: 'save_story_outline', args: { operations: eventId ? [{ op: 'attach_nodes', eventId, nodeIds }] : [
+      { op: 'create_line', ref: 'letter', title: '连续的信件' },
+      { op: 'create_event', ref: 'delivery', title: '传递信件', lineId: '$letter', nodeIds },
+    ] } }])
   })
   const { service, db } = await setup(12, fetcher)
   await service.start('a')

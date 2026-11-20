@@ -13,19 +13,25 @@ import { coverage, type Receipt } from '../extraction/recovery'
 import { readingBrief, readingProgress, refreshReading, saveReading } from './reading'
 import storyPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-story.md?raw'
 import reviewPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-review.md?raw'
+import outlineStoryPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-outline-story.md?raw'
+import outlineReviewPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-outline-review.md?raw'
 import type { SessionStatus } from '../agents/compaction'
+import { storageChanged } from '../local-storage/client'
 
 type Legacy = ReturnType<typeof createWindowStoryService>
 type State = NonNullable<ReturnType<Legacy['state']>> & { runId?: string }
 export function createReadingStoryService(workspace: ReturnType<typeof createWorkspace>, models: Pick<ModelService, 'agent' | 'settings' | 'generate'>, legacy: Legacy) {
   const states = new Map<string, State>(), controllers = new Map<string, AbortController>(), listeners = new Set<() => void>()
   const set = (bookId: string, change: Partial<State>) => { states.set(bookId, { ...(states.get(bookId) ?? { running: false, window: 0, total: 0, processed: 0, nodeTotal: 0 }), ...change }); listeners.forEach(listener => listener()) }
+  const publish = (bookId: string, tables: string[]) => {
+    if (!workspace.disk) storageChanged({ targets: tables.map(table => ({ scope: `book:${bookId}`, table, category: 'business' })) })
+  }
   async function start(bookId: string, phase: 'window_link' | 'global_review' = 'window_link', restart?: RestartMode) {
     if (controllers.has(bookId)) return
     const controller = new AbortController(); controllers.set(bookId, controller)
     set(bookId, { running: true, phase, runId: undefined, error: undefined, message: undefined, sessionStatus: undefined })
     const repo = createBookAgentRepository(workspace, bookId), owner = crypto.randomUUID()
-    let runId = '', sessionId = '', acquired = false, timer: ReturnType<typeof setInterval> | undefined, heartbeatError = ''
+    let runId = '', sessionId = '', acquired = false, outline = false, timer: ReturnType<typeof setInterval> | undefined, heartbeatError = ''
     const check = async (store: AgentStore) => {
       controller.signal.throwIfAborted()
       const lease = await store.get('pipelineRuns', 'lease:narrative'), session = await store.get('storySessions', sessionId)
@@ -44,11 +50,12 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
         if (session.leaseOwner && Number(session.leaseUntil) > Date.now()) throw new Error('本书会话正在其他窗口运行。')
         const progress = await store.get('compileProgress', 'P3')
         const old = progress?.runId ? await store.get('pipelineRuns', text(progress.runId)) : undefined
-        const reusedChecks = restart === 'reuse' ? await inheritedReadingChecks(store, phase, id => refreshReading(store, id, sessionId, phase)) : []
+        const reusedChecks = restart === 'reuse' ? await inheritedReadingChecks(store, phase, id => refreshReading(store, id, sessionId, phase), true) : []
         const previousLinking = restart && phase === 'global_review' && old ? await refreshReading(store, text(old.id), sessionId, 'window_link') : undefined
         runId = !restart && old?.stage === 'P3' && progress?.editorSessionId === sessionId ? text(old.id) : crypto.randomUUID()
+        outline = old?.id === runId ? old.storyOutlineVersion === 1 : !previousLinking || old?.storyOutlineVersion === 1
         const now = new Date().toISOString()
-        await store.put('pipelineRuns', { ...(old?.id === runId ? old : { id: runId, bookId, recordType: 'run', stage: 'P3', startedAt: now, planVersion: '2.2', scope: 'fullBook', tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent' }), status: 'running', phase })
+        await store.put('pipelineRuns', { ...(old?.id === runId ? old : { id: runId, bookId, recordType: 'run', stage: 'P3', startedAt: now, planVersion: '2.2', scope: 'fullBook', tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent' }), ...(outline ? { storyOutlineVersion: 1 } : {}), status: 'running', phase })
         if (restart) await saveReading(store, runId, phase, { pages: [], currentPageId: null, receipts: [], reusedChecks })
         if (previousLinking) await saveReading(store, runId, 'window_link', previousLinking)
         const linked = await refreshReading(store, runId, sessionId, 'window_link')
@@ -62,7 +69,7 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
         await store.put('compileProgress', { bookId, stage: 'P3', status: 'running', phase, runId, editorSessionId: sessionId, planKey: 'story-pages-v3', totalChapters: chapters.length, completedChapters: [], failedChapters: [], updatedAt: now, scope: 'fullBook', planVersion: '2.2', unit: 'item', validity: 'current' })
         return reading
       }); acquired = true
-      set(bookId, { runId })
+      set(bookId, { runId }); publish(bookId, ['compileProgress', 'pipelineRuns'])
       let heartbeatFailures = 0
       timer = setInterval(() => { void repo.transaction(true, async store => {
         await check(store)
@@ -71,10 +78,11 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
       }).then(() => { heartbeatFailures = 0 }).catch(error => { if (++heartbeatFailures >= 3) { heartbeatError = error instanceof Error ? error.message : '执行权续期失败'; controller.abort() } }) }, 8000)
       if (!readingProgress(state).complete) {
         const taskId = crypto.randomUUID()
-        const { brief, memory, count } = await repo.transaction(false, async store => ({ brief: await readingBrief(store, bookId, sessionId, phase, state), memory: await store.get('storyEditorMemory', sessionId) ?? { id: sessionId, sessionId, bookId, revision: 0, workingSummary: '', dataFingerprint: '', updatedAt: '' }, count: (await store.rows('chapters')).length }))
+        const { brief, memory, count } = await repo.transaction(false, async store => ({ brief: await readingBrief(store, bookId, sessionId, phase, state, outline), memory: await store.get('storyEditorMemory', sessionId) ?? { id: sessionId, sessionId, bookId, revision: 0, workingSummary: '', dataFingerprint: '', updatedAt: '' }, count: (await store.rows('chapters')).length }))
         const input = { bookId, runId, taskId, planVersion: '2.2', remainingCount: state.pages.filter(page => page.fingerprint !== page.checkedFingerprint).length, resume: { reason: 'continuation', appliedCommitIds: [], nextOperationKey: crypto.randomUUID(), remainingWorkIds: [] }, stage: 'P3', phase, sessionId, queue: text(brief?.queue) || 'window_nodes', window: phase === 'window_link' ? { start: 0, end: count, chapterIndices: [] } : null, workItems: [], existingLines: [], memory, afterWorkItemId: null }
         const runtime = createAgentRuntime(models.agent, { generate: models.generate, onStatus: (sessionStatus: SessionStatus) => set(bookId, { sessionStatus }) })
-        const result = await runtime.run(repo, { profile: 'story_editor', workflow: 'story_pages_v3', phase, sessionId, runId, taskId, leaseOwner: owner, retainLease: true, workItems: [], providedStoryItems: briefItems(brief), input, businessPrompt: phase === 'global_review' ? reviewPrompt : storyPrompt, prompt: `【当前阅读页】\n${JSON.stringify(brief)}`, signal: controller.signal })
+        const businessPrompt = outline ? (phase === 'global_review' ? outlineReviewPrompt : outlineStoryPrompt) : (phase === 'global_review' ? reviewPrompt : storyPrompt)
+        const result = await runtime.run(repo, { profile: 'story_editor', workflow: 'story_pages_v3', outline, phase, sessionId, runId, taskId, leaseOwner: owner, retainLease: true, workItems: [], providedStoryItems: briefItems(brief), input, businessPrompt, prompt: `【当前阅读页】\n${JSON.stringify(brief)}`, signal: controller.signal, afterCommit: async () => publish(bookId, ['pipelineRuns', 'nodes', 'eventLines', 'storyEvents', 'storyEditorNotes', 'storyEditorMemory']) })
         if (result.itemFailure || !result.ok) throw new Error(result.itemFailure ?? result.error ?? '本轮阅读未完成，进度已保留。')
       }
       state = await repo.transaction(true, async store => {
@@ -105,6 +113,7 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
         if (session?.leaseOwner === owner) { const { leaseOwner: _owner, leaseUntil: _until, ...rest } = session; await store.put('storySessions', rest) }
       }).catch(() => set(bookId, { error: '执行权释放失败，请稍后继续。' }))
       controllers.delete(bookId); set(bookId, { running: false })
+      if (acquired) publish(bookId, ['compileProgress', 'pipelineRuns', 'storySessions', 'nodes', 'eventLines', 'storyEvents'])
     }
   }
   async function read(bookId: string) {

@@ -8,13 +8,15 @@ const portable = (value: unknown): unknown => Array.isArray(value) ? value.map(p
 export async function readingCheck(store: AgentStore, type: string, id: string, sources = new Map<string, string>()): Promise<ReadingCheck> {
   const table = type === 'line_summary' ? 'eventLines' : type === 'note_page' ? 'storyEditorNotes' : 'nodes'
   const row = await store.get(table, id)
-  const nodes = table === 'eventLines' ? (await Promise.all(strings(row?.nodeIds).map(id => store.get('nodes', id)))).filter((item): item is Row => !!item) : table === 'nodes' && row ? [row] : []
+  const events = table === 'eventLines' && Array.isArray(row?.eventIds) ? await Promise.all(strings(row.eventIds).map(id => store.get('storyEvents', id))) : undefined
+  const members = [...new Set([...strings(row?.nodeIds), ...(events ?? []).flatMap(event => strings(event?.nodeIds))])]
+  const nodes = table === 'eventLines' ? (await Promise.all(members.map(id => store.get('nodes', id)))).filter((item): item is Row => !!item) : table === 'nodes' && row ? [row] : []
   const source: [string, string][] = []
   for (const chapter of new Set(nodes.map(node => text(node.chapterIndex)))) {
     if (!sources.has(chapter)) sources.set(chapter, await readingSourceFingerprint(store, chapter, 'empty'))
     source.push([chapter, sources.get(chapter)!])
   }
-  return { type, id, fingerprint: await store.wait(hash(portable({ row: storyContent(table, row ?? null), nodes: nodes.map(node => storyContent('nodes', node)), source }))) }
+  return { type, id, fingerprint: await store.wait(hash(portable({ row: storyContent(table, row ?? null), nodes: nodes.map(node => storyContent('nodes', node)), source, ...(events ? { events: events.map(event => storyContent('storyEvents', event ?? null)) } : {}) }))) }
 }
 
 export async function usableReadingChecks(store: AgentStore, checks: ReadingCheck[]) {
@@ -34,9 +36,9 @@ export async function usableReadingChecks(store: AgentStore, checks: ReadingChec
   return result
 }
 
-export async function inheritedReadingChecks(store: AgentStore, phase: string, refresh?: (runId: string) => Promise<Row>) {
+export async function inheritedReadingChecks(store: AgentStore, phase: string, refresh?: (runId: string) => Promise<Row>, outline?: boolean) {
   const latest = new Map<string, ReadingCheck>()
-  const runs = (await store.rows('pipelineRuns')).filter(run => run.stage === 'P3').sort((a, b) => text(b.startedAt).localeCompare(text(a.startedAt)))
+  const runs = (await store.rows('pipelineRuns')).filter(run => run.stage === 'P3' && (outline === undefined || (run.storyOutlineVersion === 1) === outline)).sort((a, b) => text(b.startedAt).localeCompare(text(a.startedAt)))
   for (const run of runs) {
     const saved = (run.storyReading as Row | undefined)?.[phase] as Row | undefined
     const state = saved && refresh ? await refresh(text(run.id)) : saved

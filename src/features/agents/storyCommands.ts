@@ -3,9 +3,10 @@ import { canonical, records, strings, text } from './contracts'
 import type { Scope } from './queries'
 import { lineSummary } from '../story/views'
 
-export const storyWriteTools = ['save_story_lines', 'save_story_notes', 'add_story_nodes'] as const
+export const storyWriteTools = ['save_story_lines', 'save_story_notes', 'add_story_nodes', 'save_story_outline'] as const
 export const storyToolNames = ['search_story_context', 'get_story_detail', 'read_original', ...storyWriteTools, 'finish_story_batch']
-export const readingToolNames = storyToolNames.filter(name => !['read_original', 'add_story_nodes'].includes(name))
+export const readingToolNames = storyToolNames.filter(name => !['read_original', 'add_story_nodes', 'save_story_outline'].includes(name))
+export const outlineToolNames = readingToolNames.map(name => name === 'save_story_lines' ? 'save_story_outline' : name)
 export const isStoryWrite = (name: string) => (storyWriteTools as readonly string[]).includes(name)
 
 /** 段号来自已保存文本的位置，修改不要求模型复述原句。 */
@@ -40,7 +41,8 @@ function revisedProcess(original: unknown, operation: Row) {
 export async function storyAssetEdits(store: AgentStore, before: Map<string, Row>, name: string, args: Row, result: Row, commitId: string, timestamp: string): Promise<Row[]> {
   const edits: Row[] = []
   const ignored = new Set(['id', 'bookId', 'revision', 'updatedAt', 'createdBy', 'order', 'offset'])
-  for (const [table, kind] of [['nodes', 'node'], ['eventLines', 'eventLine']]) {
+  const tables = [['nodes', 'node'], ['eventLines', 'eventLine'], ...(name === 'save_story_outline' ? [['storyEvents', 'event']] : [])]
+  for (const [table, kind] of tables) {
     const current = new Map((await store.rows(table)).map(row => [text(row.id), row]))
     const ids = new Set([...current.keys(), ...[...before.keys()].filter(key => key.startsWith(`${table}:`)).map(key => key.slice(table.length + 1))])
     for (const id of ids) {
@@ -48,7 +50,7 @@ export async function storyAssetEdits(store: AgentStore, before: Map<string, Row
       const fieldChanges = [...new Set([...Object.keys(old ?? {}), ...Object.keys(next ?? {})])].filter(field => !ignored.has(field) && canonical(old?.[field]) !== canonical(next?.[field])).map(field => ({ field, before: old?.[field] ?? null, after: next?.[field] ?? null }))
       if (!fieldChanges.length) continue
       const operation = records(args.operations).find((op, index) => op.lineId === id || strings(op.mergeLineIds).includes(id) || strings(result.lineIds)[index] === id)
-      edits.push({ commitId, tool: name, kind, id, fieldChanges, reason: text(operation?.reason) || (name === 'add_story_nodes' ? '根据已查阅原文补充事件。' : records(args.operations).map(op => text(op.reason)).filter(Boolean).join('；')), evidence: [], timestamp, actor: 'agent' })
+      edits.push({ commitId, tool: name, kind, id, fieldChanges, reason: text(operation?.reason) || text(args.reason) || (name === 'add_story_nodes' ? '根据已查阅原文补充事件。' : records(args.operations).map(op => text(op.reason)).filter(Boolean).join('；')), evidence: [], timestamp, actor: 'agent' })
     }
   }
   return edits

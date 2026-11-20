@@ -15,7 +15,7 @@ export function StoryPanel({ bookId, service }: { bookId: string; service: Story
   const [traceOpen, setTraceOpen] = useState(false)
   useEffect(() => service.subscribe(() => refresh(value => value + 1)), [service])
   const [leaseAttempt, retryLease] = useState(0)
-  const saved = useLiveResult(useCallback(() => service.read(bookId), [service, bookId]), leaseAttempt, [...bookInterests(bookId, ['compileProgress', 'pipelineRuns', 'chapters', 'chapterTexts', 'characters', 'characterRelations', 'characterRelationEdits', 'locations', 'nodes', 'eventLines', 'extractionReceipts', 'storySessions', 'storyEditorMemory', 'storyEditorNotes', 'storyEditorCheckpoints', 'assetLifecycle', 'legacyRelationRecords']), { scope: `book:${bookId}`, tables: ['storySessionEntries'], category: 'business' }])
+  const saved = useLiveResult(useCallback(() => service.read(bookId), [service, bookId]), leaseAttempt, [...bookInterests(bookId, ['compileProgress', 'pipelineRuns', 'chapters', 'chapterTexts', 'characters', 'characterRelations', 'characterRelationEdits', 'locations', 'nodes', 'eventLines', 'storyEvents', 'extractionReceipts', 'storySessions', 'storyEditorMemory', 'storyEditorNotes', 'storyEditorCheckpoints', 'assetLifecycle', 'legacyRelationRecords']), { scope: `book:${bookId}`, tables: ['storySessionEntries'], category: 'business' }])
   const state = service.state(bookId), running = !!state?.running
   const value = saved.status === 'ready' ? saved.value : undefined
   const activityError = state?.error || (saved.status === 'error' ? saved.message : undefined)

@@ -1,6 +1,7 @@
 import { transact } from '../../lib/storage/transaction'
 import type { createWorkspace } from '../../lib/storage/workspace'
-import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterPairResult, type CharacterRelation, type CharacterRelationEdit, type EventLine, type EventNode, type LegacyRelationRecord, type Lifecycle, type LocationAsset, type RelationEvidence } from './types'
+import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, type AssetInput, type AssetKind, type AssetSnapshot, type Character, type CharacterPairResult, type CharacterRelation, type CharacterRelationEdit, type EventLine, type EventNode, type LegacyRelationRecord, type Lifecycle, type LocationAsset, type RelationEvidence, type StoryEvent } from './types'
+import { storyMemberships, synchronizeOutline, usesOutline } from '../story/outline'
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
 import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRun, type MergeOptions, type MergePreview, type MergeRequest, type WorldKind, type MechanicalMergeContext } from './merge'
@@ -25,11 +26,11 @@ export interface RelationPairInput {
 }
 interface Lease { id: string; bookId: string; recordType?: string; lockKey?: string; resource?: string }
 const worldKinds = new Set<AssetKind>(['character', 'location'])
-const listFields = new Set(['aliases', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
+const listFields = new Set(['aliases', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
 const allowed: Record<AssetKind, string[]> = {
   character: ['name', 'aliases', 'chapterIndex', 'manualSourceNote', 'identity', 'ageText', 'appearance', 'personality', 'background', 'speechStyleSample', 'roleWeight'],
   location: ['name', 'aliases', 'chapterIndex', 'manualSourceNote', 'description'],
-  node: ['name', 'summary', 'chapterIndex', 'quote', 'process', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions'],
+  node: ['name', 'summary', 'chapterIndex', 'quote', 'process', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions'],
   eventLine: ['title', 'summary', 'nodeIds', 'cause', 'process', 'result', 'lineStatus'],
 }
 const fail = (field: keyof AssetInput, message: string): never => { throw new AssetError('VALIDATION', message, field) }
@@ -90,7 +91,7 @@ async function synchronizeNarrative(db: Database, bookId: string, beforeNodes: E
   for (const line of lines) {
     const members = unique(line.nodeIds).map(id => nodeById.get(id)).filter((node): node is EventNode => !!node)
       .sort((a, b) => (chapterOrder.get(a.chapterIndex) ?? 0) - (chapterOrder.get(b.chapterIndex) ?? 0) || a.order - b.order || a.id.localeCompare(b.id))
-    if (!members.length) { await markDeleted(db, bookId, 'eventLine', line.id, timestamp); continue }
+    if (!members.length && !Array.isArray(line.eventIds)) { await markDeleted(db, bookId, 'eventLine', line.id, timestamp); continue }
     const updated = { ...line, nodeIds: members.map(node => node.id), chapters: [...new Set(members.map(node => node.chapterIndex))] }
     const times = members.map(node => node.timeCoord).filter((time): time is string => !!time).sort()
     if (times.length) updated.timeRange = [times[0], times[times.length - 1]]
@@ -247,7 +248,7 @@ export function createAssetService(workspace: Workspace) {
       if (matched) row.offset = source.text.indexOf(quote)
       else delete row.offset
       for (const field of ['process', 'time_text', 'time_hint'] as const) if (input[field] !== undefined) row[field] = input[field]
-      for (const field of ['targets', 'world_delta', 'new_facts', 'started_actions'] as const) if (input[field] !== undefined) row[field] = unique(input[field]!)
+      for (const field of ['targets', 'locationNames', 'world_delta', 'new_facts', 'started_actions'] as const) if (input[field] !== undefined) row[field] = unique(input[field]!)
       if (input.participantIds !== undefined || input.unlinkedParticipants !== undefined) {
         const participants = nodeParticipants(row, characters)
         return setNodeParticipants(row, characters, input.participantIds ?? participants.ids, input.unlinkedParticipants ?? participants.names)
@@ -258,7 +259,8 @@ export function createAssetService(workspace: Workspace) {
     const previous = old as EventLine | undefined
     const title = (input.title ?? previous?.title ?? '').trim() || fail('title', '事件线标题不能为空。')
     const nodeIds = unique(input.nodeIds ?? previous?.nodeIds ?? [])
-    if (!nodeIds.length) fail('nodeIds', '请至少选择一个事件节点。')
+    if (previous && usesOutline(previous) && input.nodeIds && JSON.stringify(nodeIds) !== JSON.stringify(previous.nodeIds)) fail('nodeIds', '请在对应事件中修改成员。')
+    if (!nodeIds.length && !Array.isArray(previous?.eventIds)) fail('nodeIds', '请至少选择一个事件节点。')
     const nodes = await db.table<EventNode>('nodes').bulkGet(nodeIds)
     if (nodes.some(node => !node || node.bookId !== bookId)) fail('nodeIds', '所选节点已删除或不属于本书，请重新选择。')
     return { ...previous, ...base, title, ...(input.summary === undefined ? {} : { summary: input.summary }), nodeIds, chapters: previous?.chapters ?? [], cause: input.cause ?? previous?.cause ?? '', process: input.process ?? previous?.process ?? '', result: input.result ?? previous?.result ?? '', lineStatus: input.lineStatus ?? previous?.lineStatus ?? 'open', updatedAt: new Date().toISOString() }
@@ -299,6 +301,7 @@ export function createAssetService(workspace: Workspace) {
         if (row && kind === 'node') nodes.push(row as EventNode)
         if (row && kind === 'eventLine') lines.push(row as EventLine)
         await synchronizeNarrative(db, bookId, beforeNodes, nodes, beforeLines, lines, timestamp)
+        await synchronizeOutline(dexieMergeStore(db), timestamp)
       }
       if (!row) await markDeleted(db, bookId, kind, targetId, timestamp)
       else if (!old) await db.table('assetLifecycle').add({ key: `${kind}:${row.id}`, bookId, kind, originId: row.id, currentId: row.id, state: 'live', revision: 1, updatedAt: timestamp } satisfies Lifecycle)
@@ -362,9 +365,9 @@ export function createAssetService(workspace: Workspace) {
 
   async function readContent(bookId: string, view?: { kind: AssetKind; selectedId?: string; network?: boolean }): Promise<Omit<AssetSnapshot, 'locks'>> {
     const db = await database(bookId)
-    const charactersNeeded = !view || view.kind !== 'location', nodesNeeded = !view || ['node', 'eventLine'].includes(view.kind), linesNeeded = !view || view.kind === 'eventLine' || view.kind === 'node' && view.network
+    const charactersNeeded = !view || view.kind !== 'location', nodesNeeded = !view || ['node', 'eventLine'].includes(view.kind), linesNeeded = nodesNeeded
     const relationsNeeded = !view || view.kind === 'character', locationsNeeded = !view || view.kind === 'location'
-    const tables = [...(charactersNeeded ? ['characters'] : []), ...(nodesNeeded ? ['nodes'] : []), ...(linesNeeded ? ['eventLines'] : []), ...(relationsNeeded ? ['characterRelations', 'characterRelationEdits'] : []), ...(locationsNeeded ? ['locations'] : []), ...(!view || view.kind === 'character' || view.selectedId ? ['assetLifecycle'] : []), ...(!view ? ['pipelineRuns'] : [])]
+    const tables = [...(charactersNeeded ? ['characters'] : []), ...(nodesNeeded ? ['nodes', 'storyEvents'] : []), ...(linesNeeded ? ['eventLines'] : []), ...(relationsNeeded ? ['characterRelations', 'characterRelationEdits'] : []), ...(locationsNeeded ? ['locations'] : []), ...(!view || view.kind === 'character' || view.selectedId ? ['assetLifecycle'] : []), ...(!view ? ['pipelineRuns'] : [])]
     const key = JSON.stringify(view?.kind === 'character' ? { kind: 'character' } : view), cache = viewCache.get(db) ?? new Map<string, { versions: string; value: Omit<AssetSnapshot, 'locks'> }>()
     viewCache.set(db, cache)
     return transact(db, 'r', [tables.map(table => db.table(table))], async (db) => {
@@ -376,8 +379,9 @@ export function createAssetService(workspace: Workspace) {
         if (versions && prior?.versions === versions) return structuredClone(prior.value)
       }
       const selectedRows = async <T>(table: string): Promise<T[]> => view && !view.network && assetTables[view.kind] === table ? view.selectedId ? (await db.table<T>(table).bulkGet([view.selectedId])).filter((row): row is T => !!row) : [] : db.table<T>(table).toArray()
-      const [storedCharacters, locations, storedNodes, eventLines, lifecycle, relationRows, editRows] = await Promise.all([
+      const [storedCharacters, locations, storedNodes, eventLines, storyEvents, lifecycle, relationRows, editRows] = await Promise.all([
         charactersNeeded ? db.table<Character>('characters').toArray() : [], locationsNeeded ? selectedRows<LocationAsset>('locations') : [], nodesNeeded ? selectedRows<EventNode>('nodes') : [], linesNeeded ? selectedRows<EventLine>('eventLines') : [],
+        nodesNeeded ? db.table<StoryEvent>('storyEvents').toArray() : [],
         !view || view.kind === 'character' ? db.table<Lifecycle>('assetLifecycle').toArray() : view.selectedId ? db.table<Lifecycle>('assetLifecycle').bulkGet([`${view.kind}:${view.selectedId}`]).then(rows => rows.filter((row): row is Lifecycle => !!row)) : [],
         relationsNeeded ? db.table<CharacterRelation>('characterRelations').toArray() : [], relationsNeeded ? db.table<CharacterRelationEdit>('characterRelationEdits').toArray() : [],
       ])
@@ -399,7 +403,7 @@ export function createAssetService(workspace: Workspace) {
       const references = resolveReferences(nodes, characters)
       const lineCharacterIds = Object.fromEntries(eventLines.map(line => [line.id, [...new Set(line.nodeIds.flatMap(id => references[id]?.actorIds ?? []))]]))
       const manualMerges = view ? [] : (await db.table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id))
-      const value = { characters: projected, locations, nodes, eventLines, lifecycle, references, lineCharacterIds, relations, relationEdges, unresolvedRelations: unresolved, pairs, manualMerges }
+      const value = { characters: projected, locations, nodes, eventLines, storyEvents, storyMemberships: storyMemberships(nodes, eventLines, storyEvents), lifecycle, references, lineCharacterIds, relations, relationEdges, unresolvedRelations: unresolved, pairs, manualMerges }
       if (versions) { cache.set(key, { versions, value: structuredClone(value) }); if (cache.size > 8) cache.delete(cache.keys().next().value!) }
       return value
     })
@@ -432,6 +436,21 @@ export function createAssetService(workspace: Workspace) {
     async create<K extends AssetKind>(bookId: string, kind: K, input: AssetInput) { validateInput(kind, input); return (await mutate(bookId, kind, input))! },
     async update<K extends AssetKind>(bookId: string, kind: K, id: string, expectedRevision: number, input: AssetInput) { validateInput(kind, input); return (await mutate(bookId, kind, input, id, expectedRevision))! },
     async remove(bookId: string, kind: AssetKind, id: string, expectedRevision: number) { await mutate(bookId, kind, null, id, expectedRevision) },
+    async updateOutlineEventNodes(bookId: string, lineId: string, eventId: string, revision: number, nodeIds: string[]) {
+      const db = await database(bookId)
+      return transact(db, 'rw', [db.tables], async db => {
+        if (lockState(await db.table<Lease>('pipelineRuns').toArray(), bookId).narrative) throw new AssetError('ASSET_DOMAIN_LOCKED', '叙事资料正在更新，请等待任务结束。')
+        const line = await db.table<EventLine>('eventLines').get(lineId)
+        const event = await db.table<StoryEvent>('storyEvents').get(eventId)
+        if (!line || !event || !usesOutline(line) || !line.eventIds?.includes(eventId) || event.revision !== revision) throw new AssetError('CONFLICT', '事件归属已变化，请重新载入。')
+        const nodes = await db.table<EventNode>('nodes').bulkGet(unique(nodeIds))
+        if (nodes.some(node => !node || node.bookId !== bookId)) throw new AssetError('VALIDATION', '所选节点必须是本书的有效节点。')
+        const timestamp = new Date().toISOString()
+        await db.table('storyEvents').put({ ...event, nodeIds: unique(nodeIds), revision: event.revision + 1 })
+        await synchronizeOutline(dexieMergeStore(db), timestamp)
+        await invalidateProgress(db, 'eventLine', line.id, timestamp)
+      })
+    },
     getRelationPair,
     async listRelationPairs(bookId: string, ownerId: string, offset = 0, limit = 50) {
       const db = await database(bookId)

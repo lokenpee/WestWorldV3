@@ -5386,7 +5386,74 @@
         "kind": "read",
         "maxResults": 20,
         "maxBytes": 65536,
-        "dependencyTracking": "query-result-fingerprint"
+        "dependencyTracking": "query-result-fingerprint",
+        "outlineParameters": {
+          "type": "object",
+          "properties": {
+            "node_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 20,
+              "minItems": 1
+            },
+            "terms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 12,
+              "minItems": 1
+            },
+            "kind": {
+              "enum": [
+                "node",
+                "eventLine",
+                "note",
+                "event"
+              ]
+            },
+            "include_resolved": {
+              "type": "boolean"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "include_future": {
+              "type": "boolean",
+              "description": "按节点检索时是否包含后续章节。窗口默认检索当前及此前节点，全书复核默认包含后续节点。"
+            },
+            "chapter_range": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "status": {
+              "enum": [
+                "open",
+                "closed",
+                "active",
+                "resolved"
+              ]
+            },
+            "unassignedOnly": {
+              "type": "boolean",
+              "description": "筛选没有事件及旧线归属的节点，仅用于 kind=node。"
+            }
+          },
+          "additionalProperties": false
+        }
       },
       {
         "name": "get_story_detail",
@@ -5480,6 +5547,57 @@
               "type": "integer",
               "minimum": 1,
               "description": "单独读取事件线经过的某一段；编号来自processSegments。"
+            }
+          },
+          "required": [
+            "kind",
+            "ids"
+          ],
+          "additionalProperties": false
+        },
+        "outlineParameters": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "node",
+                "eventLine",
+                "note",
+                "event"
+              ]
+            },
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "maxItems": 10
+            },
+            "char_offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxChars": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 6000
+            },
+            "memberOffset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "memberLimit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "members": {
+              "enum": [
+                "parent_lines",
+                "legacy_nodes"
+              ]
             }
           },
           "required": [
@@ -5965,6 +6083,339 @@
               "type": "string",
               "minLength": 1,
               "description": "程序维护的提交键，模型无需填写。"
+            }
+          },
+          "required": [
+            "operations"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "save_story_outline",
+        "kind": "write",
+        "description": "按顺序原子保存故事线、事件及节点引用的增量操作。使用 ref 声明临时标识，后续操作使用 $名称 引用本批新对象。每个已有对象先通过本页、搜索或详情实际读取。",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "create_line"
+                      },
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "role": {
+                        "enum": [
+                          "main",
+                          "sub",
+                          null
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "ref",
+                      "title"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "update_line"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "role": {
+                        "enum": [
+                          "main",
+                          "sub",
+                          null
+                        ]
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId"
+                    ],
+                    "additionalProperties": false,
+                    "anyOf": [
+                      {
+                        "required": [
+                          "title"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "role"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "create_event"
+                      },
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "nodeIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true,
+                        "minItems": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "ref",
+                      "title",
+                      "lineId",
+                      "nodeIds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "rename_event"
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "eventId",
+                      "title"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "attach_event"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fromLineId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId",
+                      "eventId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "detach_event"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId",
+                      "eventId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "attach_nodes"
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "nodeIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true,
+                        "minItems": 1
+                      },
+                      "fromEventId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "eventId",
+                      "nodeIds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "detach_nodes"
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "nodeIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true,
+                        "minItems": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "eventId",
+                      "nodeIds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "delete_line"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "delete_event"
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "expectedLineIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "eventId",
+                      "expectedLineIds"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "activate_legacy_line"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "excludedNodeIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "reason": {
+              "type": "string"
+            },
+            "operationKey": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [

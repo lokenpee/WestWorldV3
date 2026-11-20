@@ -2,6 +2,7 @@ import { AssetError, assetTables, roleWeights, type AssetEditRecord, type AssetF
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
 import { rebuildFacts } from './derive'
 import { syncRelations } from './relations'
+import { synchronizeOutline, usesOutline } from '../story/outline'
 
 type Row = Record<string, unknown>
 export interface PatchStore {
@@ -26,11 +27,11 @@ export interface AssetPatchResult {
 
 const characterFields = ['name', 'aliases', 'identity', 'ageText', 'age', 'gender', 'appearance', 'personality', 'background', 'speechStyleSample', 'roleWeight', 'chapterIndex', 'manualSourceNote'] as const
 const locationFields = ['name', 'aliases', 'description', 'chapterIndex', 'manualSourceNote'] as const
-const nodeFields = ['name', 'summary', 'process', 'chapterIndex', 'quote', 'participantIds', 'unlinkedParticipants', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions', 'timeCoord', 'timePrecision'] as const
+const nodeFields = ['name', 'summary', 'process', 'chapterIndex', 'quote', 'participantIds', 'unlinkedParticipants', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'locationNames', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions', 'timeCoord', 'timePrecision'] as const
 const lineFields = ['title', 'summary', 'nodeIds', 'cause', 'process', 'result', 'lineStatus'] as const
 const allowedFields: Record<AssetKind, readonly string[]> = { character: characterFields, location: locationFields, node: nodeFields, eventLine: lineFields }
 const textFields = new Set(['name', 'identity', 'ageText', 'gender', 'appearance', 'personality', 'background', 'speechStyleSample', 'description', 'manualSourceNote', 'summary', 'process', 'quote', 'time_text', 'time_hint', 'timeCoord', 'timePrecision', 'title', 'cause', 'result'])
-const listFields = new Set(['aliases', 'participantIds', 'unlinkedParticipants', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
+const listFields = new Set(['aliases', 'participantIds', 'unlinkedParticipants', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'locationNames', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
 
 const fail = (message: string): never => { throw new AssetError('VALIDATION', message) }
 const unique = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))]
@@ -139,7 +140,7 @@ async function synchronizeLines(store: PatchStore, timestamp: string) {
   for (const line of lines) {
     const members = unique(line.nodeIds ?? []).map(id => nodeById.get(id)).filter((node): node is EventNode => !!node)
       .sort((a, b) => (chapterOrder.get(a.chapterIndex) ?? 0) - (chapterOrder.get(b.chapterIndex) ?? 0) || a.order - b.order || a.id.localeCompare(b.id))
-    if (!members.length) {
+    if (!members.length && !Array.isArray(line.eventIds)) {
       const mapping = await store.get('assetLifecycle', `eventLine:${line.id}`)
       await store.put('assetLifecycle', { ...mapping, key: `eventLine:${line.id}`, bookId: line.bookId, kind: 'eventLine', originId: line.id, state: 'deleted', revision: Number(mapping?.revision ?? 0) + 1, updatedAt: timestamp } as unknown as Row)
       continue
@@ -157,6 +158,7 @@ async function synchronizeLines(store: PatchStore, timestamp: string) {
     const eventLineIds = lineIdsFor(node.id)
     if (JSON.stringify(eventLineIds) !== JSON.stringify(node.eventLineIds ?? [])) await store.put('nodes', { ...node, eventLineIds, revision: node.revision + 1, updatedAt: timestamp } as unknown as Row)
   }
+  await synchronizeOutline(store, timestamp)
   return surviving
 }
 
@@ -174,7 +176,7 @@ async function patchNode(store: PatchStore, input: AssetPatchInput, before: Even
   if (patch.name !== undefined) { const name = String(patch.name).trim(); record('name', name); row.name = name }
   if (patch.summary !== undefined) { const summary = String(patch.summary).trim(); record('summary', summary); row.summary = summary }
   for (const field of ['process', 'time_text', 'time_hint', 'timeCoord', 'timePrecision'] as const) if (patch[field] !== undefined) { record(field, String(patch[field])); row[field] = String(patch[field]) }
-  for (const field of ['world_delta', 'new_facts', 'started_actions'] as const) if (patch[field] !== undefined) { const value = unique(patch[field] as string[]); record(field, value); row[field] = value }
+  for (const field of ['locationNames', 'world_delta', 'new_facts', 'started_actions'] as const) if (patch[field] !== undefined) { const value = unique(patch[field] as string[]); record(field, value); row[field] = value }
   if (patch.quote !== undefined) {
     const quote = String(patch.quote)
     const source = await store.get('chapterTexts', row.chapterIndex)
@@ -210,7 +212,8 @@ async function patchLine(store: PatchStore, input: AssetPatchInput, before: Even
   if (patch.lineStatus !== undefined) { record('lineStatus', patch.lineStatus); row.lineStatus = patch.lineStatus as EventLine['lineStatus'] }
   if (patch.nodeIds !== undefined) {
     const nodeIds = unique(patch.nodeIds as string[])
-    if (!nodeIds.length) fail('请至少选择一个事件节点。')
+    if (usesOutline(before) && changedValue(before.nodeIds, nodeIds)) fail('请在对应事件中修改成员。')
+    if (!nodeIds.length && !Array.isArray(before.eventIds)) fail('请至少选择一个事件节点。')
     const nodes = await Promise.all(nodeIds.map(id => store.get('nodes', id)))
     if (nodes.some(node => !node || node.bookId !== input.bookId)) fail('所选节点已删除或不属于本书。')
     record('nodeIds', nodeIds); row.nodeIds = nodeIds
@@ -223,7 +226,7 @@ async function patchLine(store: PatchStore, input: AssetPatchInput, before: Even
   row.chapters = [...new Set(members.map(node => node.chapterIndex))]
   const times = members.map(node => node.timeCoord).filter((time): time is string => !!time).sort()
   if (times.length) row.timeRange = [times[0], times[times.length - 1]]; else delete row.timeRange
-  if (!row.chapters.length) fail('事件线须至少包含一个有效节点。')
+  if (!row.chapters.length && !Array.isArray(row.eventIds)) fail('事件线须至少包含一个有效节点。')
   await store.put('eventLines', row as unknown as Row)
   await synchronizeLines(store, row.updatedAt)
   return { row: row as unknown as Row, changes, affected: [{ kind: 'eventLine', id: row.id, revision: row.revision }] }

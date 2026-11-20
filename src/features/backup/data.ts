@@ -7,7 +7,7 @@ import { hasClearedEndpoints, repairRelationBindings } from '../assets/repair'
 
 export const tableSchemas = {
   chapters: 'Chapter', chapterTexts: 'ChapterText', characters: 'StoredCharacter', locations: 'StoredLocation', nodes: 'StoredNode', eventLines: 'StoredEventLine', characterRelations: 'StoredRelation', characterRelationEdits: 'CharacterRelationEdit', legacyRelationRecords: 'LegacyRelationRecord', compileProgress: 'CompileProgress', storyEditorMemory: 'StoryEditorMemory', storyEditorNotes: 'StoryEditorNote', storyEditorCheckpoints: 'StoryEditorCheckpoint', storySessions: 'StorySession', storySessionEntries: 'StorySessionEntry', extractionReceipts: 'ExtractionReceipt', assetLifecycle: 'AssetLifecycle', pipelineRuns: 'PipelineRun',
-  extractionTasks: 'ExtractionTask', extractionInputs: 'ExtractionInput',
+  extractionTasks: 'ExtractionTask', extractionInputs: 'ExtractionInput', storyEvents: 'StoryEvent',
 } as const
 export type TableName = keyof typeof tableSchemas
 export type Row = Record<string, unknown>
@@ -65,12 +65,21 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
   const characters = new Set(tables.characters.map(row => row.id))
   const nodes = new Map(tables.nodes.map(row => [row.id, row]))
   const lines = new Map(tables.eventLines.map(row => [row.id, row]))
+  const events = new Map(tables.storyEvents.map(row => [row.id, row]))
+  for (const event of tables.storyEvents) {
+    for (const id of strings(event.nodeIds)) if (!nodes.has(id)) fail(`storyEvents/${event.id}`, `成员节点不存在：${id}`)
+  }
   for (const node of tables.nodes) {
     for (const id of [...strings(node.actorIds), ...strings(node.targetCharacterIds)]) if (!characters.has(id)) fail(`nodes/${node.id}`, `人物关联不存在：${id}`)
     for (const id of strings(node.eventLineIds)) if (!strings(lines.get(id)?.nodeIds).includes(node.id as string)) fail(`nodes/${node.id}`, `事件线反向关联不符：${id}`)
   }
   for (const line of tables.eventLines) {
-    if (!strings(line.nodeIds).length) fail(`eventLines/${line.id}`, '事件线须包含节点。')
+    const outline = Array.isArray(line.eventIds) && !line.outlinePending
+    for (const id of strings(line.eventIds)) if (!events.has(id)) fail(`eventLines/${line.id}`, `成员事件不存在：${id}`)
+    if (outline) {
+      const effective = new Set(strings(line.eventIds).flatMap(id => strings(events.get(id)?.nodeIds)))
+      if (effective.size !== strings(line.nodeIds).length || strings(line.nodeIds).some(id => !effective.has(id))) fail(`eventLines/${line.id}`, '事件归属与实际成员不符。')
+    } else if (!strings(line.nodeIds).length && !Array.isArray(line.eventIds)) fail(`eventLines/${line.id}`, '事件线须包含节点。')
     for (const id of strings(line.nodeIds)) if (!nodes.has(id) || !strings(nodes.get(id)?.eventLineIds).includes(line.id as string)) fail(`eventLines/${line.id}`, `成员节点不存在或反向关联不符：${id}`)
     for (const chapter of strings(line.chapters)) if (!hasChapter(chapter)) fail(`eventLines/${line.id}`, `事件线章节不存在：${chapter}`)
   }

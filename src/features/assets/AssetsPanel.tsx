@@ -10,6 +10,7 @@ import { setLeaveGuard } from './leaveGuard'
 import './AssetsPanel.css'
 import { MergeDialog } from './MergeDialog'
 import { LegacyRelationReport } from './LegacyRelationReport'
+import { OutlineView } from '../story/OutlineViews'
 
 export function AssetsPanel({ bookId, repository, service, kind, onKindChange, organizeDisabled, organizeDisabledReason, resumeCharacterId, onAutoTier, onOrganizeCharacter, onContinueCharacter }: {
   bookId: string; repository: BookRepository; service: AssetService; kind: AssetKind; onKindChange: (kind: AssetKind) => void
@@ -73,6 +74,7 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
     setPendingLeave(undefined); action()
   }
   const panelRef = useRef<HTMLElement>(null)
+  const [outlineOpen, setOutlineOpen] = useState(false)
   useEffect(() => {
     const panel = panelRef.current
     const workspace = panel?.closest<HTMLElement>('.workspace-content')
@@ -117,6 +119,7 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
       {characterNetworkVisible
         ? <AssetNetwork key={`${bookId}:${kind}`} bookId={bookId} service={service} kind={kind} chapters={chapters.value} selectedId={selection && selection !== 'new' ? selection.id : undefined} onNavigate={navigate} onSelect={id => setSelection({ id })} onClear={() => setSelection(undefined)} />
         : <div className="asset-results">{networkOpened && <AssetNetwork key={bookId} bookId={bookId} service={service} kind={kind === 'eventLine' ? 'eventLine' : 'node'} active={eventNetworkVisible} chapters={chapters.value} selectedId={kind === 'node' && selection && selection !== 'new' ? selection.id : undefined} onNavigate={navigate} onSelect={id => setSelection({ id })} onClear={() => setSelection(undefined)} />}<div hidden={eventNetworkVisible} className="asset-list-view">
+          {kind === 'eventLine' && <details open={outlineOpen} onToggle={event => setOutlineOpen(event.currentTarget.open)}><summary>剧情大纲</summary>{outlineOpen && <OutlineView key={bookId} bookId={bookId} service={service} onNode={id => navigate(() => { onKindChange('node'); setSelection({ id }); setQueryText(''); setOffset(0) })} />}</details>}
           <p className="result-count">显示 {visible.length} / {page.total} 条 · {normalized ? '按相关度排列' : kind === 'character' ? '按层级与姓名排列' : '按名称排列'}{data.status === 'loading' ? ' · 正在查询…' : ''}</p>
           {data.status === 'error' && <p role="alert">{data.message}<button onClick={() => setAttempt(value => value + 1)}>重试</button></p>}
           {visible.length === 0 ? <p className="asset-empty">{page.total ? '没有匹配的资产，请调整搜索或筛选。' : `还没有${assetLabels[kind]}，可以点击上方按钮新增。`}</p> : <ul className="asset-list">{visible.map(row => <li key={row.id}>{mergeMode ? <label className="merge-selection"><input type="checkbox" aria-label={`选择合并 ${row.label} ${row.id}`} checked={mergeIds.includes(row.id)} onChange={event => setMergeIds(ids => event.target.checked ? [...ids, row.id] : ids.filter(id => id !== row.id))} /><span><strong>{row.label}</strong><small>{row.id} · {row.chapterName || '人工来源'}</small></span></label> : <button className={selection && selection !== 'new' && selection.id === row.id ? 'selected' : ''} aria-label={`编辑 ${row.label}`} onClick={() => navigate(() => setSelection({ id: row.id }))}><strong>{row.label}</strong><span>{row.preview}</span><small>{row.createdBy === 'manual' ? '人工' : '提取'} · {row.chapterName || (kind === 'eventLine' ? '事件线' : '无章节来源')} · 修订 {row.revision}</small><code>{row.id}</code></button>}</li>)}</ul>}

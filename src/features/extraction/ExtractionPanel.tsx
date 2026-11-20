@@ -10,7 +10,7 @@ export function ExtractionPanel({ bookId, service }: { bookId: string; service: 
   const [resultPage, setResultPage] = useState(0)
   const [recoveryError, setRecoveryError] = useState('')
   const [actionError, setActionError] = useState('')
-  const [reExtract, setReExtract] = useState<{ step: Substep; preview?: { counts: { characters: number; locations: number; relations: number; nodes: number; eventLines: number }; blockers: string[] }; error?: string }>()
+  const [reExtract, setReExtract] = useState<{ step: Substep; preview?: { counts: { characters: number; locations: number; relations: number; nodes: number; eventLines: number; storyEvents?: number }; blockers: string[] }; error?: string }>()
   useEffect(() => service.subscribe(() => refresh(value => value + 1)), [service])
   useEffect(() => {
     let active = true; let pending = false
@@ -105,7 +105,7 @@ export function ExtractionPanel({ bookId, service }: { bookId: string; service: 
       {reExtract.error && <p className="field-error" role="alert">{reExtract.error}</p>}
       {reExtract.preview && <>
         <p>将先清空全书对应旧资产，再逐章重新提取。清空后不可恢复。</p>
-        <p>{reExtract.step === 'worldAssets' ? `人物 ${reExtract.preview.counts.characters} · 地点 ${reExtract.preview.counts.locations} · 关系 ${reExtract.preview.counts.relations}；事件节点保留，P2整理结果清除，P3进度失效。` : `事件节点 ${reExtract.preview.counts.nodes} · 事件线 ${reExtract.preview.counts.eventLines}；人物、地点、关系保留，P3结果清除。`}</p>
+         <p>{reExtract.step === 'worldAssets' ? `人物 ${reExtract.preview.counts.characters} · 地点 ${reExtract.preview.counts.locations} · 关系 ${reExtract.preview.counts.relations}；事件节点保留，P2整理结果清除，P3进度失效。` : `事件节点 ${reExtract.preview.counts.nodes} · 事件线 ${reExtract.preview.counts.eventLines}${reExtract.preview.counts.storyEvents ? ` · 大纲事件 ${reExtract.preview.counts.storyEvents}` : ''}；人物、地点、关系保留，P3结果清除。`}</p>
         {!!reExtract.preview.blockers.length && <p className="field-error" role="alert">{reExtract.preview.blockers.join('；')}</p>}
       </>}
       <div className="editor-actions"><button type="button" className="danger-button" disabled={!reExtract.preview || !!reExtract.preview.blockers.length} onClick={() => void confirmReExtract()}>清空并重新提取</button><button type="button" className="secondary-button" onClick={() => setReExtract(undefined)}>取消</button></div>

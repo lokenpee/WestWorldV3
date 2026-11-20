@@ -45,12 +45,12 @@ export function createBackupProcessor() {
         case 'migrationDigest': {
           migration = job.input
           onProgress?.('正在核对旧库是否已经迁移…')
-          let digestData = migration.data
-          if (!migration.data.tables.extractionTasks.length && !migration.data.tables.extractionInputs.length) {
-            const { extractionTasks: _tasks, extractionInputs: _inputs, ...tables } = migration.data.tables
-            // 仅新增空表的旧源库保持既有迁移摘要，已保存的磁盘资料仍按原标记跳过。
-            digestData = { ...migration.data, tables } as BookData
+          const tables: Partial<BookData['tables']> = { ...migration.data.tables }
+          if (!tables.storyEvents?.length) delete tables.storyEvents
+          if (!tables.extractionTasks?.length && !tables.extractionInputs?.length) {
+            delete tables.extractionTasks; delete tables.extractionInputs
           }
+          const digestData = { ...migration.data, tables }
           return checksumOf(new TextEncoder().encode(JSON.stringify(digestData)))
         }
         case 'migrate': {

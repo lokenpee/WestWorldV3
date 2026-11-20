@@ -6,10 +6,12 @@ import modelText from '../../../docs/v2/resources/v2.2/model-output-contract.jso
 import storageText from '../../../docs/v2/resources/v2.2/storage.schema.json?raw'
 
 export type AgentProfile = 'asset_editor' | 'story_editor'
-export interface ToolContract { name: string; description: string; parameters: TSchema; legacyParameters?: TSchema; kind: string; maxResults?: number }
-export const parametersFor = (contract: ToolContract, workflow?: string) => workflow === 'story_pages_v3' ? contract.parameters : contract.legacyParameters ?? contract.parameters
+export interface ToolContract { name: string; description: string; parameters: TSchema; legacyParameters?: TSchema; outlineParameters?: TSchema; kind: string; maxResults?: number }
+export const parametersFor = (contract: ToolContract, workflow?: string, outline = false) => outline && contract.outlineParameters ? contract.outlineParameters : workflow === 'story_pages_v3' ? contract.parameters : contract.legacyParameters ?? contract.parameters
 export const toolContracts = (JSON.parse(toolText) as { profiles: Record<AgentProfile, ToolContract[]> }).profiles
-export const resultContracts = new Map((JSON.parse(resultText) as { tools: { name: string; success: TSchema }[] }).tools.map(row => [row.name, row.success]))
+const resultDefinitions = (JSON.parse(resultText) as { tools: { name: string; success: TSchema; outlineSuccess?: TSchema }[] }).tools
+export const resultContracts = new Map(resultDefinitions.map(row => [row.name, row.success]))
+export const resultFor = (name: string, outline = false) => outline ? resultDefinitions.find(row => row.name === name)?.outlineSuccess ?? resultContracts.get(name) : resultContracts.get(name)
 export const summarySchema = (JSON.parse(modelText) as { schemas: Record<string, TSchema> }).schemas.AgentTaskSummarySchema
 const storageSchema = JSON.parse(storageText) as TSchema
 export const inputSchema = (name: string): TSchema => ({ ...storageSchema, $ref: `#/$defs/${name}` })

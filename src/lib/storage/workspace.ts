@@ -32,6 +32,7 @@ export const MAIN_SCOPE: DatabaseScope = {
   settingsName: 'westworld_settings',
   bookPrefix: 'westworld_canon_',
 }
+export const BOOK_SCHEMA_VERSION = 10
 
 export interface BookSummary {
   bookId: string
@@ -164,6 +165,7 @@ class BookDatabase extends Dexie {
       extractionTasks: 'id, runId, [runId+ordinal], [runId+status]',
       extractionInputs: 'id',
     })
+    this.version(BOOK_SCHEMA_VERSION).stores({ storyEvents: 'id' })
     this.on('ready', () => this.transaction('rw', this.tables, async () => {
       await repairRelationBindings(dexieMergeStore(this), bookId)
     }))

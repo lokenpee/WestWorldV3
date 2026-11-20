@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const resources = path.join(root, 'docs/v2/resources')
 const activePrompts = path.join(resources, 'v2.2/prompts/active')
-const storyToolNames = ['search_story_context', 'get_story_detail', 'save_story_lines', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch']
+const storyToolNames = ['search_story_context', 'get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch']
 const examplesDir = path.join(resources, 'v2.2/request-examples')
 const manifest = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/prompt-call-manifest.json'), 'utf8'))
 const ownershipPath = path.join(root, 'docs/v2/文档与资源归属.json')
@@ -60,7 +60,7 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
     const contracts = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/tool-contracts.json'), 'utf8')).profiles.story_editor
     example.context.tools = storyToolNames.map(name => {
       const tool = contracts.find(item => item.name === name)
-      const parameters = structuredClone(tool.parameters)
+      const parameters = structuredClone(tool.outlineParameters ?? tool.parameters)
       delete parameters.properties.operationKey
       return { name, description: tool.description, parameters }
     })

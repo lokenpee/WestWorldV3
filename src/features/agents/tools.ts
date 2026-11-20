@@ -1,11 +1,12 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { JsonValue } from '@earendil-works/pi-ai'
 import type { AgentRepository, Row } from './repository'
-import { canonical, hash, records, resultContracts, strings, summarySchema, text, toolContracts, validate, parametersFor, type Summary } from './contracts'
+import { canonical, hash, records, resultContracts, resultFor, strings, summarySchema, text, toolContracts, validate, parametersFor, type Summary } from './contracts'
 import { assertScope, readTool, toolBytes, type Scope } from './queries'
 import { assetReviewTools, checkLease, commitCommand, relationTools, saveTask, taskOf, validateReadSet, type CommitAck, type ReadSet } from './commands'
 import { noteOrganizationRead } from './organizationReview'
-import { isStoryWrite, storyToolNames, readingToolNames } from './storyCommands'
+import { isStoryWrite, storyToolNames, readingToolNames, outlineToolNames } from './storyCommands'
+import { OutlineError } from '../story/outlineCommands'
 import { navigateStoryReading, readingProgress, refreshReading } from '../story/reading'
 import { briefItems, recordStoryReads } from '../story/views'
 import { limitsOriginalRead, readOrganizationOriginal } from './organizationReads'
@@ -28,7 +29,7 @@ const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.phase === 'asset_review') return scope.reviewScope === 'relations'
     ? ['get_character_relation', 'get_legacy_relation_records', 'get_character_detail', 'read_original', 'set_character_relation', 'delete_character_relation', 'submit_result']
     : ['get_character_detail', 'get_location_detail', 'get_node_detail', 'get_event_line_detail', 'get_character_relation', 'read_original', 'edit_character', 'edit_location', 'edit_event_node', 'edit_event_line', 'set_character_relation', 'delete_character_relation', 'submit_result']
-  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...readingToolNames, 'navigate_story_pages'] : scope.workflow === 'story_lines_v2' ? storyToolNames : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
+  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...(scope.outline ? outlineToolNames : readingToolNames), 'navigate_story_pages'] : scope.workflow === 'story_lines_v2' ? storyToolNames.filter(name => name !== 'save_story_outline') : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
   return null
 }
 export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
@@ -70,13 +71,20 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       ? contract.name !== 'commit_asset_changes'
       : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
     .filter(contract => contract.kind !== 'finish' && (story ? storyToolNames.includes(contract.name) || pages && contract.name === 'navigate_story_pages' : !isStoryWrite(contract.name) && !['get_story_detail', 'navigate_story_pages'].includes(contract.name)))
-    .filter(contract => !pages || [...readingToolNames, 'navigate_story_pages'].includes(contract.name))
+    .filter(contract => !pages || [...(scope.outline ? outlineToolNames : readingToolNames), 'navigate_story_pages'].includes(contract.name))
+    .filter(contract => scope.outline || contract.name !== 'save_story_outline')
     .filter(contract => !relationOnly || contract.kind !== 'write' || (relationTools as readonly string[]).includes(contract.name))
   const allTools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
-    parameters: modelParameters(contract.name, parametersFor(contract, scope.workflow)),
-    outputSchema: resultContracts.get(contract.name),
+    parameters: modelParameters(contract.name, parametersFor(contract, scope.workflow, scope.outline)),
+    outputSchema: resultFor(contract.name, scope.outline),
     async execute(toolCallId, parameters, signal) {
-      assertScope(scope, repo.bookId); signal?.throwIfAborted(); validate(parametersFor(contract, scope.workflow), parameters)
+      assertScope(scope, repo.bookId); signal?.throwIfAborted()
+      try { validate(parametersFor(contract, scope.workflow, scope.outline), parameters) }
+      catch (error) {
+        if (contract.name !== 'save_story_outline') throw error
+        const value = { ok: false, code: 'INVALID_ARGS', message: error instanceof Error ? error.message : String(error) }
+        return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value, isError: true }
+      }
       if (toolBytes(parameters) > 65536) throw new Error('TOO_LARGE:工具参数超过单次处理上限。')
       const args = structuredClone(parameters) as Row
       if (pages && contract.name === 'navigate_story_pages') {
@@ -95,7 +103,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       }
       if (story && isStoryWrite(contract.name)) {
         const { operationKey: _key, ...payload } = args
-        args.operationKey = await hash({ runId: scope.runId, taskId: scope.taskId, tool: contract.name, toolCallId, payload })
+        args.operationKey = await hash({ runId: scope.runId, tool: contract.name, toolCallId, ...(contract.name === 'save_story_outline' ? {} : { taskId: scope.taskId, payload }) })
       }
       if (organization && ['save_identity_groups', 'navigate_identity_pages', 'submit_profile_review', 'submit_relation_review'].includes(contract.name)) {
         const { operationKey: _key, ...payload } = args
@@ -105,10 +113,21 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       if (scope.probe && !(scope.profile === 'asset_editor' ? ['get_character_detail', 'read_original', 'commit_asset_changes'] : ['get_editor_memory', 'commit_story_changes']).includes(contract.name)) throw new Error('INVALID_ARGS:探针仅允许指定调用。')
       let value: Row
       if (contract.kind === 'write') {
-        const ack = await commitCommand(repo, scope, contract.name, toolCallId, args, reads, signal)
-        if (ack.complete === true) completedWork = true
-        writeCalls++; if (ack.commitId) await options.afterCommit?.(ack)
-        value = ack as unknown as Row
+        try {
+          const ack = await commitCommand(repo, scope, contract.name, toolCallId, args, reads, signal)
+          if (ack.complete === true) completedWork = true
+          writeCalls++; if (ack.commitId) await options.afterCommit?.(ack)
+          value = ack as unknown as Row
+          if (contract.name === 'save_story_outline') {
+            const { operationKey: _key, summary: _summary, ...receipt } = value
+            value = receipt
+          }
+        } catch (error) {
+          if (contract.name !== 'save_story_outline' || signal?.aborted) throw error
+          const message = error instanceof Error ? error.message : String(error)
+          const code = /^(\w+):/.exec(message)?.[1] ?? 'COMMIT_FAILED'
+          value = { ok: false, code, message, ...(error instanceof OutlineError && error.opIndex !== undefined ? { opIndex: error.opIndex } : {}) }
+        }
       } else {
         const binding = organization && (contract.name === 'query_character_profile' || contract.name === 'query_relation_work')
         const limited = contract.name === 'read_original' && limitsOriginalRead(scope)
@@ -124,7 +143,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         // 省略编号只影响本次调用的便利写法；读集始终保存实际读取的人物身份。
         if (binding) args[contract.name === 'query_character_profile' ? 'id' : 'characterId'] = text((value.data as Row).id)
         if (toolBytes(value) > 65536) throw new Error('TOO_LARGE:工具结果超过单次返回上限。')
-        const output = resultContracts.get(contract.name)
+        const output = resultFor(contract.name, scope.outline)
         if (output) validate(output, value, `INVALID_RESULT:${contract.name}返回结构不符合要求。`)
         const fingerprint = await hash(value)
         const query = { tool: contract.name, args: structuredClone(args), resultFingerprint: fingerprint }
@@ -169,7 +188,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
           await saveTask(store, scope, { readSet: reads })
         }); readCalls++
       }
-      const output = resultContracts.get(contract.name)
+      const output = resultFor(contract.name, scope.outline)
       if (output) validate(output, value, `INVALID_RESULT:${contract.name}返回结构不符合要求。`)
       return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue, ...(value.ok === false ? { isError: true } : {}) }
     },

@@ -1,5 +1,5 @@
 import Dexie from 'dexie'
-import { MAIN_SCOPE, type Book, type DatabaseScope } from '../../lib/storage/workspace'
+import { BOOK_SCHEMA_VERSION, MAIN_SCOPE, type Book, type DatabaseScope } from '../../lib/storage/workspace'
 import { emptyTables, tableNames } from '../backup/data'
 import { prepareMigration } from '../backup/preparation'
 import { remoteDatabase, storageChanged, type StorageCall } from './client'
@@ -20,11 +20,11 @@ export async function migrateBrowserData(call: StorageCall, progress: (message: 
     if (!await Dexie.exists(scope.bookPrefix + book.id)) throw new Error(`《${book.title}》的浏览器书库缺失，原书架已保留。`)
     const source = new Dexie(scope.bookPrefix + book.id)
     let data = { book, tables: emptyTables() }
-    let version = 9
+    let version = BOOK_SCHEMA_VERSION
     try {
       await source.open()
       version = source.verno
-      if (source.verno < 5 || source.verno > 9) throw new Error(`《${book.title}》的旧库版本不支持直接迁移，请先使用对应版本导出整书备份。`)
+      if (source.verno < 5 || source.verno > BOOK_SCHEMA_VERSION) throw new Error(`《${book.title}》的旧库版本不支持直接迁移，请先使用对应版本导出整书备份。`)
       await source.transaction('r', source.tables, async tx => {
         for (const name of tableNames) if (source.tables.some(table => table.name === name)) data.tables[name] = await tx.table(name).toArray()
       })

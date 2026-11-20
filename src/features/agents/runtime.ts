@@ -30,6 +30,7 @@ export interface AgentTaskOptions {
   requiredLineIds?: string[]
   reviewScope?: 'all_assets' | 'relations'
   workflow?: 'character_organization_v1' | 'story_lines_v2' | 'story_pages_v3'
+  outline?: boolean
   providedStoryItems?: Row[]; contextId?: string; unitId?: string; organizationWorkKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string; shouldPause?: () => boolean; shouldCancel?: () => boolean
 }
 export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; itemFailure?: string; readCalls: number; writeCalls: number }
@@ -41,7 +42,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
   const active = new Set<string>()
   async function run(repo: AgentRepository, options: AgentTaskOptions): Promise<AgentTaskResult> {
     const key = `${repo.bookId}:${options.profile}`
-    const scope: Scope = { bookId: repo.bookId, profile: options.profile, phase: options.phase, runId: options.runId ?? crypto.randomUUID(), executionId: crypto.randomUUID(), taskId: options.taskId ?? crypto.randomUUID(), owner: options.leaseOwner ?? crypto.randomUUID(), sessionId: options.sessionId, probe: options.probe, workItemIds: options.workItems.map(row => text(row.workItemId)), workflow: options.workflow, contextId: options.contextId, unitId: options.unitId, workKind: options.organizationWorkKind, organizationStep: options.organizationStep }
+    const scope: Scope = { bookId: repo.bookId, profile: options.profile, phase: options.phase, runId: options.runId ?? crypto.randomUUID(), executionId: crypto.randomUUID(), taskId: options.taskId ?? crypto.randomUUID(), owner: options.leaseOwner ?? crypto.randomUUID(), sessionId: options.sessionId, probe: options.probe, workItemIds: options.workItems.map(row => text(row.workItemId)), workflow: options.workflow, outline: options.outline, contextId: options.contextId, unitId: options.unitId, workKind: options.organizationWorkKind, organizationStep: options.organizationStep }
     const organization = options.profile === 'asset_editor' && options.phase === 'character_organization'
     if (options.phase === 'asset_review') {
       const requested = options.reviewScope ?? text(options.input.reviewScope)
@@ -124,7 +125,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
       if (!scope.probe && scope.sessionId) trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.businessPrompt, purpose: 'work' })
       const systemPrompt = options.businessPrompt
-      if (scope.workflow === 'story_pages_v3') loadedMessages = storyMessages(loadedMessages)
+      if (scope.workflow === 'story_pages_v3') loadedMessages = storyMessages(loadedMessages, scope.outline)
       if (!organization && loadedMessages.length) loadedMessages.push({ role: 'system', content: systemPrompt, timestamp: Date.now() })
       persistedMessages = organization ? loadedMessages.length : loadedMessages.length ? loadedMessages.length - 1 : 0
       const prior = await repo.transaction(false, store => taskOf(store, scope))
@@ -186,7 +187,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         prepareRequest: async ({ context, model }) => {
           const messages = await prepareContext(context, model.contextWindow)
           if (!scope.probe) {
-            const rawBase = scope.workflow === 'story_pages_v3' ? [{ role: 'system' as const, content: systemPrompt, timestamp: Date.now() }, ...storyMessages(messages ?? context.messages)] : messages ?? context.messages
+            const rawBase = scope.workflow === 'story_pages_v3' ? [{ role: 'system' as const, content: systemPrompt, timestamp: Date.now() }, ...storyMessages(messages ?? context.messages, scope.outline)] : messages ?? context.messages
             let seenPrompt = false
             const base = organization ? rawBase.filter(message => {
               if (message.role !== 'user' || contentText(message) !== options.prompt) return true

@@ -1,5 +1,7 @@
 import type { AgentRepository, AgentStore, Row } from './repository'
 import { canonical, hash, records, strings, text, toolContracts, validate, parametersFor } from './contracts'
+import { applyOutline, OutlineError } from '../story/outlineCommands'
+import { recordStoryReads } from '../story/views'
 import { assertScope, noteFingerprint, readTool, resolveAsset, type Scope } from './queries'
 import { detailTokens } from '../assets/merge'
 import { mergeWorldAssets } from '../assets/mergeCore'
@@ -54,10 +56,10 @@ export const domainOf = (scope: Scope) => scope.profile === 'asset_editor' ? 'wo
 export async function checkLease(store: AgentStore, scope: Scope, signal?: AbortSignal) {
   signal?.throwIfAborted()
   const lease = await store.get('pipelineRuns', `lease:${domainOf(scope)}`)
-  if (!lease || lease.bookId !== scope.bookId || lease.owner !== scope.owner || lease.runId !== scope.runId || Number(lease.expiresAt) <= Date.now()) throw new Error('CONFLICT:本任务的执行权已失效。')
+  if (!lease || lease.bookId !== scope.bookId || lease.owner !== scope.owner || lease.runId !== scope.runId || Number(lease.expiresAt) <= Date.now()) throw scope.outline ? new OutlineError('LEASE_LOST', '本任务的执行权已失效。') : new Error('CONFLICT:本任务的执行权已失效。')
   if (scope.sessionId) {
     const session = await store.get('storySessions', scope.sessionId)
-    if (!session || session.bookId !== scope.bookId || session.leaseOwner !== scope.owner || Number(session.leaseUntil) <= Date.now()) throw new Error('SCOPE:会话执行权与本任务不一致。')
+    if (!session || session.bookId !== scope.bookId || session.leaseOwner !== scope.owner || Number(session.leaseUntil) <= Date.now()) throw scope.outline ? new OutlineError('LEASE_LOST', '会话执行权与本任务不一致。') : new Error('SCOPE:会话执行权与本任务不一致。')
   }
 }
 export async function appendEntry(store: AgentStore, scope: Scope, value: Row, options: { advanceLeaf?: boolean } = {}) {
@@ -406,25 +408,26 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
   const organization = scope.phase === 'character_organization'
   const allowed = scope.profile === 'asset_editor'
     ? (organization ? [...organizationWriteTools] : scope.phase === 'asset_review' ? [...(relationOnly ? relationTools : assetReviewTools)] : ['commit_asset_changes'])
-    : scope.workflow === 'story_pages_v3' ? ['save_story_lines', 'save_story_notes'] : ['commit_story_changes', ...storyWriteTools]
+    : scope.workflow === 'story_pages_v3' ? [scope.outline ? 'save_story_outline' : 'save_story_lines', 'save_story_notes'] : ['commit_story_changes', ...storyWriteTools.filter(tool => tool !== 'save_story_outline')]
   if (!allowed.includes(name)) throw new Error(relationOnly ? 'WRITE_SCOPE_DENIED:人物关系专项只允许保存或删除人物对关系。' : 'SCOPE:当前职责或阶段不能执行此写工具。')
-  validate(parametersFor(toolContracts[scope.profile].find(tool => tool.name === name)!, scope.workflow), args)
+  validate(parametersFor(toolContracts[scope.profile].find(tool => tool.name === name)!, scope.workflow, scope.outline), args)
   const operationKey = text(args.operationKey); const payload = name === 'commit_asset_changes' || name === 'commit_story_changes' ? args.payload as Row : args
+  const outlineWrite = name === 'save_story_outline'
   const payloadFingerprint = await hash({ tool: name, payload }); const timestamp = new Date().toISOString()
   const previous = await repo.transaction(true, async store => {
     const { run } = await taskOf(store, scope)
     if (organization && run.status === 'cancelled') throw new Error('CANCELLED:运行已取消，不能继续写入。')
     const applied = records(run.appliedCommands).find(row => row.operationKey === operationKey)
     if (applied) {
-      if (applied.payloadFingerprint !== payloadFingerprint || !organization && applied.taskId !== scope.taskId) throw new Error('IDEMPOTENCY_CONFLICT:命令键已经用于其他任务或内容。')
+      if (applied.payloadFingerprint !== payloadFingerprint || !organization && !outlineWrite && applied.taskId !== scope.taskId) throw new Error('IDEMPOTENCY_CONFLICT:命令键已经用于其他任务或内容。')
       if (organization) await restoreCompletedWork(store, scope, run, applied, name, args, readSet, signal)
       return replayAck(applied, operationKey)
     }
     await checkLease(store, scope, signal)
     const intent = records(run.commandIntents).find(row => row.operationKey === operationKey)
-    if (intent && (intent.payloadFingerprint !== payloadFingerprint || !organization && intent.taskId !== scope.taskId || intent.state === 'rejected' && !organization)) throw new Error('IDEMPOTENCY_CONFLICT:命令内容或状态已变化，请使用新的命令键。')
+    if (intent && (intent.payloadFingerprint !== payloadFingerprint || !organization && !outlineWrite && intent.taskId !== scope.taskId || intent.state === 'rejected' && !organization && !outlineWrite)) throw new Error('IDEMPOTENCY_CONFLICT:命令内容或状态已变化，请使用新的命令键。')
     if (!intent) await store.put('pipelineRuns', { ...run, commandIntents: [...records(run.commandIntents), { operationKey, taskId: scope.taskId, toolCallId, toolName: name, state: 'prepared', payload, payloadFingerprint, expectedReadSet: readSet, createdAt: timestamp, updatedAt: timestamp }] })
-    else if (organization && (intent.state === 'rejected' || intent.taskId !== scope.taskId)) await store.put('pipelineRuns', { ...run, commandIntents: records(run.commandIntents).map(row => row.operationKey === operationKey ? { ...row, taskId: scope.taskId, toolCallId, state: 'prepared', error: undefined, updatedAt: timestamp } : row) })
+    else if ((organization || outlineWrite) && (intent.state === 'rejected' || intent.taskId !== scope.taskId)) await store.put('pipelineRuns', { ...run, commandIntents: records(run.commandIntents).map(row => row.operationKey === operationKey ? { ...row, taskId: scope.taskId, toolCallId, state: 'prepared', expectedReadSet: readSet, error: undefined, updatedAt: timestamp } : row) })
     return undefined
   })
   if (previous) return previous
@@ -436,7 +439,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       if (organization && run.status === 'cancelled') throw new Error('CANCELLED:运行已取消，不能继续写入。')
       const applied = records(run.appliedCommands).find(row => row.operationKey === operationKey)
       if (applied) {
-        if (applied.payloadFingerprint !== payloadFingerprint || !organization && applied.taskId !== scope.taskId) throw new Error('IDEMPOTENCY_CONFLICT:命令内容不一致。')
+        if (applied.payloadFingerprint !== payloadFingerprint || !organization && !outlineWrite && applied.taskId !== scope.taskId) throw new Error('IDEMPOTENCY_CONFLICT:命令内容不一致。')
         if (organization) await restoreCompletedWork(store, scope, run, applied, name, args, readSet, signal)
         return replayAck(applied, operationKey)
       }
@@ -448,7 +451,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       if (organization) { bindReviewReads(expected, run); bindReviewReads(updatedReads, run) }
       const queryResults = organization && name === 'record_organization_progress' ? new Map<QueryRead, Row>() : dedicated ? new Map<QueryRead, Row>() : await validateReadSet(store, scope, expected)
       const previousStory = new Map<string, Row>()
-      if (name === 'commit_story_changes' || isStoryWrite(name)) for (const table of ['nodes', 'eventLines', 'storyEditorNotes']) for (const row of await store.rows(table)) previousStory.set(`${table}:${row.id}`, row)
+      if (name === 'commit_story_changes' || isStoryWrite(name)) for (const table of ['nodes', 'eventLines', 'storyEditorNotes', ...(name === 'save_story_outline' ? ['storyEvents'] : [])]) for (const row of await store.rows(table)) previousStory.set(`${table}:${row.id}`, row)
       const workTables: Record<string, string> = { character: 'characters', location: 'locations', node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' }
       const workItems = records((task.input as Row | undefined)?.workItems)
       const before = await Promise.all(workItems.map(item => workTables[text(item.kind)] ? store.get(workTables[text(item.kind)], text(item.id)) : undefined))
@@ -456,6 +459,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       let storyResult: Row | undefined
       if (name === 'commit_asset_changes') await applyAssets(store, scope, payload, expected, commitId)
       else if (name === 'commit_story_changes') await applyStory(store, scope, payload, expected, queryResults)
+      else if (name === 'save_story_outline') storyResult = await applyOutline(store, scope, args, expected, timestamp)
       else if (isStoryWrite(name)) storyResult = await applyStory(store, scope, await storyPayload(store, scope, name, args), expected, queryResults)
       if (name === 'save_story_lines' && scope.workflow === 'story_pages_v3' && storyResult) {
         storyResult.lines = await Promise.all(strings(storyResult.lineIds).map(async lineId => {
@@ -537,6 +541,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       if (organization) await reconcileOrganizationAfterWrite(store, scope, latest, name, args, toolResult as Row | undefined)
       await store.put('pipelineRuns', { ...latest, ...(assetReview ? { assetReview } : {}), appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, ...(scope.unitId ? { unitId: scope.unitId } : {}), operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { ...toolResult } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
       await appendEntry(store, scope, { type: 'commit', summary: `${commitId}：${summary}` })
+      if (outlineWrite) await recordStoryReads(store, updatedReads, records(storyResult?.changes).filter(item => item.action === 'created'))
       await rebaseReadSet(store, scope, updatedReads)
       await saveTask(store, scope, { readSet: updatedReads })
       if (name === 'commit_story_changes' || isStoryWrite(name)) {

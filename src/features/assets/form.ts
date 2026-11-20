@@ -2,7 +2,7 @@ import type { Asset, AssetInput, AssetKind, Character, EventLine, EventNode, Loc
 import { nodeParticipants, nodeProcess } from './characterLinks'
 
 export const labels: Record<keyof AssetInput, string> = {
-  participantIds: '涉及人物', unlinkedParticipants: '补充人物称呼',
+  participantIds: '涉及人物', unlinkedParticipants: '补充人物称呼', locationNames: '地点',
   name: '名称', title: '标题', aliases: '别名', chapterIndex: '来源章节', manualSourceNote: '来源说明', identity: '身份', ageText: '年龄描述', appearance: '外貌', personality: '性格', background: '背景', speechStyleSample: '原话片段', roleWeight: '人物层级', description: '地点描述', summary: '概述', process: '详细经过', quote: '参考引文', actors: '行动人物', targets: '涉及对象', actorIds: '关联行动人物', targetCharacterIds: '关联对象人物', time_text: '明确时间', time_hint: '时间提示', world_delta: '状态变化', new_facts: '新增事实', started_actions: '开始的行动', nodeIds: '成员节点', cause: '起因', result: '结果', lineStatus: '事件线状态',
 }
 export type FormValues = Record<keyof AssetInput, string>
@@ -23,7 +23,7 @@ export function formValues(asset?: Asset, characters: Character[] = []): FormVal
   values.ageText = world.profile?.ageText ?? ''
   values.actors = (node.actors ?? []).join('，'); values.targets = (node.targets ?? []).join('，')
   values.actorIds = (node.actorIds ?? []).join('\n'); values.targetCharacterIds = (node.targetCharacterIds ?? []).join('\n')
-  for (const key of ['world_delta', 'new_facts', 'started_actions'] as const) values[key] = (node[key] ?? []).join('\n')
+  for (const key of ['locationNames', 'world_delta', 'new_facts', 'started_actions'] as const) values[key] = (node[key] ?? []).join('\n')
   values.nodeIds = (line.nodeIds ?? []).join('\n')
   if ('nodeIds' in asset && line.summary === undefined) values.summary = [...new Set([line.cause, line.process, line.result].filter(Boolean))].join('\n\n')
   if ('actors' in asset) {
@@ -41,7 +41,7 @@ export function formInput(kind: AssetKind, values: FormValues, creating: boolean
     if (kind === 'location') return { ...base, description: values.description }
     return { ...base, identity: values.identity, ageText: values.ageText, appearance: values.appearance, personality: values.personality, background: values.background, speechStyleSample: values.speechStyleSample, ...(creating ? { roleWeight: values.roleWeight as RoleWeight } : {}) }
   }
-  if (kind === 'node') return { name: values.name, summary: values.summary, chapterIndex: values.chapterIndex, quote: values.quote, process: values.process, participantIds: split(values.participantIds), unlinkedParticipants: split(values.unlinkedParticipants), time_text: values.time_text, time_hint: values.time_hint, world_delta: split(values.world_delta), new_facts: split(values.new_facts), started_actions: split(values.started_actions) }
+  if (kind === 'node') return { name: values.name, summary: values.summary, chapterIndex: values.chapterIndex, quote: values.quote, process: values.process, participantIds: split(values.participantIds), unlinkedParticipants: split(values.unlinkedParticipants), locationNames: values.locationNames.split(/\r?\n/).map(name => name.trim()).filter(Boolean), time_text: values.time_text, time_hint: values.time_hint, world_delta: split(values.world_delta), new_facts: split(values.new_facts), started_actions: split(values.started_actions) }
   return { title: values.title, summary: values.summary, nodeIds: split(values.nodeIds), cause: values.cause, process: values.process, result: values.result, ...(creating ? { lineStatus: values.lineStatus as 'open' | 'closed' } : {}) }
 }
 export const memberIds = (value: string) => split(value)

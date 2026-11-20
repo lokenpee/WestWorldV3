@@ -30,6 +30,9 @@ export function validateExtraction(step: Substep, message: AssistantMessage): Ex
   const schemaErrors = [...Value.Errors(schema, value)]
   if (schemaErrors.length) throw new ModelError('validation', `提取结果的字段、类型或置信度不符合要求：${schemaErrors.slice(0, 5).map(error => `${error.instancePath || error.schemaPath || '/'}：${error.message}`).join('；')}`)
   const data = value as ExtractionData
+  for (const node of data.nodes ?? []) {
+    if (Array.isArray(node.locationNames)) node.locationNames = [...new Set(node.locationNames.map((name: string) => name.trim()).filter(Boolean))]
+  }
   for (const row of [...(data.characters ?? []), ...(data.locations ?? []), ...(data.nodes ?? [])]) if (!row.name.trim()) throw new ModelError('validation', '人物、地点和事件名称须有内容。')
   if (step === 'worldAssets') for (const character of data.characters ?? []) {
     const relations = Array.isArray(character.relations) ? character.relations as Record<string, unknown>[] : []

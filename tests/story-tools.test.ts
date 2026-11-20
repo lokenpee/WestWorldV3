@@ -6,11 +6,11 @@ import type { Scope } from '../src/features/agents/queries'
 import { storyTaskPrompt } from '../src/features/story/prompt'
 
 const node = (id: string, chapterIndex: string): Row => ({ id, bookId: 'b', name: `三河帮事件${id}`, summary: '三河帮追查旧信', process: '信件的线索得到回应', actors: [], quote: '', chapterIndex, chapterName: chapterIndex, order: 0, confidence: 1, revision: 1, createdBy: 'P1', eventLineIds: [] })
-async function fixture(chapters = ['1', '20', '120'], workflow = 'story_lines_v2') {
+async function fixture(chapters = ['1', '20', '120'], workflow = 'story_lines_v2', outline = false) {
   const nodes = chapters.map((chapter, index) => node(`N${index + 1}`, chapter))
   const workItems = nodes.map(row => ({ kind: 'node', id: row.id, workItemId: `w:${row.id}` }))
   const memory = { id: 's', bookId: 'b', sessionId: 's', workingSummary: '三河帮线索待核对', revision: 1, dataFingerprint: '', updatedAt: new Date().toISOString() }
-  const scope: Scope = { bookId: 'b', profile: 'story_editor', phase: 'window_link', workflow, runId: 'r', taskId: 't', owner: 'o', sessionId: 's', workItemIds: workItems.map(item => item.workItemId) }
+  const scope: Scope = { bookId: 'b', profile: 'story_editor', phase: 'window_link', workflow, outline, runId: 'r', taskId: 't', owner: 'o', sessionId: 's', workItemIds: workItems.map(item => item.workItemId) }
   const repo = createMemoryAgentRepository('b', { nodes, chapters: chapters.map((chapterIndex, order) => ({ bookId: 'b', chapterIndex, chapterName: chapterIndex, order })), chapterTexts: chapters.map(chapterIndex => ({ bookId: 'b', chapterIndex, text: '三河帮收到旧信，信中说明旧事的来由。' })), storyEditorMemory: [memory],
     storySessions: [{ id: 's', bookId: 'b', leaseOwner: 'o', leaseUntil: Date.now() + 60000, nextOrdinal: 0 }],
     pipelineRuns: [{ id: 'lease:narrative', bookId: 'b', runId: 'r', owner: 'o', expiresAt: Date.now() + 60000 }, { id: 'r', bookId: 'b', status: 'running', tasks: [{ taskId: 't', phase: 'window_link', input: { workItems }, appliedCommitIds: [], reviewedItems: [] }], appliedCommands: [], commandIntents: [] }],
@@ -26,6 +26,54 @@ async function fixture(chapters = ['1', '20', '120'], workflow = 'story_lines_v2
   const create = (title: string, nodeIds: string[]) => call('save_story_lines', { operations: [workflow === 'story_pages_v3' ? { action: 'create', title, nodeIds, summary: '旧信留下疑问，线索持续发展，尚待后续。' } : { action: 'create', title, nodeIds, cause: '旧信留下疑问', process: '线索持续发展', result: '待后续', lineStatus: 'open', reason: '同一封旧信', confidence: 1, evidenceNodeIds: nodeIds }] })
   return { repo, scope, adapter, call, rows, detail, create, workItems }
 }
+
+it('大纲工具原子建线、共享与移接，重复调用可取回同一确认', async () => {
+  const f = await fixture(['120', '126', '145', '151'], 'story_pages_v3', true)
+  expect(f.adapter.initialTools.map(tool => tool.name).sort()).toEqual(['search_story_context', 'get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch'].sort())
+  await f.detail('node', ['N1', 'N2', 'N3'])
+  const args = { operations: [
+    { op: 'create_line', ref: 'lai', title: '赖家线' },
+    { op: 'create_line', ref: 'house', title: '贾族权力变化' },
+    { op: 'create_event', ref: 'audit', lineId: '$lai', title: '清查赖家', nodeIds: ['N1', 'N2'] },
+    { op: 'create_event', ref: 'search', lineId: '$lai', title: '查抄赖家', nodeIds: ['N3'] },
+    { op: 'attach_event', lineId: '$house', eventId: '$audit' },
+  ] }
+  const saved = await f.call('save_story_outline', args, 'create-once')
+  expect(saved).toMatchObject({ ok: true, changed: true })
+  const ids = saved.created as Record<string, string>
+  expect(await f.call('save_story_outline', args, 'create-once')).toMatchObject({ ok: true, alreadyApplied: true, commitId: saved.commitId, created: ids })
+  expect(await f.call('save_story_outline', { operations: [{ op: 'delete_line', lineId: ids.lai }] }, 'create-once')).toMatchObject({ ok: false, code: 'IDEMPOTENCY_CONFLICT' })
+  expect(await f.call('save_story_outline', { operations: [
+    { op: 'rename_event', eventId: ids.audit, title: '错误批次' },
+    { op: 'delete_event', eventId: ids.audit, expectedLineIds: [ids.lai] },
+  ] })).toMatchObject({ ok: false, code: 'CONFLICT', opIndex: 1 })
+  expect((await f.rows('storyEvents')).find(event => event.id === ids.audit)?.title).toBe('清查赖家')
+  const shared = await f.call('save_story_outline', { operations: [{ op: 'attach_nodes', eventId: ids.search, nodeIds: ['N2'] }] })
+  expect(shared).toMatchObject({ ok: true, changed: true })
+  await f.call('save_story_outline', { operations: [{ op: 'detach_nodes', eventId: ids.audit, nodeIds: ['N2'] }] })
+  expect((await f.rows('storyEvents')).find(event => event.id === ids.search)?.nodeIds).toEqual(['N2', 'N3'])
+  expect((await f.rows('nodes')).find(node => node.id === 'N2')?.eventLineIds).toEqual([ids.lai])
+  expect(await f.call('search_story_context', { kind: 'node', unassignedOnly: true })).toMatchObject({ data: [{ id: 'N4' }] })
+})
+
+it('旧线先保留原成员，整线复核核对去向后切换', async () => {
+  const f = await fixture(['120', '126', '145'], 'story_pages_v3', true)
+  await f.repo.transaction(true, async store => {
+    await store.put('eventLines', { id: 'L1', bookId: 'b', title: '旧赖家线', nodeIds: ['N1', 'N2', 'N3'], chapters: ['120', '126', '145'], revision: 1, summary: '原整理内容' })
+  })
+  await f.detail('eventLine', ['L1'], { members: 'legacy_nodes' })
+  await f.detail('node', ['N1', 'N2'])
+  await f.call('save_story_outline', { operations: [{ op: 'create_event', ref: 'audit', title: '清查赖家', lineId: 'L1', nodeIds: ['N1', 'N2'] }] })
+  expect(await f.rows('eventLines')).toMatchObject([{ outlinePending: true, nodeIds: ['N1', 'N2', 'N3'] }])
+  await f.repo.transaction(true, async store => {
+    const run = (await store.get('pipelineRuns', 'r'))!
+    await store.put('pipelineRuns', { ...run, storyReading: { global_review: { currentPageId: 'review', pages: [{ id: 'review', type: 'line_summary', lineId: 'L1' }] } } })
+  })
+  f.scope.phase = 'global_review'
+  expect(await f.call('save_story_outline', { operations: [{ op: 'activate_legacy_line', lineId: 'L1' }] })).toMatchObject({ ok: false, code: 'INVALID_ARGS' })
+  expect(await f.call('save_story_outline', { operations: [{ op: 'activate_legacy_line', lineId: 'L1', excludedNodeIds: ['N3'] }] })).toMatchObject({ ok: true })
+  expect(await f.rows('eventLines')).toMatchObject([{ outlinePending: false, nodeIds: ['N1', 'N2'], legacyNodeIds: ['N1', 'N2', 'N3'], summary: '原整理内容' }])
+})
 
 it('只开放七工具，跨章追加保留脉络且不重写记忆，一节点可属于两线', async () => {
   const f = await fixture()

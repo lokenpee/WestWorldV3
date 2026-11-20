@@ -2390,6 +2390,13 @@
               "maximum": 1,
               "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
               "type": "number"
+            },
+            "locationNames": {
+              "description": "行动实际发生的地点，按原文可确定的精度及出现顺序记录。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         }

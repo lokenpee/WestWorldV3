@@ -33,7 +33,7 @@ export async function readReadingStatus(workspace: Workspace, bookId: string) {
     if (!(run?.storyReading as Row | undefined)?.[phase] || !progress) return undefined
     const cache: Cache = caches.get(db) ?? { rows: new Map(), sources: new Map() }
     const dependencyTables = records(run.coverageItems).flatMap(item => records((item.dependencies as Row | undefined)?.records).map(read => text(read.table)))
-    const tables = [...new Set(['nodes', 'eventLines', 'chapters', 'storyEditorNotes', 'chapterTexts', ...dependencyTables])]
+    const tables = [...new Set(['nodes', 'eventLines', 'chapters', 'storyEditorNotes', 'chapterTexts', ...(run.storyOutlineVersion === 1 ? ['storyEvents'] : []), ...dependencyTables])]
     const versions = new Map<string, Map<string, number>>()
     let reusable = true
     for (const table of tables) {

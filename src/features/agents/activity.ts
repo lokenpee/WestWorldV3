@@ -6,7 +6,7 @@ const actions: Record<string, string> = {
   read_original: '正在查阅原文', get_character_relation: '正在查询人物关系', query_relation_work: '正在核对人物关系',
   query_candidate_groups: '正在查阅疑似组', save_identity_groups: '正在保存疑似组', navigate_identity_pages: '正在翻阅人物目录',
   submit_profile_review: '正在保存人物资料', edit_character: '正在保存人物资料', submit_relation_review: '正在保存人物关系',
-  search_story_context: '正在查找相关事件', get_story_detail: '正在查阅事件详情', save_story_lines: '正在保存事件线',
+  search_story_context: '正在查找相关事件', get_story_detail: '正在查阅事件详情', save_story_lines: '正在保存事件线', save_story_outline: '正在保存剧情大纲',
   save_story_notes: '正在保存线索', add_story_nodes: '正在补充事件节点', navigate_story_pages: '正在翻阅事件资料', finish_story_batch: '正在保存整理进度',
 }
 export function activityError(message: string) {
