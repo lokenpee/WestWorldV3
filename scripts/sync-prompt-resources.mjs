@@ -7,11 +7,13 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { compactOutlineParameters, linkingDetailDescription } from '../src/features/story/outlineToolSchema.ts'
+import { storyPagePrompt } from '../src/features/story/readingPresentation.ts'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const resources = path.join(root, 'docs/v2/resources')
 const activePrompts = path.join(resources, 'v2.2/prompts/active')
-const storyToolNames = ['search_story_context', 'get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch']
+const storyToolNames = ['read_original', 'search_story_context', 'get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch']
 const examplesDir = path.join(resources, 'v2.2/request-examples')
 const manifest = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/prompt-call-manifest.json'), 'utf8'))
 const ownershipPath = path.join(root, 'docs/v2/文档与资源归属.json')
@@ -57,27 +59,31 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
   }
   const story = call.id === 'PROMPT-P3-WINDOW' || call.id === 'PROMPT-P3-GLOBAL'
   if (story) {
+    const review = call.id === 'PROMPT-P3-GLOBAL'
     const contracts = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/tool-contracts.json'), 'utf8')).profiles.story_editor
-    example.context.tools = storyToolNames.map(name => {
+    example.context.tools = storyToolNames.filter(name => review || !['search_story_context', 'read_original'].includes(name)).map(name => {
       const tool = contracts.find(item => item.name === name)
       const parameters = structuredClone(tool.outlineParameters ?? tool.parameters)
+      if (!review) delete parameters.properties.noteResults
       delete parameters.properties.operationKey
-      return { name, description: tool.description, parameters }
+      return { name, description: !review && name === 'get_story_detail' ? linkingDetailDescription : tool.description,
+        parameters: !review && name === 'save_story_outline' ? compactOutlineParameters(parameters) : parameters }
     })
     const input = example.input
     const hints = input.contextHints ?? { assigned: input.workItems.map(item => ({ kind: item.kind, id: item.id, title: '三河帮的线索', summary: '发现三河帮活动的迹象', chapters: ['1'] })), related: [] }
-    const review = call.id === 'PROMPT-P3-GLOBAL'
     const page = { id: review ? 'orphans:1' : 'nodes:1', pageNumber: 1, totalPages: 1, type: 'node_page', ids: input.workItems.map(item => item.id) }
     const brief = input.page ? input : { phase: input.phase, queue: input.queue, page, remainingCount: input.remainingCount, workItems: hints.assigned, related: hints.related, moreRelated: hints.truncated === true, workingSummary: input.memory?.workingSummary ?? '' }
     const view = row => row.kind === 'node' ? { id: row.id, kind: 'node', name: row.name ?? row.title, summary: row.summary ?? '', chapterIndex: row.chapterIndex ?? row.chapters?.[0] ?? '' } : row.kind === 'eventLine' ? { id: row.id, kind: 'eventLine', title: row.title, summary: row.summary ?? [row.cause, row.process, row.result].filter(Boolean).join('\n\n'), nodeIds: row.nodeIds ?? [], lineStatus: row.lineStatus ?? 'open' } : row
-    brief.workItems = brief.workItems.map(view)
-    brief.related = (brief.related ?? []).map(view)
+    brief.workItems = brief.workItems.map(row => row.kind === 'node' ? { ...view(row), chapterName: row.chapterName ?? '第一章', process: row.process ?? '从遗留信封的印记确认线索。', clues: row.clues ?? ['信封上的印记'] } : view(row))
+    if (review) brief.outlineReview = true
+    else brief.outline ??= { lines: [], events: [] }
+    for (const field of ['remainingCount', 'related', 'moreRelated', 'workingSummary']) delete brief[field]
     example.input = brief
     example.inputSchema = 'prompt-inputs.schema.json#/$defs/StoryReadingBrief'
     const discipline = normalize(fs.readFileSync(path.join(activePrompts, 'output-discipline.txt'), 'utf8')).trim()
     example.context.messages = [
       { role: 'system', content: `${prompt.trimEnd()}\n\n${discipline}`, toolsAdded: example.context.tools, timestamp: 0 },
-      { role: 'user', content: `【当前阅读页】\n${JSON.stringify(brief)}`, timestamp: 1 },
+      { role: 'user', content: storyPagePrompt(brief), timestamp: 1 },
     ]
     delete example.options.maxSteps
     delete example.options.timeoutMs

@@ -2308,7 +2308,7 @@
     ],
     "properties": {
       "nodes": {
-        "description": "本章相对完整的独立事件；同一目标下的连续行动合成一个节点，过程细节写 process。普通章节约 2～5 条供参考，复杂章节不设硬上限。",
+        "description": "必填。本章可独立记录的事件，无条目时传空列表。同一目标下的连续行动合为一个节点。",
         "type": "array",
         "items": {
           "additionalProperties": false,
@@ -2318,12 +2318,11 @@
             "name",
             "summary",
             "actors",
-            "quote",
-            "confidence"
+            "quote"
           ],
           "properties": {
             "name": {
-              "description": "事件名称，客观描述，**不得是结论**。例：贾琏的资金来源异常",
+              "description": "客观概括本次事件。未经证实的指控或传闻保留其性质。",
               "type": "string"
             },
             "summary": {
@@ -2335,35 +2334,21 @@
               "type": "string"
             },
             "actors": {
-              "description": "行动者。用**本章原文的称呼**，还没归并。例：[\"贾琏\"]",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "targets": {
-              "description": "对象 / 承受者。例：[\"王熙凤\"]",
+              "description": "本章原文称呼，包括行动发起者、对话参与者和直接受影响的具体人物。无可确认人物时传空列表。",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "world_delta": {
-              "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
+              "description": "本次事件已实际发生且后续可查的状态变化。计划和商议写在概述或经过。",
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
             "new_facts": {
-              "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "started_actions": {
-              "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
+              "description": "本节点揭示的重要信息。转述、传闻、猜测和指控保留说法来源及确定程度。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -2374,25 +2359,26 @@
               "type": "string"
             },
             "time_hint": {
-              "description": "原文里的**相对**时间表述。可空。例：次日 / 过了半月",
+              "description": "本次事件发生时的原文相对时间，如次日或过了半月。",
               "type": "string"
             },
             "quote": {
-              "description": "用于回查的原文片段。",
+              "description": "必填。从本章逐字摘录支持关键进展的连续片段，无合适引文时传空字符串。",
               "type": "string"
             },
             "offset": {
-              "description": "该片段在**本章正文**中的字符起点（从 0 开始）。拿不准就留空。",
-              "type": "number"
-            },
-            "confidence": {
-              "minimum": 0,
-              "maximum": 1,
-              "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
+              "description": "引文在本章正文中的字符起点，从 0 开始，确定时才填。",
               "type": "number"
             },
             "locationNames": {
               "description": "行动实际发生的地点，按原文可确定的精度及出现顺序记录。",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "clues": {
+              "description": "可选。原文中用于查证、追踪或辨认的具体信息，无此类信息时省略。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -4201,15 +4187,14 @@
     ],
     "properties": {
       "characters": {
-        "description": "本章出现的人物快照。",
+        "description": "必填。本章有依据的人物，无条目时传空列表。",
         "type": "array",
         "items": {
           "additionalProperties": false,
           "description": "人物快照（P1 产出，未归并、未分层的原始观察）。",
           "type": "object",
           "required": [
-            "name",
-            "confidence"
+            "name"
           ],
           "properties": {
             "name": {
@@ -4229,19 +4214,15 @@
             },
             "profile": {
               "additionalProperties": false,
-              "description": "人物基础资料；精确年龄与原文年龄描述分开保存。",
+              "description": "可选的人物基础资料。记录本章有依据的原文年龄描述或性别。",
               "type": "object",
               "properties": {
-                "age": {
-                  "description": "原文明确写出的精确年龄。范围、约数或未知年龄不填此字段，不取平均值、不猜测。",
-                  "type": "number"
-                },
                 "ageText": {
-                  "description": "原文的年龄描述，逐字保留，如“十四五岁”“年过三旬”；不知道则省略或填 null。",
+                  "description": "统一的年龄字段，按原文表述，例如“十六岁”“十四五岁”“年过三旬”。不明确时省略。",
                   "type": "string"
                 },
                 "gender": {
-                  "description": "原文写明的性别，不知道则省略或填 null。",
+                  "description": "原文写明的性别，缺少依据时省略。",
                   "type": "string"
                 }
               }
@@ -4274,12 +4255,11 @@
                   "relation_type",
                   "relation_label",
                   "reverse_label",
-                  "direction",
                   "quote"
                 ],
                 "properties": {
                   "target": {
-                    "description": "关系指向的人。用本章原文的称呼，还没归并。",
+                    "description": "关系指向的人，使用本次人物列表中该人物的主名。",
                     "type": "string",
                     "minLength": 1
                   },
@@ -4298,50 +4278,26 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "direction": {
-                    "description": "directed = 方向明确（父亲/子女）；bidirectional = 对称（夫妻/朋友）；unspecified = 原文方向未明确。",
-                    "anyOf": [
-                      {
-                        "const": "directed",
-                        "type": "string"
-                      },
-                      {
-                        "const": "bidirectional",
-                        "type": "string"
-                      },
-                      {
-                        "const": "unspecified",
-                        "type": "string"
-                      }
-                    ]
-                  },
                   "quote": {
-                    "description": "能解释这条关系的本章连续原文片段，逐字复制。",
+                    "description": "支持该关系和双方身份的本章依据，可以摘录原文或简洁概括。",
                     "type": "string",
                     "minLength": 1
                   }
                 }
               }
-            },
-            "confidence": {
-              "minimum": 0,
-              "maximum": 1,
-              "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
-              "type": "number"
             }
           }
         }
       },
       "locations": {
-        "description": "本章出现的地点。",
+        "description": "必填。本章可辨认的地点，无条目时传空列表。",
         "type": "array",
         "items": {
           "additionalProperties": false,
           "description": "地点快照（P1 产出，未合并）。",
           "type": "object",
           "required": [
-            "name",
-            "confidence"
+            "name"
           ],
           "properties": {
             "name": {
@@ -4351,12 +4307,6 @@
             "description": {
               "description": "一句话描述。原文没写就留空。",
               "type": "string"
-            },
-            "confidence": {
-              "minimum": 0,
-              "maximum": 1,
-              "description": "抽取置信度，0 到 1 之间的小数。不确定时给低分，不要编造。",
-              "type": "number"
             }
           }
         }

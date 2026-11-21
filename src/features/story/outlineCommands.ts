@@ -2,7 +2,8 @@ import { records, strings, text } from '../agents/contracts'
 import type { ReadSet } from '../agents/commands'
 import type { Scope } from '../agents/queries'
 import type { AgentStore, Row } from '../agents/repository'
-import { synchronizeOutline } from './outline'
+import { eventDescriptionBatch, refreshReading, type ReadingState } from './reading'
+import { hasOutlineDescription, synchronizeOutline, usesOutline } from './outline'
 
 export class OutlineError extends Error {
   readonly code: string
@@ -20,7 +21,24 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
   const created = new Map<string, string>()
   const changes: Row[] = []
   const additions = new Set<string>()
-  for (const [opIndex, operation] of records(args.operations).entries()) {
+  const savedReading = scope.quickStoryCheck ? ((await store.get('pipelineRuns', scope.runId))?.storyReading as Row | undefined)?.window_link as Row | undefined : undefined
+  const currentIds = scope.quickStoryCheck ? new Set(strings(records(savedReading?.pages).find(page => page.id === savedReading?.currentPageId)?.ids)) : undefined
+  const run = scope.phase === 'global_review' ? await store.get('pipelineRuns', scope.runId) : undefined
+  const review = (run?.storyReading as Row | undefined)?.global_review as ReadingState | undefined
+  const reviewPages = records(review?.pages)
+  const currentPage = reviewPages.find(page => page.id === review?.currentPageId)
+  const descriptionIds = currentPage?.type === 'event_summary' ? eventDescriptionBatch(review).flatMap(page => page.ids) : strings(currentPage?.ids)
+  const operations = records(args.operations)
+  const writingDescription = (op: Row) => op.summary !== undefined || op.coreClue !== undefined
+  if (review?.independent && operations.some(writingDescription)) {
+    if (!operations.every(writingDescription)) throw new OutlineError('INVALID_ARGS', '请先单独保存归属修改并核对，再填写说明。')
+    const latest = await refreshReading(store, scope.runId, scope.sessionId!, scope.phase)
+    const allowed = currentPage?.type === 'line_summary' ? ['line_summary'] : ['event_summary', 'line_summary']
+    if (latest.pages.some(page => page.checkedFingerprint !== page.fingerprint && !allowed.includes(page.type))) {
+      throw new OutlineError('INVALID_ARGS', '归属或前一步的说明仍需核对，请先翻页读取当前任务。')
+    }
+  }
+  for (const [opIndex, operation] of operations.entries()) {
     const fail = (code: string, message: string): never => { throw new OutlineError(code, message, opIndex) }
     const resolve = (value: unknown) => {
       const id = text(value)
@@ -34,6 +52,21 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
       return row
     }
     const title = () => text(operation.title).trim() || fail('INVALID_ARGS', '请输入名称。')
+    const changesDescription = operation.summary !== undefined || operation.coreClue !== undefined
+    if (changesDescription && scope.phase !== 'global_review') fail('INVALID_ARGS', '概况和核心关键线索只能在全书复核阶段填写。')
+    if (changesDescription && review?.independent) {
+      const expected = operation.op === 'update_event' ? 'event_summary' : 'line_summary'
+      const id = text(operation.eventId ?? operation.lineId)
+      if (currentPage?.type !== expected || !descriptionIds.includes(id)) {
+        fail('INVALID_ARGS', '请先完成全书归属及疑点核对，再填写当前说明页的概况和核心关键线索。')
+      }
+    }
+    const withDescription = (row: Row): Row => {
+      if (!changesDescription) return row
+      const updated = { ...row, summary: text(operation.summary ?? row.summary).trim(), coreClue: text(operation.coreClue ?? row.coreClue).trim() }
+      if (!hasOutlineDescription(updated)) fail('INVALID_ARGS', '概况和核心关键线索均为必填，请一并填写。')
+      return updated
+    }
     const newId = (prefix: string) => {
       const ref = text(operation.ref)
       if (created.has(ref)) return fail('INVALID_ARGS', `临时编号重复：${ref}`)
@@ -56,17 +89,19 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
       await store.put('assetLifecycle', { ...before, key, bookId: scope.bookId, kind: 'eventLine', originId: id, state, ...(state === 'live' ? { currentId: id } : { currentId: undefined }), revision: Number(before?.revision ?? 0) + 1, updatedAt: timestamp })
     }
     const nodeIds = strings(operation.nodeIds)
+    if (currentIds && nodeIds.some(id => !currentIds.has(id))) fail('INVALID_ARGS', '快速核对只能调整本页节点。')
     if (['create_event', 'attach_nodes', 'detach_nodes'].includes(text(operation.op))) for (const id of nodeIds) await get('nodes', id)
     switch (operation.op) {
       case 'create_line': {
         const id = newId('L')
-        await write('eventLines', undefined, { id, bookId: scope.bookId, title: title(), eventIds: [], nodeIds: [], chapters: [], lineStatus: 'open', cause: '', process: '', result: '', createdBy: 'P3', ...(operation.role ? { role: operation.role } : {}) }, 'created')
+        await write('eventLines', undefined, { id, bookId: scope.bookId, title: title(), summary: '', coreClue: '', eventIds: [], nodeIds: [], chapters: [], lineStatus: 'open', cause: '', process: '', result: '', createdBy: 'P3', ...(operation.role ? { role: operation.role } : {}) }, 'created')
         await lifecycle(id, 'live')
         break
       }
       case 'update_line': {
         const line = await get('eventLines', operation.lineId)
-        const updated: Row = { ...line, ...(operation.title !== undefined ? { title: title() } : {}), ...(operation.role ? { role: operation.role } : {}) }
+        if (changesDescription && !usesOutline(line)) fail('INVALID_ARGS', '此旧线尚未切换到三层大纲，请先核对归属并切换。')
+        const updated = withDescription({ ...line, ...(operation.title !== undefined ? { title: title() } : {}), ...(operation.role ? { role: operation.role } : {}) })
         if (operation.role === null) delete updated.role
         await write('eventLines', line, updated, 'updated')
         break
@@ -74,13 +109,19 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
       case 'create_event': {
         const line = await get('eventLines', operation.lineId)
         const id = newId('E')
-        await write('storyEvents', undefined, { id, bookId: scope.bookId, title: title(), nodeIds: union([], nodeIds) }, 'created')
+        await write('storyEvents', undefined, { id, bookId: scope.bookId, title: title(), nodeIds: union([], nodeIds), summary: '', coreClue: '' }, 'created')
         await write('eventLines', line, lineWithEvents(line, union(strings(line.eventIds), [id])), 'updated')
         break
       }
       case 'rename_event': {
         const event = await get('storyEvents', operation.eventId)
         await write('storyEvents', event, { ...event, title: title() }, 'updated')
+        break
+      }
+      case 'update_event': {
+        const event = await get('storyEvents', operation.eventId)
+        const updated = withDescription({ ...event, ...(operation.title !== undefined ? { title: title() } : {}) })
+        await write('storyEvents', event, updated, 'updated')
         break
       }
       case 'attach_event':
@@ -127,10 +168,7 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
       }
       case 'activate_legacy_line': {
         const line = await get('eventLines', operation.lineId)
-        const run = await store.get('pipelineRuns', scope.runId)
-        const review = (run?.storyReading as Row | undefined)?.global_review as Row | undefined
-        const page = records(review?.pages).find(item => item.id === review?.currentPageId)
-        if (scope.phase !== 'global_review' || page?.type !== 'line_summary' || page.lineId !== line.id || !line.outlinePending) fail('INVALID_ARGS', '仅可在该旧线的整线复核页切换。')
+        if (scope.phase !== 'global_review' || currentPage?.type !== (review?.independent ? 'line_structure' : 'line_summary') || currentPage.lineId !== line.id || (review?.independent ? usesOutline(line) : !line.outlinePending)) fail('INVALID_ARGS', '仅可在该旧线的整线复核页切换。')
         const members = new Set<string>()
         for (const id of strings(line.eventIds)) for (const nodeId of strings((await store.get('storyEvents', id))?.nodeIds)) members.add(nodeId)
         const old = strings(line.nodeIds), excluded = strings(operation.excludedNodeIds)

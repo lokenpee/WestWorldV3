@@ -8,11 +8,19 @@ export const pageTables = { character: 'characters', location: 'locations', node
 export const assetPageFields = (kind: PageKind, searching: boolean) => [...new Set([
   'id', 'revision', 'createdBy', 'chapterName', 'chapterIndex', 'sourceChapters',
   ...(kind === 'eventLine' ? ['title', 'summary', 'chapters', ...(searching ? ['cause', 'process', 'result'] : [])] : ['name', 'aliases']),
-  ...(kind === 'character' ? ['identity', 'roleWeight'] : kind === 'location' ? ['description'] : kind === 'node' ? ['summary'] : []),
+  ...(kind === 'character' ? ['identity', 'roleWeight'] : kind === 'location' ? ['description'] : kind === 'node' ? ['summary', 'order'] : []),
 ])]
+const nodeIds = new Intl.Collator('zh-CN', { numeric: true })
+
 export function makeAssetPage(kind: PageKind, rows: (SearchAsset & Record<string, unknown>)[], chapters: { chapterIndex: string; order: number }[], options: AssetPageOptions): AssetPage {
   const source = options.role && kind === 'character' ? rows.filter(row => row.roleWeight === options.role) : rows
-  const sorted = kind === 'character' ? searchCharacters(source as (SearchAsset & { name: string })[], options.query ?? '', chapters) : searchAssets(source, options.query ?? '', chapters)
+  const query = options.query ?? ''
+  const chapterOrder = new Map(chapters.map(chapter => [chapter.chapterIndex, chapter.order]))
+  const chapterOf = (row: SearchAsset) => chapterOrder.get(row.chapterIndex ?? '') ?? Infinity
+  const nodeOrderOf = (row: Record<string, unknown>) => typeof row.order === 'number' ? row.order : Infinity
+  const sorted = kind === 'node' && !query.trim() ? [...source].sort((a, b) => chapterOf(a) - chapterOf(b)
+    || nodeIds.compare(a.chapterIndex ?? '', b.chapterIndex ?? '') || nodeOrderOf(a) - nodeOrderOf(b) || nodeIds.compare(a.id, b.id))
+    : kind === 'character' ? searchCharacters(source as (SearchAsset & { name: string })[], query, chapters) : searchAssets(source, query, chapters)
   const limit = Math.max(1, Math.min(200, Math.floor(options.limit ?? 100)))
   const offset = Math.min(Math.max(0, Math.floor(options.offset ?? 0)), Math.max(0, Math.floor((sorted.length - 1) / limit) * limit))
   const ids = new Set(rows.map(row => row.id))

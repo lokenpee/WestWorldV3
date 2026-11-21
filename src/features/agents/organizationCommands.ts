@@ -102,9 +102,11 @@ async function memberNames(store: AgentStore, ids: string[]) {
 async function mergeNodes(store: AgentStore, scope: Scope, members: EventNode[], keepId: string, patch: Row, timestamp: string) {
   const keep = members.find(row => row.id === keepId)!
   const union = (field: keyof EventNode) => [...new Set(members.flatMap(row => Array.isArray(row[field]) ? row[field] as string[] : []))]
+  const clues = [...new Set([...union('clues'), ...strings(patch.clues)].map(value => value.trim()).filter(Boolean))]
   const next: EventNode = {
     ...keep, ...patch, id: keepId, bookId: scope.bookId,
     actors: union('actors'), targets: union('targets'), actorIds: union('actorIds'), targetCharacterIds: union('targetCharacterIds'),
+    ...(clues.length || patch.clues !== undefined ? { clues } : {}),
     eventLineIds: union('eventLineIds'), revision: keep.revision + 1, updatedAt: timestamp,
   } as EventNode
   await store.put('nodes', next as unknown as Row)

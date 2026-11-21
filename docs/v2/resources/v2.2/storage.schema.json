@@ -1088,7 +1088,6 @@
       "type": "object",
       "required": [
         "name",
-        "confidence",
         "id",
         "bookId",
         "revision",
@@ -1389,7 +1388,6 @@
       "type": "object",
       "required": [
         "name",
-        "confidence",
         "id",
         "bookId",
         "revision",
@@ -1527,7 +1525,6 @@
         "name",
         "summary",
         "actors",
-        "confidence",
         "id",
         "bookId",
         "order",
@@ -1784,6 +1781,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "clues": {
+          "description": "可选。用于找回相关剧情的原文名称或短语，如关键人物、家族、物品、地点或事项。",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1816,6 +1820,14 @@
         },
         "title": {
           "description": "这条线的名字，例：贾赦父子走私案",
+          "type": "string"
+        },
+        "summary": {
+          "type": "string",
+          "description": "事件线简短概述；旧记录缺省时使用原叙述。"
+        },
+        "coreClue": {
+          "description": "全书复核填写的故事线核心关键线索",
           "type": "string"
         },
         "nodeIds": {
@@ -1878,10 +1890,6 @@
             "manual",
             "P2"
           ]
-        },
-        "summary": {
-          "type": "string",
-          "description": "事件线简短概述；旧记录缺省时使用原叙述。"
         },
         "eventIds": {
           "type": "array",
@@ -2736,6 +2744,19 @@
             "link",
             "review"
           ]
+        },
+        "eventIds": {
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "maxLength": 128,
+            "type": "string"
+          }
+        },
+        "basisVersion": {
+          "type": "integer",
+          "const": 2,
+          "description": "大纲事项按节点、事件及所属线的实际归属核对依据。旧事项可省略。"
         }
       }
     },
@@ -6977,6 +6998,14 @@
                               "sub",
                               null
                             ]
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "全书复核填写的故事线概况"
+                          },
+                          "coreClue": {
+                            "type": "string",
+                            "description": "全书复核填写的故事线核心关键线索"
                           }
                         },
                         "required": [
@@ -6991,6 +7020,14 @@
                         "properties": {
                           "op": {
                             "const": "update_line"
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "全书复核填写的故事线概况"
+                          },
+                          "coreClue": {
+                            "type": "string",
+                            "description": "全书复核填写的故事线核心关键线索"
                           },
                           "lineId": {
                             "type": "string",
@@ -7022,6 +7059,62 @@
                           {
                             "required": [
                               "role"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "summary"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "coreClue"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "update_event"
+                          },
+                          "eventId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "summary": {
+                            "type": "string",
+                            "description": "全书复核填写的事件概况"
+                          },
+                          "coreClue": {
+                            "type": "string",
+                            "description": "全书复核填写的事件核心关键线索"
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "eventId"
+                        ],
+                        "additionalProperties": false,
+                        "anyOf": [
+                          {
+                            "required": [
+                              "title"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "summary"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "coreClue"
                             ]
                           }
                         ]
@@ -9945,6 +10038,14 @@
         "title": {
           "type": "string",
           "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "description": "全书复核填写的事件概况"
+        },
+        "coreClue": {
+          "type": "string",
+          "description": "全书复核填写的事件核心关键线索"
         },
         "nodeIds": {
           "type": "array",

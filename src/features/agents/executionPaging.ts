@@ -35,10 +35,12 @@ export function readPagedExecution(workspace: Workspace, bookId: string, query: 
         const next = removed ? await call<ExecutionPageResult>('executionPage', query) : result
         if (removed) groups.clear()
         for (const group of next.groups) groups.set(idOf(group.request), group)
-        page = previous && !earlier && !removed ? { ...next, hasEarlier: previous.hasEarlier, nextBefore: previous.nextBefore } : next
+        const oldFirst = previous?.firstRequest, nextFirst = next.firstRequest
+        const firstRequest = oldFirst && nextFirst && idOf(oldFirst) === idOf(nextFirst) && oldFirst.version === nextFirst.version ? oldFirst : nextFirst
+        page = { ...next, firstRequest, ...(previous && !earlier && !removed ? { hasEarlier: previous.hasEarlier, nextBefore: previous.nextBefore } : {}) }
         const ordered = [...groups.values()].sort((a, b) => String(a.request.startedAt).localeCompare(String(b.request.startedAt)) || idOf(a.request).localeCompare(idOf(b.request)))
         return { entries: [], requests: ordered.map(group => group.request), snapshots: new Map<string, Row>(), runStatus,
-          summary: page.summary, paging: { events: ordered.flatMap(group => group.events), hasEarlier: page.hasEarlier, loadEvent, loadRequest,
+          summary: page.summary, firstRequest: page.firstRequest, paging: { events: ordered.flatMap(group => group.events), hasEarlier: page.hasEarlier, loadEvent, loadRequest,
             loadEarlier: async () => (await refresh(true))! } }
       })
       queue = work

@@ -13,3 +13,5 @@
 .story-history-pages { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .story-history pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; }
 .story-history details { padding: 6px 0; border-bottom: 1px solid var(--border); }
+
+.story-history select { max-width: 100%; }

@@ -17,13 +17,14 @@ export function storyContent(table: string, value: Row | null) {
 }
 export const storyFingerprint = (table: string, row: Row | null) => hash(storyContent(table, row))
 export const windowFingerprint = (window: unknown, nodes: unknown[]) => hash({ window, nodes: nodes.map(row => storyContent('nodes', row as Row)) })
-export const storyTable = (kind: string) => ({ node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[kind]
+export const storyTable = (kind: string) => ({ node: 'nodes', event: 'storyEvents', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[kind]
 
 export function storyDependencies(value: unknown): Row {
   const reads = value as Row | undefined
-  const details: Record<string, string> = { get_node_detail: 'nodes', get_event_line_detail: 'eventLines', get_character_detail: 'characters', get_location_detail: 'locations', get_editor_note_detail: 'storyEditorNotes' }
-  const ids = new Set(records(reads?.queries).flatMap(query => details[text(query.tool)] ? strings((query.args as Row)?.ids).map(id => `${details[text(query.tool)]}:${id}`) : []))
-  return structuredClone({ records: records(reads?.records).filter(row => row.table === 'chapterTexts' || ids.has(`${row.table}:${row.id}`) || ids.has(`${row.table}:${row.resolvedId}`)), queries: records(reads?.queries).filter(row => details[text(row.tool)] || row.tool === 'read_original') })
+  const details: Record<string, string> = { get_node_detail: 'nodes', get_event_detail: 'storyEvents', get_event_line_detail: 'eventLines', get_character_detail: 'characters', get_location_detail: 'locations', get_editor_note_detail: 'storyEditorNotes' }
+  const detailTable = (query: Row) => text(query.tool) === 'get_story_detail' ? ({ node: 'nodes', event: 'storyEvents', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[text((query.args as Row)?.kind)] : details[text(query.tool)]
+  const ids = new Set(records(reads?.queries).flatMap(query => detailTable(query) ? strings((query.args as Row)?.ids).map(id => `${detailTable(query)}:${id}`) : []))
+  return structuredClone({ records: records(reads?.records).filter(row => row.table === 'chapterTexts' || ids.has(`${row.table}:${row.id}`) || ids.has(`${row.table}:${row.resolvedId}`)), queries: records(reads?.queries).filter(row => detailTable(row) || row.tool === 'read_original') })
 }
 
 async function matches(store: AgentStore, table: string, id: string, fingerprint: unknown) {

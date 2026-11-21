@@ -5,6 +5,7 @@ import { commitCommand, type ReadSet } from '../src/features/agents/commands'
 import { readTool, type Scope } from '../src/features/agents/queries'
 import { hash, records, toolContracts } from '../src/features/agents/contracts'
 import { saveCharacterPair } from '../src/features/assets/relationEdits'
+import { applyOrganizationTool } from '../src/features/agents/organizationCommands'
 
 async function fixture(kind: 'relations' | 'profile' = 'relations') {
   const scope: Scope = { bookId: 'test', runId: crypto.randomUUID(), taskId: 'task', owner: 'owner', profile: 'asset_editor', phase: 'character_organization', workKind: kind, unitId: `${kind}:A`, workItemIds: [] }
@@ -37,6 +38,25 @@ async function fixture(kind: 'relations' | 'profile' = 'relations') {
 }
 
 describe('工具查询、提交、完成与重放的真实调用链', () => {
+  it('旧节点合并命令保留各成员的线索并去重', async () => {
+    const { repo, scope } = await fixture('profile')
+    const members = [
+      { id: 'N1', clues: ['来信'] },
+      { id: 'N2', clues: ['来信', '顾衡'] },
+      { id: 'N3' },
+    ]
+    const ids = members.map(row => row.id)
+    await repo.transaction(true, async store => {
+      for (const row of members) await store.put('nodes', { ...row, bookId: scope.bookId, revision: 1, actors: [] })
+      await applyOrganizationTool(store, scope, 'merge_assets', {
+        kind: 'node', keepId: 'N1', memberIds: ids, expectedRevisions: { N1: 1, N2: 1, N3: 1 },
+        basis: ids.map(id => ({ summary: '样本依据', source: { kind: 'asset', assetKind: 'node', id } })),
+      }, { records: ids.map(id => ({ table: 'nodes', id, resolvedId: id, revision: 1, factFingerprint: '' })), queries: [] }, 'fixture', new Date().toISOString())
+      expect((await store.get('nodes', 'N1'))?.clues).toEqual(['来信', '顾衡'])
+      expect(await store.get('nodes', 'N2')).toBeUndefined()
+    })
+  })
+
   it('模型声明只保留业务字段，工具详情使用同一精简声明，内部旧参数仍可结束', async () => {
     for (const kind of ['relations', 'profile'] as const) {
       const { adapter, call } = await fixture(kind)

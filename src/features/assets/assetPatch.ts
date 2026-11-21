@@ -27,11 +27,11 @@ export interface AssetPatchResult {
 
 const characterFields = ['name', 'aliases', 'identity', 'ageText', 'age', 'gender', 'appearance', 'personality', 'background', 'speechStyleSample', 'roleWeight', 'chapterIndex', 'manualSourceNote'] as const
 const locationFields = ['name', 'aliases', 'description', 'chapterIndex', 'manualSourceNote'] as const
-const nodeFields = ['name', 'summary', 'process', 'chapterIndex', 'quote', 'participantIds', 'unlinkedParticipants', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'locationNames', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions', 'timeCoord', 'timePrecision'] as const
+const nodeFields = ['name', 'summary', 'process', 'chapterIndex', 'quote', 'participantIds', 'unlinkedParticipants', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'locationNames', 'clues', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions', 'timeCoord', 'timePrecision'] as const
 const lineFields = ['title', 'summary', 'nodeIds', 'cause', 'process', 'result', 'lineStatus'] as const
 const allowedFields: Record<AssetKind, readonly string[]> = { character: characterFields, location: locationFields, node: nodeFields, eventLine: lineFields }
 const textFields = new Set(['name', 'identity', 'ageText', 'gender', 'appearance', 'personality', 'background', 'speechStyleSample', 'description', 'manualSourceNote', 'summary', 'process', 'quote', 'time_text', 'time_hint', 'timeCoord', 'timePrecision', 'title', 'cause', 'result'])
-const listFields = new Set(['aliases', 'participantIds', 'unlinkedParticipants', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'locationNames', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
+const listFields = new Set(['aliases', 'participantIds', 'unlinkedParticipants', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'locationNames', 'clues', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
 
 const fail = (message: string): never => { throw new AssetError('VALIDATION', message) }
 const unique = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))]
@@ -176,7 +176,7 @@ async function patchNode(store: PatchStore, input: AssetPatchInput, before: Even
   if (patch.name !== undefined) { const name = String(patch.name).trim(); record('name', name); row.name = name }
   if (patch.summary !== undefined) { const summary = String(patch.summary).trim(); record('summary', summary); row.summary = summary }
   for (const field of ['process', 'time_text', 'time_hint', 'timeCoord', 'timePrecision'] as const) if (patch[field] !== undefined) { record(field, String(patch[field])); row[field] = String(patch[field]) }
-  for (const field of ['locationNames', 'world_delta', 'new_facts', 'started_actions'] as const) if (patch[field] !== undefined) { const value = unique(patch[field] as string[]); record(field, value); row[field] = value }
+  for (const field of ['locationNames', 'clues', 'world_delta', 'new_facts', 'started_actions'] as const) if (patch[field] !== undefined) { const value = unique(patch[field] as string[]); record(field, value); row[field] = value }
   if (patch.quote !== undefined) {
     const quote = String(patch.quote)
     const source = await store.get('chapterTexts', row.chapterIndex)

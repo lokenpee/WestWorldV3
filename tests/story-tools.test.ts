@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { createMemoryAgentRepository, type Row } from '../src/features/agents/repository'
 import { createAgentTools } from '../src/features/agents/tools'
-import { hash, inputSchema, validate } from '../src/features/agents/contracts'
+import { hash, inputSchema, resultContracts, validate } from '../src/features/agents/contracts'
 import type { Scope } from '../src/features/agents/queries'
 import { storyTaskPrompt } from '../src/features/story/prompt'
 
@@ -29,7 +29,7 @@ async function fixture(chapters = ['1', '20', '120'], workflow = 'story_lines_v2
 
 it('大纲工具原子建线、共享与移接，重复调用可取回同一确认', async () => {
   const f = await fixture(['120', '126', '145', '151'], 'story_pages_v3', true)
-  expect(f.adapter.initialTools.map(tool => tool.name).sort()).toEqual(['search_story_context', 'get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch'].sort())
+  expect(f.adapter.initialTools.map(tool => tool.name).sort()).toEqual(['get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch'].sort())
   await f.detail('node', ['N1', 'N2', 'N3'])
   const args = { operations: [
     { op: 'create_line', ref: 'lai', title: '赖家线' },
@@ -44,16 +44,52 @@ it('大纲工具原子建线、共享与移接，重复调用可取回同一确�
   expect(await f.call('save_story_outline', args, 'create-once')).toMatchObject({ ok: true, alreadyApplied: true, commitId: saved.commitId, created: ids })
   expect(await f.call('save_story_outline', { operations: [{ op: 'delete_line', lineId: ids.lai }] }, 'create-once')).toMatchObject({ ok: false, code: 'IDEMPOTENCY_CONFLICT' })
   expect(await f.call('save_story_outline', { operations: [
-    { op: 'rename_event', eventId: ids.audit, title: '错误批次' },
+    { op: 'update_event', eventId: ids.audit, title: '错误批次' },
     { op: 'delete_event', eventId: ids.audit, expectedLineIds: [ids.lai] },
   ] })).toMatchObject({ ok: false, code: 'CONFLICT', opIndex: 1 })
   expect((await f.rows('storyEvents')).find(event => event.id === ids.audit)?.title).toBe('清查赖家')
   const shared = await f.call('save_story_outline', { operations: [{ op: 'attach_nodes', eventId: ids.search, nodeIds: ['N2'] }] })
   expect(shared).toMatchObject({ ok: true, changed: true })
-  await f.call('save_story_outline', { operations: [{ op: 'detach_nodes', eventId: ids.audit, nodeIds: ['N2'] }] })
+  const moved = await f.call('save_story_outline', { operations: [{ op: 'attach_nodes', eventId: ids.search, nodeIds: ['N2'], fromEventId: ids.audit }] })
+  expect(moved).toMatchObject({ ok: true, changed: true })
+  expect((await f.rows('storyEvents')).find(event => event.id === ids.audit)?.nodeIds).toEqual(['N1'])
   expect((await f.rows('storyEvents')).find(event => event.id === ids.search)?.nodeIds).toEqual(['N2', 'N3'])
   expect((await f.rows('nodes')).find(node => node.id === 'N2')?.eventLineIds).toEqual([ids.lai])
-  expect(await f.call('search_story_context', { kind: 'node', unassignedOnly: true })).toMatchObject({ data: [{ id: 'N4' }] })
+  expect(await f.detail('eventLine', [ids.lai])).toMatchObject({ data: [{ events: [{ id: ids.audit, name: '清查赖家' }, { id: ids.search, name: '查抄赖家' }] }] })
+  expect(await f.detail('event', [ids.search])).toMatchObject({ data: [{ evidenceNodes: [{ id: 'N2' }, { id: 'N3' }] }] })
+  expect(await f.call('save_story_outline', { operations: [{ op: 'attach_event', eventId: ids.search, lineId: ids.house, fromLineId: ids.lai }] })).toMatchObject({ ok: true, changed: true })
+  expect((await f.rows('eventLines')).find(line => line.id === ids.lai)?.eventIds).toEqual([ids.audit])
+  expect((await f.rows('eventLines')).find(line => line.id === ids.house)?.eventIds).toEqual([ids.audit, ids.search])
+  expect(await f.call('save_story_outline', { operations: [{ op: 'attach_nodes', lineId: ids.lai, eventId: ids.search, nodeIds: ['N2'] }] })).toMatchObject({ ok: false, code: 'INVALID_ARGS', message: expect.stringContaining('第 1 项 attach_nodes') })
+  expect(await f.call('save_story_outline', { operations: [{ op: 'delete_event', eventId: ids.audit, expectedLineIds: [ids.lai, ids.house] }] })).toMatchObject({ ok: true, changed: true })
+  expect((await f.rows('storyEvents')).map(event => event.id)).toEqual([ids.search])
+  expect((await f.rows('nodes')).map(node => node.id)).toEqual(['N1', 'N2', 'N3', 'N4'])
+})
+
+it('概况和核心关键线索只在全书复核阶段写入故事线与事件', async () => {
+  const f = await fixture(['120'], 'story_pages_v3', true)
+  await f.detail('node', ['N1'])
+  const created = await f.call('save_story_outline', { operations: [
+    { op: 'create_line', ref: 'lai', title: '赖家线' },
+    { op: 'create_event', ref: 'audit', lineId: '$lai', title: '清查赖家', nodeIds: ['N1'] },
+  ] })
+  const ids = created.created as Record<string, string>
+  await f.detail('eventLine', [ids.lai])
+  await f.detail('event', [ids.audit])
+  const update = { operations: [
+    { op: 'update_event', eventId: ids.audit, summary: '核查赖家账目并发现侵吞证据。', coreClue: '赖大是否侵吞公中财物。' },
+    { op: 'update_line', lineId: ids.lai, summary: '围绕查账、追赃及赖家后续处置展开。', coreClue: '赖大贪污及其牵连范围。' },
+  ] }
+  expect(await f.call('save_story_outline', update)).toMatchObject({ ok: false, code: 'INVALID_ARGS' })
+  f.scope.phase = 'global_review'
+  expect(await f.call('save_story_outline', { operations: [{ op: 'update_event', eventId: ids.audit, summary: '只有概况' }] })).toMatchObject({ ok: false, code: 'INVALID_ARGS' })
+  expect(await f.call('save_story_outline', { operations: [{ op: 'update_line', lineId: ids.lai, summary: '已有概况', coreClue: '  ' }] })).toMatchObject({ ok: false, code: 'INVALID_ARGS' })
+  expect(await f.call('save_story_outline', update)).toMatchObject({ ok: true, changed: true })
+  expect(await f.rows('storyEvents')).toMatchObject([expect.objectContaining({ summary: '核查赖家账目并发现侵吞证据。', coreClue: '赖大是否侵吞公中财物。' })])
+  expect(await f.rows('eventLines')).toMatchObject([expect.objectContaining({ summary: '围绕查账、追赃及赖家后续处置展开。', coreClue: '赖大贪污及其牵连范围。' })])
+  const search = createAgentTools(f.repo, f.scope).initialTools.find(tool => tool.name === 'search_story_context')!
+  expect((await search.execute(crypto.randomUUID(), { kind: 'event', terms: ['赖大是否侵吞公中财物'] })).details).toMatchObject({ data: [{ id: ids.audit }] })
+  expect((await search.execute(crypto.randomUUID(), { kind: 'eventLine', terms: ['赖大贪污及其牵连范围'] })).details).toMatchObject({ data: [{ id: ids.lai }] })
 })
 
 it('旧线先保留原成员，整线复核核对去向后切换', async () => {
@@ -70,6 +106,8 @@ it('旧线先保留原成员，整线复核核对去向后切换', async () => {
     await store.put('pipelineRuns', { ...run, storyReading: { global_review: { currentPageId: 'review', pages: [{ id: 'review', type: 'line_summary', lineId: 'L1' }] } } })
   })
   f.scope.phase = 'global_review'
+  expect(await f.call('save_story_outline', { operations: [{ op: 'update_line', lineId: 'L1', summary: '覆盖旧线', coreClue: '旧线不能覆盖' }] })).toMatchObject({ ok: false, code: 'INVALID_ARGS' })
+  expect(await f.rows('eventLines')).toMatchObject([{ summary: '原整理内容' }])
   expect(await f.call('save_story_outline', { operations: [{ op: 'activate_legacy_line', lineId: 'L1' }] })).toMatchObject({ ok: false, code: 'INVALID_ARGS' })
   expect(await f.call('save_story_outline', { operations: [{ op: 'activate_legacy_line', lineId: 'L1', excludedNodeIds: ['N3'] }] })).toMatchObject({ ok: true })
   expect(await f.rows('eventLines')).toMatchObject([{ outlinePending: false, nodeIds: ['N1', 'N2'], legacyNodeIds: ['N1', 'N2', 'N3'], summary: '原整理内容' }])
@@ -153,6 +191,35 @@ it('线索独立保存，回收前读取旧事项，未传摘要保持原版本'
   await f.call('save_story_notes', { notes: [{ key: 'old-letter', status: 'resolved', statement: '后文回应旧信', nodeIds: ['N1', 'N3'] }] })
   expect(await f.rows('storyEditorNotes')).toMatchObject([{ id: note.id, status: 'resolved', revision: 2 }])
   expect(await f.rows('storyEditorMemory')).toMatchObject([{ revision: 1 }])
+})
+
+it('大纲事项保存回执返回真实编号，重放保留回执，本轮可直接关闭', async () => {
+  const f = await fixture(['120'], 'story_pages_v3', true)
+  const pending = { key: 'L-怜雪线误改', status: 'active', statement: '线名误改，待恢复', nodeIds: ['N1'] }
+  const args = { notes: [pending] }
+  const result = await f.call('save_story_notes', args, 'new-note')
+  const note = (result.notes as Row[])[0]
+  expect(note).toMatchObject({ id: expect.any(String), kind: 'note', ...pending })
+  expect(() => validate(resultContracts.get('save_story_notes')!, result)).not.toThrow()
+  expect(await f.call('save_story_notes', args, 'new-note')).toMatchObject({ alreadyApplied: true, commitId: result.commitId, notes: [note] })
+  expect(await f.call('save_story_notes', { notes: [{ ...pending, status: 'resolved', statement: '已恢复原线名' }] })).toMatchObject({ ok: true, notes: [{ id: note.id, status: 'resolved' }] })
+  expect(await f.rows('storyEditorNotes')).toMatchObject([{ id: note.id, revision: 2, status: 'resolved' }])
+})
+
+it('关闭未读的旧事项会给出真实查询参数，按 key 查询只在当前会话匹配', async () => {
+  const f = await fixture(['120'], 'story_pages_v3', true)
+  const oldNote = { id: 'note-uuid', key: 'L-怜雪线误改', sessionId: 's', bookId: 'b', status: 'active', kind: 'decision', statement: '线名误改', nodeIds: [], lineIds: [], revision: 1 }
+  await f.repo.transaction(true, async store => {
+    await store.put('storyEditorNotes', oldNote)
+    await store.put('storyEditorNotes', { ...oldNote, id: 'archived-note', sessionId: 'old-session', statement: '此前运行的同名事项' })
+    await store.put('storyEditorNotes', { ...oldNote, id: 'only-archived', sessionId: 'old-session', key: 'archived-key' })
+  })
+  const close = { notes: [{ key: oldNote.key, status: 'resolved', statement: '线名已经恢复' }] }
+  await expect(f.call('save_story_notes', close)).rejects.toThrow('READ_REQUIRED:关闭已有事项前需核对该事项。请先调用 get_story_detail {"kind":"note","ids":["note-uuid"]}')
+  expect(await f.detail('note', ['archived-key'])).toMatchObject({ data: [], missingIds: ['archived-key'] })
+  expect(await f.detail('note', [oldNote.key])).toMatchObject({ data: [{ id: oldNote.id, key: oldNote.key, statement: oldNote.statement }], missingIds: [] })
+  expect(await f.call('save_story_notes', close)).toMatchObject({ ok: true, notes: [{ id: oldNote.id, key: oldNote.key, status: 'resolved' }] })
+  expect((await f.rows('storyEditorNotes')).find(row => row.id === 'archived-note')?.status).toBe('active')
 })
 
 it('目录浏览、章节过滤和长事件线成员分页可完整读取', async () => {

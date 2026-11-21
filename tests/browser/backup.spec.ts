@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
+import { strFromU8, unzipSync } from 'fflate'
+const { version } = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }
 
 async function samples(page: Page) {
   await page.goto('/?acceptance=backup')
@@ -18,6 +20,9 @@ async function download(page: Page) {
 test('真实下载、预检取消与副本恢复，刷新后保留原文与人物关联', async ({ page }, testInfo) => {
   await samples(page)
   const bytes = await download(page)
+  await expect(page.getByRole('banner').getByText(`v${version}`, { exact: true })).toBeVisible()
+  const manifest = JSON.parse(strFromU8(unzipSync(bytes)['manifest.json']))
+  expect(manifest.appVersion).toBe(version)
   await page.getByRole('button', { name: '设置', exact: true }).click()
   await page.getByLabel('选择备份文件（.wwv2）', { exact: true }).setInputFiles({ name: '样本.wwv2', mimeType: 'application/zip', buffer: bytes })
   await expect(page.getByRole('region', { name: '备份预检' })).toContainText('4 章 / 块 · 人物 4 · 地点 2 · 节点 4 · 事件线 2')
@@ -47,6 +52,7 @@ test('真实下载、预检取消与副本恢复，刷新后保留原文与人�
 test('损坏备份清除旧预览并禁用确认，窄屏恢复与删除按钮可达', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 375, height: 812 })
   await samples(page)
+  await expect(page.getByRole('banner').getByText(`v${version}`, { exact: true })).toBeVisible()
   const bytes = await download(page)
   await page.getByRole('button', { name: '设置', exact: true }).click()
   const fileInput = page.getByLabel('选择备份文件（.wwv2）', { exact: true })

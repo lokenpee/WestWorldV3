@@ -1,1 +1,4 @@
-探针taskId={taskId}。先get_editor_memory({})。然后commit_story_changes，operationKey={operationKey}，payload={event_line_ops:[],new_nodes:[],memory_update:{workingSummary:"隔离探针摘要",notes:[]}}。最后提交status=completed、实际commitIds、summary、remainingWorkIds=[]、reviewedItems=[]。
+探针taskId={taskId}。每次直接调用当前提供的工具，等待工具返回后进入下一步。
+第1次调用 get_editor_memory，参数为 {}。
+第2次调用 commit_story_changes，参数为 {"operationKey":"{operationKey}","payload":{"event_line_ops":[],"new_nodes":[],"memory_update":{"workingSummary":"隔离探针摘要","notes":[]}}}。
+第3次调用 submit_result，填写 status="completed"、上一步返回的 commitId 列表、简短 summary、remainingWorkIds=[]、reviewedItems=[]。

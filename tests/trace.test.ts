@@ -5,7 +5,7 @@ import type { AgentEvent } from '@earendil-works/pi-agent-core'
 import { createWorkspace } from '../src/lib/storage/workspace'
 import { createMemoryAgentRepository } from '../src/features/agents/repository'
 import { isObservationEntry, projectSession } from '../src/features/agents/context'
-import { readBookTrace, TraceSession } from '../src/features/agents/trace'
+import { readBookTrace, readExecutionChain, TraceSession } from '../src/features/agents/trace'
 import { markMissingTraceRefs } from '../src/features/backup/codec'
 import type { BookTables } from '../src/features/backup/data'
 import { messageRows, sentMessages } from '../src/features/agents/requestPresentation'
@@ -27,6 +27,21 @@ async function fixture() {
   const repo = createMemoryAgentRepository(bookId, { storySessions: [{ id: sessionId, bookId, profile: 'asset_editor', status: 'active', leafId: null, nextOrdinal: 1 }] })
   return repo
 }
+
+it('P3 浏览器书库按实际请求顺序展示串联和复核，恢复执行时序号可重新起算', async () => {
+  const name = crypto.randomUUID()
+  const workspace = createWorkspace({ settingsName: `trace-order-${name}`, bookPrefix: `trace-order-${name}-` })
+  const db = workspace.openBook(bookId)
+  try {
+    await db.table('pipelineRuns').put({ id: 'run', stage: 'P3' })
+    await db.table('storySessionEntries').bulkPut(['串联首轮', '串联续跑', '复核首轮'].map((id, index) => ({
+      id, bookId, type: 'request_trace', runId: 'run', sessionId, ordinal: index + 1, requestOrdinal: index === 1 ? 2 : 1,
+      startedAt: new Date(index * 1000).toISOString(),
+    })))
+    const chain = await readExecutionChain(workspace, bookId, 'run', { sessionId })
+    expect(chain.requests.map(row => row.id)).toEqual(['串联首轮', '串联续跑', '复核首轮'])
+  } finally { await db.delete(); workspace.close() }
+})
 
 it('最终只含工具调用时保留已收到的正文与思考，落库后详情仍可读取且不重复', async () => {
   const repo = await fixture()

@@ -11,6 +11,8 @@ import { createBookAgentRepository, createMemoryAgentRepository } from '../src/f
 import { appendEntry } from '../src/features/agents/commands'
 import { sessionProjection } from '../src/features/agents/compaction'
 import { navigateStoryReading, readingBrief, refreshReading, saveReading } from '../src/features/story/reading'
+import { applyOutline } from '../src/features/story/outlineCommands'
+import { presentStoryPage } from '../src/features/story/readingPresentation'
 import { emptyTables, tableNames } from '../src/features/backup/data'
 import { encodeBackup, inspectBackup, restoredTables } from '../src/features/backup/codec'
 
@@ -133,6 +135,55 @@ it('复核依次阅读孤立节点、长线分段、整线及本会话疑点，�
   expect(await repo.transaction(false, store => store.get('storyEditorNotes', note.id))).toEqual(note)
 })
 
+it('全书复核为共享事件只建一页概况，中文页只送真实归属与成员资料', async () => {
+  const nodes = [1, 2].map(i => ({ id: `N${i}`, bookId: 'a', name: `账目进展${i}`, summary: '查账发现新的侵吞证据', process: '核对前院交回的账册', clues: ['账册钤印'], new_facts: ['旧事实'], chapterIndex: String(i), revision: 1, order: i }))
+  const event = { id: 'E1', bookId: 'a', title: '清查赖家', nodeIds: ['N1', 'N2'], summary: '核查赖家账目并发现侵吞证据。', coreClue: '赖大是否侵吞公中财物。', revision: 1 }
+  const lines = [
+    { id: 'L1', bookId: 'a', title: '赖家线', summary: '围绕查账和追赃展开。', coreClue: '赖大贪污及其牵连范围。', eventIds: ['E1'], nodeIds: [], revision: 1 },
+    { id: 'L2', bookId: 'a', title: '荣府账目线', eventIds: ['E1'], nodeIds: [], revision: 1 },
+  ]
+  const repo = createMemoryAgentRepository('a', { nodes, storyEvents: [event], eventLines: lines, chapters: nodes.map((node, order) => ({ bookId: 'a', chapterIndex: node.chapterIndex, order })), pipelineRuns: [{ id: 'r', bookId: 'a', storyOutlineVersion: 1 }] })
+  const state = await repo.transaction(false, store => refreshReading(store, 'r', 's', 'global_review'))
+  expect(state.pages.filter(page => page.type === 'event_summary')).toHaveLength(1)
+  expect(state.pages.map(page => page.type)).toEqual(['line_segment', 'event_summary', 'line_summary', 'line_summary'])
+  expect(state.pages.filter(page => page.type === 'line_summary')).toHaveLength(2)
+  expect(state.pages.findIndex(page => page.type === 'line_summary')).toBeGreaterThan(state.pages.findLastIndex(page => page.type === 'event_summary'))
+  const eventPage = state.pages.find(page => page.type === 'event_summary')!
+  const brief = await repo.transaction(false, store => readingBrief(store, 'a', 's', 'global_review', { ...state, currentPageId: eventPage.id }, true))
+  expect(brief?.event).toMatchObject({ id: 'E1', summary: event.summary, coreClue: event.coreClue })
+  expect(presentStoryPage(brief)).toMatchObject({ 阶段: '全书复核', 本页: { 类型: '事件说明' }, 事件成员概述: [{ 编号: 'N1' }, { 编号: 'N2' }] })
+  const linePage = state.pages.find(page => page.type === 'line_summary')!
+  const lineBrief = await repo.transaction(false, store => readingBrief(store, 'a', 's', 'global_review', { ...state, currentPageId: linePage.id }, true))
+  expect(lineBrief?.line).toMatchObject({ id: 'L1', summary: lines[0].summary, coreClue: lines[0].coreClue })
+  expect(presentStoryPage(lineBrief)).toMatchObject({ 本页: { 类型: '故事线说明' }, 所属事件: [{ 编号: 'E1', 名称: event.title, 概况: event.summary, 核心关键线索: event.coreClue }] })
+  expect(lineBrief).not.toHaveProperty('related')
+  const members = await repo.transaction(false, store => readingBrief(store, 'a', 's', 'global_review', state, true))
+  expect(presentStoryPage(members)).toMatchObject({ 本页: { 类型: '成员复核' }, 本页待阅读节点: [{ 节点: [{ 编号: 'N1', 详细经过: '核对前院交回的账册', 线索: ['账册钤印'] }] }, { 节点: [{ 编号: 'N2' }] }] })
+  expect(JSON.stringify(presentStoryPage(members))).not.toContain('旧事实')
+})
+
+it('旧运行误标完成的空白说明重新待检，字段写齐才可翻页', async () => {
+  const scope = { bookId: 'a', runId: 'r', taskId: 't', sessionId: 's', phase: 'global_review', outline: true }
+  const node = { id: 'N1', bookId: 'a', chapterIndex: '1', name: '查账', summary: '查看公中账目' }
+  const event = { id: 'E1', bookId: 'a', title: '查账', nodeIds: ['N1'], summary: '', coreClue: '' }
+  const line = { id: 'L1', bookId: 'a', title: '赖家线', eventIds: ['E1'], nodeIds: ['N1'], summary: '查账引出追赃', coreClue: '  ' }
+  const repo = createMemoryAgentRepository('a', { nodes: [node], storyEvents: [event], eventLines: [line], pipelineRuns: [{ id: 'r', bookId: 'a', storyOutlineVersion: 1 }] })
+  await repo.transaction(true, async store => {
+    const state = await refreshReading(store, 'r', 's', 'global_review')
+    await saveReading(store, 'r', 'global_review', { ...state, currentPageId: null, pages: state.pages.map(page => ({ ...page, checkedFingerprint: page.fingerprint })) })
+    const refreshed = await refreshReading(store, 'r', 's', 'global_review')
+    expect(refreshed.currentPageId).toBe('event_summary:E1:0')
+    await saveReading(store, 'r', 'global_review', refreshed)
+  })
+  const next = (id: string) => repo.transaction(true, store => navigateStoryReading(store, scope, { direction: 'next' }, id))
+  await expect(next('empty-event')).rejects.toThrow('两项均为必填')
+  await repo.transaction(true, store => store.put('storyEvents', { ...event, summary: '查看公中账目', coreClue: '公中账目的亏空引发清查' }))
+  expect(await next('written-event')).toMatchObject({ complete: false, page: { page: { type: 'line_summary' } } })
+  await expect(next('empty-line')).rejects.toThrow('两项均为必填')
+  await repo.transaction(true, store => store.put('eventLines', { ...line, coreClue: '公中财物能否追回' }))
+  expect(await next('written-line')).toMatchObject({ complete: true })
+})
+
 it('AI未翻页而提前结束时只保留当前页，程序不自动送入后页', async () => {
   const bodies: Row[] = []
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
@@ -145,6 +196,8 @@ it('AI未翻页而提前结束时只保留当前页，程序不自动送入后�
   expect(bodies).toHaveLength(1)
   const { input } = storyTask(bodies[0])
   expect(input.page).toMatchObject({ pageNumber: 1, totalPages: 3 })
+  expect(input.directory).toMatchObject({ 故事线数量: 0, 事件数量: 0 })
+  expect(input.workItems[0]).toMatchObject({ process: expect.any(String) })
   expect(input.workItems.map((item: Row) => item.id)).toEqual(Array.from({ length: 10 }, (_, i) => `N${String(i + 1).padStart(3, '0')}`))
   expect(await reading(service)).toMatchObject({ pageNumber: 1, checked: 0, complete: false })
   expect(await db.table('eventLines').count()).toBe(0)
@@ -174,14 +227,15 @@ it('同一会话由AI翻过三页，多次保存持续续接原事件', async ()
   const lines = await db.table('eventLines').toArray()
   expect(lines).toHaveLength(1)
   expect(lines[0].nodeIds).toHaveLength(25)
-  expect(lines[0].summary).toBeUndefined()
+  expect(lines[0].summary).toBe('')
   const events = await db.table('storyEvents').toArray()
   expect(events).toMatchObject([{ title: '传递信件', nodeIds: lines[0].nodeIds }])
   expect(lines[0].process).toBe('')
   expect(await reading(service)).toMatchObject({ checked: 3, totalPages: 3, complete: true })
   expect([...new Set(bodies.map(body => storyTask(body).input.page.pageNumber))]).toEqual([1, 2, 3])
   const lastMessages = bodies.at(-1)!.messages as { role: string; content?: unknown }[]
-  expect(lastMessages.filter(row => row.role === 'user' && /"queue":"window_nodes"/.test(messageText(row.content)))).toHaveLength(1)
+  expect(lastMessages.filter(row => row.role === 'user' && messageText(row.content).startsWith('【当前阅读页】'))).toHaveLength(1)
+  expect(storyTask(bodies.find(body => storyTask(body).input.page.pageNumber === 2)!).input.directory).toMatchObject({ 故事线数量: 1, 事件数量: 1, 故事线: [{ 名称: '信件流转', 事件: [{ 名称: '传递信件', 节点编号: expect.arrayContaining(['N001']) }] }] })
   expect(await db.table('storySessions').count()).toBe(1)
   const progress = await db.table('compileProgress').get('P3'), run = await db.table('pipelineRuns').get(progress.runId)
   expect(run.appliedCommands).toHaveLength(3)
@@ -232,13 +286,14 @@ it('第二页上下文超长且翻页回执被压缩掉后，重建精确当前�
     const content = messageText(row.content); return JSON.parse(content.slice(content.indexOf('{')))
   })
   expect(restoredTasks).toHaveLength(1)
-  expect(restoredTasks[0].page).toMatchObject({ pageNumber: 2, totalPages: 3, ids: Array.from({ length: 10 }, (_, i) => `N${String(i + 11).padStart(3, '0')}`) })
+  expect(restoredTasks[0].本页).toMatchObject({ 页码: 2, 总页数: 3 })
+  expect(storyTask(recoveredRequests[0]).input.page.ids).toEqual(Array.from({ length: 10 }, (_, i) => `N${String(i + 11).padStart(3, '0')}`))
   expect(restoredMessages.filter(row => row.role === 'tool')).toHaveLength(0)
   expect(JSON.stringify(restoredMessages)).not.toContain('本段核对旧信的来由与去向，详细内容见原记录。'.repeat(100))
   expect(await reading(service)).toMatchObject({ checked: 3, totalPages: 3, complete: true })
   const state = await service.read('a')
   const projection = await sessionProjection(repository, state.session.id!)
-  expect(projection.messages.some(row => row.role === 'user' && messageText(row.content).startsWith('【当前阅读页】') && messageText(row.content).includes('"pageNumber":2'))).toBe(true)
+  expect(projection.messages.some(row => row.role === 'user' && messageText(row.content).startsWith('【当前阅读页】') && messageText(row.content).includes('"页码": 2'))).toBe(true)
 }, 30000)
 
 it('可以回看上一页，没有修改也可往返翻页，不制造写入', async () => {
@@ -433,7 +488,9 @@ it('普通说明后API报错立即退出，保留实际错误而不是总结错�
 it('全书复核对长线逐段阅读后再核对整线，使用独立复核提示词', async () => {
   const reviewPages: Row[] = [], systems: string[] = []
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
-    const body = bodyOf(init), { input } = storyTask(body)
+    const body = bodyOf(init)
+    if (body.messages.some((message: Row) => messageText(message.content).includes('【需要压缩的原始会话数据】'))) return storyResponse(body)
+    const { input } = storyTask(body)
     if (input.phase === 'global_review') {
       reviewPages.push(input.page)
       systems.push((body.messages as { role: string; content: string }[]).filter(row => row.role === 'system').map(row => row.content).join('\n'))
@@ -443,8 +500,7 @@ it('全书复核对长线逐段阅读后再核对整线，使用独立复核提�
   const { service } = await setup(25, fetcher)
   await service.start('a'); await service.review('a')
   expect(service.state('a')?.error).toBeUndefined()
-  expect(reviewPages.filter(page => page.type === 'line_segment')).toHaveLength(3)
-  expect(reviewPages.filter(page => page.type === 'line_summary')).toHaveLength(1)
+  expect([...new Map(reviewPages.map(page => [page.id, page.type])).values()]).toEqual(['line_segment', 'line_segment', 'line_segment', 'line_structure', 'event_summary', 'line_summary'])
   expect(reviewPages.at(-1)?.type).toBe('line_summary')
   expect(systems.every(system => system.includes('复核'))).toBe(true)
   expect((await service.read('a')).progress).toMatchObject({ phase: 'global_review', status: 'completed' })
@@ -467,10 +523,47 @@ it('P3重新开始显式开新轮：复用不发模型请求，全量重新检�
   expect(fetcher.mock.calls.length).toBeGreaterThan(calls)
   expect(await db.table('eventLines').count()).toBe(1)
   await service.review('a')
+  expect(service.state('a')?.error).toBeUndefined()
   const reviewed = fetcher.mock.calls.length
   await service.review('a', 'reuse')
   expect(service.state('a')?.error).toBeUndefined()
   expect(fetcher.mock.calls.length).toBe(reviewed)
+  expect(await reading(service)).toMatchObject({ complete: true })
+}, 30000)
+
+it('快检保留大纲，覆盖重串清空大纲，两者都另起模型上下文并保留历史', async () => {
+  const bodies: Row[] = []
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = bodyOf(init)
+    bodies.push(body)
+    return storyResponse(body)
+  })
+  const { service, db, workspace } = await setup(12, fetcher)
+  await service.start('a')
+  const initial = await db.table('compileProgress').get('P3'), originalEvents = await db.table('storyEvents').toArray()
+  const nodeIds = await db.table('nodes').toCollection().primaryKeys()
+  const initialBody = bodies.length
+  await service.start('a', 'quick')
+  const quick = await db.table('compileProgress').get('P3')
+  expect(quick.editorSessionId).not.toBe(initial.editorSessionId)
+  expect((bodies[initialBody].messages as Row[]).every(row => ['system', 'user'].includes(String(row.role)))).toBe(true)
+  expect(bodies.slice(initialBody).map(body => storyTask(body).input.quick)).toEqual([true, true])
+  expect(await db.table('storyEvents').toArray()).toEqual(originalEvents)
+  const quickEnd = bodies.length
+  await service.start('a', 'replace')
+  expect(service.state('a')?.error).toBeUndefined()
+  const restarted = await db.table('compileProgress').get('P3')
+  expect(restarted.editorSessionId).not.toBe(quick.editorSessionId)
+  expect((bodies[quickEnd].messages as Row[]).every(row => ['system', 'user'].includes(String(row.role)))).toBe(true)
+  expect(storyTask(bodies[quickEnd]).input.directory).toMatchObject({ 故事线数量: 0, 事件数量: 0 })
+  expect((await db.table('storyEvents').toArray())[0].id).not.toBe(originalEvents[0].id)
+  expect(await db.table('nodes').toCollection().primaryKeys()).toEqual(nodeIds)
+  expect(await db.table('storySessions').get(initial.editorSessionId)).toMatchObject({ status: 'archived' })
+  expect(await db.table('storySessionEntries').where('sessionId').equals(initial.editorSessionId).count()).toBeGreaterThan(0)
+  const tables = emptyTables()
+  for (const table of tableNames) if (table !== 'extractionReceipts') tables[table] = await db.table(table).toArray()
+  const backup = await encodeBackup({ book: (await workspace.settings.books.get('a'))!, tables })
+  expect((await inspectBackup(backup.bytes)).ok).toBe(true)
 }, 30000)
 
 
@@ -520,4 +613,97 @@ it('启动失败清除旧轮活动身份，保留原成果且修正后能重试'
   expect(fetcher.mock.calls.length).toBe(before)
   expect(await db.table('compileProgress').get('P3')).toEqual(progress)
   expect(await db.table('eventLines').count()).toBe(1)
+})
+
+it('复核独立接手节点、事件、故事线及无引用的疑点，保留本轮逐项结论', async () => {
+  const firstRequests: Row[] = []
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = bodyOf(init)
+    if (storyTask(body).input.phase === 'global_review') firstRequests.push(body)
+    return storyResponse(body)
+  })
+  const { db, service } = await setup(2, fetcher)
+  await service.start('a')
+  const linking = await db.table('compileProgress').get('P3')
+  const [event] = await db.table('storyEvents').toArray()
+  const [line] = await db.table('eventLines').toArray()
+  const secondEvent = { ...event, id: 'E-other', title: '寄信人身份', nodeIds: ['N002'] }
+  await db.table('storyEvents').put(secondEvent)
+  await db.table('eventLines').put({ ...line, eventIds: [...line.eventIds, secondEvent.id] })
+  const original = { bookId: 'a', sessionId: linking.editorSessionId, status: 'active', revision: 1, kind: 'review', stage: 'P3', evidence: [], basisFingerprint: '', nodeIds: [], lineIds: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+  const references = [{ nodeIds: ['N001'] }, { eventIds: [event.id] }, { lineIds: [line.id] }, {}, { nodeIds: ['N002'] }, { eventIds: [event.id] }]
+  await db.table('storyEditorNotes').bulkPut(references.map((ref, i) => ({ ...original, ...ref, id: 'old-' + i, key: '信件疑点' + i, statement: '核对收信与转交的承接' + i })))
+  await db.table('storyEditorMemory').put({ id: linking.editorSessionId, workingSummary: '串联私有摘要', revision: 1 })
+  await service.review('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  const review = await db.table('compileProgress').get('P3')
+  expect(review.editorSessionId).not.toBe(linking.editorSessionId)
+  expect(JSON.stringify(firstRequests[0].messages)).not.toMatch(/串联私有摘要|本页待阅读节点.*已保存的大纲|按页维护剧情大纲/)
+  expect((firstRequests[0].messages as Row[]).some(row => row.role === 'assistant' || row.role === 'tool')).toBe(false)
+  expect((await service.history('a')).sessions.map(row => row.id)).toEqual(expect.arrayContaining([linking.editorSessionId, review.editorSessionId]))
+  const progress = await reading(service)
+  expect(progress?.complete).toBe(true)
+  expect(progress?.conclusions).toHaveLength(6)
+  expect(firstRequests.some(body => storyTask(body).input.eventGroup?.length === 2)).toBe(true)
+  expect((await db.table('storyEvents').toArray()).every(row => row.summary && row.coreClue)).toBe(true)
+  expect(progress?.conclusions.every(row => String(row.conclusion).includes('来信者'))).toBe(true)
+  const calls = firstRequests.length
+  await service.review('a', 'reuse')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(firstRequests.length).toBe(calls)
+  const changed = await db.table('nodes').get('N001')
+  await db.table('nodes').put({ ...changed, summary: '后文揭示寄信人' })
+  await service.review('a', 'reuse')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(firstRequests.length).toBeGreaterThan(calls)
+  expect((await reading(service))?.conclusions).toHaveLength(6)
+}, 30000)
+
+it('复核在途暂停后，从同一会话继续已保存的步骤', async () => {
+  let reached!: () => void, release!: () => void
+  const started = new Promise<void>(resolve => { reached = resolve })
+  const wait = new Promise<void>(resolve => { release = resolve })
+  let pauseOnce = true
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const body = bodyOf(init)
+    if (pauseOnce && storyTask(body).input.phase === 'global_review') {
+      pauseOnce = false
+      reached()
+      await wait
+    }
+    return storyResponse(body)
+  })
+  const { workspace, db, models, service } = await setup(2, fetcher)
+  await service.start('a')
+  const work = service.review('a')
+  await started
+  service.pause('a')
+  release()
+  await work
+  const paused = await db.table('compileProgress').get('P3')
+  expect(paused).toMatchObject({ phase: 'global_review', status: 'paused' })
+  const resumed = createStoryService(workspace, models)
+  await resumed.review('a')
+  expect(resumed.state('a')?.error).toBeUndefined()
+  expect((await resumed.read('a')).progress).toMatchObject({ editorSessionId: paused.editorSessionId, runId: paused.runId, status: 'completed' })
+}, 30000)
+
+it('仍有归属和交接问题时拒绝提前写说明，未给疑点结论时停在原页', async () => {
+  const bookId = 'a', sessionId = 'review', runId = 'r', phase = 'global_review'
+  const repo = createMemoryAgentRepository(bookId, {
+    pipelineRuns: [{ id: runId, bookId, storyOutlineVersion: 1 }],
+    nodes: [{ id: 'N1', bookId, name: '传信', chapterIndex: '1' }],
+    storyEvents: [{ id: 'E1', bookId, title: '转交信件', nodeIds: ['N1'] }],
+    storyEditorNotes: [{ id: 'Q1', bookId, sessionId, key: '寄信人', statement: '核对来信者身份', status: 'active', eventIds: ['E1'] }],
+  })
+  const scope = { bookId, sessionId, runId, phase, taskId: 't', profile: 'story_editor' as const, owner: 'test', workItemIds: [] }
+  await repo.transaction(true, async store => {
+    await saveReading(store, runId, phase, { independent: true, pages: [], currentPageId: null, receipts: [] })
+    await saveReading(store, runId, phase, await refreshReading(store, runId, sessionId, phase))
+  })
+  await expect(repo.transaction(true, store => applyOutline(store, scope, { operations: [{ op: 'update_event', eventId: 'E1', summary: '转交信件', coreClue: '来信下落' }] }, { records: [], queries: [] }, new Date().toISOString()))).rejects.toThrow('归属')
+  await expect(repo.transaction(true, store => navigateStoryReading(store, scope, { direction: 'next' }, 'missing'))).rejects.toThrow('noteResults')
+  const after = await repo.transaction(false, store => refreshReading(store, runId, sessionId, phase))
+  expect(after.pages[0].checkedFingerprint).toBeUndefined()
+  expect(after.pages[0].reviewNotes).toHaveProperty('Q1')
 })

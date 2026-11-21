@@ -4175,6 +4175,13 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-quick-check.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/readingService.ts"
+      ]
     }
   ],
   "runtimeAssets": [
@@ -4194,7 +4201,7 @@
         "src/features/extraction/contracts.ts",
         "src/features/world/optimization.ts"
       ],
-      "sha256": "2edf6669abfb16a980e1142133a03d73f475d88b546158043114c1e659542cc1"
+      "sha256": "2439d3ce165b2a735f9ed2a37de99d7cb7c9f3901ed198e117426dee015ab7dd"
     },
     {
       "path": "docs/v2/resources/v2.2/model-output-contract.json",
@@ -4203,7 +4210,7 @@
         "src/features/agents/contracts.ts",
         "src/features/world/optimization.ts"
       ],
-      "sha256": "cceba4171dcf6e51a811dfdddef0cf5f1c787373e204e401e979bb1cc01ae1ed"
+      "sha256": "6c9388c2202f64d50555ed80a7520340908b64d9aaa2ba3a3fcb8a7e1c2d42ce"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/character-optimize.md",
@@ -4243,7 +4250,7 @@
       "consumers": [
         "src/features/extraction/contracts.ts"
       ],
-      "sha256": "7fe1bce092cc5ae092d8730db094a8b2b180164662f796e153468d530959a4ec"
+      "sha256": "9f79043838545e22e4a9ba4a0ea694876620809c121f458416c04da1eec75145"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p1-world.md",
@@ -4251,7 +4258,7 @@
       "consumers": [
         "src/features/extraction/contracts.ts"
       ],
-      "sha256": "054e27902ba6ad9b6b9a79f3937b1f002cb5ba5cd18c81ebf4715b6546fe527a"
+      "sha256": "3d64d816394c5d817189b76954ea79699d389ca7990d8bbf34fc23b115892edc"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-identity.md",
@@ -4293,7 +4300,7 @@
       "consumers": [
         "src/features/agents/probe.ts"
       ],
-      "sha256": "cfdb7f15280ee714ecfa33efe0fa9180ced3460df7b9fdbbf6079e76256c570c"
+      "sha256": "275abc24345628bc9ffaf25b46a70760bcd13b4d56c2a0566c6dbe9a37917d53"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/probe_system.txt",
@@ -4317,7 +4324,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "ba864f47d7af6b12b6397a82b2250d3ae4b73ec039eebf1eafe79f3a7931398c"
+      "sha256": "9c5d5775966bdec503ece7d96c80631bbdfcecd57552265db2c7c26f352078f0"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4325,7 +4332,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "91478db4d4e0cc60fc563cb90b7066ab925b7b69f3112d78131c9601599684f2"
+      "sha256": "112b2eff26c2dd0b4c343b52c66f6d5862c992d43c64595eeb53e4aac366a49f"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4333,7 +4340,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "5e9cc0b2e7661ee5cc147dad9f292687d86516d19921d9138c7ceb87b69dca89"
+      "sha256": "b2830446add032ed40d40309ea1e7f4aaa6baca377da6c2d69490cc22b4fa2a2"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",
@@ -4365,7 +4372,7 @@
       "consumers": [
         "src/features/world/organization.ts"
       ],
-      "sha256": "5dc1c6533dd88d54ded796c1cdd1e6960ff8820456da87a0f1081a1121c0ca59"
+      "sha256": "f348a9a9b002b214fb784b0edd170488520b3131c0b01d90bec3dc08285b1173"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-organization-relations.md",
@@ -4381,7 +4388,7 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ],
-      "sha256": "0bdc049ab9495f4426c07782940bc872af178968f785023d6847086a07d5f2d0"
+      "sha256": "d4fa16cc7a32a6f4ed7f9afe806431e823c53ac2c0dfdc27cfa0d2432711bacd"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p3-outline-review.md",
@@ -4389,7 +4396,15 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ],
-      "sha256": "5f0126cdfed003710a51a1993a24b7f78fcc789f355b55085b2e308a8afe9c38"
+      "sha256": "39f0ec3e1541815ab1d9b97f09a46f0bd0ace81199ed9dea0f85341fccd1ddfd"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-quick-check.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/readingService.ts"
+      ],
+      "sha256": "836a30614e71c2024fd422f20800b254e41b5c1f34e7650d076fae259c24cf7b"
     }
   ],
   "decisions": [

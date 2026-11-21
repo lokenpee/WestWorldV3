@@ -64,7 +64,7 @@ export async function storyPayload(store: AgentStore, scope: Scope, name: string
     const saved = await store.rows('storyEditorNotes')
     const notes: Row[] = records(args.notes).map(note => {
       const old = saved.find(row => row.sessionId === scope.sessionId && row.key === note.key)
-      return { ...note, kind: note.kind ?? old?.kind ?? 'review', nodeIds: note.nodeIds ?? old?.nodeIds ?? [], lineIds: note.lineIds ?? old?.lineIds ?? [], evidence: note.evidence ?? old?.evidence ?? [] }
+      return { ...note, kind: note.kind ?? old?.kind ?? 'review', nodeIds: note.nodeIds ?? old?.nodeIds ?? [], lineIds: note.lineIds ?? old?.lineIds ?? [], ...(note.eventIds || old?.eventIds ? { eventIds: note.eventIds ?? old?.eventIds } : {}), evidence: note.evidence ?? old?.evidence ?? [] }
     })
     if (new Set(notes.map(note => note.key)).size !== notes.length) throw new Error('INVALID_ARGS:同一批线索的key须唯一。')
     return { event_line_ops: [], new_nodes: [], memory_update: { ...(args.workingSummary === undefined ? {} : { workingSummary: args.workingSummary }), notes } }

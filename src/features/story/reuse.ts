@@ -2,15 +2,16 @@ import { hash, records, strings, text } from '../agents/contracts'
 import type { AgentStore, Row } from '../agents/repository'
 import { readingSourceFingerprint } from './sourceFingerprint'
 import { storyContent } from './coverage'
+import { hasOutlineDescription, usesOutline } from './outline'
 
 export interface ReadingCheck extends Row { id: string; type: string; fingerprint: string }
 const portable = (value: unknown): unknown => Array.isArray(value) ? value.map(portable) : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([key]) => !['bookId', 'sessionId', 'basisFingerprint'].includes(key)).map(([key, value]) => [key, portable(value)])) : value
 export async function readingCheck(store: AgentStore, type: string, id: string, sources = new Map<string, string>()): Promise<ReadingCheck> {
-  const table = type === 'line_summary' ? 'eventLines' : type === 'note_page' ? 'storyEditorNotes' : 'nodes'
+  const table = type === 'line_summary' ? 'eventLines' : type === 'event_summary' ? 'storyEvents' : type === 'note_page' ? 'storyEditorNotes' : 'nodes'
   const row = await store.get(table, id)
   const events = table === 'eventLines' && Array.isArray(row?.eventIds) ? await Promise.all(strings(row.eventIds).map(id => store.get('storyEvents', id))) : undefined
   const members = [...new Set([...strings(row?.nodeIds), ...(events ?? []).flatMap(event => strings(event?.nodeIds))])]
-  const nodes = table === 'eventLines' ? (await Promise.all(members.map(id => store.get('nodes', id)))).filter((item): item is Row => !!item) : table === 'nodes' && row ? [row] : []
+  const nodes = table === 'eventLines' || table === 'storyEvents' ? (await Promise.all(members.map(id => store.get('nodes', id)))).filter((item): item is Row => !!item) : table === 'nodes' && row ? [row] : []
   const source: [string, string][] = []
   for (const chapter of new Set(nodes.map(node => text(node.chapterIndex)))) {
     if (!sources.has(chapter)) sources.set(chapter, await readingSourceFingerprint(store, chapter, 'empty'))
@@ -19,17 +20,19 @@ export async function readingCheck(store: AgentStore, type: string, id: string, 
   return { type, id, fingerprint: await store.wait(hash(portable({ row: storyContent(table, row ?? null), nodes: nodes.map(node => storyContent('nodes', node)), source, ...(events ? { events: events.map(event => storyContent('storyEvents', event ?? null)) } : {}) }))) }
 }
 
-export async function usableReadingChecks(store: AgentStore, checks: ReadingCheck[]) {
+export async function usableReadingChecks(store: AgentStore, checks: ReadingCheck[], outline = false) {
   const notes = (await store.rows('storyEditorNotes')).filter(note => note.status === 'active')
   const lines = await store.rows('eventLines')
   const sources = new Map<string, string>()
   const result: ReadingCheck[] = []
   for (const check of checks) {
     if (check.type === 'note_page') continue
-    const row = await store.get(check.type === 'line_summary' ? 'eventLines' : 'nodes', check.id)
+    const table = check.type === 'line_summary' ? 'eventLines' : check.type === 'event_summary' ? 'storyEvents' : 'nodes'
+    const row = await store.get(table, check.id)
     if (!row) continue
-    const members = check.type === 'line_summary' ? strings(row.nodeIds) : [check.id]
-    const affectedLines = check.type === 'line_summary' ? [check.id] : lines.filter(line => strings(line.nodeIds).includes(check.id)).map(line => text(line.id))
+    if (outline && (table === 'storyEvents' || table === 'eventLines' && usesOutline(row)) && !hasOutlineDescription(row)) continue
+    const members = check.type === 'line_summary' || check.type === 'event_summary' ? strings(row.nodeIds) : [check.id]
+    const affectedLines = check.type === 'line_summary' ? [check.id] : check.type === 'event_summary' ? lines.filter(line => strings(line.eventIds).includes(check.id)).map(line => text(line.id)) : lines.filter(line => strings(line.nodeIds).includes(check.id)).map(line => text(line.id))
     if (notes.some(note => strings(note.nodeIds).some(id => members.includes(id)) || strings(note.lineIds).some(id => affectedLines.includes(id)))) continue
     if ((await readingCheck(store, check.type, check.id, sources)).fingerprint === check.fingerprint) result.push(check)
   }
@@ -51,5 +54,5 @@ export async function inheritedReadingChecks(store: AgentStore, phase: string, r
     }
     for (const check of [...records(state?.checks), ...records(state?.reusedChecks)] as ReadingCheck[]) if (!latest.has(`${check.type}:${check.id}`)) latest.set(`${check.type}:${check.id}`, check)
   }
-  return usableReadingChecks(store, [...latest.values()])
+  return usableReadingChecks(store, [...latest.values()], outline)
 }

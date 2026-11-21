@@ -68,8 +68,8 @@ const instructions: Record<WorkKind, string[]> = {
     '- 合并前必须核对成员的实际资料和原文依据；无法确认时登记为待核对。',
   ],
   profile: [
-    '- 以上字段是当前人物的现有资料，已经由程序读取；不要重复查询同一个人物资料。',
-    '- 普通整理不需要查原文；需要逐字依据时再调用 `read_original`。',
+    '- 以上已完整提供本次要整理的人物档案字段。空字段表示当前没有这部分资料；人物资料少时也直接整理，无需重复查详情或补齐空项。',
+    '- 有具体疑点才查原文。`sourceChapters` 是书内章节索引，传给 `read_original` 的 `chapter_indices`。`asset_ids` 填上面的对象编号。',
   ],
   relations: [
     '- 上面的 `已有关系` 是当前人物全部关系概览，已经由程序读取；不要再用 `query_relation_work` 读取关系列表。',

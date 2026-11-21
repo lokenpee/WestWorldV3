@@ -263,6 +263,9 @@
 .run-api-boundary > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem; cursor: pointer; color: var(--muted); font-size: 12px; }
 .run-api-boundary > summary strong { color: inherit; letter-spacing: 0.04em; }
 .run-api-boundary > summary span:last-child { margin-left: auto; color: #4a7; }
+.run-api-slice { display: flex; flex-direction: column; gap: 0.5rem; }
+.run-api-marker { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem; color: var(--muted); font-size: 12px; }
+.run-api-marker strong { letter-spacing: 0.04em; }
 .run-api-boundary-body { margin-top: 0.6rem; }
 .run-api-boundary-body .run-api { margin: 0; }
 .run-compaction { color: var(--muted); font-size: 12px; }

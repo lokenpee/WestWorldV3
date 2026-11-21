@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AssetService } from './service'
 import type { AssetByKind } from './types'
 import { fuseWorldAssets, uniqueStrings, type MergePreview, type MergeRequest, type WorldKind } from './merge'
+import { characterAgeText } from './characterAge'
 
 export function MergeDialog({ bookId, kind, memberIds, service, locked, onClose, onMerged, onPrepared, initialRequest }: {
   bookId: string; kind: WorldKind; memberIds: string[]; service: AssetService; locked: boolean
@@ -68,7 +69,7 @@ export function MergeDialog({ bookId, kind, memberIds, service, locked, onClose,
         <div className="asset-field"><label htmlFor="merge-custom-name">自定义主名</label><input id="merge-custom-name" value={customName} disabled={busy || loading} placeholder="也可以填写新的主名" onChange={event => { setCustomName(event.target.value); setChosenName('') }} /></div>
         {!name && <p className="field-help">所选条目的名称不同，请明确选择合并后的主名。</p>}
         <section className="merge-result" aria-label="融合结果"><h3>{name || '待选择主名'}</h3><p>别名：{proposed.result.aliases?.join('、') || '无'}</p><p>来源章节：{proposed.result.sourceChapters?.join('、') || '人工资料'}</p><p>来源说明：{proposed.result.manualSourceNote || '无'}</p>
-          {kind === 'character' ? <>{(['identity', 'appearance', 'personality', 'background', 'speechStyleSample'] as const).map((field, i) => <p key={field}><strong>{['身份', '外貌', '性格', '背景', '原话片段'][i]}：</strong>{(proposed.result as AssetByKind['character'])[field] || '无'}</p>)}<p>年龄描述：{(proposed.result as AssetByKind['character']).profile?.ageText || '无'}</p></> : <p><strong>地点描述：</strong>{(proposed.result as AssetByKind['location']).description || '无'}</p>}
+          {kind === 'character' ? <>{(['identity', 'appearance', 'personality', 'background', 'speechStyleSample'] as const).map((field, i) => <p key={field}><strong>{['身份', '外貌', '性格', '背景', '原话片段'][i]}：</strong>{(proposed.result as AssetByKind['character'])[field] || '无'}</p>)}<p><strong>年龄：</strong>{characterAgeText((proposed.result as AssetByKind['character']).profile) || '无'}</p></> : <p><strong>地点描述：</strong>{(proposed.result as AssetByKind['location']).description || '无'}</p>}
           {proposed.conflicts.map((conflict, index) => <p className="field-error" key={index}>{conflict}</p>)}
           <details><summary>事实底稿（{proposed.result.mergeFacts?.length ?? 0}条）</summary>{proposed.result.mergeFacts?.map(fact => <p key={fact.id}>{fact.text}（来源：{fact.chapters.join('、') || '人工'}）</p>)}</details>
         </section>

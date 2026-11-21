@@ -7,15 +7,21 @@ import { assetReviewTools, checkLease, commitCommand, relationTools, saveTask, t
 import { noteOrganizationRead } from './organizationReview'
 import { isStoryWrite, storyToolNames, readingToolNames, outlineToolNames } from './storyCommands'
 import { OutlineError } from '../story/outlineCommands'
+import { compactOutlineParameters, linkingDetailDescription, outlineOperations, quickOutlineOps } from '../story/outlineToolSchema'
 import { navigateStoryReading, readingProgress, refreshReading } from '../story/reading'
 import { briefItems, recordStoryReads } from '../story/views'
+import { presentStoryPage } from '../story/readingPresentation'
 import { limitsOriginalRead, readOrganizationOriginal } from './organizationReads'
 
 const tableOf: Record<string, string> = { query_character_catalog: 'characters', get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
+const isOutlineLinking = (scope: Scope) => scope.outline && scope.workflow === 'story_pages_v3' && scope.phase === 'window_link' && !scope.probe
+const pageTools = (scope: Scope) => scope.outline && scope.phase === 'global_review' ? [...outlineToolNames, 'read_original'] : scope.outline ? outlineToolNames : readingToolNames
+const quickStoryTools = ['save_story_outline', 'save_story_notes', 'navigate_story_pages']
 const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.probe) return scope.profile === 'asset_editor'
     ? ['get_character_detail', 'read_original', 'commit_asset_changes', 'submit_result']
     : ['get_editor_memory', 'commit_story_changes', 'submit_result']
+  if (scope.quickStoryCheck) return quickStoryTools
   if (scope.phase === 'character_organization') {
     if (!scope.workKind) return null
     return {
@@ -29,7 +35,7 @@ const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.phase === 'asset_review') return scope.reviewScope === 'relations'
     ? ['get_character_relation', 'get_legacy_relation_records', 'get_character_detail', 'read_original', 'set_character_relation', 'delete_character_relation', 'submit_result']
     : ['get_character_detail', 'get_location_detail', 'get_node_detail', 'get_event_line_detail', 'get_character_relation', 'read_original', 'edit_character', 'edit_location', 'edit_event_node', 'edit_event_line', 'set_character_relation', 'delete_character_relation', 'submit_result']
-  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...(scope.outline ? outlineToolNames : readingToolNames), 'navigate_story_pages'] : scope.workflow === 'story_lines_v2' ? storyToolNames.filter(name => name !== 'save_story_outline') : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
+  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...pageTools(scope), 'navigate_story_pages'].filter(name => !isOutlineLinking(scope) || name !== 'search_story_context') : scope.workflow === 'story_lines_v2' ? storyToolNames.filter(name => name !== 'save_story_outline') : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
   return null
 }
 export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
@@ -40,13 +46,19 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
   let navigationCallId: string | undefined
   const relationOnly = scope.phase === 'asset_review' && scope.reviewScope === 'relations'
   const organization = scope.phase === 'character_organization'
+  const storyProbe = scope.probe && scope.profile === 'story_editor'
   const pages = scope.workflow === 'story_pages_v3' && !scope.probe
   const story = scope.profile === 'story_editor' && (scope.workflow === 'story_lines_v2' || pages) && !scope.probe
   const finishContract = toolContracts.story_editor.find(tool => tool.name === 'finish_story_batch')!
   const workKind = scope.workKind
+  const linking = isOutlineLinking(scope)
+  const outlineSchema = toolContracts.story_editor.find(tool => tool.name === 'save_story_outline')!.parameters
+  const operationRules = outlineOperations(outlineSchema)
   // 模型只填写业务参数；执行入口继续兼容历史调用中的操作键和批次依据。
   const modelParameters = (name: string, schema: AgentTool['parameters']): AgentTool['parameters'] => {
+    if (linking && name === 'save_story_outline') return compactOutlineParameters(schema, scope.quickStoryCheck)
     const properties = { ...((schema as { properties?: Row }).properties) }
+    if (name === 'navigate_story_pages' && scope.phase !== 'global_review') delete properties.noteResults
     if (organization && ['save_identity_groups', 'navigate_identity_pages', 'submit_profile_review', 'submit_relation_review'].includes(name)) delete properties.operationKey
     if (organization && name === 'submit_relation_review') delete properties.basis
     if (isStoryWrite(name)) delete properties.operationKey
@@ -71,15 +83,24 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
       ? contract.name !== 'commit_asset_changes'
       : !(assetReviewTools as readonly string[]).includes(contract.name) && contract.name !== 'get_character_relation')
     .filter(contract => contract.kind !== 'finish' && (story ? storyToolNames.includes(contract.name) || pages && contract.name === 'navigate_story_pages' : !isStoryWrite(contract.name) && !['get_story_detail', 'navigate_story_pages'].includes(contract.name)))
-    .filter(contract => !pages || [...(scope.outline ? outlineToolNames : readingToolNames), 'navigate_story_pages'].includes(contract.name))
+    .filter(contract => !pages || [...pageTools(scope), 'navigate_story_pages'].includes(contract.name))
     .filter(contract => scope.outline || contract.name !== 'save_story_outline')
+    .filter(contract => !linking || contract.name !== 'search_story_context')
+    .filter(contract => !scope.quickStoryCheck || quickStoryTools.includes(contract.name))
     .filter(contract => !relationOnly || contract.kind !== 'write' || (relationTools as readonly string[]).includes(contract.name))
-  const allTools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
+  const allTools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: linking && contract.name === 'get_story_detail' ? linkingDetailDescription : contract.description, label: contract.name,
     parameters: modelParameters(contract.name, parametersFor(contract, scope.workflow, scope.outline)),
     outputSchema: resultFor(contract.name, scope.outline),
     async execute(toolCallId, parameters, signal) {
       assertScope(scope, repo.bookId); signal?.throwIfAborted()
-      try { validate(parametersFor(contract, scope.workflow, scope.outline), parameters) }
+      try {
+        if (contract.name === 'save_story_outline') for (const [index, operation] of records((parameters as Row)?.operations).entries()) {
+          if (scope.quickStoryCheck && !quickOutlineOps.includes(text(operation?.op))) throw new Error('INVALID_ARGS:快速核对只能调整节点在现有事件中的归属。')
+          const rule = operationRules.find(rule => rule.properties.op.const === operation?.op)
+          if (rule) validate(rule, operation, `INVALID_ARGS:第 ${index + 1} 项 ${text(operation.op)} 的参数不符合要求。`)
+        }
+        validate(parametersFor(contract, scope.workflow, scope.outline), parameters)
+      }
       catch (error) {
         if (contract.name !== 'save_story_outline') throw error
         const value = { ok: false, code: 'INVALID_ARGS', message: error instanceof Error ? error.message : String(error) }
@@ -99,7 +120,8 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
           const actual = await repo.transaction(false, async store => strings((await taskOf(store, scope)).task.appliedCommitIds))
           summary = { status: 'completed', commitIds: actual, summary: value.summary, reviewedItems: [], remainingWorkIds: [] }
         }
-        return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as JsonValue }
+        const presented = scope.outline ? { ...value, page: presentStoryPage(value.page) } : value
+        return { content: [{ type: 'text', text: JSON.stringify(presented, null, scope.outline ? 2 : undefined) }], details: value, structuredContent: value as JsonValue }
       }
       if (story && isStoryWrite(contract.name)) {
         const { operationKey: _key, ...payload } = args
@@ -274,7 +296,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
   const initialNames = new Set((selected ?? contracts.map(contract => contract.name)).filter(name => catalog.has(name)))
   if (submitTool && (!selected || selected.includes(submitTool.name))) initialNames.add(submitTool.name)
   const activeNames = new Set(initialNames)
-  const discoveryTools: AgentTool[] = contractIdentityScope() || story ? [] : [
+  const discoveryTools: AgentTool[] = contractIdentityScope() || story || storyProbe ? [] : [
     { name: 'get_tools', label: '查看可用工具', description: '列出当前任务允许但尚未开放的工具名称和简介；需要参数时再用 get_tools_detail。', parameters: { type: 'object', additionalProperties: false, properties: {} },
       async execute(_id, _parameters, signal) {
         assertScope(scope, repo.bookId); signal?.throwIfAborted()
@@ -292,7 +314,12 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value as unknown as JsonValue }
       } },
   ]
-  const currentTools = () => [...allTools.filter(tool => activeNames.has(tool.name)), ...(submitTool && activeNames.has(submitTool.name) ? [submitTool] : []), ...discoveryTools]
+  const currentTools = () => {
+    const available = [...allTools.filter(tool => activeNames.has(tool.name)), ...(submitTool && activeNames.has(submitTool.name) ? [submitTool] : []), ...discoveryTools]
+    if (!storyProbe) return available
+    const current = !readCalls ? 'get_editor_memory' : !writeCalls ? 'commit_story_changes' : 'submit_result'
+    return available.filter(tool => tool.name === current)
+  }
   const activate = (name: string) => { if (!catalog.has(name)) return false; activeNames.add(name); return true }
   const tools = [...allTools, ...(submitTool ? [submitTool] : []), ...discoveryTools]
   return { tools, initialTools: currentTools(), currentTools, activate, reads,

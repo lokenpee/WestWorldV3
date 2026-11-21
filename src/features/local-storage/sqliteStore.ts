@@ -146,7 +146,7 @@ export class SqliteRecordStore {
     const rows = this.database.prepare(`SELECT json_object(${columns}) AS value FROM records WHERE scope=? AND tableName=?`).all(scope, pageTables[kind]).map(row => JSON.parse(String(row.value))) as (SearchAsset & StoredValue)[]
     // 缺失字段不投影成null，保持原搜索的字段分支与数组默认值。
     for (const row of rows) for (const key of Object.keys(row)) if (row[key] === null) delete row[key]
-    const chapters = options.query?.trim() ? this.database.prepare("SELECT json_extract(body,'$.chapterIndex') AS chapterIndex,json_extract(body,'$.order') AS 'order' FROM records WHERE scope=? AND tableName='chapters'").all(scope) as unknown as { chapterIndex: string; order: number }[] : []
+    const chapters = kind === 'node' || options.query?.trim() ? this.database.prepare("SELECT json_extract(body,'$.chapterIndex') AS chapterIndex,json_extract(body,'$.order') AS 'order' FROM records WHERE scope=? AND tableName='chapters'").all(scope) as unknown as { chapterIndex: string; order: number }[] : []
     return makeAssetPage(kind, rows, chapters, options)
   }
   notificationFields(scope: string, table: string, key: string): StoredValue | undefined { return this.database.prepare("SELECT json_extract(body,'$.type') AS type,json_extract(body,'$.recordType') AS recordType,json_extract(body,'$.stage') AS stage FROM records WHERE scope=? AND tableName=? AND recordKey=?").get(scope, table, key) }

@@ -15,7 +15,7 @@ interface BaseAsset { id: string; bookId: string; revision: number; createdBy: '
 export interface Fact { id: string; field: string; text: string; chapters: string[] }
 export interface Frequency { chapters: number; mentions: number; scopeChapters: number; percentile: number }
 interface WorldAsset extends BaseAsset {
-  name: string; aliases?: string[]; confidence: number; chapterIndex?: string; chapterName?: string
+  name: string; aliases?: string[]; confidence?: number; chapterIndex?: string; chapterName?: string
   verifiedAliases?: string[]
   sourceChapters?: string[]; manualSourceNote?: string; nameSource?: 'extracted' | 'automatic' | 'manual'; manualKeep?: boolean
   updatedAt?: string; mergeFacts?: Fact[]; mergeNotes?: string[]; optimizedFactIds?: string[]; optimizationFingerprint?: string; frequency?: Frequency
@@ -31,21 +31,21 @@ export interface LegacyRelation { target: string; relation_type: string; relatio
 export interface LocationAsset extends WorldAsset { description?: string }
 export interface EventNode extends BaseAsset {
   name: string; summary: string; process?: string; chapterIndex: string; chapterName: string; quote: string; offset?: number
-  order: number; actors: string[]; targets?: string[]; eventLineIds?: string[]; confidence: number
+  order: number; actors: string[]; targets?: string[]; eventLineIds?: string[]; confidence?: number
   actorIds?: string[]; targetCharacterIds?: string[]
   actorBindings?: CharacterBinding[]; targetBindings?: CharacterBinding[]
   manualActorIds?: string[]; manualTargetCharacterIds?: string[]
   legacyActorIds?: string[]; legacyTargetCharacterIds?: string[]
   quoteStatus?: 'matched' | 'unmatched' | 'empty'
-  locationNames?: string[]; world_delta?: string[]; new_facts?: string[]; started_actions?: string[]; time_text?: string; time_hint?: string
+  locationNames?: string[]; clues?: string[]; world_delta?: string[]; new_facts?: string[]; started_actions?: string[]; time_text?: string; time_hint?: string
   timeCoord?: string; timePrecision?: string
 }
 export interface EventLine extends BaseAsset {
-  title: string; summary?: string; nodeIds: string[]; chapters: string[]; cause: string; process: string; result: string
+  title: string; summary?: string; coreClue?: string; nodeIds: string[]; chapters: string[]; cause: string; process: string; result: string
   lineStatus: 'open' | 'closed'; updatedAt: string; timeRange?: string[]
   eventIds?: string[]; outlinePending?: boolean; role?: 'main' | 'sub'; legacyNodeIds?: string[]
 }
-export interface StoryEvent { id: string; bookId: string; title: string; nodeIds: string[]; revision: number }
+export interface StoryEvent { id: string; bookId: string; title: string; nodeIds: string[]; summary?: string; coreClue?: string; revision: number }
 export interface StoryMembership { lineId: string | null; eventId: string | null }
 /** 节点里的称呼绑定：一个原始称呼连同它命中的全部人物编号。 */
 export interface CharacterBinding { mention: string; ids: string[] }
@@ -124,7 +124,7 @@ export interface AssetInput {
   name?: string; title?: string; aliases?: string[]; chapterIndex?: string; manualSourceNote?: string
   identity?: string; ageText?: string; appearance?: string; personality?: string; background?: string; speechStyleSample?: string
   roleWeight?: RoleWeight; description?: string; summary?: string; process?: string; quote?: string
-  actors?: string[]; targets?: string[]; locationNames?: string[]; time_text?: string; time_hint?: string; world_delta?: string[]; new_facts?: string[]; started_actions?: string[]
+  actors?: string[]; targets?: string[]; locationNames?: string[]; clues?: string[]; time_text?: string; time_hint?: string; world_delta?: string[]; new_facts?: string[]; started_actions?: string[]
   actorIds?: string[]; targetCharacterIds?: string[]
   participantIds?: string[]; unlinkedParticipants?: string[]
   nodeIds?: string[]; cause?: string; result?: string; lineStatus?: 'open' | 'closed'

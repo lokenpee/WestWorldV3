@@ -86,9 +86,9 @@ export function projectExecution(chain: ExecutionChain): ProjectedExecution {
   return { events, apiByToolCall: requestByToolCall, requests: chain.requests }
 }
 
-/** 从实际请求和响应重建阅读顺序；仅省略下一请求重带的同一段上下文。 */
-export function projectRequestConversation(chain: ExecutionChain): ExecutionEvent[] {
-  if (!chain.requests.length || chain.requests.some(row => record(row.input).messageFormat !== 'provider-request/v1')) return projectExecution(chain).events
+/** 从请求和响应重建阅读顺序，P2 只显示前一轮尚未展示的输入。 */
+export function projectRequestConversation(chain: ExecutionChain, deltaOnly = false): ExecutionEvent[] {
+  if (!chain.requests.length || !deltaOnly && chain.requests.some(row => record(row.input).messageFormat !== 'provider-request/v1')) return projectExecution(chain).events
   const events: ExecutionEvent[] = []
   let context: ExecutionEvent[] = []
   const signature = (event: ExecutionEvent) => JSON.stringify([event.role, event.content, event.toolCallId, event.toolCalls.map(call => [call.id, call.name, call.arguments])])
@@ -105,10 +105,29 @@ export function projectRequestConversation(chain: ExecutionChain): ExecutionEven
   }
   chain.requests.forEach((request, index) => {
     const apiIndex = index + 1, requestKey = text(request.requestId ?? request.id)
-    const input = messageRows(list(record(request.input).messages)).map((message, at) => convert(message, `${requestKey}:input:${at}`, apiIndex))
-    let common = 0
-    while (common < input.length && common < context.length && signature(input[common]) === signature(context[common])) common++
-    events.push(...input.slice(common))
+    const saved = record(request.input)
+    const messages = messageRows(list(saved.messages))
+    if (saved.messageFormat !== 'provider-request/v1' && !messages.some(message => message.role === 'system')) {
+      const snapshot = chain.snapshots.get(text(saved.systemPromptSnapshotId))
+      if (snapshot?.content) messages.unshift({ role: 'system', content: snapshot.content })
+    }
+    const input = messages.map((message, at) => convert(message, `${requestKey}:input:${at}`, apiIndex))
+    if (deltaOnly) {
+      const carried = new Map<string, number>()
+      for (const event of context) {
+        const key = signature(event)
+        carried.set(key, (carried.get(key) ?? 0) + 1)
+      }
+      for (const event of input) {
+        const key = signature(event), count = carried.get(key) ?? 0
+        if (count) carried.set(key, count - 1)
+        else events.push(event)
+      }
+    } else {
+      let common = 0
+      while (common < input.length && common < context.length && signature(input[common]) === signature(context[common])) common++
+      events.push(...input.slice(common))
+    }
     context = [...input]
     const calls = list(request.toolCalls)
     if (request.text || request.thinking || calls.length) {

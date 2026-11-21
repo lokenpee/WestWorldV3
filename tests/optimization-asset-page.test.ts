@@ -37,7 +37,8 @@ test('opt19：地点首屏不读取其他三类资产与人物关系', async () 
     const full = await service.readContent('book')
     for (const kind of Object.keys(assetTables) as AssetKind[]) {
       for (const query of ['', '1', '摘要', '地点介绍']) {
-        const all = kind === 'character' ? searchCharacters(full.characters, query) : searchAssets<SearchAsset>(full[assetTables[kind]], query)
+        const all = kind === 'node' && !query ? [...full.nodes].sort((a, b) => a.order - b.order)
+          : kind === 'character' ? searchCharacters(full.characters, query) : searchAssets<SearchAsset>(full[assetTables[kind]], query)
         const paged: string[] = []
         for (let offset = 0; offset < Math.max(1, all.length); offset += 100) {
           const page = await service.readAssetPage('book', kind, { query, offset, selectedIds: [full[assetTables[kind]][0].id, 'missing'] })

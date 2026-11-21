@@ -38,6 +38,7 @@
 - [x] 3.10 非 P2 回归：P3/其他 Agent 的 System Prompt、工具集、提交和总结行为不变。检查 T13。
 - [x] 3.11 scan/resolve 回归：目录和疑似组仍使用各自提示词/工具及 submit_result。检查 T14。
 - [x] 3.12 用户授权后用真实单人/8 人复核 P2；P3 仅做自动回归。未验收不归档、不提交 Git。
+- [x] 3.13 BUG-53。强化稀疏档案说明及原文入参引导，核对合法查阅、失败纠正和空提交。[检查记录](acceptance.md#2026-11-21-p2-资料首轮与原文定位)
 
 当前进展：`npm run typecheck`、全量单元测试（476 通过 / 3 跳过）、`npm run build`、`npm run governance:check`、OpenSpec 严格校验及世界/叙事/Agent 开发与生产浏览器测试（38 项）通过。`tests/organization.test.ts` 覆盖第二步/第三步候选优先调度、写后版本和跨步骤失效范围；`tests/agents.test.ts` 覆盖 P3 包装提示词未受影响。
 

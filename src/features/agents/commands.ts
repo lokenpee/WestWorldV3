@@ -1,7 +1,7 @@
 import type { AgentRepository, AgentStore, Row } from './repository'
 import { canonical, hash, records, strings, text, toolContracts, validate, parametersFor } from './contracts'
 import { applyOutline, OutlineError } from '../story/outlineCommands'
-import { recordStoryReads } from '../story/views'
+import { recordStoryReads, storyView } from '../story/views'
 import { assertScope, noteFingerprint, readTool, resolveAsset, type Scope } from './queries'
 import { detailTokens } from '../assets/merge'
 import { mergeWorldAssets } from '../assets/mergeCore'
@@ -181,7 +181,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
   const modern = ['story_lines_v2', 'story_pages_v3'].includes(scope.workflow ?? '')
   const paged = scope.workflow === 'story_pages_v3'
   let changed = false
-  const savedNodes: Row[] = [], lineIds: string[] = []
+  const savedNodes: Row[] = [], savedNotes: Row[] = [], lineIds: string[] = []
   const wasDetailed = (table: string, id: string) => {
     if (paged && readSet.records.some(read => read.table === table && (read.id === id || read.resolvedId === id))) return true
     const tool = ({ nodes: 'get_node_detail', eventLines: 'get_event_line_detail', storyEditorNotes: 'get_editor_note_detail' } as Record<string, string>)[table]
@@ -292,15 +292,28 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     } else await assertEvidence(store, records(note.evidence))
     if (!paged && !strings(note.nodeIds).length && !strings(note.lineIds).length && !records(note.evidence).length) throw new Error('INVALID_ARGS:工作事项须有节点、事件线或引文依据。')
     for (const id of strings(note.nodeIds)) if (!await store.get('nodes', resolveId(id))) throw new Error('INVALID_ARGS:事项节点不存在。')
+    for (const id of strings(note.eventIds)) if (!await store.get('storyEvents', id)) throw new Error('INVALID_ARGS:事项事件不存在。')
     for (const id of strings(note.lineIds)) if (!await store.get('eventLines', id)) throw new Error('INVALID_ARGS:事项事件线不存在。')
     const old = (await store.rows('storyEditorNotes')).find(row => row.sessionId === scope.sessionId && row.key === note.key)
-    if (old && note.status === 'resolved' && !wasDetailed('storyEditorNotes', text(old.id))) throw new Error(modern ? 'INVALID_ARGS:解决已有线索前须调用get_story_detail核对该事项。' : 'INVALID_ARGS:解决已有线索前须调用get_editor_note_detail核对该事项。')
-    const resolvedNote = { ...note, nodeIds: strings(note.nodeIds).map(resolveId) }
-    if (old && canonical(resolvedNote) === canonical(Object.fromEntries(Object.keys(resolvedNote).map(key => [key, old[key]])))) continue
-    changed = true
-    await store.put('storyEditorNotes', { ...old, ...resolvedNote, id: old?.id ?? crypto.randomUUID(), bookId: scope.bookId, ...(scope.sessionId ? { sessionId: scope.sessionId } : {}), revision: Number(old?.revision ?? 0) + 1, stage: 'P3', basisFingerprint: await noteFingerprint(store, resolvedNote), createdAt: old?.createdAt ?? timestamp, updatedAt: timestamp })
+    if (old && note.status === 'resolved' && !wasDetailed('storyEditorNotes', text(old.id))) {
+      if (paged && scope.outline) {
+        const lookup = JSON.stringify({ kind: 'note', ids: [old.id] })
+        const hint = scope.quickStoryCheck ? '请在正常串联或全书复核中' : '请先'
+        throw new Error(`READ_REQUIRED:关闭已有事项前需核对该事项。${hint}调用 get_story_detail ${lookup}。`)
+      }
+      throw new Error(modern ? 'INVALID_ARGS:解决已有线索前须调用get_story_detail核对该事项。' : 'INVALID_ARGS:解决已有线索前须调用get_editor_note_detail核对该事项。')
+    }
+    const resolvedNote = { ...note, ...(paged && scope.outline ? { basisVersion: 2 } : {}), nodeIds: strings(note.nodeIds).map(resolveId) }
+    let saved = old
+    const basisFingerprint = await noteFingerprint(store, resolvedNote)
+    if (!old || old.basisFingerprint !== basisFingerprint || canonical(resolvedNote) !== canonical(Object.fromEntries(Object.keys(resolvedNote).map(key => [key, old[key]])))) {
+      changed = true
+      saved = { ...old, ...resolvedNote, id: old?.id ?? crypto.randomUUID(), bookId: scope.bookId, ...(scope.sessionId ? { sessionId: scope.sessionId } : {}), revision: Number(old?.revision ?? 0) + 1, stage: 'P3', basisFingerprint, createdAt: old?.createdAt ?? timestamp, updatedAt: timestamp }
+      await store.put('storyEditorNotes', saved)
+    }
+    if (paged && scope.outline && saved) savedNotes.push(storyView(saved, 'note', true))
   }
-  return { changed, nodes: savedNodes, lineIds }
+  return { changed, nodes: savedNodes, lineIds, ...(savedNotes.length ? { notes: savedNotes } : {}) }
 }
 
 export const assetReviewTools = ['edit_character', 'edit_location', 'edit_event_node', 'edit_event_line', 'set_character_relation', 'delete_character_relation'] as const
@@ -542,6 +555,7 @@ export async function commitCommand(repo: AgentRepository, scope: Scope, name: s
       await store.put('pipelineRuns', { ...latest, ...(assetReview ? { assetReview } : {}), appliedCommands: [...records(latest.appliedCommands), { taskId: scope.taskId, ...(scope.unitId ? { unitId: scope.unitId } : {}), operationKey, payloadFingerprint, commitId, committedAt: timestamp, resultSummary: summary, ...(toolResult ? { result: { ...toolResult } } : {}) }], commandIntents: records(latest.commandIntents).map(row => row.operationKey === operationKey ? { ...row, state: 'applied', commitId, updatedAt: timestamp } : row), tasks: records(latest.tasks).map(row => row.taskId === scope.taskId ? updatedTask : row) })
       await appendEntry(store, scope, { type: 'commit', summary: `${commitId}：${summary}` })
       if (outlineWrite) await recordStoryReads(store, updatedReads, records(storyResult?.changes).filter(item => item.action === 'created'))
+      if (name === 'save_story_notes' && storyResult?.notes) await recordStoryReads(store, updatedReads, records(storyResult.notes))
       await rebaseReadSet(store, scope, updatedReads)
       await saveTask(store, scope, { readSet: updatedReads })
       if (name === 'commit_story_changes' || isStoryWrite(name)) {

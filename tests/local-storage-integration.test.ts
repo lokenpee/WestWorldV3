@@ -10,12 +10,15 @@ import { transact } from '../src/lib/storage/transaction'
 import { createModelConfigStore } from '../src/features/models/config'
 import { createModelService } from '../src/features/models/service'
 import { createStoryService } from '../src/features/story/service'
+import { createExtractionService } from '../src/features/extraction/service'
+import { createBackupService } from '../src/features/backup/service'
 import { defaultConfig } from '../src/features/models/types'
 import type { StorageCall } from '../src/features/local-storage/client'
 import type { StoredValue } from '../src/features/local-storage/contracts'
 import { migrateBrowserData } from '../src/features/local-storage/migration'
 import { createImportService } from '../src/lib/storage/importService'
 import { createAssetService } from '../src/features/assets/service'
+import { makeAssetPage, type AssetPage } from '../src/features/assets/assetPage'
 import { DEFAULT_CHAPTER_PATTERN, splitChapters } from '../src/features/import/text'
 import { SqliteRecordStore } from '../src/features/local-storage/sqliteStore'
 import { readBookTrace } from '../src/features/agents/trace'
@@ -23,6 +26,7 @@ import { character, createLegacyBook, bookSchemaV5 } from './support/legacy-book
 import { checksumOf } from '../src/features/backup/codec'
 import { emptyTables } from '../src/features/backup/data'
 import { storyResponse, storyTask } from './support/story-protocol'
+import { agentStream } from './support/agent-protocol'
 const protector = { protect: (text: string) => Buffer.from(text).toString('base64'), unprotect: (text: string) => Buffer.from(text, 'base64').toString() }
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => { vi.restoreAllMocks(); for (const cleanup of cleanups.splice(0)) await cleanup() })
@@ -32,7 +36,7 @@ function fixture() {
   const call: StorageCall = async body => JSON.parse(JSON.stringify(await service.execute(JSON.parse(JSON.stringify(body))) ?? null))
   const workspace = createWorkspace({ settingsName: 'test', bookPrefix: 'test-' }, call)
   cleanups.push(async () => { workspace.close(); await service.close(); rmSync(dir, { recursive: true, force: true }) })
-  return { service, workspace, call }
+  return { service, workspace, call, dir }
 }
 test('disk settings save and credential load share an atomic transaction', async () => {
   const { workspace } = fixture()
@@ -66,9 +70,10 @@ test('P3 Agent 在本机书库暂停后续接同一事件并完成全书复核',
   const seen: { phase: string; page: number }[] = []
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string)
+    if (body.tools.length === 1 && body.tools[0].function.name === 'submit_result') return storyResponse(body)
     const { input } = storyTask(body)
     expect(body.tools.map((tool: { function: { name: string } }) => tool.function.name).sort()).toEqual([
-      'finish_story_batch', 'get_story_detail', 'navigate_story_pages', 'save_story_notes', 'save_story_outline', 'search_story_context',
+      'finish_story_batch', 'get_story_detail', 'navigate_story_pages', ...(input.phase === 'global_review' ? ['read_original'] : []), 'save_story_notes', 'save_story_outline', ...(input.phase === 'global_review' ? ['search_story_context'] : []),
     ])
     seen.push({ phase: input.phase, page: input.page.pageNumber })
     if (!resume && input.page.pageNumber === 2) {
@@ -102,10 +107,81 @@ test('P3 Agent 在本机书库暂停后续接同一事件并完成全书复核',
   expect(reviewed.progress).toMatchObject({ status: 'completed', phase: 'global_review' })
   expect(reviewed.review.pending).toBe(0)
   expect(seen.some(item => item.phase === 'global_review')).toBe(true)
+
+  const linking = (await resumed.execution(bookId, 'window_link'))!
+  const review = (await resumed.execution(bookId, 'global_review'))!
+  expect(linking.runId).not.toBe(review.runId)
+  expect(linking.chain.requests.length).toBeGreaterThan(0)
+  expect(review.chain.requests.length).toBeGreaterThan(0)
+  expect(linking.chain.requests.some(row => review.chain.requests.some(other => row.requestId === other.requestId))).toBe(false)
+  expect(review.chain.requests[0].timelineOrdinal).toBe(1)
+  const request = await review.chain.paging!.loadRequest(review.chain.requests[0])
+  expect(JSON.stringify(request.request.input)).toContain('全书剧情大纲复核')
+  await expect(review.chain.paging!.loadRequest(linking.chain.requests[0])).rejects.toThrow('不属于当前范围')
+  expect(await reopened.openBook(bookId).table('storyEvents').get(original.id)).toMatchObject({ coreClue: expect.stringMatching(/去向/) })
+
+  await resumed.review(bookId, 'all')
+  expect(resumed.state(bookId)?.error).toBeUndefined()
+  expect((await resumed.execution(bookId, 'global_review'))?.runId).not.toBe(review.runId)
+  expect((await resumed.execution(bookId, 'window_link'))?.runId).toBe(linking.runId)
 }, 30000)
 
 const text = '第一章 书信\n沈青收到信。'
 const preview = () => ({ fileName: '迁移样本.txt', byteLength: new TextEncoder().encode(text).length, text, encoding: 'UTF-8' as const, pattern: DEFAULT_CHAPTER_PATTERN, chapters: splitChapters(text, DEFAULT_CHAPTER_PATTERN) })
+
+test('P1 精简字段与旧字段同库存入 SQLite，并通过书籍备份恢复', async () => {
+  const { workspace, dir } = fixture()
+  const importer = createImportService(workspace)
+  cleanups.unshift(async () => importer.close())
+  const book = await importer.importNovel(preview())
+  const db = workspace.openBook(book.id)
+  const assets = createAssetService(workspace)
+  const oldPerson = await assets.create(book.id, 'character', { name: '老船工', chapterIndex: '1' })
+  await db.table('characters').update(oldPerson.id, { profile: { age: 46 } })
+  const oldNode = await assets.create(book.id, 'node', {
+    name: '保留旧账册', summary: '老船工拿出账册', chapterIndex: '1', targets: ['旧账册'], started_actions: ['核账'],
+  })
+
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const world = JSON.parse(init?.body as string).tools[0].function.parameters.properties.characters
+    const args = world ? {
+      characters: [
+        { name: '沈青', profile: { ageText: '十四五岁' }, relations: [{ target: '顾衡', relation_type: 'friendship', relation_label: '朋友', reverse_label: '朋友', quote: '沈青与顾衡是朋友' }] },
+        { name: '顾衡' },
+      ],
+      locations: [{ name: '青石码头' }],
+    } : { nodes: [{ name: '沈青收信', summary: '沈青收到来信。', quote: '沈青收到信。', actors: ['沈青', '顾衡'], clues: [' 来信 ', '来信'] }] }
+    return agentStream([{ name: 'submit_result', args }])
+  })
+  const models = createModelService(workspace, { fetch: fetcher, wait: async (_ms, signal) => signal.throwIfAborted() })
+  await models.settings.save({ ...defaultConfig, providerId: 'custom', baseUrl: 'https://p1-fields-disk.invalid/v1', extractionModel: 'test' }, 'fixture-key')
+  const extraction = createExtractionService(workspace, models)
+  await extraction.start(book.id)
+  expect((await extraction.progress(book.id))?.status).toBe('completed')
+  const node = await db.table('nodes').get('C1-N001')
+  expect(node).toMatchObject({ actors: ['沈青', '顾衡'], clues: ['来信'] })
+  await assets.update(book.id, 'node', node!.id, node!.revision, { clues: ['顾衡来信'] })
+
+  const persisted = new SqliteRecordStore(dir)
+  const stored = (table: string, key: string) => persisted.get({ scope: `book:${book.id}`, table, key })?.value
+  try {
+    expect(stored('nodes', node!.id)).toMatchObject({ clues: ['顾衡来信'] })
+    for (const field of ['targets', 'started_actions', 'confidence']) expect(stored('nodes', node!.id)).not.toHaveProperty(field)
+    expect(stored('characters', 'C1-P001')).toMatchObject({ profile: { ageText: '十四五岁' } })
+    expect(stored('characters', 'C1-P001')).not.toHaveProperty('confidence')
+    expect(stored('locations', 'C1-L001')).not.toHaveProperty('confidence')
+    expect(stored('characters', oldPerson.id)).toMatchObject({ profile: { age: 46 }, confidence: 0.5 })
+    expect(stored('nodes', oldNode.id)).toMatchObject({ targets: ['旧账册'], started_actions: ['核账'] })
+  } finally { persisted.close() }
+
+  const backups = createBackupService(workspace, importer)
+  const { bytes } = await backups.exportBook(book.id)
+  const restored = workspace.openBook((await backups.importBackup(bytes)).id)
+  expect(await restored.table('nodes').get(node!.id)).toMatchObject({ clues: ['顾衡来信'] })
+  expect(await restored.table('nodes').get(oldNode.id)).toMatchObject({ targets: ['旧账册'], started_actions: ['核账'] })
+  expect(await restored.table('characters').get(oldPerson.id)).toMatchObject({ profile: { age: 46 }, confidence: 0.5 })
+  expect(await restored.table('characterRelations').toArray()).toMatchObject([{ direction: 'bidirectional', forwardLabel: '朋友', reverseLabel: '朋友' }])
+})
 
 test('migration interrupted before publication retries without duplicates and keeps source and credentials', async () => {
   const { workspace, call } = fixture()
@@ -215,6 +291,24 @@ test('disk trace pagination returns the requested page and only its referenced s
   expect(page.snapshots.get('prompt')?.text).toBe('fixture')
   const older = await call<{ rows: StoredValue[]; total: number }>({ action: 'tracePage', scope: 'book:book', options: { runId: 'run', unitId: 'profile:p1', before: { startedAt: '2026-11-13T00:00:00.000Z', requestId: 'r056' }, limit: 2 } })
   expect(older.rows.map(row => row.requestId)).toEqual(['r054', 'r055'])
+})
+
+test('事件节点列表先按章节和章内顺序排序再分页，保留缺号后的节点编号', async () => {
+  const { workspace, call } = fixture(), bookId = 'ordered-nodes', db = workspace.openBook(bookId)
+  const chapters = ['9', '3'].map((chapterIndex, order) => ({ bookId, chapterIndex, order, chapterName: `样本 ${chapterIndex}`, charCount: 0 }))
+  const nodes = [
+    { bookId, id: 'C3-N001', name: '甲节点', chapterIndex: '3', order: 0 },
+    { bookId, id: 'C9-N007', name: '乙节点', chapterIndex: '9', order: 1 },
+    { bookId, id: 'C9-N004', name: '丙节点', chapterIndex: '9', order: 0 },
+  ]
+  await db.chapters.bulkPut(chapters)
+  await db.table('nodes').bulkPut(nodes)
+  const options = { limit: 2 }
+  const read = (offset: number) => call<AssetPage>({ action: 'assetPage', scope: `book:${bookId}`, kind: 'node', options: { ...options, offset } })
+  const first = await read(0)
+  expect(first).toEqual(makeAssetPage('node', nodes, chapters, options))
+  expect(first.items.map(item => item.id)).toEqual(['C9-N004', 'C9-N007'])
+  expect((await read(2)).items.map(item => item.id)).toEqual(['C3-N001'])
 })
 
 test('automatic backup failure stays visible without undoing saved data and can be retried', async () => {

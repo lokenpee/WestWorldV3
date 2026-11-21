@@ -112,6 +112,7 @@ export async function readReadingStatus(workspace: Workspace, bookId: string) {
     }
     const current = readingProgress(memo.current)
     const line = current.lineId ? await store.get('eventLines', current.lineId) : undefined
+    const event = current.eventId ? await store.get('storyEvents', current.eventId) : undefined
     const chapters = await store.rows('chapters') as unknown as Chapter[]
     const covered = coverage(chapters, await scoped.table('extractionReceipts').toArray() as Receipt[]).allCovered
     const leaseIds = ['lease:narrative', 'lease:world', 'lease:extraction', 'lease:extraction:worldAssets', 'lease:extraction:narrativeAssets']
@@ -128,6 +129,6 @@ export async function readReadingStatus(workspace: Workspace, bookId: string) {
     }
     caches.set(db, cache)
     return { ...value, activityTasks: tasks.filter(task => task.phase === phase).map(task => ({ taskId: task.taskId, stepsUsed: task.stepsUsed, lastError: task.lastError, status: task.status })),
-      reading: { ...current, pages: memo.current.pages.map(page => ({ id: page.id, type: page.type, reason: page.reason, checked: page.checkedFingerprint === page.fingerprint })), lineTitle: text(line?.title) } }
+      reading: { ...current, pages: memo.current.pages.map(page => ({ id: page.id, type: page.type, reason: page.reason, checked: page.checkedFingerprint === page.fingerprint })), lineTitle: text(line?.title), eventTitle: text(event?.title) } }
   })
 }

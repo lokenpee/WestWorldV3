@@ -10,12 +10,12 @@ export function agentStream(calls: { name: string; args: unknown }[]) {
 }
 
 export function agentResponse(body: { tools: { function: { name: string } }[]; messages: unknown[] }): Response {
-    const story = body.tools.some((tool: { function: { name: string } }) => tool.function.name === 'get_editor_memory')
+    const story = body.tools.some((tool: { function: { name: string } }) => ['get_editor_memory', 'commit_story_changes'].includes(tool.function.name))
     const messages = body.messages as { role: string; content: unknown; tool_calls?: unknown[] }[]
     const user = messages.filter(row => row.role === 'user').map(row => contentOf(row.content)).join('\n')
     const current = messages.findLast(row => row.role === 'user' && contentOf(row.content).includes('operationKey'))
     let input: Row = {}; try { input = JSON.parse(contentOf(current?.content)) as Row } catch { /* 文本探针采用固定模板。 */ }
-    const operationKey = input.operationKey ?? user.match(/operationKey[=：]([^，。\s]+)/)?.[1] ?? 'probe-operation'
+    const operationKey = input.operationKey ?? user.match(/"operationKey"\s*:\s*"([^"]+)"|operationKey[=：]([^，。\s]+)/)?.slice(1).find(Boolean) ?? 'probe-operation'
     const begin = Math.max(0, messages.findLastIndex(row => row.role === 'user' && contentOf(row.content).includes('operationKey')))
     const toolResults = messages.slice(begin).filter(row => row.role === 'tool').flatMap(row => { try { return [JSON.parse(contentOf(row.content)) as Row] } catch { return [] } })
     const commit = toolResults.find(row => row.ok === true && row.commitId)

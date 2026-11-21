@@ -235,8 +235,15 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
               let nodeOrder = kind === 'node' ? Math.max(-1, ...(await db.table<EventNode>('nodes').toArray()).filter(row => row.chapterIndex === chapter.chapterIndex).map(row => row.order)) + 1 : 0
               for (const source of (kind === 'node' ? rows : distinct(rows))) {
                 let id: string
-                do { id = `C${chapter.chapterIndex}-${code}${String(sequence++).padStart(3, '0')}` } while (await db.table(table).get(id) || await db.table('assetLifecycle').get(`${kind}:${id}`))
-                const row: Record<string, unknown> = { ...source, id, bookId, revision: 1, createdBy: 'P1', chapterIndex: chapter.chapterIndex, chapterName: chapter.chapterName }
+                let previous: Lifecycle | undefined
+                for (;;) {
+                  id = `C${chapter.chapterIndex}-${code}${String(sequence++).padStart(3, '0')}`
+                  if (await db.table(table).get(id)) continue
+                  previous = await db.table<Lifecycle>('assetLifecycle').get(`${kind}:${id}`)
+                  if (!previous || (kind === 'node' && activeScope?.step === 'narrativeAssets' && previous.state === 'deleted')) break
+                }
+                const revision = (previous?.revision ?? 0) + 1
+                const row: Record<string, unknown> = { ...source, id, bookId, revision, createdBy: 'P1', chapterIndex: chapter.chapterIndex, chapterName: chapter.chapterName }
                 const relationInputs = kind === 'character' ? (Array.isArray(source.relations) ? source.relations as Record<string, unknown>[] : []) : []
                 delete row.relations
                 if (kind === 'node') {
@@ -253,14 +260,16 @@ export function createExtractionService(workspace: Workspace, models: Pick<Model
                   row.mergeFacts = rebuildFacts([], Object.fromEntries((kind === 'character' ? ['identity', 'appearance', 'personality', 'background'] : ['description']).filter(field => typeof row[field] === 'string').map(field => [field, row[field] as string])), [chapter.chapterIndex])
                 }
                 await db.table(table).add(row)
-                await db.table('assetLifecycle').add({ key: `${kind}:${id}`, bookId, kind, originId: id, currentId: id, state: 'live', revision: 1, updatedAt: timestamp, sourceChapterIndex: chapter.chapterIndex })
+                const lifecycle = { key: `${kind}:${id}`, bookId, kind, originId: id, currentId: id, state: 'live', revision, updatedAt: timestamp, sourceChapterIndex: chapter.chapterIndex }
+                if (previous) await db.table('assetLifecycle').put(lifecycle)
+                else await db.table('assetLifecycle').add(lifecycle)
                 originIds.push(id)
                 for (const input of relationInputs) {
                   const target = String(input.target ?? '').trim()
                   if (!target) continue
                   pendingRelations.push({ person: row as unknown as Character, input: {
                     target, relationType: String(input.relation_type ?? ''), forwardLabel: String(input.relation_label ?? ''), reverseLabel: String(input.reverse_label ?? ''),
-                    direction: String(input.direction ?? ''), chapterIndex: chapter.chapterIndex, quote: String(input.quote ?? ''),
+                    direction: String(input.direction ?? (String(input.relation_label).trim() === String(input.reverse_label).trim() ? 'bidirectional' : 'directed')), chapterIndex: chapter.chapterIndex, quote: String(input.quote ?? ''),
                   } })
                 }
               }

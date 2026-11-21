@@ -46,7 +46,12 @@ test('opt13：200次API链路首屏与无变化刷新传输量', async () => {
       return
     }
     let chain = await readExecutionChain(workspace, 'book', 'run', { unitId: 'profile:A' })
-    expect(chain.requests).toHaveLength(20)
+    expect(chain.firstRequest).toMatchObject({ requestId: 'r0000' })
+    expect(chain.firstRequest).not.toHaveProperty('input')
+    expect(chain.requests[0]).toMatchObject({ requestId: 'r0000' })
+    expect(chain.requests.at(-1)).toMatchObject({ requestId: 'r0199', timelineOrdinal: 200 })
+    expect((await chain.paging!.loadRequest(chain.firstRequest!)).request).toEqual(seed[0])
+    expect(chain.requests).toHaveLength(21)
     expect(chain.paging?.hasEarlier).toBe(true)
     expect(JSON.stringify(chain.paging?.events)).not.toContain('人物资料')
     expect(chain.summary?.stats).toEqual(executionStats(seed.filter(row => row.type === 'request_trace')))

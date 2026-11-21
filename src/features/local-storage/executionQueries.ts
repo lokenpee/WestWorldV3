@@ -15,8 +15,17 @@ function scopeHeaders(db: DatabaseSync, scope: string, options: ExecutionQuery):
     where += key === 'unitId' ? " AND coalesce(nullif(json_extract(body,'$.unitId'),''),json_extract(body,'$.workId'),'')=?" : ` AND json_extract(body,'$.${key}')=?`
     args.push(options[key]!)
   }
+  if (options.storyPhase !== undefined) {
+    if (!['window_link', 'global_review'].includes(options.storyPhase)) throw new Error('叙事阶段无效。')
+    where += ` AND json_extract(body,'$.taskId') IN (
+      SELECT json_extract(task.value,'$.taskId') FROM records AS run, json_each(run.body,'$.tasks') AS task
+      WHERE run.scope=? AND run.tableName='pipelineRuns' AND run.recordKey=? AND json_extract(run.body,'$.stage')='P3'
+        AND json_extract(task.value,'$.phase')=?
+    )`
+    args.push(scope, options.runId, options.storyPhase)
+  }
   const columns = ['requestId', 'requestOrdinal', 'startedAt', 'finishedAt', 'model', 'status', 'usage'].map(key => `'${key}',json_extract(body,'$.${key}')`).join(',')
-  const rows = db.prepare(`SELECT recordKey,version,json_object('id',recordKey,${columns},'format',json_extract(body,'$.input.messageFormat'),'toolCount',json_array_length(json_extract(body,'$.toolCalls'))) AS header FROM records WHERE ${where} ORDER BY coalesce(json_extract(body,'$.startedAt'),''),coalesce(nullif(json_extract(body,'$.requestId'),''),recordKey)`).all(...args)
+  const rows = db.prepare(`SELECT recordKey,version,json_object('id',recordKey,${columns},'format',json_extract(body,'$.input.messageFormat'),'toolCount',json_array_length(json_extract(body,'$.toolCalls'))${options.includeFirst ? ",'toolSchemaSnapshotId',json_extract(body,'$.input.toolSchemaSnapshotId')" : ''}) AS header FROM records WHERE ${where} ORDER BY coalesce(json_extract(body,'$.startedAt'),''),coalesce(nullif(json_extract(body,'$.requestId'),''),recordKey)`).all(...args)
   return rows.map(row => ({ key: String(row.recordKey), version: Number(row.version), row: JSON.parse(String(row.header)) as Row }))
 }
 const idOf = (header: Header) => text(header.row.requestId) || header.key
@@ -24,11 +33,11 @@ function body(db: DatabaseSync, scope: string, key: string): Row | undefined {
   const row = db.prepare("SELECT body FROM records WHERE scope=? AND tableName='storySessionEntries' AND recordKey=?").get(scope, key)
   return row ? JSON.parse(String(row.body)) as Row : undefined
 }
-function eventsFor(db: DatabaseSync, scope: string, headers: Header[], at: number): ExecutionEvent[] {
+function eventsFor(db: DatabaseSync, scope: string, headers: Header[], at: number, deltaOnly?: boolean): ExecutionEvent[] {
   const current = headers[at], request = body(db, scope, current.key)
   if (!request) return []
   const previous = at > 0 ? body(db, scope, headers[at - 1].key) : undefined
-  return projectRequestConversation({ entries: [], requests: previous ? [previous, request] : [request], snapshots: new Map() }).filter(event => event.apiIndex === (previous ? 2 : 1)).map(event => ({ ...event, apiIndex: Number(request.requestOrdinal) || at + 1 }))
+  return projectRequestConversation({ entries: [], requests: previous ? [previous, request] : [request], snapshots: new Map() }, deltaOnly).filter(event => event.apiIndex === (previous ? 2 : 1)).map(event => ({ ...event, apiIndex: Number(request.requestOrdinal) || at + 1 }))
 }
 function summaryOf(headers: Header[]): ExecutionSummary {
   const rows: Row[] = headers.map(header => ({ ...header.row, toolCalls: Array.from({ length: Number(header.row.toolCount) || 0 }, () => ({})) }))
@@ -37,7 +46,9 @@ function summaryOf(headers: Header[]): ExecutionSummary {
 }
 export function executionPage(db: DatabaseSync, scope: string, options: ExecutionQuery, version: number): ExecutionPageResult {
   const headers = scopeHeaders(db, scope, options), summary = summaryOf(headers)
-  const base = { summary, version, validRequestIds: headers.map(idOf), groups: [], hasEarlier: false }
+  const earliest = headers[0]
+  const base = { summary, version, validRequestIds: headers.map(idOf), groups: [], hasEarlier: false,
+    ...(earliest ? { firstRequest: { ...earliest.row, version: earliest.version } } : {}) }
   if (headers.some(header => header.row.format !== 'provider-request/v1')) return { ...base, legacy: true }
   const limit = Math.min(50, Math.max(1, Number(options.limit) || 20))
   let selected: Header[], hasEarlier = false
@@ -49,19 +60,24 @@ export function executionPage(db: DatabaseSync, scope: string, options: Executio
     const older = options.before ? headers.filter(header => text(header.row.startedAt) < options.before!.startedAt || text(header.row.startedAt) === options.before!.startedAt && idOf(header) < options.before!.requestId) : headers
     selected = older.slice(-limit); hasEarlier = older.length > selected.length
   }
-  const groups = selected.map(header => {
-    const events = eventsFor(db, scope, headers, headers.indexOf(header)).map(event => ({ ...event, content: '', thinking: '', toolCalls: event.toolCalls.map(call => ({ id: call.id, name: call.name })), execution: event.execution ? { name: event.execution.name, state: event.execution.state, isError: event.execution.isError } : undefined,
-      entry: { requestId: idOf(header), version: header.version, hasContent: !!event.content, hasThinking: !!event.thinking, hasResult: event.execution?.result !== undefined || event.execution?.resultPreview !== undefined } }))
-    return { request: { ...header.row, version: header.version }, events }
-  })
   const first = selected[0]
+  if (options.includeFirst && options.since === undefined && !options.before && hasEarlier && earliest) {
+    selected.unshift(earliest)
+    hasEarlier = headers.length > selected.length
+  }
+  const groups = selected.map(header => {
+    const at = headers.indexOf(header)
+    const events = eventsFor(db, scope, headers, at, options.includeFirst).map(event => ({ ...event, content: '', thinking: '', toolCalls: event.toolCalls.map(call => ({ id: call.id, name: call.name })), execution: event.execution ? { name: event.execution.name, state: event.execution.state, isError: event.execution.isError } : undefined,
+      entry: { requestId: idOf(header), version: header.version, hasContent: !!event.content, hasThinking: !!event.thinking, hasResult: event.execution?.result !== undefined || event.execution?.resultPreview !== undefined } }))
+    return { request: { ...header.row, version: header.version, ...(options.includeFirst ? { timelineOrdinal: at + 1 } : {}) }, events }
+  })
   return { ...base, groups, hasEarlier, ...(first && options.since === undefined ? { nextBefore: { startedAt: text(first.row.startedAt), requestId: idOf(first) } } : {}) }
 }
 export function executionBody(db: DatabaseSync, scope: string, options: ExecutionQuery & { requestId: string; eventKey?: string }) {
   const headers = scopeHeaders(db, scope, options), at = headers.findIndex(header => idOf(header) === options.requestId)
   if (at < 0) throw new Error('执行详情已清理或不属于当前范围，请刷新。')
   if (options.eventKey) {
-    const event = eventsFor(db, scope, headers, at).find(event => event.key === options.eventKey)
+    const event = eventsFor(db, scope, headers, at, options.includeFirst).find(event => event.key === options.eventKey)
     if (!event) throw new Error('该消息已更新，请刷新后展开。')
     return { event }
   }

@@ -57,7 +57,8 @@ export function bindNodeCharacters(node: EventNode, characters: Character[], opt
   return {
     ...node,
     actors: actors.names, actorIds: actors.ids, actorBindings: actors.groups, manualActorIds: actors.manual, legacyActorIds: actors.legacy,
-    targets: targets.names, targetCharacterIds: targets.ids, targetBindings: targets.groups, manualTargetCharacterIds: targets.manual, legacyTargetCharacterIds: targets.legacy,
+    ...(node.targets !== undefined || targets.names.length ? { targets: targets.names } : {}),
+    targetCharacterIds: targets.ids, targetBindings: targets.groups, manualTargetCharacterIds: targets.manual, legacyTargetCharacterIds: targets.legacy,
   }
 }
 
@@ -107,7 +108,8 @@ export function setNodeParticipants(node: EventNode, characters: Character[], se
   const boundMentions = [...(node.actorBindings ?? []), ...(node.targetBindings ?? [])].filter(group => group.ids.length).map(group => group.mention)
   const pendingMentions = [...(node.actorBindings ?? []).filter(group => !group.ids.length), ...(node.targetBindings ?? []).filter(group => !group.ids.length && characterCandidates(group.mention, characters).length > 0)].map(group => group.mention)
   const dropped = unique([...boundMentions, ...pendingMentions]).filter(mention => !kept.includes(mention))
-  return bindNodeCharacters({ ...node, actors: nextActor, targets: [...nextTarget, ...previous.objects.filter(object => !kept.includes(object))],
+  const targets = [...nextTarget, ...previous.objects.filter(object => !kept.includes(object))]
+  return bindNodeCharacters({ ...node, actors: nextActor, ...(node.targets !== undefined || targets.length ? { targets } : {}),
     legacyActorIds: (node.legacyActorIds ?? []).filter(id => manual.includes(id)),
     legacyTargetCharacterIds: (node.legacyTargetCharacterIds ?? []).filter(id => manual.includes(id)),
   }, characters, {

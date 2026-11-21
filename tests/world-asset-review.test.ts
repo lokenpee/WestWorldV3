@@ -37,6 +37,10 @@ it.each(['completed', 'partial', 'needs_review', 'paging'])('P2全资产核对�
   const b = await assets.create('a', 'character', { name: '张蕾', chapterIndex: '1', identity: '长女' })
   const place = await assets.create('a', 'location', { name: '北京城', chapterIndex: '1', description: '西门' })
   const node = await assets.create('a', 'node', { name: '会面', summary: '张三与张蕾会面', chapterIndex: '1', quote: '船夫张三是长女张蕾的父亲。' })
+  // P1 新资产可以省略置信度，详情工具仍能读取。
+  await db.table('characters').update(a.id, { confidence: undefined })
+  await db.table('locations').update(place.id, { confidence: undefined })
+  await db.table('nodes').update(node.id, { confidence: undefined, clues: ['父亲'] })
   await assets.create('a', 'eventLine', { title: '信件', nodeIds: [node.id] })
   if (mode === 'paging') for (let i = 0; i < 54; i++) await assets.create('a', 'node', { name: `核对节点${i}`, summary: `节点${i}`, chapterIndex: '1', quote: '船夫张三是长女张蕾的父亲。' })
   const characters = await db.table('characters').toArray()

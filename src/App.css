@@ -2,7 +2,7 @@
 .app-shell { height: 100dvh; display: flex; flex-direction: column; }
 .app-header { min-height: 64px; display: flex; align-items: center; gap: 48px; padding: 12px 24px; background: white; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .brand { display: flex; gap: 10px; align-items: center; color: var(--ink); text-decoration: none; font-size: 12px; font-weight: 650; letter-spacing: .09em; }
-.brand small { color: #a3a3a3; font-size: 10px; margin-left: 5px; font-weight: 400; }
+.brand small { color: var(--muted); font-size: 10px; margin-left: 5px; font-weight: 400; letter-spacing: 0; white-space: nowrap; }
 .brand-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: var(--ink); color: white; font-family: Georgia, serif; font-size: 18px; font-weight: 400; }
 .app-header nav { display: flex; gap: 5px; }
 .app-header nav button { border: 0; border-radius: 5px; background: transparent; color: var(--muted); padding: 7px 18px; font-size: 12px; }
@@ -55,7 +55,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
   .app-header nav { margin-left: auto; }
   .app-header nav button { padding: 7px 12px; }
   .brand { letter-spacing: .03em; font-size: 10px; gap: 7px; }
-  .brand small, .header-local { display: none; }
+  .header-local { display: none; }
   .assets-layout { flex-direction: column; overflow: visible; }
   .workspace-content { padding: 28px 20px; overflow: visible; }
   .import-welcome { margin-top: 0; }

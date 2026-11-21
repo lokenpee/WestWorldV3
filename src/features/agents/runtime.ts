@@ -1,4 +1,5 @@
 import { storyMessages, recordStoryReads } from '../story/views'
+import { storyPagePrompt } from '../story/readingPresentation'
 import type { Agent, AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core'
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai'
 import type { AgentInput } from '../models/gateway'
@@ -31,6 +32,7 @@ export interface AgentTaskOptions {
   reviewScope?: 'all_assets' | 'relations'
   workflow?: 'character_organization_v1' | 'story_lines_v2' | 'story_pages_v3'
   outline?: boolean
+  quickStoryCheck?: boolean
   providedStoryItems?: Row[]; contextId?: string; unitId?: string; organizationWorkKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string; shouldPause?: () => boolean; shouldCancel?: () => boolean
 }
 export interface AgentTaskResult { ok: boolean; bookId: string; runId: string; taskId: string; sessionId?: string; summary?: Summary; commitIds: string[]; result?: CallResult; error?: string; itemFailure?: string; readCalls: number; writeCalls: number }
@@ -42,7 +44,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
   const active = new Set<string>()
   async function run(repo: AgentRepository, options: AgentTaskOptions): Promise<AgentTaskResult> {
     const key = `${repo.bookId}:${options.profile}`
-    const scope: Scope = { bookId: repo.bookId, profile: options.profile, phase: options.phase, runId: options.runId ?? crypto.randomUUID(), executionId: crypto.randomUUID(), taskId: options.taskId ?? crypto.randomUUID(), owner: options.leaseOwner ?? crypto.randomUUID(), sessionId: options.sessionId, probe: options.probe, workItemIds: options.workItems.map(row => text(row.workItemId)), workflow: options.workflow, outline: options.outline, contextId: options.contextId, unitId: options.unitId, workKind: options.organizationWorkKind, organizationStep: options.organizationStep }
+    const scope: Scope = { bookId: repo.bookId, profile: options.profile, phase: options.phase, runId: options.runId ?? crypto.randomUUID(), executionId: crypto.randomUUID(), taskId: options.taskId ?? crypto.randomUUID(), owner: options.leaseOwner ?? crypto.randomUUID(), sessionId: options.sessionId, probe: options.probe, workItemIds: options.workItems.map(row => text(row.workItemId)), workflow: options.workflow, outline: options.outline, quickStoryCheck: options.quickStoryCheck, contextId: options.contextId, unitId: options.unitId, workKind: options.organizationWorkKind, organizationStep: options.organizationStep }
     const organization = options.profile === 'asset_editor' && options.phase === 'character_organization'
     if (options.phase === 'asset_review') {
       const requested = options.reviewScope ?? text(options.input.reviewScope)
@@ -57,6 +59,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     const controller = new AbortController(); const abort = () => controller.abort()
     options.signal?.addEventListener('abort', abort, { once: true }); if (options.signal?.aborted) abort()
     const identity = !options.probe && options.profile === 'asset_editor' && options.phase === 'ai_identity'
+    const storyProbe = options.probe && options.profile === 'story_editor'
     const resumable = identity || organization || !options.probe && (options.profile === 'story_editor' || options.phase === 'asset_review')
     const maxRequests = options.probe ? 3 : options.maxRequests ?? 1_000_000
     const started = Date.now(), duration = options.workflow === 'story_pages_v3' ? 86400000 : organization ? 3600000 : identity ? 180000 : resumable ? 300000 : options.timeoutMs ?? 180000
@@ -67,6 +70,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     const failedSignatures = new Set<string>()
     let organizationConflicts = 0
     let thinkingTruncations = 0
+    let lastProbeFeedback = ''
     let adapter: ReturnType<typeof createAgentTools> | undefined
     try {
       controller.signal.throwIfAborted()
@@ -125,7 +129,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
       if (!scope.probe && scope.sessionId) trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.businessPrompt, purpose: 'work' })
       const systemPrompt = options.businessPrompt
-      if (scope.workflow === 'story_pages_v3') loadedMessages = storyMessages(loadedMessages, scope.outline)
+      if (scope.workflow === 'story_pages_v3') loadedMessages = storyMessages(loadedMessages, scope.outline, scope.phase === 'global_review')
       if (!organization && loadedMessages.length) loadedMessages.push({ role: 'system', content: systemPrompt, timestamp: Date.now() })
       persistedMessages = organization ? loadedMessages.length : loadedMessages.length ? loadedMessages.length - 1 : 0
       const prior = await repo.transaction(false, store => taskOf(store, scope))
@@ -168,7 +172,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           prompt: scope.workflow === 'story_pages_v3' ? '' : options.prompt,
           ...(scope.workflow === 'story_pages_v3' ? { currentTask: () => repo.transaction(false, async store => {
             const current = await refreshReading(store, scope.runId, scope.sessionId!, scope.phase)
-            return `【当前阅读页】\n${JSON.stringify(await readingBrief(store, scope.bookId, scope.sessionId!, scope.phase, current))}`
+            return storyPagePrompt(await readingBrief(store, scope.bookId, scope.sessionId!, scope.phase, current, scope.outline, scope.quickStoryCheck))
           }) } : {}),
           systemMessage: effectiveSystem ? { ...effectiveSystem, content: systemPrompt } : undefined, force, signal: controller.signal, onStatus: sessionOptions.onStatus })
         await repo.transaction(true, async store => { await rebaseReadSet(store, scope, tools.reads, true); await saveTask(store, scope, { readSet: tools.reads }) })
@@ -187,7 +191,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         prepareRequest: async ({ context, model }) => {
           const messages = await prepareContext(context, model.contextWindow)
           if (!scope.probe) {
-            const rawBase = scope.workflow === 'story_pages_v3' ? [{ role: 'system' as const, content: systemPrompt, timestamp: Date.now() }, ...storyMessages(messages ?? context.messages, scope.outline)] : messages ?? context.messages
+            const rawBase = scope.workflow === 'story_pages_v3' ? [{ role: 'system' as const, content: systemPrompt, timestamp: Date.now() }, ...storyMessages(messages ?? context.messages, scope.outline, scope.phase === 'global_review')] : messages ?? context.messages
             let seenPrompt = false
             const base = organization ? rawBase.filter(message => {
               if (message.role !== 'user' || contentText(message) !== options.prompt) return true
@@ -211,6 +215,13 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           }
           const activeTools = tools.currentTools()
           if (agent) agent.state.tools = activeTools
+          if (storyProbe) {
+            // 探针只发送当前工具，历史声明仍会被 Pi 合入请求，因此仅保留消息正文和工具回执。
+            const probeMessages = (messages ?? context.messages).map(message => message.role === 'system'
+              ? { ...message, toolsAdded: undefined, toolsRemoved: undefined }
+              : message)
+            return { context: { ...context, messages: probeMessages, tools: activeTools } }
+          }
           return messages ? { context: { ...context, messages, tools: activeTools } } : undefined
         },
         recoverContext: scope.sessionId && sessionOptions ? async (context, model) => {
@@ -251,6 +262,12 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         },
         finishTurn: ({ message, toolResults }) => {
           if (options.shouldPause?.() || options.shouldCancel?.()) return { action: 'end' }
+          if (storyProbe) {
+            const failedTool = toolResults.findLast(result => result.isError)
+            lastProbeFeedback = failedTool ? contentText(failedTool).slice(0, 300)
+              : message.content.some(part => part.type === 'toolCall') ? ''
+                : message.stopReason === 'length' ? '模型达到单次输出长度上限，未调用工具。' : '模型未调用工具。'
+          }
           // Pi 的工具查找、参数校验和拦截错误不会经过 afterToolCall。
           // 在此按返回顺序统一处理，成功查询/提交仍清除之前的重复失败记录。
           if (organization || scope.workflow === 'story_pages_v3') for (const result of toolResults) {
@@ -294,6 +311,10 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         },
         validateFinal: () => {
           if (tools.completed || tools.summary || options.shouldPause?.() || options.shouldCancel?.() || outcome.itemFailure || deferredAfterValidation || resumable && (usedRequests >= maxRequests || timeLeft() === 0)) return
+          if (storyProbe) {
+            const stage = !tools.readCalls ? '读取工作记忆' : !tools.writeCalls ? '写入工作记忆' : '核对提交确认'
+            throw new ModelError('validation', `叙事工具测试未完成${stage}，已请求 ${usedRequests} 次。${lastProbeFeedback}`)
+          }
           throw new ModelError(usedRequests >= maxRequests ? 'budget' : 'validation', usedRequests >= maxRequests ? 'BUDGET:子任务预算已用完，剩余工作交后续批次。' : '当前任务尚未收到工具的完成确认，已保存进度。')
         },
       }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(organization && !scope.probe ? { reasoning: 'low' as const } : {}), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })

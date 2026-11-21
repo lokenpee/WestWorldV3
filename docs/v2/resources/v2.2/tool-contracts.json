@@ -330,7 +330,7 @@
       },
       {
         "name": "read_original",
-        "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。 P2人物资料、关系整理各自每个人物最多成功查阅一次，暂停恢复不重置；次数耗尽正常返回提示，请依据已有资料整理并提交结论。",
+        "description": "按书内章节索引或资产编号读取原文核实具体疑点。提供 chapter_indices、chapter_range、asset_ids 中至少一项，组合使用时取交集。返回受字数、字节上限约束。P2 人物资料、关系整理每人每步最多成功查阅一次，暂停恢复不重置；额度耗尽后按现有资料提交结论。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -338,7 +338,7 @@
             "asset_ids": {
               "minItems": 1,
               "maxItems": 20,
-              "description": "按资产编号读取其来源章节原文；与 chapter_range 至少给一项。",
+              "description": "人物、地点或事件节点资产编号，例如 C8-P002。书内章节索引用 chapter_indices。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -347,7 +347,7 @@
             "chapter_range": {
               "minItems": 2,
               "maxItems": 2,
-              "description": "连续章节范围：[起始章节, 结束章节]。与 asset_ids 至少给一项。",
+              "description": "连续书内章节范围，例如 [\"8\",\"10\"] 读取 8 至 10。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -369,7 +369,7 @@
               "items": {
                 "type": "string"
               },
-              "description": "需要核实的离散章节；与资产编号一起使用时只读取交集。"
+              "description": "只读取列出的书内章节索引，例如 [\"8\",\"19\"]。可直接使用 sourceChapters 中的值。"
             },
             "cursor": {
               "type": "object",
@@ -3797,7 +3797,7 @@
       },
       {
         "name": "read_original",
-        "description": "读取章节原文核实称呼或补断点。返回受字数、字节上限约束，使用 offset 继续读取。 P2人物资料、关系整理各自每个人物最多成功查阅一次，暂停恢复不重置；次数耗尽正常返回提示，请依据已有资料整理并提交结论。",
+        "description": "按书内章节索引或资产编号读取原文核实具体疑点。提供 chapter_indices、chapter_range、asset_ids 中至少一项，组合使用时取交集。返回受字数、字节上限约束。P2 人物资料、关系整理每人每步最多成功查阅一次，暂停恢复不重置；额度耗尽后按现有资料提交结论。",
         "parameters": {
           "additionalProperties": false,
           "type": "object",
@@ -3805,7 +3805,7 @@
             "asset_ids": {
               "minItems": 1,
               "maxItems": 20,
-              "description": "按资产编号读取其来源章节原文；与 chapter_range 至少给一项。",
+              "description": "人物、地点或事件节点资产编号，例如 C8-P002。书内章节索引用 chapter_indices。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -3814,7 +3814,7 @@
             "chapter_range": {
               "minItems": 2,
               "maxItems": 2,
-              "description": "连续章节范围：[起始章节, 结束章节]。与 asset_ids 至少给一项。",
+              "description": "连续书内章节范围，例如 [\"8\",\"10\"] 读取 8 至 10。",
               "type": "array",
               "items": {
                 "type": "string"
@@ -3836,7 +3836,7 @@
               "items": {
                 "type": "string"
               },
-              "description": "需要核实的离散章节；与资产编号一起使用时只读取交集。"
+              "description": "只读取列出的书内章节索引，例如 [\"8\",\"19\"]。可直接使用 sourceChapters 中的值。"
             },
             "cursor": {
               "type": "object",
@@ -5568,6 +5568,7 @@
             },
             "ids": {
               "type": "array",
+              "description": "对象真实编号。kind 为 note 时也接受本书当前会话中的事项 key。",
               "items": {
                 "type": "string",
                 "minLength": 1
@@ -6153,6 +6154,16 @@
                           "sub",
                           null
                         ]
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "全书复核填写的故事线概况，完成说明页前与 coreClue 均须有内容"
+                      },
+                      "coreClue": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "有原文依据且贯穿故事线的关键人物、事件、地点、物件或问题，说明其作用"
                       }
                     },
                     "required": [
@@ -6169,6 +6180,64 @@
                       {
                         "required": [
                           "role"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "summary"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "coreClue"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "update_event"
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "全书复核填写的事件概况，完成说明页前与 coreClue 均须有内容"
+                      },
+                      "coreClue": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "有原文依据且推动或联结事件的具体线索，说明其作用"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "eventId"
+                    ],
+                    "additionalProperties": false,
+                    "anyOf": [
+                      {
+                        "required": [
+                          "title"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "summary"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "coreClue"
                         ]
                       }
                     ]
@@ -6427,7 +6496,7 @@
       {
         "name": "save_story_notes",
         "kind": "write",
-        "description": "保存未解线索、解决说明或工作摘要；同一线索沿用key，省略的工作摘要保留。",
+        "description": "保存未解线索、解决说明或工作摘要。同一事项沿用 key。大纲流程的事项回执返回真实编号和已保存内容，本轮可直接使用。",
         "parameters": {
           "type": "object",
           "properties": {
@@ -6486,6 +6555,14 @@
                     }
                   },
                   "lineIds": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    }
+                  },
+                  "eventIds": {
                     "maxItems": 20,
                     "type": "array",
                     "items": {
@@ -6805,6 +6882,27 @@
             "notes": {
               "type": "string",
               "description": "可选的待查问题或阅读备注。"
+            },
+            "noteResults": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "conclusion": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "id",
+                  "conclusion"
+                ],
+                "additionalProperties": false
+              },
+              "description": "本页仍保留的待复核事项，逐条填写编号和有依据的本轮结论。"
             }
           },
           "required": [

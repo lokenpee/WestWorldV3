@@ -77,6 +77,10 @@ it('当前格式全流程备份恢复保留有效P2待办、P3完成状态和原
   await createWorldService(workspace, models, assets, { assetReview: false }).start(restored.id)
   expect(fetcher.mock.calls.length - calls).toBe(2)
   expect(await copy.table('eventLines').count()).toBe(1)
+  for (const table of ['eventLines', 'storyEvents']) {
+    const descriptions = (await copy.table(table).toArray()).map(({ summary, coreClue }) => ({ summary, coreClue }))
+    expect(descriptions).toEqual([{ summary: expect.stringMatching(/传信/), coreClue: expect.stringMatching(/去向/) }])
+  }
   expect((await backups.inspectBackup((await backups.exportBook(restored.id)).bytes)).ok).toBe(true)
   expect(await db.table('pipelineRuns').toArray()).toEqual(originalRuns)
   expect(await db.table('extractionTasks').toArray()).toEqual(originalExtractionTasks)

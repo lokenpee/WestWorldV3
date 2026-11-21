@@ -192,7 +192,6 @@
                     "name",
                     "summary",
                     "actors",
-                    "confidence",
                     "id",
                     "bookId",
                     "order",
@@ -404,6 +403,13 @@
                         "empty"
                       ],
                       "description": "参考引文定位状态。"
+                    },
+                    "clues": {
+                      "description": "可选。用于找回相关剧情的原文名称或短语，如关键人物、家族、物品、地点或事项。",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 },
@@ -1233,7 +1239,6 @@
                   "type": "object",
                   "required": [
                     "name",
-                    "confidence",
                     "id",
                     "bookId",
                     "revision",
@@ -3665,7 +3670,6 @@
                   "type": "object",
                   "required": [
                     "name",
-                    "confidence",
                     "id",
                     "bookId",
                     "revision",
@@ -4855,6 +4859,7 @@
                     "kind": {
                       "enum": [
                         "node",
+                        "event",
                         "eventLine",
                         "note"
                       ]
@@ -4863,6 +4868,9 @@
                       "type": "string"
                     },
                     "summary": {
+                      "type": "string"
+                    },
+                    "coreClue": {
                       "type": "string"
                     },
                     "chapters": {
@@ -4931,6 +4939,7 @@
                     "kind": {
                       "enum": [
                         "node",
+                        "event",
                         "eventLine",
                         "note"
                       ]
@@ -4944,16 +4953,41 @@
                     "summary": {
                       "type": "string"
                     },
-                    "chapterIndex": {
+                    "coreClue": {
                       "type": "string"
                     },
-                    "nodeIds": {
+                    "lineId": {
+                      "type": "string"
+                    },
+                    "lineTitle": {
+                      "type": "string"
+                    },
+                    "lineCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "eventTitle": {
+                      "type": "string"
+                    },
+                    "lineIds": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
                     },
-                    "lineIds": {
+                    "evidenceNodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "chapterIndex": {
+                      "type": "string"
+                    },
+                    "nodeIds": {
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -6665,6 +6699,14 @@
                     "maxLength": 128,
                     "type": "string"
                   }
+                },
+                "eventIds": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "maxLength": 128,
+                    "type": "string"
+                  }
                 }
               }
             },
@@ -6716,6 +6758,65 @@
           },
           "changed": {
             "type": "boolean"
+          },
+          "notes": {
+            "description": "大纲流程中已确认保存的事项。旧回执可省略。",
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "note"
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "status": {
+                  "enum": [
+                    "active",
+                    "resolved"
+                  ]
+                },
+                "statement": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "nodeIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "lineIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "eventIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "key",
+                "status",
+                "statement",
+                "nodeIds",
+                "lineIds"
+              ],
+              "additionalProperties": false
+            }
           },
           "nodes": {
             "type": "array",
@@ -7115,6 +7216,27 @@
           "notes": {
             "type": "string",
             "description": "可选的待查问题或阅读备注。"
+          },
+          "noteResults": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "conclusion": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "id",
+                "conclusion"
+              ],
+              "additionalProperties": false
+            },
+            "description": "本页仍保留的待复核事项，逐条填写编号和有依据的本轮结论。"
           }
         },
         "required": [

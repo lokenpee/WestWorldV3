@@ -177,8 +177,10 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
         }} />
         {field('locationNames', true)}
         <p className="field-help">多处地点可每行填写一处。</p>
-        {field('time_text')}{field('time_hint')}{field('world_delta', true)}{field('new_facts', true)}{field('started_actions', true)}
-        <p className="field-help">状态变化、事实与行动可每行一项。</p>
+        {field('clues', true)}
+        <p className="field-help">线索可留空，每行填写一个可用于查找相关剧情的名称或短语。</p>
+        {field('time_text')}{field('time_hint')}{field('world_delta', true)}{field('new_facts', true)}
+        <p className="field-help">状态变化和新增事实可每行一项。</p>
       </> : <>
         {field('title')}
         <div className="asset-field"><label htmlFor="asset-lineStatus">事件线状态</label><select id="asset-lineStatus" value={values.lineStatus} disabled={disabled || conflict} onChange={event => void immediate('lineStatus', event.target.value)}><option value="open">进行中</option><option value="closed">已结束</option></select><small>{creating ? '保存事件线时生效' : '选择后立即保存'}</small></div>
@@ -189,7 +191,7 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
       </>}
       {baseline && kind === 'character' && <RelationEditor ref={relationRef} bookId={bookId} character={baseline as Character} snapshot={snapshot} service={service} locked={locked || busy} onDirtyChange={setRelationDirty} />}
       {baseline && <details className="asset-metadata"><summary>来源与事实底稿</summary><p>创建来源：{baseline.createdBy === 'manual' ? '人工' : '提取'}；修订：{baseline.revision}</p>{'sourceChapters' in baseline && <p>来源章节：{baseline.sourceChapters?.join('、') || '无'}</p>}{'mergeNotes' in baseline && baseline.mergeNotes?.map((note, index) => <p key={index}>{note}</p>)}{'mergeFacts' in baseline && baseline.mergeFacts?.map(fact => <p key={fact.id}>{fact.text}（来源：{fact.chapters.join('、') || '人工'}）</p>)}</details>}
-      {baseline && kind === 'character' && <p className="field-help">基础资料：年龄 {(baseline as Character).profile?.age ?? '未记录'}；性别 {(baseline as Character).profile?.gender || '未记录'}</p>}
+      {baseline && kind === 'character' && <p className="field-help">性别 {(baseline as Character).profile?.gender || '未记录'}</p>}
       {baseline && kind === 'eventLine' && <p className="field-help">当前可确定人物：{(snapshot.lineCharacterIds[baseline.id] ?? []).map(id => snapshot.characters.find(row => row.id === id)?.name ?? id).join('、') || '无'}；来源章节：{'chapters' in baseline ? baseline.chapters.join('、') : ''}</p>}
       </div>
       <footer className="editor-actions"><button className="primary-button" type="submit" disabled={disabled || conflict}>{busy ? '正在保存…' : '保存'}</button><button type="button" className="secondary-button" onClick={onClose}>取消编辑</button>{!creating && !missing && kind === 'character' && <>{canContinue && onContinueOrganization && <button type="button" className="primary-button" disabled={disabled || conflict || dirty || relationDirty || !!organizing || !!onOrganizeDisabled} onClick={() => void organize('resume')}>{organizing === 'resume' ? '继续整理…' : '继续上次 AI 整理'}</button>}<button type="button" className="secondary-button" disabled={disabled || conflict || dirty || relationDirty || !!organizing || !!onOrganizeDisabled} onClick={() => void organize('profile')}>{organizing === 'profile' ? '启动人物资料整理…' : 'AI 整理人物资料'}</button><button type="button" className="secondary-button" disabled={disabled || conflict || dirty || relationDirty || !!organizing || !!onOrganizeDisabled} onClick={() => void organize('relations')}>{organizing === 'relations' ? '启动人物关系整理…' : 'AI 整理人物关系'}</button></>}{!creating && !missing && <button type="button" className="danger-button" disabled={disabled || conflict} onClick={() => setDeleteTarget(baseline)}>删除条目</button>}<span role="status">{savedMessage}</span></footer>

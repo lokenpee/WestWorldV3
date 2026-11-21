@@ -9,6 +9,7 @@ import { isObservationEntry } from '../src/features/agents/context'
 import { createAgentRuntime } from '../src/features/agents/runtime'
 import { createAgentTools } from '../src/features/agents/tools'
 import { agentStream, createAgentFixture, scriptedAgentFetcher } from './support/agent-streams'
+import { agentResponse, agentTextStream } from './support/agent-protocol'
 import { commitCommand, type ReadSet } from '../src/features/agents/commands'
 import type { Scope } from '../src/features/agents/queries'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
@@ -23,7 +24,7 @@ async function setup(fetcher: typeof fetch) {
 }
 afterEach(async () => { for (const workspace of opened.splice(0)) { workspace.close(); for (const name of await Dexie.getDatabaseNames()) if (name === workspace.scope.settingsName || name.startsWith(workspace.scope.bookPrefix)) await Dexie.delete(name) } })
 
-it('Pi原生循环完成两套隔离探测，声明全部工具并核对真实提交', async () => {
+it('Pi原生循环完成两套隔离探测并核对真实提交', async () => {
   const fetcher = scriptedAgentFetcher()
   const { models, workspace } = await setup(fetcher)
   const result = await models.probeTools()
@@ -32,6 +33,34 @@ it('Pi原生循环完成两套隔离探测，声明全部工具并核对真实�
   expect(fetcher).toHaveBeenCalledTimes(6)
   expect(await workspace.settings.books.count()).toBe(0)
   expect((await Dexie.getDatabaseNames()).filter(name => name.startsWith(workspace.scope.bookPrefix))).toHaveLength(0)
+})
+
+it('叙事探针逐步提供当前工具，避免工具发现消耗三次请求', async () => {
+  const requests: string[][] = []
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const request = JSON.parse(init?.body as string) as Parameters<typeof agentResponse>[0]
+    const names = request.tools.map(tool => tool.function.name)
+    requests.push(names)
+    if (names.includes('get_editor_memory') && names.includes('get_tools')) return agentStream([{ name: 'get_tools', args: {} }])
+    return agentResponse(request)
+  })
+  const { models } = await setup(fetcher)
+  const result = await models.probeTools()
+  expect(result.results.find(row => row.suite === 'story')).toMatchObject({ ok: true, readCalls: 1, writeCalls: 1, attempts: 3 })
+  expect(requests.slice(3)).toEqual([['get_editor_memory'], ['commit_story_changes'], ['submit_result']])
+})
+
+it('叙事探针遇到普通文字时报告没有调用读取工具', async () => {
+  let requests = 0
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => (
+    ++requests <= 3 ? agentResponse(JSON.parse(init?.body as string)) : agentTextStream('我准备开始检查。')
+  ))
+  const { models } = await setup(fetcher)
+  const result = await models.probeTools()
+  const story = result.results.find(row => row.suite === 'story')
+  expect(story).toMatchObject({ ok: false, readCalls: 0, writeCalls: 0, attempts: 3, commitIds: [] })
+  expect(story?.error).toContain('读取工作记忆')
+  expect(story?.error).toContain('模型未调用工具')
 })
 
 async function commandFixture(profile: 'asset_editor' | 'story_editor' = 'asset_editor', originalArgs: Record<string, unknown> = { chapter_range: ['2', '2'] }) {

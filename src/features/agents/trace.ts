@@ -10,7 +10,7 @@ import { getCurrentTools, toToolDeclaration } from '@earendil-works/pi-ai/utils/
 import { sentMessages, toolDeclaration } from './requestPresentation'
 import { readPagedExecution } from './executionPaging'
 import type { ExecutionEvent } from './executionChain'
-import type { ExecutionSummary } from './executionPagingTypes'
+import type { ExecutionSummary, StoryExecutionPhase } from './executionPagingTypes'
 
 export interface OrganizationStepIndexEntry { runId: string; runStartedAt: string; runStatus: string; mode: OrganizationMode; scope: 'fullBook' | 'character'; step: 'scan' | 'profiles' | 'relations'; kind: 'directory' | 'candidate' | 'profile' | 'relations'; objectKey: string; label: string; status?: string; outcome?: string | null; characterId?: string; requestCount: number; hasTrace: boolean; detailReady?: boolean }
 export interface OrganizationRequestBefore { startedAt: string; requestId: string }
@@ -481,17 +481,21 @@ export async function readOrganizationRequests(workspace: ReturnType<typeof crea
 
 export interface ExecutionChain {
   entries: Row[]; requests: Row[]; snapshots: Map<string, Row>; runStatus?: string
-  summary?: ExecutionSummary
+  summary?: ExecutionSummary; firstRequest?: Row
   paging?: { events: ExecutionEvent[]; hasEarlier: boolean; loadEarlier: () => Promise<ExecutionChain>; loadEvent: (event: ExecutionEvent) => Promise<ExecutionEvent>; loadRequest: (request: Row) => Promise<{ request: Row; snapshots: Map<string, Row> }> }
 }
 
-export async function readExecutionChain(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string, options: { unitId?: string; contextId?: string; sessionId?: string } = {}): Promise<ExecutionChain> {
+export async function readExecutionChain(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string, options: { unitId?: string; contextId?: string; sessionId?: string; storyPhase?: StoryExecutionPhase } = {}): Promise<ExecutionChain> {
   const db = workspace.openBook(bookId)
   const run = await db.table('pipelineRuns').get(runId)
   if (!run) return { entries: [], requests: [], snapshots: new Map() }
   const sessionId = text(options.sessionId) || text(run.sessionId)
+  const phaseTasks = options.storyPhase ? records(run.tasks).filter(task => run.stage === 'P3' && task.phase === options.storyPhase) : undefined
+  const taskIds = phaseTasks && new Set(phaseTasks.map(task => text(task.taskId)).filter(Boolean))
+  const inPhase = (row: Row) => !taskIds || taskIds.has(text(row.taskId))
+  const runStatus = text(phaseTasks ? phaseTasks.at(-1)?.status : run.status)
   if (workspace.disk) {
-    const paged = await readPagedExecution(workspace, bookId, { runId, ...(sessionId ? { sessionId } : {}), ...(options.unitId && run.scope !== 'character' ? { unitId: options.unitId } : {}) }, text(run.status))
+    const paged = await readPagedExecution(workspace, bookId, { runId, ...(sessionId ? { sessionId } : {}), ...(options.unitId && run.scope !== 'character' ? { unitId: options.unitId } : {}), ...(options.storyPhase ? { storyPhase: options.storyPhase } : {}), ...(['P2', 'P3'].includes(run.stage) ? { includeFirst: true } : {}) }, runStatus)
     if (paged) return paged
   }
   const all = sessionId ? await db.table('storySessionEntries').where('sessionId').equals(sessionId).toArray() : await db.table('storySessionEntries').toArray()
@@ -500,19 +504,20 @@ export async function readExecutionChain(workspace: ReturnType<typeof createWork
   const entries = all.filter(row => {
     if (row.type !== 'message' && row.type !== 'compaction') return false
     if (sessionId && row.sessionId !== sessionId) return false
+    if (options.storyPhase && (row.runId !== runId || !inPhase(row))) return false
     if (unitId && !targeted && row.unitId !== unitId) return false
     if (!unitId && options.contextId && row.contextId && row.contextId !== options.contextId) return false
     return true
   }).sort((a, b) => Number(a.ordinal) - Number(b.ordinal))
-  const requests = all.filter(row => row.type === 'request_trace' && row.runId === runId && (!unitId || targeted || (text(row.unitId) || text(row.workId)) === unitId))
-    .sort((a, b) => Number(a.requestOrdinal) - Number(b.requestOrdinal))
+  const requests = all.filter(row => row.type === 'request_trace' && row.runId === runId && inPhase(row) && (!unitId || targeted || (text(row.unitId) || text(row.workId)) === unitId))
+    .sort((a, b) => text(a.startedAt).localeCompare(text(b.startedAt)) || Number(a.ordinal) - Number(b.ordinal) || Number(a.requestOrdinal) - Number(b.requestOrdinal))
   const referenced = new Set<string>()
   for (const row of requests) {
     const input = row.input && typeof row.input === 'object' ? row.input as Row : {}
     for (const key of ['systemPromptSnapshotId', 'businessPromptSnapshotId', 'toolSchemaSnapshotId']) if (typeof input[key] === 'string') referenced.add(input[key] as string)
   }
   const snapshots = all.filter(row => row.type !== 'request_trace' && referenced.has(String(row.snapshotId ?? row.id)))
-  return { entries, requests, snapshots: new Map(snapshots.map(row => [String(row.snapshotId ?? row.id), row])), runStatus: text(run.status) }
+  return { entries, requests, snapshots: new Map(snapshots.map(row => [String(row.snapshotId ?? row.id), row])), runStatus }
 }
 
 export async function readBookTrace(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId?: string, options: { limit?: number; offset?: number } = {}) {

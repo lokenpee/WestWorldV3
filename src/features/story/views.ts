@@ -3,13 +3,17 @@ import type { JsonValue } from '@earendil-works/pi-ai'
 import { records, strings, text, hash } from '../agents/contracts'
 import type { ReadSet } from '../agents/commands'
 import type { AgentStore, Row } from '../agents/repository'
+import { usesOutline } from './outline'
 
 export const lineSummary = (row: Row) => typeof row.summary === 'string' ? row.summary : [...new Set([row.cause, row.process, row.result].map(text).filter(Boolean))].join('\n\n')
 export function storyView(row: Row, kind: string, outline = false): Row {
-  if (kind === 'node') return { id: row.id, kind, name: row.name ?? row.title, summary: text(row.summary), chapterIndex: text(row.chapterIndex) || strings(row.chapters)[0] || '', ...(outline ? { started_actions: strings(row.started_actions), new_facts: strings(row.new_facts), ...(typeof row.unassigned === 'boolean' ? { unassigned: row.unassigned } : {}) } : {}) }
-  if (kind === 'event') return { id: row.id, kind, title: row.title, ...Object.fromEntries(['nodeIds', 'lineIds', 'lineId', 'lineTitle', 'lineCount', 'eventId', 'eventTitle', 'memberCount', 'evidenceNodes'].filter(key => row[key] !== undefined).map(key => [key, row[key]])) }
-  if (kind === 'eventLine') return { id: row.id, kind, title: row.title, ...(outline && Array.isArray(row.eventIds) && !row.outlinePending ? {} : { summary: lineSummary(row), nodeIds: strings(row.nodeIds) }), lineStatus: row.lineStatus ?? row.status ?? 'open', ...(outline ? { eventIds: strings(row.eventIds), outlinePending: row.outlinePending === true } : {}) }
-  return { id: row.id, kind: 'note', key: row.key ?? row.title, status: row.status, statement: row.statement ?? row.summary, nodeIds: strings(row.nodeIds), lineIds: strings(row.lineIds) }
+  if (kind === 'node') return { id: row.id, kind, name: row.name ?? row.title, summary: text(row.summary), chapterIndex: text(row.chapterIndex) || strings(row.chapters)[0] || '', ...(outline && typeof row.unassigned === 'boolean' ? { unassigned: row.unassigned } : {}) }
+  if (kind === 'event') return { id: row.id, kind, title: row.title, ...Object.fromEntries(['summary', 'coreClue', 'nodeIds', 'lineIds', 'lineId', 'lineTitle', 'lineCount', 'eventId', 'eventTitle', 'memberCount', 'evidenceNodes'].filter(key => row[key] !== undefined).map(key => [key, row[key]])) }
+  if (kind === 'eventLine') {
+    const active = usesOutline(row)
+    return { id: row.id, kind, title: row.title, ...(outline && active ? { summary: text(row.summary), coreClue: text(row.coreClue) } : { summary: lineSummary(row), nodeIds: strings(row.nodeIds), ...(typeof row.coreClue === 'string' ? { coreClue: row.coreClue } : {}) }), lineStatus: row.lineStatus ?? row.status ?? 'open', ...(outline ? { eventIds: strings(row.eventIds), outlinePending: !active } : {}) }
+  }
+  return { id: row.id, kind: 'note', key: row.key ?? row.title, status: row.status, statement: row.statement ?? row.summary, ...(strings(row.eventIds).length ? { eventIds: strings(row.eventIds) } : {}), nodeIds: strings(row.nodeIds), lineIds: strings(row.lineIds) }
 }
 /** 目录只提供定位信息；完整概述和完整成员通过详情工具分页读取。 */
 export function storyCatalogView(row: Row, kind: string, focusIds: ReadonlySet<string> = new Set()): Row {
@@ -25,7 +29,11 @@ export function storyCatalogView(row: Row, kind: string, focusIds: ReadonlySet<s
   view.membersTruncated = members.length > 12
   return view
 }
-export const briefItems = (brief: Row | null | undefined): Row[] => brief ? [...records(brief.workItems), ...records(brief.related), ...(brief.line ? [brief.line as Row] : []), ...(brief.event ? [brief.event as Row] : []), ...(brief.previousNode ? [brief.previousNode as Row] : [])] : []
+export const briefItems = (brief: Row | null | undefined): Row[] => {
+  if (!brief) return []
+  const outline = brief.outline as Row | undefined
+  return [...records(brief.workItems), ...records(brief.reviewNotes), ...records(brief.parentLines).map(row => ({ id: row.id, kind: 'eventLine' })), ...records(brief.otherEvents).map(row => ({ id: row.id, kind: 'event' })), ...records(brief.memberEvidence).flatMap(row => records(row.members)), ...records(brief.related), ...records(brief.lineEvents), ...records(brief.eventMembers), ...records(outline?.lines).map(row => ({ id: row.id, kind: 'eventLine' })), ...records(outline?.events).map(row => ({ id: row.id, kind: 'event' })), ...(brief.line ? [brief.line as Row] : []), ...(brief.event ? [brief.event as Row] : []), ...(brief.previousNode ? [brief.previousNode as Row] : [])]
+}
 
 /** 仅登记实际送出的资产；版本指纹留在程序中，不交给模型填写。 */
 export async function recordStoryReads(store: AgentStore, reads: ReadSet, items: Row[]) {
@@ -49,14 +57,14 @@ function compactValue(value: Row, tool: string): Row {
       ...Object.fromEntries(['process', 'charOffset', 'totalChars', 'truncated', 'nextCharOffset', 'memberOffset', 'memberCount', 'membersTruncated', 'nextMemberOffset', 'summaryTruncated'].filter(key => row[key] !== undefined && (key !== 'process' || kind === 'node')).map(key => [key, row[key]])) }
   }
   if (Array.isArray(value.data)) return { ...value, data: records(value.data).map(project) }
-  if (Array.isArray(value.workItems)) return { ...value, workItems: records(value.workItems).map(project), related: records(value.related).map(project), ...(value.line ? { line: project(value.line as Row) } : {}), ...(value.previousNode ? { previousNode: project(value.previousNode as Row) } : {}) }
+  if (Array.isArray(value.workItems)) return { ...value, workItems: records(value.workItems).map(project), related: records(value.related).map(project), ...(value.line ? { line: project(value.line as Row) } : {}), ...(value.event ? { event: project(value.event as Row) } : {}), ...(value.previousNode ? { previousNode: project(value.previousNode as Row) } : {}) }
   if (value.page && typeof value.page === 'object') return { ...value, page: compactValue(value.page as Row, tool) }
   return value
 }
 /** 原消息不改动；续跑和压缩都只使用当前业务视图。 */
-export function storyMessages(messages: AgentMessage[], outline = false): AgentMessage[] {
+export function storyMessages(messages: AgentMessage[], outline = false, review = false): AgentMessage[] {
   if (outline) return messages.filter(message => message.role !== 'system').map(message => {
-    if (message.role !== 'toolResult' || !['read_original', 'get_original', 'save_story_lines'].includes(message.toolName)) return message
+    if (message.role !== 'toolResult' || review && message.toolName === 'read_original' || !['read_original', 'get_original', 'save_story_lines'].includes(message.toolName)) return message
     const details = { message: '旧流程的结果已保存。请通过当前剧情大纲工具查看相关资料。' }
     return { ...message, content: [{ type: 'text' as const, text: JSON.stringify(details) }], details }
   })

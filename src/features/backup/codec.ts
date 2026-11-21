@@ -1,4 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zip, type Zippable } from 'fflate'
+import { version as appVersion } from '../../../package.json'
 import type { Book } from '../../lib/storage/workspace'
 import { chapterFileName, emptyTables, migrateLegacy, migrateRelationsData, pauseBookData, repairValidatedBookData, tableNames, type BackupError, type BookData, type BookTables, type Row, type TableName } from './data'
 import { convertLegacyRelations, hasCurrentRelationRows, isLegacyRelationRow } from '../assets/legacyRelations'
@@ -29,7 +30,7 @@ export async function encodeBackup(input: BookData, onProgress?: BackupProgress)
   const files: Record<string, Uint8Array> = { 'data/book.json': strToU8(JSON.stringify(data.book)) }
   for (const name of exportedTables) files[`data/${name}.json`] = strToU8(JSON.stringify(data.tables[name]))
   for (const row of data.tables.chapterTexts) files[chapterFileName(row.chapterIndex as string)] = strToU8(row.text as string)
-  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: hasOutline ? 13 : 12, appVersion: '0.4.3', exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
+  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: hasOutline ? 13 : 12, appVersion, exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
   files['manifest.json'] = strToU8(JSON.stringify(manifest))
   onProgress?.('正在压缩备份…')
   const bytes = await new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) => zip(files as Zippable, { level: 6 }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))

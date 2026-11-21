@@ -52,6 +52,8 @@ BUG-33，中型缺陷。用户实际运行 P2/P3 时，“运行详情”出现�
 
 ## 接手说明
 
+2026-11-21 用户要求 P2 用同一条顺序时间线展示输入和输出。API 01 展示系统提示、当次工具定义、程序注入及实际存在的用户消息，然后展示模型回复、工具调用和工具返回。后续请求只显示新增消息与结果。取消独立首请求面板和 P2 逐轮完整请求展开入口。沿用 BUG-33 和 REQ-020，见[设计补充](design.md#2026-11-21-p2-首次请求输入)及任务9。
+
 2026-11-13 BUG-42再次反馈的结束流程修复已获用户明确授权：“改，然后检查其他环节有没有这种情况”。本次中型局部修复范围为共用Agent运行层及P2三步、P3串联/复核的调用方。普通文字回复后继续当前未完成任务，完成仍依据工具回执；主动暂停、取消和工具失败不能被旧总结校验覆盖。不增加输出格式或字数校验。字段与存储无变化，沿用任务状态、完成回执及会话消息，旧数据与备份兼容。实施方法、数据流及验收见设计末节与任务8。
 
 读本提案、[任务](tasks.md)、[验收](acceptance.md)、[修改记录](implementation-record.md)及差异规格后实施。技术入口为 `src/features/agents/AgentRunPanel.tsx`、`src/features/world/WorldPanel.tsx`、`src/features/story/StoryPanel.tsx`；数据仍来自 `request_trace`、`prompt_snapshot`、`tool_snapshot`、`WorldRun.requestLedger` 和 `report.assetEdits`。

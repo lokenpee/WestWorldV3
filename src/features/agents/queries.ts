@@ -12,7 +12,7 @@ import { storyProcessSegments } from './storyCommands'
 import { characterDetails, relationOverview } from './assetViews'
 import { storyView } from '../story/views'
 
-export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; outline?: boolean; contextId?: string; unitId?: string; workKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string }
+export interface Scope { bookId: string; profile: AgentProfile; phase: string; runId: string; executionId?: string; taskId: string; sessionId?: string; owner: string; probe?: boolean; workItemIds: string[]; requiredLineIds?: string[]; reviewScope?: 'all_assets' | 'relations'; workflow?: string; outline?: boolean; quickStoryCheck?: boolean; contextId?: string; unitId?: string; workKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string }
 const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
 const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0
 const canonicalCursor = (value: unknown) => JSON.stringify(Array.isArray(value) ? value.map(String) : [])
@@ -20,7 +20,17 @@ const within = (index: string, range: string[]) => !range.length || index.locale
 export async function noteFingerprint(store: AgentStore, note: Row) {
   const nodes = await Promise.all(strings(note.nodeIds).map(id => store.get('nodes', id)))
   const lines = await Promise.all(strings(note.lineIds).map(id => store.get('eventLines', id)))
-  return store.wait(hash({ nodes: nodes.map(row => storyContent('nodes', row ?? null)), lines: lines.map(row => storyContent('eventLines', row ?? null)), evidence: note.evidence }))
+  if (note.basisVersion === 2) {
+    const nodeIds = new Set(strings(note.nodeIds)), eventIds = new Set(strings(note.eventIds)), lineIds = new Set(strings(note.lineIds))
+    for (const line of lines) for (const id of strings(line?.eventIds)) eventIds.add(id)
+    const events = (await store.rows('storyEvents')).filter(event => eventIds.has(text(event.id)) || strings(event.nodeIds).some(id => nodeIds.has(id)))
+    for (const event of events) eventIds.add(text(event.id))
+    const parents = (await store.rows('eventLines')).filter(line => lineIds.has(text(line.id)) || strings(line.eventIds).some(id => eventIds.has(id)))
+    const structure = (rows: Row[]) => rows.map(row => [row.id, row.title, row.nodeIds, row.eventIds]).sort(([a], [b]) => text(a).localeCompare(text(b)))
+    return store.wait(hash({ nodes: nodes.map(row => storyContent('nodes', row ?? null)), events: structure(events), lines: structure(parents), evidence: note.evidence }))
+  }
+  const events = await Promise.all(strings(note.eventIds).map(id => store.get('storyEvents', id)))
+  return store.wait(hash({ ...(events.length ? { events: events.map(row => storyContent('storyEvents', row ?? null)) } : {}), nodes: nodes.map(row => storyContent('nodes', row ?? null)), lines: lines.map(row => storyContent('eventLines', row ?? null)), evidence: note.evidence }))
 }
 async function projectNotes(store: AgentStore, notes: Row[]): Promise<(Row & { validity: string })[]> {
   return Promise.all(notes.map(async row => ({ ...row, validity: await noteFingerprint(store, row) === row.basisFingerprint ? 'current' : 'stale' })))
@@ -84,7 +94,7 @@ async function references(store: AgentStore, scope: Scope, names: string[], ids:
 }
 export async function readTool(store: AgentStore, scope: Scope, name: string, args: Row, maxResults = 100): Promise<Row> {
   if (name === 'get_story_detail') {
-    if (scope.outline) return readOutlineDetail(store, scope.bookId, args, maxResults)
+    if (scope.outline) return readOutlineDetail(store, scope, args, maxResults)
     if (scope.profile !== 'story_editor') throw new Error('SCOPE:故事详情仅供故事编辑使用。')
     if (scope.workflow === 'story_pages_v3') {
       const kind = text(args.kind), table = ({ node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[kind]
@@ -151,7 +161,10 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
       indexes = new Set<string>()
       for (const id of assetIds) {
         const asset = await resolveAsset(store, scope, 'characters', id) ?? await resolveAsset(store, scope, 'locations', id) ?? await resolveAsset(store, scope, 'nodes', id)
-        if (!asset) throw new Error('NOT_FOUND:资产不存在。')
+        if (!asset) {
+          if (chapters.some(chapter => chapter.chapterIndex === id)) throw new Error(`INVALID_ARGS:${JSON.stringify(id)} 是书内章节索引。请将 sourceChapters 中要查的索引填入 chapter_indices，例如 ${JSON.stringify({ chapter_indices: [id] })}。asset_ids 接收人物、地点或事件节点编号。`)
+          throw new Error(`NOT_FOUND:找不到 asset_ids 中的资产 ${JSON.stringify(id)}。如果要按章查阅，请使用 chapter_indices。`)
+        }
         for (const index of strings(asset.sourceChapters).length ? strings(asset.sourceChapters) : [text(asset.chapterIndex)]) if (index) indexes.add(index)
       }
     }

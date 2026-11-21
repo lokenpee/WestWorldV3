@@ -676,6 +676,8 @@
               "enum": [
                 "node_page",
                 "line_segment",
+                "line_structure",
+                "event_summary",
                 "line_summary",
                 "note_page"
               ]
@@ -687,6 +689,9 @@
               }
             },
             "lineId": {
+              "type": "string"
+            },
+            "eventId": {
               "type": "string"
             },
             "segment": {

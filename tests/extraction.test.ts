@@ -9,6 +9,7 @@ import { defaultConfig } from '../src/features/models/types'
 import { emptyTables, tableNames, validateBookData } from '../src/features/backup/data'
 import { encodeBackup, inspectBackup, restoredTables } from '../src/features/backup/codec'
 import { createAssetService } from '../src/features/assets/service'
+import { formValues } from '../src/features/assets/form'
 import { readExtractionInput } from '../src/features/extraction/taskStore'
 import type { StoredTask } from '../src/features/extraction/recovery'
 import { RemoteDatabase } from '../src/features/local-storage/client'
@@ -49,10 +50,75 @@ afterEach(async () => { for (const workspace of workspaces.splice(0)) { workspac
 const extractionMessage = (value: unknown) => ({ content: [{ type: 'toolCall', name: 'submit_result', arguments: value }] }) as unknown as Parameters<typeof validateExtraction>[1]
 const relationWorld = (quote: string) => ({ characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'friend', relation_label: '朋友', reverse_label: '朋友', direction: 'bidirectional', quote }] }], locations: [] })
 
+it('P1 提交精简字段，历史响应和资产仍可兼容保存和恢复', async () => {
+  const person = { name: '沈青', profile: { ageText: '十四五岁' }, relations: [{ target: '顾衡', relation_type: 'friendship', relation_label: '朋友', reverse_label: '朋友', quote: '两人多年好友' }] }
+  const node = { name: '送信', summary: '沈青托顾衡转交来信', actors: ['沈青', '顾衡'], quote: '沈青送信。', clues: [' 来信 ', '', '来信'], new_facts: ['顾衡收到了来信'] }
+  const fetcher = vi.fn<typeof fetch>()
+    .mockResolvedValueOnce(stream({ characters: [person, { name: '顾衡' }], locations: [{ name: '青石镇' }] }))
+    .mockResolvedValueOnce(stream({ nodes: [node] }))
+  const { book, service, db, workspace } = await setup(fetcher)
+  await service.start(book.id)
+  expect(fetcher).toHaveBeenCalledTimes(2)
+  const [worldRequest, narrativeRequest] = fetcher.mock.calls.map(([, init]) => JSON.parse(init?.body as string))
+  const systemPrompt = (request: { messages: { role: string; content: string }[] }) => request.messages.find(message => message.role === 'system')?.content
+  expect(systemPrompt(worldRequest)).toContain('profile.ageText')
+  expect(systemPrompt(worldRequest)).not.toMatch(/\|\s*(?:confidence|profile\.age|relations\[\]\.direction)\s*\|/)
+  expect(systemPrompt(narrativeRequest)).toContain('| `clues` | 选填 | ≤2 项，每项 ≤32 字符 |')
+  expect(systemPrompt(narrativeRequest)).not.toMatch(/\|\s*(?:confidence|targets|started_actions)\s*\|/)
+  const worldSchema = worldRequest.tools[0].function.parameters
+  expect(worldSchema.required).toEqual(['characters', 'locations'])
+  expect(worldSchema.properties.characters.items.required).toEqual(['name'])
+  expect(worldSchema.properties.locations.items.required).toEqual(['name'])
+  expect(worldSchema.properties.characters.items.properties.relations.items.required).toEqual(['target', 'relation_type', 'relation_label', 'reverse_label', 'quote'])
+  expect(worldSchema).not.toHaveProperty('properties.characters.items.properties.confidence')
+  expect(worldSchema).not.toHaveProperty('properties.locations.items.properties.confidence')
+  expect(worldSchema).not.toHaveProperty('properties.characters.items.properties.profile.properties.age')
+  expect(worldSchema).not.toHaveProperty('properties.characters.items.properties.relations.items.properties.direction')
+  const narrativeSchema = narrativeRequest.tools[0].function.parameters
+  expect(narrativeSchema.required).toEqual(['nodes'])
+  expect(narrativeSchema.properties.nodes.items.required).toEqual(['name', 'summary', 'actors', 'quote'])
+  const narrativeFields = narrativeSchema.properties.nodes.items.properties
+  expect(narrativeFields.clues).toMatchObject({ type: 'array', items: { type: 'string' } })
+  for (const removed of ['confidence', 'targets', 'started_actions']) {
+    expect(narrativeFields).not.toHaveProperty(removed)
+  }
+  const [saved] = await db.table('nodes').toArray()
+  expect(saved).toMatchObject({ actorIds: ['C1-P001', 'C1-P002'], clues: ['来信'] })
+  for (const removed of ['confidence', 'targets', 'started_actions']) expect(saved).not.toHaveProperty(removed)
+  expect((await db.table('locations').toArray())[0]).not.toHaveProperty('confidence')
+  const first = await db.table('characters').get('C1-P001')
+  expect(first).toMatchObject({ profile: { ageText: '十四五岁' } })
+  expect(first).not.toHaveProperty('confidence')
+  expect((await db.table('characterRelations').toArray())[0]).toMatchObject({ direction: 'bidirectional' })
+
+  const oldWorld = validateExtraction('worldAssets', extractionMessage({ characters: [{ ...person, profile: { age: 16 }, confidence: 1 }], locations: [] }))
+  expect(oldWorld.characters?.[0]).toMatchObject({ profile: { ageText: '16岁' } })
+  expect(oldWorld.characters?.[0].profile).not.toHaveProperty('age')
+  const oldNarrative = validateExtraction('narrativeAssets', extractionMessage({ nodes: [{ ...node, targets: ['信件'], started_actions: ['转交信件'], confidence: 1 }] }))
+  expect(oldNarrative.nodes?.[0]?.targets).toEqual(['信件'])
+  expect(oldNarrative.nodes?.[0]).not.toHaveProperty('started_actions')
+  expect(() => validateExtraction('narrativeAssets', extractionMessage({ nodes: [{ ...node, clues: '来信' }] }))).toThrow('字段或类型不符合要求')
+
+  await db.table('characters').update('C1-P002', { profile: { age: 16 }, confidence: 0.5 })
+  expect(formValues(await db.table('characters').get('C1-P002')).ageText).toBe('16岁')
+  await db.table('nodes').update(saved.id, { targets: ['信件'], started_actions: ['转交信件'] })
+  const assets = createAssetService(workspace)
+  await assets.update(book.id, 'node', saved.id, saved.revision, { clues: [' 书信 ', '书信'] })
+  await assets.update(book.id, 'character', 'C1-P002', (await db.table('characters').get('C1-P002'))!.revision, { identity: '收信人', ageText: '16岁' })
+  const tables = emptyTables()
+  for (const table of tableNames) tables[table] = await db.table(table).toArray()
+  const backup = await encodeBackup({ book, tables })
+  const inspected = await inspectBackup(backup.bytes)
+  expect(inspected.ok, JSON.stringify(inspected.errors)).toBe(true)
+  const restored = await restoredTables(inspected.data!, 'copy')
+  expect(restored.nodes[0]).toMatchObject({ clues: ['书信'], targets: ['信件'], started_actions: ['转交信件'] })
+  expect(restored.characters.find(row => row.id === 'C1-P002')).toMatchObject({ confidence: 0.5, profile: { age: 16 } })
+})
+
 it('节点地点按出现顺序保存、可更正，并兼容省略与无效输入', async () => {
   const locations = [' 荣庆堂 ', '', '荣庆堂', '宁国府前院厢房']
   const input = { nodes: [{ ...narrative.nodes[0], locationNames: locations }, narrative.nodes[1]] }
-  expect(() => validateExtraction('narrativeAssets', extractionMessage({ nodes: [{ ...input.nodes[0], locationNames: '荣庆堂' }] }))).toThrow('字段、类型或置信度不符合要求')
+  expect(() => validateExtraction('narrativeAssets', extractionMessage({ nodes: [{ ...input.nodes[0], locationNames: '荣庆堂' }] }))).toThrow('字段或类型不符合要求')
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const fields = JSON.parse(init?.body as string).tools[0].function.parameters.properties
     if (fields.characters) return stream(world)
@@ -80,7 +146,7 @@ it('人物关系依据只要求有内容，不要求长度或逐字匹配本章�
   expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('朋友')))).not.toThrow()
   expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('朋')))).not.toThrow()
   expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('依'.repeat(501))))).not.toThrow()
-  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('')))).toThrow('字段、类型或置信度不符合要求')
+  expect(() => validateExtraction('worldAssets', extractionMessage(relationWorld('')))).toThrow('字段或类型不符合要求')
 })
 
 it('整书重提世界资产先清空再提取，保留叙事节点并清除P2', async () => {
@@ -116,9 +182,39 @@ it('整书重提叙事资产删除事件线和P3结果，保留人物地点', as
   expect(service.state('a')?.error).toBeUndefined()
   expect(await db.table('eventLines').count()).toBe(0)
   expect(await db.table('nodes').count()).toBe(before.nodes)
+  expect(await db.table('nodes').toCollection().primaryKeys()).toEqual(['C1-N001', 'C1-N002'])
   expect(await db.table('characters').count()).toBe(before.characters)
   expect(await db.table('locations').count()).toBe(before.locations)
   expect(await db.table('pipelineRuns').get('p3-old')).toBeUndefined()
+}, 30000)
+
+it('单章叙事重提覆盖旧节点，失败后继续仍从 N001 编号且不承接旧归属', async () => {
+  let replace = false, failReplacement = false
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+    const schema = JSON.parse(init?.body as string).tools[0].function.parameters
+    if (!schema.properties.characters && failReplacement) return stream({ nodes: [{ name: '' }] })
+    return stream(schema.properties.characters ? world : replace ? { nodes: [{ ...narrative.nodes[0], name: '重提后的送信' }] } : narrative)
+  })
+  const { service, db, book } = await setup(fetcher, 2)
+  await service.start('a')
+  const second = await db.table('extractionReceipts').get('2:narrativeAssets')
+  await db.table('nodes').update('C1-N001', { revision: 8 })
+  await db.table('storyEvents').put({ id: 'E1', bookId: 'a', title: '旧事件', nodeIds: ['C1-N001', 'C2-N001'], revision: 1 })
+  failReplacement = true
+  await service.reExtract('a', { scope: 'chapter', chapterIndex: '1', step: 'narrativeAssets' })
+  expect(await db.table('nodes').where('chapterIndex').equals('1').count()).toBe(0)
+  expect((await service.progress('a'))?.reExtract).toMatchObject({ step: 'narrativeAssets', chapterIndex: '1' })
+  failReplacement = false
+  replace = true
+  await service.continueReExtract('a')
+  expect(service.state('a')?.error).toBeUndefined()
+  expect(await db.table('nodes').where('chapterIndex').equals('1').toArray()).toMatchObject([{ id: 'C1-N001', name: '重提后的送信', order: 0, eventLineIds: [], revision: 10 }])
+  expect(await db.table('assetLifecycle').get('node:C1-N001')).toMatchObject({ state: 'live', revision: 10 })
+  expect(await db.table('assetLifecycle').get('node:C1-N002')).toMatchObject({ state: 'deleted' })
+  expect(await db.table('storyEvents').get('E1')).toMatchObject({ nodeIds: ['C2-N001'] })
+  expect(await db.table('extractionReceipts').get('2:narrativeAssets')).toEqual(second)
+  const tables = emptyTables(); for (const name of tableNames) tables[name] = await db.table(name).toArray()
+  expect(await validateBookData({ book, tables })).toEqual([])
 }, 30000)
 
 it('单章重提合并编号后其他章节凭证仍有效，首章失败可继续且立即备份可校验', async () => {
@@ -311,8 +407,30 @@ it('P1提示词包含关系存在性、未具名指向和传闻不确定性规�
   expect(worldPrompt).toContain('“有人”“众人”等泛称不作为具体人物')
   expect(worldPrompt).toContain('依据不足时省略该条关系')
   expect(worldPrompt).toContain('关系目标使用该条主名')
-  expect(worldPrompt).toContain('正向填“父亲”、反向填“儿子”')
+  expect(worldPrompt).toContain('正向填「父亲」，反向填「儿子」')
   expect(promptOf('narrativeAssets')).toContain('猜测、传闻、谎言、未经证实的指控')
+})
+
+it.each(['worldAssets', 'narrativeAssets'] as const)('P1 %s 提示词中的少样本能通过实际提交校验', step => {
+  const samples = [...promptOf(step).matchAll(/^> (.+)\r?\n[\s\S]*?^```json\r?\n([\s\S]*?)^```/gm)]
+  expect(samples).toHaveLength(2)
+  const results = samples.map(([, original, json]) => {
+    const result = validateExtraction(step, extractionMessage(JSON.parse(json)))
+    for (const node of result.nodes ?? []) if (node.quote) expect(original).toContain(node.quote)
+    for (const person of result.characters ?? []) if (person.speech_style_sample) expect(original).toContain(person.speech_style_sample)
+    return result
+  })
+  if (step === 'worldAssets') {
+    expect(results[0].characters?.[0].relations).toMatchObject([{ target: '沈宁', relation_label: '父亲', reverse_label: '儿子' }])
+    expect(results[1]).toEqual({ characters: [{ name: '顾衡' }, { name: '沈宁' }], locations: [] })
+    expect(validateExtraction(step, extractionMessage({ characters: [], locations: [] }))).toEqual({ characters: [], locations: [] })
+  } else {
+    expect(results[0].nodes?.[0]).toMatchObject({ clues: ['账簿第七页的私印'], world_delta: ['账簿已贴封条。'] })
+    expect(results[1].nodes?.[0]).not.toHaveProperty('clues')
+    const minimum = { nodes: [{ name: '河水冲断木桥', summary: '木桥被河水冲断。', actors: [], quote: '' }] }
+    expect(validateExtraction(step, extractionMessage(minimum))).toEqual(minimum)
+    expect(validateExtraction(step, extractionMessage({ nodes: [] }))).toEqual({ nodes: [] })
+  }
 })
 
 it.each(['worldAssets', 'narrativeAssets'] as const)('P1 %s 初始消息纯净，修正独立追加且保存来源不变', async failingStep => {
@@ -646,7 +764,7 @@ it('P1关系按落库人物编号保存，目标全部命中，人物行不再�
 })
 
 it('关系依据不要求逐字匹配本章原文，有简明依据即可保存', async () => {
-  const valid = { characters: [{ name: '沈青', confidence: 1, relations: [{ target: '顾衡', relation_type: 'parent_child', relation_label: '父亲', reverse_label: '子女', direction: 'directed', quote: '模型概括的父子关系依据' }] }], locations: [] }
+  const valid = { characters: [{ name: '沈青', relations: [{ target: '顾衡', relation_type: 'parent_child', relation_label: '父亲', reverse_label: '子女', quote: '模型概括的父子关系依据' }] }], locations: [] }
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const body = JSON.parse(init?.body as string)
     return stream(body.tools[0].function.parameters.properties.characters ? valid : { nodes: [] })
@@ -655,7 +773,7 @@ it('关系依据不要求逐字匹配本章原文，有简明依据即可保存'
   await service.start('a')
   const relations = await db.table('characterRelations').toArray()
   expect(relations).toHaveLength(1)
-  expect(relations[0]).toMatchObject({ originCharacterId: 'C1-P001', targetName: '顾衡', evidence: [{ chapterIndex: '1', quote: '模型概括的父子关系依据' }] })
+  expect(relations[0]).toMatchObject({ originCharacterId: 'C1-P001', targetName: '顾衡', direction: 'directed', evidence: [{ chapterIndex: '1', quote: '模型概括的父子关系依据' }] })
   expect(await db.table('extractionReceipts').get('1:worldAssets')).toBeTruthy()
   expect(service.state('a')?.results.find(row => row.step === 'worldAssets')?.ok).toBe(true)
 })

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { storyResponse } from '../support/story-protocol'
+import { storyResponse, storyTask } from '../support/story-protocol'
 
 async function prepare(page: Page, outlined = false) {
   await page.goto('/?acceptance=stage1')
@@ -53,9 +53,17 @@ test('大纲事件分段沿用故事线高亮，旧线和节点归属继续可�
   }
 })
 
-test('P3 从节点建立三层大纲，展开事件可回到原节点', async ({ page }) => {
+test('P3 从节点建立三层大纲，整理详情分阶段查看实际请求', async ({ page }) => {
+  test.setTimeout(60000)
+  const calls: { phase: string; system: string }[] = []
   await page.route('**/story-outline-fixture/v1/chat/completions', async route => {
-    await route.fulfill({ contentType: 'text/event-stream', body: await storyResponse(route.request().postDataJSON()).text() })
+    const body = route.request().postDataJSON()
+    const { input } = storyTask(body)
+    if (input.phase === 'global_review' && input.page.type === 'line_summary') {
+      expect(input.lineEvents).toMatchObject([{ title: '传递信件', summary: expect.any(String), coreClue: '同一封信的去向牵动了人物的接收与转交。' }])
+    }
+    calls.push({ phase: input.phase, system: body.messages.find((row: { role: string }) => row.role === 'system').content })
+    await route.fulfill({ contentType: 'text/event-stream', body: await storyResponse(body).text() })
   })
   await page.goto('/?acceptance=story')
   await page.getByRole('button', { name: '装载跨窗口样本', exact: true }).click()
@@ -66,7 +74,21 @@ test('P3 从节点建立三层大纲，展开事件可回到原节点', async ({
   await page.getByRole('button', { name: '保存模型配置', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '模型配置已保存' })).toBeVisible()
   await page.getByRole('button', { name: '资产', exact: true }).click()
-   await page.getByRole('button', { name: '串联事件线', exact: true }).click()
+  const panel = page.getByRole('region', { name: '事件线窗口串联' })
+  const detailButton = panel.getByRole('button', { name: 'P3 整理详情', exact: true })
+  const trace = page.getByRole('dialog', { name: '整理详情', exact: true })
+  const stages = trace.getByRole('navigation', { name: 'P3 整理阶段' })
+  const linkTab = stages.getByRole('button', { name: '事件串联', exact: true })
+  const reviewTab = stages.getByRole('button', { name: '全书复核', exact: true })
+  const close = trace.getByRole('button', { name: '关闭', exact: true })
+  await detailButton.click()
+  await expect(trace).toContainText('该阶段暂无 API 请求记录。')
+  await expect(linkTab).toHaveAttribute('aria-pressed', 'true')
+  await reviewTab.click()
+  await expect(trace).toContainText('该阶段暂无 API 请求记录。')
+  expect(calls).toHaveLength(0)
+  await close.click()
+  await page.getByRole('button', { name: '串联事件线', exact: true }).click()
   await expect.poll(() => page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('westworld_acceptance_story_book_stage1-book-a')
@@ -79,12 +101,35 @@ test('P3 从节点建立三层大纲，展开事件可回到原节点', async ({
       })
     } finally { db.close() }
   }), { timeout: 20000 }).toMatchObject({ status: 'completed', phase: 'window_link_complete' })
-  await expect(page.getByRole('region', { name: '事件线窗口串联' })).toContainText('串联完成', { timeout: 20000 })
+  await expect(panel).toContainText('串联完成', { timeout: 20000 })
+  await page.getByRole('button', { name: '全书复核', exact: true }).click()
+  await expect(panel).toContainText('全书复核完成', { timeout: 30000 })
+  await detailButton.click()
+  const first = trace.getByRole('region', { name: 'API 01', exact: true })
+  const second = trace.getByRole('region', { name: 'API 02', exact: true })
+  for (const [phase, tab] of [['global_review', reviewTab], ['window_link', linkTab]] as const) {
+    await tab.click()
+    await expect(tab).toHaveAttribute('aria-pressed', 'true')
+    const requests = calls.filter(call => call.phase === phase)
+    await expect(trace.locator('.run-api-slice')).toHaveCount(requests.length)
+    await first.locator('.run-role-system > summary').click()
+    await expect(first.locator('.run-role-system pre')).toHaveText(requests[0].system)
+    await expect(first.locator('.run-role-tools')).toHaveCount(1)
+    await expect(second.locator('.run-role-system, .run-role-tools')).toHaveCount(0)
+    await second.getByText('查看本次实际请求', { exact: true }).click()
+    await second.locator('.run-api > summary').click()
+    const fullSystem = second.getByRole('region', { name: 'API 输入消息' }).locator('.run-role-system')
+    await fullSystem.locator('summary').click()
+    await expect(fullSystem.locator('pre')).toHaveText(requests[1].system)
+  }
+  await close.click()
   await page.getByRole('button', { name: '事件线 1', exact: true }).click()
   await page.getByText('剧情大纲', { exact: true }).click()
   const outline = page.getByLabel('剧情大纲内容')
   await outline.getByText('信件流转', { exact: true }).click()
   await outline.getByText('传递信件', { exact: true }).click()
+  await expect(outline.getByText('待全书复核')).toHaveCount(0)
+  await expect(outline.getByText('同一封信的去向牵动了人物的接收与转交。', { exact: false })).toHaveCount(2)
   await outline.getByRole('button').first().click()
   const details = page.getByRole('region', { name: '编辑事件节点', exact: true })
   await expect(details.getByRole('table', { name: '剧情归属', exact: true }).getByRole('cell')).toHaveText(['信件流转', '传递信件'])

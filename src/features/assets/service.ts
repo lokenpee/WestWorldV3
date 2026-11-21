@@ -4,6 +4,7 @@ import { assetTables, AssetError, roleWeights, type Asset, type AssetByKind, typ
 import { storyMemberships, synchronizeOutline, usesOutline } from '../story/outline'
 import { rebuildFacts, resolveReferences, updateFrequencies } from './derive'
 import { bindNodeCharacters, nodeParticipants, remapCharacterLinks, setNodeParticipants } from './characterLinks'
+import { characterAgeText } from './characterAge'
 import { detailTokens, fuseWorldAssets, validateMergeOptions, type ManualMergeRun, type MergeOptions, type MergePreview, type MergeRequest, type WorldKind, type MechanicalMergeContext } from './merge'
 import { dexieMergeStore, mergeWorldAssets } from './mergeCore'
 import { invalidateAssetProgress } from './invalidate'
@@ -26,11 +27,11 @@ export interface RelationPairInput {
 }
 interface Lease { id: string; bookId: string; recordType?: string; lockKey?: string; resource?: string }
 const worldKinds = new Set<AssetKind>(['character', 'location'])
-const listFields = new Set(['aliases', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
+const listFields = new Set(['aliases', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'clues', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
 const allowed: Record<AssetKind, string[]> = {
   character: ['name', 'aliases', 'chapterIndex', 'manualSourceNote', 'identity', 'ageText', 'appearance', 'personality', 'background', 'speechStyleSample', 'roleWeight'],
   location: ['name', 'aliases', 'chapterIndex', 'manualSourceNote', 'description'],
-  node: ['name', 'summary', 'chapterIndex', 'quote', 'process', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions'],
+  node: ['name', 'summary', 'chapterIndex', 'quote', 'process', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'clues', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions'],
   eventLine: ['title', 'summary', 'nodeIds', 'cause', 'process', 'result', 'lineStatus'],
 }
 const fail = (field: keyof AssetInput, message: string): never => { throw new AssetError('VALIDATION', message, field) }
@@ -205,7 +206,7 @@ export function createAssetService(workspace: Workspace) {
       const manualSourceNote = (input.manualSourceNote ?? previous?.manualSourceNote ?? '').trim()
       if (!chapter && !previous?.sourceChapters?.length && !manualSourceNote) fail('manualSourceNote', '没有来源章节时，请填写来源说明。')
       const nameSource = previous ? (input.name !== undefined && name !== previous.name ? 'manual' : previous.nameSource ?? 'extracted') : 'manual'
-      const row: Character | LocationAsset = { ...previous, ...base, name, confidence: previous?.confidence ?? 0.5, aliases: unique(input.aliases ?? previous?.aliases ?? []).filter(alias => alias !== name), updatedAt: new Date().toISOString(), nameSource, manualKeep: previous?.manualKeep ?? false, sourceChapters: previous?.sourceChapters ?? (chapterIndex ? [chapterIndex] : []), manualSourceNote }
+      const row: Character | LocationAsset = { ...previous, ...base, name, ...(!previous ? { confidence: 0.5 } : {}), aliases: unique(input.aliases ?? previous?.aliases ?? []).filter(alias => alias !== name), updatedAt: new Date().toISOString(), nameSource, manualKeep: previous?.manualKeep ?? false, sourceChapters: previous?.sourceChapters ?? (chapterIndex ? [chapterIndex] : []), manualSourceNote }
       if (chapter) { row.chapterIndex = chapter.chapterIndex; row.chapterName = chapter.chapterName }
       const facts: Record<string, string> = {}
       const textFields = kind === 'character' ? ['identity', 'appearance', 'personality', 'background', 'speechStyleSample'] as const : ['description'] as const
@@ -217,7 +218,10 @@ export function createAssetService(workspace: Workspace) {
       if (kind === 'character') {
         const character = row as Character
         if (character.identity !== (previous as Character | undefined)?.identity && character.identity !== undefined) facts.identity = character.identity
-        if (input.ageText !== undefined) character.profile = { ...(previous as Character | undefined)?.profile, ageText: input.ageText }
+        if (input.ageText !== undefined && input.ageText.trim() !== characterAgeText(character.profile)) {
+          character.profile = { ...character.profile, ageText: input.ageText.trim() }
+          if (!character.profile.ageText) delete character.profile.age
+        }
         if (input.roleWeight !== undefined) { character.roleWeight = input.roleWeight; character.roleWeightSource = 'manual' }
       }
       if (row.mergeFacts && Object.keys(facts).length) {
@@ -244,11 +248,11 @@ export function createAssetService(workspace: Workspace) {
       const summary = (input.summary ?? bound?.summary ?? '').trim() || fail('summary', '概述不能为空。')
       const quote = input.quote ?? bound?.quote ?? ''
       const matched = !!quote.trim() && source.text.includes(quote)
-      const row: EventNode = { ...bound, ...base, name, summary, quote, quoteStatus: !quote.trim() ? 'empty' : matched ? 'matched' : 'unmatched', chapterIndex, chapterName: chapter!.chapterName, order: bound?.order ?? await db.table<EventNode>('nodes').where('chapterIndex').equals(chapterIndex).count(), confidence: bound?.confidence ?? 0.5, actors: unique(input.actors ?? bound?.actors ?? []), eventLineIds: bound?.eventLineIds ?? [] }
+      const row: EventNode = { ...bound, ...base, name, summary, quote, quoteStatus: !quote.trim() ? 'empty' : matched ? 'matched' : 'unmatched', chapterIndex, chapterName: chapter!.chapterName, order: bound?.order ?? await db.table<EventNode>('nodes').where('chapterIndex').equals(chapterIndex).count(), ...(!bound ? { confidence: 0.5 } : {}), actors: unique(input.actors ?? bound?.actors ?? []), eventLineIds: bound?.eventLineIds ?? [] }
       if (matched) row.offset = source.text.indexOf(quote)
       else delete row.offset
       for (const field of ['process', 'time_text', 'time_hint'] as const) if (input[field] !== undefined) row[field] = input[field]
-      for (const field of ['targets', 'locationNames', 'world_delta', 'new_facts', 'started_actions'] as const) if (input[field] !== undefined) row[field] = unique(input[field]!)
+      for (const field of ['targets', 'locationNames', 'clues', 'world_delta', 'new_facts', 'started_actions'] as const) if (input[field] !== undefined) row[field] = unique(input[field]!)
       if (input.participantIds !== undefined || input.unlinkedParticipants !== undefined) {
         const participants = nodeParticipants(row, characters)
         return setNodeParticipants(row, characters, input.participantIds ?? participants.ids, input.unlinkedParticipants ?? participants.names)

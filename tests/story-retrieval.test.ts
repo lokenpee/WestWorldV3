@@ -33,6 +33,19 @@ it('线索检索可分页，已解决事项按需读取', async () => {
   expect((await repo.transaction(false, store => searchStoryContext(store, 'book', 's', { terms: ['旧印章'], include_resolved: true }))).totalCount).toBe(25)
 })
 
+it('新大纲检索匹配节点线索、涉及人物和剧情词，不使用旧行动或新增事实', async () => {
+  const old = { ...node('old', '8', '交接账册'), actors: ['赖大'], process: '前院缴回库银', clues: ['带火印的账簿'], started_actions: ['旧行动口令'], new_facts: ['旧事实暗号'] }
+  const current = { ...node('new', '165', '火灾后核对编号'), actors: [], clues: ['带火印的账簿'] }
+  const repo = createMemoryAgentRepository('book', { nodes: [old, current], storyEvents: [{ id: 'E1', bookId: 'book', title: '清查', nodeIds: ['old'] }] })
+  const search = (args: Row) => repo.transaction(false, store => searchStoryContext(store, 'book', 's', args, true, true))
+  expect((await search({ terms: ['带火印的账簿'] })).data.map(row => row.id)).toEqual(expect.arrayContaining(['old', 'new', 'E1']))
+  expect((await search({ node_ids: ['new'], kind: 'node' })).data.map(row => row.id)).toEqual(['old'])
+  for (const term of ['赖大', '前院缴回库银']) {
+    expect((await search({ terms: [term], kind: 'node', chapter_range: ['1', '10'] })).data.map(row => row.id)).toEqual(['old'])
+  }
+  expect((await search({ terms: ['旧行动口令', '旧事实暗号'] })).data).toEqual([])
+})
+
 it('长节点按内容量缩小批次，超大单项仍有处理机会', () => {
   const long = Array.from({ length: 20 }, (_, i) => node(String(i), '1', '事件'))
   expect(selectStoryBatch(long)).toHaveLength(1)

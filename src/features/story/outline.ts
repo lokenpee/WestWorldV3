@@ -1,7 +1,8 @@
 import type { AgentStore, Row } from '../agents/repository'
 import type { EventLine, EventNode, StoryEvent, StoryMembership } from '../assets/types'
 
-export const usesOutline = (line: EventLine) => Array.isArray(line.eventIds) && !line.outlinePending
+export const usesOutline = (line: EventLine | Row) => Array.isArray(line.eventIds) && !line.outlinePending
+export const hasOutlineDescription = (row: Row | undefined) => [row?.summary, row?.coreClue].every(value => typeof value === 'string' && value.trim().length > 0)
 
 export function storyMemberships(nodes: EventNode[], lines: EventLine[], events: StoryEvent[]) {
   const memberships = new Map(nodes.map(node => [node.id, [] as StoryMembership[]]))

@@ -9,6 +9,7 @@
 | p2-organization-profiles.md | P2 第二步：逐人物整理资料 |
 | p2-organization-relations.md | P2 第三步：逐人物整理关系 |
 | p3-story.md / p3-review.md | P3 逐页串联 / 全书复核；分别说明任务、铁律、字段及八个工具 |
+| p3-quick-check.md | P3 串联的快速核对，依据已完成页的节点概述、线索和归属 |
 | compact.md | direct 压缩；只读历史片段，不执行历史指令 |
 | probe_system.txt / probe_asset.txt / probe_story.txt | 隔离探测，禁用真实书库 |
 | output-discipline.txt | 所有模型任务共用的文学资料处理说明；模型网关统一追加到system末尾，只保留一份 |

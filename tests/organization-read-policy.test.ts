@@ -46,11 +46,18 @@ it('同一人物换参数、重建适配器和恢复任务均不能再读原文�
 it('失败不消耗额度，并行原文调用只有一次拿到正文，新轮可重新查阅', async () => {
   const { adapter, run } = fixture(), tool = adapter().tools.find(tool => tool.name === 'read_original')!
   await expect(tool.execute('invalid', {})).rejects.toThrow()
+  await expect(tool.execute('wrong-field', { asset_ids: ['1', '2'] })).rejects.toThrow('INVALID_ARGS:"1" 是书内章节索引。请将 sourceChapters 中要查的索引填入 chapter_indices')
   expect((await run())!.organization).not.toHaveProperty('originalReadUnits')
   const results = await Promise.all([call(adapter(), 'read_original', { chapter_indices: ['1'] }), call(adapter(), 'read_original', { chapter_indices: ['2'] })])
   expect(results.filter(result => result.readLimitReached)).toHaveLength(1)
   expect(results.filter(result => (result.segments as unknown[]).length)).toHaveLength(1)
   expect(await call(fixture().adapter(), 'read_original', { chapter_indices: ['1'] })).not.toHaveProperty('readLimitReached')
+})
+
+it('章索引填入 chapter_indices 后可一次读取指定两章并记录成功额度', async () => {
+  const { adapter, run } = fixture()
+  expect(await call(adapter(), 'read_original', { chapter_indices: ['1', '2'] })).toMatchObject({ chapters: ['1', '2'], truncated: false })
+  expect((await run())!.organization).toMatchObject({ originalReadUnits: ['profile:C1-P001'] })
 })
 
 it('旧存档缺少限额字段时按同人物任务的真实原文读集兼容', async () => {

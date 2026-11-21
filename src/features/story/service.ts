@@ -9,10 +9,12 @@ import { checkpointId, evidenceEntries, membershipsOf, type StoryCheckpoint, typ
 import { createStoryWindows, windowKey, windowNodes, type StoryWindow } from './windows'
 import { runGlobalReview, reviewQueue } from './review'
 import { recoverStoryCoverage, saveStoryCoverage, storyFingerprint, validStoryCoverage, windowFingerprint } from './coverage'
-import { hash, records } from '../agents/contracts'
+import { hash, records, text } from '../agents/contracts'
 import { buildStoryContext, lineDigest, selectStoryBatch, storyBatchBudget } from './retrieval'
 import type { SessionStatus } from '../agents/compaction'
-import { readBookTrace, readExecutionChain } from '../agents/trace'
+import { readBookTrace } from '../agents/trace'
+import type { StoryExecutionPhase } from '../agents/executionPagingTypes'
+import { readStoryExecution } from './execution'
 import { isObservationEntry } from '../agents/context'
 import storyPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-story.md?raw'
 import { storyTaskPrompt } from './prompt'
@@ -216,14 +218,16 @@ export function createWindowStoryService(workspace: Workspace, models: Pick<Mode
       return { progress, windows, covered, locked, leaseExpiry, checkpoints, completed: checkpoints.filter(row => row.status === 'completed').length, tasks: evidenceEntries((run?.tasks as Row[] | undefined) ?? [], nodes, lines), usage: run?.usage as { totalTokens: number; cost: number; costStatus?: string } | undefined, requestLedger: (run?.requestLedger as Row[] | undefined) ?? [], runStatus: run?.status as string | undefined, runStartedAt: run?.startedAt as string | undefined, commits: (run?.appliedCommands as Row[] | undefined) ?? [], assetEdits: records(run?.assetEdits), memory, notes: review?.items.filter(row => row.queue === 'review_notes').map(row => row.row) ?? [], session: { id: progress?.editorSessionId, entryCount: entries.length, compactions: entries.filter(row => row.type === 'compaction').length, compact }, review: { total: review?.items.length ?? 0, pending: review?.pending.length ?? 0, conclusions: review?.coverage ?? [] } }
     })
   }
-  async function history(bookId: string, offset = 0) {
+  async function history(bookId: string, offset = 0, selectedId?: string) {
     const db = workspace.openBook(bookId)
     const sessions = await db.table('storySessions').toArray()
-    const session = sessions.find(row => row.profile === 'story_editor' && row.status === 'active')
+    const choices = sessions.filter(row => row.profile === 'story_editor').sort((a, b) => text(b.createdAt).localeCompare(text(a.createdAt)))
+    const progress = await db.table('compileProgress').get('P3')
+    const session = choices.find(row => row.id === (selectedId || progress?.editorSessionId)) ?? choices[0]
     const entries = session ? await db.table<Row>('storySessionEntries').where('sessionId').equals(session.id).sortBy('ordinal').then(rows => rows.filter(row => !isObservationEntry(row))) : []
-    return { sessionId: session?.id as string | undefined, total: entries.length, entries: entries.slice(offset, offset + 20) }
+    return { sessions: choices.map(row => ({ id: text(row.id), label: row.kind === 'review' ? '全书复核' : '事件串联／历史会话' })), sessionId: session?.id as string | undefined, total: entries.length, entries: entries.slice(offset, offset + 20) }
   }
-  return { start: (bookId: string) => start(bookId), review: (bookId: string) => start(bookId, 'global_review'), read, history, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), execution: (bookId: string, runId: string, options?: { unitId?: string; contextId?: string; sessionId?: string }) => readExecutionChain(workspace, bookId, runId, options), state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { cancelled.add(bookId); controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } } }
+  return { start: (bookId: string) => start(bookId), review: (bookId: string) => start(bookId, 'global_review'), read, history, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), execution: (bookId: string, phase: StoryExecutionPhase) => readStoryExecution(workspace, bookId, phase), state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { cancelled.add(bookId); controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } } }
 }
 export function createStoryService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'settings' | 'generate'>) {
   return createReadingStoryService(workspace, models, createWindowStoryService(workspace, models))

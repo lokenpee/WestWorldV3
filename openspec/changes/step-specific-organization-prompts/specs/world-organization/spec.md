@@ -11,6 +11,10 @@
 - **WHEN** 运行 profiles 工作项
 - **THEN** System Prompt 不包含目录、疑似组或关系整理的完整说明；结束规则只使用 submit_profile_review 的 done，不出现 submit_result 的结束要求。
 
+#### Scenario: 资料稀少与章节定位
+- **WHEN** 人物资料当前快照缺少某些字段，或模型需要核实具体疑点
+- **THEN** 提示词说明当前快照已覆盖待整理字段，允许空修改完成。需要查看离散章节时使用 `chapter_indices`。把有效章索引传入 `asset_ids` 且未匹配到资产时，工具给出可纠正的入参提示，不消费成功查阅额度。
+
 #### Scenario: 第三步 System Prompt
 - **WHEN** 运行 relations 工作项
 - **THEN** System Prompt 不包含目录、疑似组或人物资料整理的完整说明；结束规则只使用 submit_relation_review 的 done。
