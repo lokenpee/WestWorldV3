@@ -26,7 +26,7 @@ test('opt12：2501成员长线与后续短线的关联预算、目录大小和�
   expect(directory.totalCount).toBe(2)
   const context = await repo.transaction(false, store => buildStoryContext(store, bookId, sessionId, [current], 'node', false, true))
   expect(context.totalRelated).toBe(2)
-  expect(context.assigned).toMatchObject([{ id: currentId, name: current.name, summary: current.summary }])
+  expect(context.assigned).toMatchObject([{ id: currentId, name: current.name, chapterIndex: String(members.length) }])
   const candidateTokens = directoryRows.map(row => ({ id: row.id, tokens: estimateTextTokens(JSON.stringify(row)), nodeIds: strings(row.nodeIds).length, memberCount: row.memberCount ?? null }))
 
   // 走现有正式详情工具，验证精简目录不会缩短真实事件线或截断后续分页。

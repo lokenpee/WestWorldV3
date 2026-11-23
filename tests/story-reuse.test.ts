@@ -34,6 +34,6 @@ it('续跑模型视图去掉旧原文和存储字段，原始日志保持不变'
   ] as Parameters<typeof storyMessages>[0]
   const before = JSON.stringify(messages), current = storyMessages(messages)
   expect(JSON.stringify(current)).not.toMatch(/旧工具提示词|原文秘密|证据秘密|bookId|revision/)
-  expect(JSON.stringify(current)).toContain('详细经过')
+  expect(JSON.stringify(current)).not.toContain('详细经过')
   expect(JSON.stringify(messages)).toBe(before)
 })

@@ -662,7 +662,9 @@
           "enum": [
             "run",
             "asset_edit",
-            "history_index"
+            "history_index",
+            "narrative_task",
+            "narrative_receipt"
           ]
         },
         "id": {
@@ -909,6 +911,45 @@
             "$ref": "#/$defs/RequestLedgerEntry"
           }
         },
+        "stageDirectories": {
+          "type": "object",
+          "description": "串联与复核完成时各自的目录，供比较分类效果。旧任务可省略。",
+          "propertyNames": {
+            "enum": [
+              "window_link",
+              "global_review"
+            ]
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "orphans": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            },
+            "required": [
+              "lines",
+              "events",
+              "orphans"
+            ],
+            "additionalProperties": false
+          }
+        },
         "storyReading": {
           "type": "object",
           "description": "P3主动阅读的页面、检查结果与当前位置；由程序持久化，旧记录可省略。",
@@ -934,6 +975,156 @@
         },
         "storyOutlineVersion": {
           "const": 1
+        },
+        "narrative": {
+          "$ref": "#/$defs/NarrativePlan"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/NarrativeTask"
+        },
+        "reviewResults": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["target_id", "outcome"],
+            "properties": {
+              "target_id": { "type": "string" },
+              "outcome": { "type": "string" }
+            }
+          }
+        },
+        "taskInputVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "contextStartOrdinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "placeholders": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "systemPrompt": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lastNarrativeError": {
+          "type": "string"
+        },
+        "narrativeUsage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "input": {
+              "type": "number"
+            },
+            "output": {
+              "type": "number"
+            },
+            "cacheRead": {
+              "type": "number"
+            },
+            "cacheWrite": {
+              "type": "number"
+            },
+            "cost": {
+              "type": "number"
+            },
+            "unknown": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "requests",
+            "input",
+            "output",
+            "cacheRead",
+            "cacheWrite",
+            "cost"
+          ]
+        },
+        "observed": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "toolSchemas": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
+        },
+        "outcome": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "parent",
+              "items"
+            ],
+            "properties": {
+              "parent": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "title"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "title"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "required": [
@@ -1020,6 +1211,49 @@
                 "const": "completed"
               }
             }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "recordType": {
+                "const": "narrative_task"
+              }
+            },
+            "required": [
+              "recordType"
+            ]
+          },
+          "then": {
+            "required": [
+              "snapshot",
+              "runId",
+              "placeholders",
+              "systemPrompt",
+              "observed"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "recordType": {
+                "const": "narrative_receipt"
+              }
+            },
+            "required": [
+              "recordType"
+            ]
+          },
+          "then": {
+            "required": [
+              "runId",
+              "taskId",
+              "signature",
+              "name",
+              "arguments",
+              "result"
+            ]
           }
         }
       ]
@@ -2757,6 +2991,16 @@
           "type": "integer",
           "const": 2,
           "description": "大纲事项按节点、事件及所属线的实际归属核对依据。旧事项可省略。"
+        },
+        "category": {
+          "enum": [
+            "NODE_ASSIGNMENT",
+            "EVENT_ASSIGNMENT",
+            "OTHER"
+          ]
+        },
+        "resolution": {
+          "type": "string"
         }
       }
     },
@@ -3545,6 +3789,13 @@
             },
             "input": {
               "type": "object",
+              "properties": {
+                "rawBodies": {
+                  "type": "object",
+                  "description": "各次传输尝试的原始请求正文，以尝试编号为键",
+                  "additionalProperties": { "type": "string" }
+                }
+              },
               "additionalProperties": true
             },
             "providerPayloadRef": {
@@ -4358,144 +4609,158 @@
             "assigned": {
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/StoryNodeIndex"
                   },
-                  "kind": {
-                    "enum": [
-                      "node",
-                      "eventLine",
-                      "note"
-                    ]
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "chapters": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "enum": [
+                          "node",
+                          "eventLine",
+                          "note"
+                        ]
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "chapters": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      },
+                      "nodeIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 12
+                      },
+                      "actors": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      },
+                      "estimatedDetailTokens": {
+                        "type": "integer"
+                      }
                     },
-                    "maxItems": 8
-                  },
-                  "nodeIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 12
-                  },
-                  "actors": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 8
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "truncated": {
-                    "type": "boolean"
-                  },
-                  "estimatedDetailTokens": {
-                    "type": "integer"
+                    "required": [
+                      "id",
+                      "kind",
+                      "title",
+                      "summary",
+                      "chapters",
+                      "nodeIds",
+                      "actors",
+                      "status",
+                      "truncated",
+                      "estimatedDetailTokens"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "id",
-                  "kind",
-                  "title",
-                  "summary",
-                  "chapters",
-                  "nodeIds",
-                  "actors",
-                  "status",
-                  "truncated",
-                  "estimatedDetailTokens"
-                ],
-                "additionalProperties": false
+                ]
               },
               "maxItems": 20
             },
             "related": {
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/StoryNodeIndex"
                   },
-                  "kind": {
-                    "enum": [
-                      "node",
-                      "eventLine",
-                      "note"
-                    ]
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "chapters": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "enum": [
+                          "node",
+                          "eventLine",
+                          "note"
+                        ]
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "chapters": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      },
+                      "nodeIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 12
+                      },
+                      "actors": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      },
+                      "estimatedDetailTokens": {
+                        "type": "integer"
+                      },
+                      "matchedTerms": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      }
                     },
-                    "maxItems": 8
-                  },
-                  "nodeIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 12
-                  },
-                  "actors": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 8
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "truncated": {
-                    "type": "boolean"
-                  },
-                  "estimatedDetailTokens": {
-                    "type": "integer"
-                  },
-                  "matchedTerms": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 8
+                    "required": [
+                      "id",
+                      "kind",
+                      "title",
+                      "summary",
+                      "chapters",
+                      "nodeIds",
+                      "actors",
+                      "status",
+                      "truncated",
+                      "estimatedDetailTokens",
+                      "matchedTerms"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "id",
-                  "kind",
-                  "title",
-                  "summary",
-                  "chapters",
-                  "nodeIds",
-                  "actors",
-                  "status",
-                  "truncated",
-                  "estimatedDetailTokens",
-                  "matchedTerms"
-                ],
-                "additionalProperties": false
+                ]
               },
               "maxItems": 12
             },
@@ -5064,6 +5329,9 @@
             },
             {
               "$ref": "#/$defs/CharacterOrganizationTask"
+            },
+            {
+              "$ref": "#/$defs/NarrativeTask"
             }
           ]
         },
@@ -9666,144 +9934,158 @@
             "assigned": {
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/StoryNodeIndex"
                   },
-                  "kind": {
-                    "enum": [
-                      "node",
-                      "eventLine",
-                      "note"
-                    ]
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "chapters": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "enum": [
+                          "node",
+                          "eventLine",
+                          "note"
+                        ]
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "chapters": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      },
+                      "nodeIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 12
+                      },
+                      "actors": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      },
+                      "estimatedDetailTokens": {
+                        "type": "integer"
+                      }
                     },
-                    "maxItems": 8
-                  },
-                  "nodeIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 12
-                  },
-                  "actors": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 8
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "truncated": {
-                    "type": "boolean"
-                  },
-                  "estimatedDetailTokens": {
-                    "type": "integer"
+                    "required": [
+                      "id",
+                      "kind",
+                      "title",
+                      "summary",
+                      "chapters",
+                      "nodeIds",
+                      "actors",
+                      "status",
+                      "truncated",
+                      "estimatedDetailTokens"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "id",
-                  "kind",
-                  "title",
-                  "summary",
-                  "chapters",
-                  "nodeIds",
-                  "actors",
-                  "status",
-                  "truncated",
-                  "estimatedDetailTokens"
-                ],
-                "additionalProperties": false
+                ]
               },
               "maxItems": 20
             },
             "related": {
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/StoryNodeIndex"
                   },
-                  "kind": {
-                    "enum": [
-                      "node",
-                      "eventLine",
-                      "note"
-                    ]
-                  },
-                  "title": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string"
-                  },
-                  "chapters": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "enum": [
+                          "node",
+                          "eventLine",
+                          "note"
+                        ]
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      },
+                      "chapters": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      },
+                      "nodeIds": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 12
+                      },
+                      "actors": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "truncated": {
+                        "type": "boolean"
+                      },
+                      "estimatedDetailTokens": {
+                        "type": "integer"
+                      },
+                      "matchedTerms": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "maxItems": 8
+                      }
                     },
-                    "maxItems": 8
-                  },
-                  "nodeIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 12
-                  },
-                  "actors": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 8
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "truncated": {
-                    "type": "boolean"
-                  },
-                  "estimatedDetailTokens": {
-                    "type": "integer"
-                  },
-                  "matchedTerms": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "maxItems": 8
+                    "required": [
+                      "id",
+                      "kind",
+                      "title",
+                      "summary",
+                      "chapters",
+                      "nodeIds",
+                      "actors",
+                      "status",
+                      "truncated",
+                      "estimatedDetailTokens",
+                      "matchedTerms"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "id",
-                  "kind",
-                  "title",
-                  "summary",
-                  "chapters",
-                  "nodeIds",
-                  "actors",
-                  "status",
-                  "truncated",
-                  "estimatedDetailTokens",
-                  "matchedTerms"
-                ],
-                "additionalProperties": false
+                ]
               },
               "maxItems": 12
             },
@@ -10059,6 +10341,290 @@
           "minimum": 1
         }
       }
+    },
+    "StoryNodeIndex": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "const": "node"
+        },
+        "name": {
+          "type": "string"
+        },
+        "chapterIndex": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "chapterIndex"
+      ],
+      "additionalProperties": false
+    },
+    "NarrativeTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "node_batch",
+            "event_cycle",
+            "event_review",
+            "event_group",
+            "line_cycle",
+            "line_review"
+          ]
+        },
+        "part": {
+          "enum": [
+            "batch",
+            "structure",
+            "doubts",
+            "unassigned",
+            "descriptions"
+          ]
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "singletonSources": {
+          "type": "object",
+          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+        },
+        "reviewProgress": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["环节", "已核", "待核"],
+            "properties": {
+              "环节": { "type": "string" },
+              "已核": { "type": "integer", "minimum": 0 },
+              "待核": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "basis": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "mode",
+        "part",
+        "ids",
+        "prompt",
+        "basis"
+      ]
+    },
+    "NarrativePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "nodeBatchSize": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "eventGroupSize": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "eventReviewInterval": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "lineReviewInterval": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "segmentSize": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "outlineThreshold": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "keepRecentRounds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "nodeBatchSize",
+            "eventGroupSize",
+            "eventReviewInterval",
+            "lineReviewInterval",
+            "segmentSize",
+            "outlineThreshold",
+            "keepRecentRounds"
+          ]
+        },
+        "layer": {
+          "enum": [
+            "event",
+            "line"
+          ]
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "reuseAssigned": {
+          "type": "boolean"
+        },
+        "active": {
+          "$ref": "#/$defs/NarrativeTask"
+        },
+        "nodes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "events": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "retained": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "batches": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "event": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "line": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "event",
+            "line"
+          ]
+        },
+        "period": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "affected": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "final": {
+              "type": "boolean"
+            },
+            "coverage": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "final",
+            "coverage"
+          ]
+        },
+        "periodTasks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reviews": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "layer": {
+                "enum": [
+                  "event",
+                  "line"
+                ]
+              },
+              "final": {
+                "type": "boolean"
+              },
+              "batchIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "counts": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "required": [
+              "layer",
+              "final",
+              "batchIds",
+              "counts"
+            ]
+          }
+        }
+      },
+      "required": [
+        "config",
+        "layer",
+        "complete",
+        "nodes",
+        "events",
+        "retained",
+        "batches",
+        "period",
+        "affected"
+      ]
     }
   }
 }

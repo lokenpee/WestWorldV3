@@ -5,7 +5,7 @@ import { storyMemberships, usesOutline } from '../story/outline'
 export const nodeWidth = 200, nodeHeight = 84
 export const lineColors = ['#426b45', '#a05f22', '#76518c', '#287d91', '#ad4c67', '#80712d']
 export interface NetworkNode { id: string; x: number; y: number; node: EventNode; lineIds: string[]; memberships: StoryMembership[] }
-export interface NetworkEdge { id: string; lineId: string; source: string; target: string; color: string; eventIds?: string[] }
+export interface NetworkEdge { id: string; lineId: string | null; source: string; target: string; color: string; eventIds?: string[] }
 export interface NetworkLayout { nodes: NetworkNode[]; edges: NetworkEdge[]; chapters: { id: string; title: string; x: number; width: number }[]; width: number; height: number }
 
 export function layoutNetwork(input: EventNode[], lines: EventLine[], chapters: Chapter[], events: StoryEvent[] = []): NetworkLayout {
@@ -35,15 +35,25 @@ export function layoutNetwork(input: EventNode[], lines: EventLine[], chapters: 
   const order = new Map(positions.map((row, index) => [row.id, index]))
   const edges = new Map<string, NetworkEdge>()
   const eventsById = new Map(events.map(event => [event.id, event]))
-  for (const [index, line] of lines.entries()) {
-    const segments = usesOutline(line) ? (line.eventIds ?? []).flatMap(id => eventsById.has(id) ? [{ eventId: id, nodeIds: eventsById.get(id)!.nodeIds }] : []) : [{ eventId: null, nodeIds: line.nodeIds }]
+  const grouped = new Set(lines.flatMap(line => line.eventIds ?? []))
+  const paths = [
+    ...lines.map(line => ({
+      key: line.id, lineId: line.id as string | null,
+      segments: usesOutline(line) ? (line.eventIds ?? []).flatMap(id => eventsById.has(id) ? [{ eventId: id, nodeIds: eventsById.get(id)!.nodeIds }] : []) : [{ eventId: null, nodeIds: line.nodeIds }],
+    })),
+    ...events.filter(event => !grouped.has(event.id)).map(event => ({
+      key: 'event:' + event.id, lineId: null,
+      segments: [{ eventId: event.id, nodeIds: event.nodeIds }],
+    })),
+  ]
+  for (const [index, {key, lineId, segments}] of paths.entries()) {
     for (const segment of segments) {
       const ids = [...new Set(segment.nodeIds)].filter(id => order.has(id)).sort((a, b) => order.get(a)! - order.get(b)!)
       for (let i = 1; i < ids.length; i++) {
-        const source = ids[i - 1], target = ids[i], id = `${line.id}:${source}:${target}`
+        const source = ids[i - 1], target = ids[i], id = `${key}:${source}:${target}`
         const edge = edges.get(id)
         if (edge && segment.eventId) { if (!edge.eventIds!.includes(segment.eventId)) edge.eventIds!.push(segment.eventId) }
-        else if (!edge) edges.set(id, { id, lineId: line.id, source, target, color: lineColors[index % lineColors.length], ...(segment.eventId ? { eventIds: [segment.eventId] } : {}) })
+        else if (!edge) edges.set(id, { id, lineId, source, target, color: lineColors[index % lineColors.length], ...(segment.eventId ? { eventIds: [segment.eventId] } : {}) })
       }
     }
   }

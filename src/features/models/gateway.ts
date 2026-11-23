@@ -5,18 +5,54 @@ import type { Agent, AgentEvent, AgentMessage, AgentOptions, AgentTool, FinishTu
 import { abortableDelay, awaitWithSignal, classifyError, redact, retryable, retryDelay, summarizeUsage } from './policy'
 import { loadProtocol } from './registry'
 import { withContextDiscipline } from '../agents/output-discipline'
-import { ModelError, type Attempt, type CallMode, type CallOptions, type CallResult, type DirectRequest, type ModelFailure, type ResolvedModel } from './types'
+import { ModelError, type Attempt, type CallMode, type CallOptions, type CallResult, type DirectRequest, type ModelFailure, type ResolvedModel, type SkippedToolCall } from './types'
 
 export interface GatewayEnvironment { fetch?: typeof fetch; now?: () => number; random?: () => number; wait?: typeof abortableDelay; beforeRequest?: () => Promise<void> }
 export interface AgentInput {
   prompt: string; systemPrompt: string; finishTurn?: FinishTurn; tools?: AgentTool[]; getTools?: () => AgentTool[]; messages?: AgentMessage[]; agent?: Agent
   beforeToolCall?: AgentOptions['beforeToolCall']; afterToolCall?: AgentOptions['afterToolCall']; prepareRequest?: AgentOptions['prepareRequest']
-  onEvent?: (event: AgentEvent) => Promise<void>; onAgent?: (agent: Agent) => void; beforeRequest?: () => Promise<void>; validateFinal?: () => void
+  observeEvent?: (event: AgentEvent) => void; onEvent?: (event: AgentEvent) => Promise<void>; onAgent?: (agent: Agent) => void; beforeRequest?: () => Promise<void>; validateFinal?: () => void
   recoverContext?: (context: Context, model: ResolvedModel['model']) => Promise<Context | undefined>
 }
 const textOf = (message: AssistantMessage) => message.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('')
 const estimateTokens = (value: string) => { let weight = 0; for (const char of value) weight += /[㐀-鿿぀-ヿ가-힯]/u.test(char) ? 1.5 : char.codePointAt(0)! > 127 ? 1 : 0.25; return Math.ceil(weight) }
+function recoverToolsAtOutputLimit(message: AssistantMessage, events: AssistantMessageEvent[]) {
+  if (message.stopReason !== 'length') return { message, skippedTools: [] as SkippedToolCall[] }
+  const argumentChunks = new Map<number, string[]>()
+  for (const event of events) {
+    if (event.type !== 'toolcall_delta') continue
+    const chunks = argumentChunks.get(event.contentIndex) ?? []
+    chunks.push(event.delta)
+    argumentChunks.set(event.contentIndex, chunks)
+  }
+  const skippedTools: SkippedToolCall[] = []
+  const content = message.content.flatMap<AssistantMessage['content'][number]>((part, contentIndex) => {
+    if (part.type !== 'toolCall') return [part]
+    // SDK 的 arguments 可能由半截 JSON 补齐。这里只接受原始流已完整给出的参数。
+    try {
+      const parsed = JSON.parse(argumentChunks.get(contentIndex)?.join('') ?? '')
+      if (part.id && part.name && parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+        return [{ ...part, arguments: parsed }]
+    } catch { /* 原始参数没有形成完整 JSON。 */ }
+    skippedTools.push({ id: part.id, name: part.name, contentIndex, reason: '模型达到本次输出上限，工具参数未完整返回。' })
+    return []
+  })
+  // 同轮有截断的操作时，先补齐漏项再确认任务。
+  if (skippedTools.length) for (const [contentIndex, part] of message.content.entries())
+    if (part.type === 'toolCall' && part.name === 'confirm' && !skippedTools.some((tool) => tool.contentIndex === contentIndex))
+      skippedTools.push({ id: part.id, name: part.name, contentIndex, reason: '同轮还有工具参数未完整返回，待补齐后再确认。' })
+  const retained = skippedTools.length ? content.filter((part) => part.type !== 'toolCall' || part.name !== 'confirm') : content
+  return { message: { ...message, content: retained, stopReason: retained.some((part) => part.type === 'toolCall') ? 'toolUse' as const : 'length' as const }, skippedTools }
+}
+
 const emptyUsage = (): Usage => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } })
+
+// 保留服务商原生协议，仅把随轮次变化的消息数组放到请求体末尾。
+function messagesLast(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload
+  const { messages, input, ...fixed } = payload as Record<string,unknown>
+  return { ...fixed, ...(messages !== undefined ? {messages} : {}), ...(input !== undefined ? {input} : {}) }
+}
 
 // 调用与实际请求预算遵循 docs/decisions/model-connection.md。
 class CallSession {
@@ -85,7 +121,7 @@ class CallSession {
       if (this.options.trace?.request && this.requestId) {
         try {
           const body = typeof init?.body === 'string' ? init.body : input instanceof Request ? await input.clone().text() : undefined
-          if (body) this.options.trace.request({ requestId: this.requestId, attemptId: attempt.attemptId!, body: JSON.parse(body) as Record<string, unknown> })
+          if (body) this.options.trace.request({ requestId: this.requestId, attemptId: attempt.attemptId!, rawBody: body, body: JSON.parse(body) as Record<string, unknown> })
         } catch { /* 观测失败不改变请求或阻断调用 */ }
       }
       const response = await (this.environment.fetch ?? globalThis.fetch)(input, init)
@@ -94,15 +130,17 @@ class CallSession {
       return response
     } finally { attempt.elapsedMs = this.now() - start; attempt.finishedAt = attempt.finishedAt ?? new Date(this.now()).toISOString() }
   }
-  async runTurn(context: Context, traceOptions: { parentRequestId?: string; purpose?: 'work' | 'compaction' | 'repair' } = {}): Promise<{ message: AssistantMessage; events: AssistantMessageEvent[]; requestId: string }> {
+  async runTurn(context: Context, traceOptions: { parentRequestId?: string; purpose?: 'work' | 'compaction' | 'repair' } = {}): Promise<{ message: AssistantMessage; events: AssistantMessageEvent[]; requestId: string; skippedTools?: SkippedToolCall[] }> {
     context = withContextDiscipline(context)
     this.turn++
     this.requestId = crypto.randomUUID()
     const requestId = this.requestId
+    const requestedReasoning = this.options.reasoning
+    const reasoning = typeof requestedReasoning === 'function' ? requestedReasoning() : requestedReasoning
     const attemptsBefore = this.attempts.length
     const trace = this.options.trace
     try { trace?.start({ requestId, ...(traceOptions.parentRequestId ? { parentRequestId: traceOptions.parentRequestId } : {}), purpose: traceOptions.purpose ?? this.options.tracePurpose ?? 'work', model: { providerId: this.resolved.snapshot.providerId, modelId: this.resolved.snapshot.modelId }, context, turn: this.turn, startedAt: new Date(this.now()).toISOString() }) } catch { /* 观测失败不影响模型调用 */ }
-    const traceEnd = (value: { message?: AssistantMessage; usage?: Usage; status: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'; error?: ReturnType<CallSession['failure']> }) => { try { trace?.modelEnd({ requestId, attempts: this.attempts.slice(attemptsBefore), ...value }) } catch { /* 观测失败不影响模型调用 */ } }
+    const traceEnd = (value: { message?: AssistantMessage; usage?: Usage; status: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'; error?: ReturnType<CallSession['failure']>; skippedTools?: SkippedToolCall[] }) => { try { trace?.modelEnd({ requestId, attempts: this.attempts.slice(attemptsBefore), ...value }) } catch { /* 观测失败不影响模型调用 */ } }
     let client: Awaited<ReturnType<CallSession['models']>>
     try { client = await this.models() } catch (error) { traceEnd({ status: this.controller.signal.aborted ? 'cancelled' : 'failed', error: this.failure(this.controller.signal.aborted ? this.controller.signal.reason : error) }); throw error }
     try {
@@ -111,13 +149,23 @@ class CallSession {
         this.status = undefined; this.retryAfter = undefined; this.transportFailure = undefined
         const before = this.attempts.length
         const started = this.now()
-        const stream = client.streamSimple(this.resolved.model, context, { signal: this.controller.signal, fetch: this.transport, maxRetries: 0, transport: 'sse', timeoutMs: Math.max(1, Math.min(this.options.requestTimeoutMs ?? 180000, this.options.cooperativeTimeout ? Infinity : this.timeoutMs - (this.now() - this.started))), maxTokens: Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens), ...(this.options.temperature === undefined ? {} : { temperature: this.options.temperature }), ...(this.resolved.model.reasoning && this.options.reasoning ? { reasoning: this.options.reasoning } : {}) })
+        const stream = client.streamSimple(this.resolved.model, context, { signal: this.controller.signal, fetch: this.transport, ...(this.options.messagesLast ? {onPayload: messagesLast} : {}), maxRetries: 0, transport: 'sse', timeoutMs: Math.max(1, Math.min(this.options.requestTimeoutMs ?? 180000, this.options.cooperativeTimeout ? Infinity : this.timeoutMs - (this.now() - this.started))), maxTokens: Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens), ...(this.options.temperature === undefined ? {} : { temperature: this.options.temperature }), ...(this.resolved.model.reasoning && reasoning ? { reasoning } : {}) })
         const events: AssistantMessageEvent[] = []
         for await (const event of stream) { events.push(event); try { trace?.delta?.({ requestId, event }) } catch { /* 观测失败不影响模型调用 */ } }
         const raw = await stream.result()
         const attempt = this.attempts.length > before ? this.attempts.at(-1) : undefined
         if (attempt) { attempt.usage = raw.usage; attempt.elapsedMs = this.now() - started; attempt.finishedAt = new Date(this.now()).toISOString(); attempt.estimatedInput = estimateTokens(JSON.stringify(context)); attempt.outputReserve = Math.min(this.options.maxTokens ?? 8192, this.resolved.model.maxTokens) }
-        if (raw.stopReason !== 'error' && raw.stopReason !== 'aborted') { traceEnd({ message: raw, usage: raw.usage, status: 'succeeded' }); return { message: raw, events, requestId } }
+        if (raw.stopReason !== 'error' && raw.stopReason !== 'aborted') {
+          const recovered = this.options.useModelToolOutput ? recoverToolsAtOutputLimit(raw, events) : { message: raw, skippedTools: [] }
+          traceEnd({ message: raw, usage: raw.usage, status: 'succeeded', skippedTools: recovered.skippedTools })
+          const skipped = new Set(recovered.skippedTools.map((tool) => tool.contentIndex))
+          return {
+            message: recovered.message,
+            events: skipped.size ? events.filter((event) => !('contentIndex' in event && event.type.startsWith('toolcall_') && skipped.has(event.contentIndex))) : events,
+            requestId,
+            skippedTools: recovered.skippedTools,
+          }
+        }
         const failure = this.failure(this.transportFailure ?? (this.controller.signal.aborted ? this.controller.signal.reason : raw.errorMessage ?? ''), raw.stopReason)
         if (attempt) attempt.errorKind = failure.kind
         if (!retryable(failure.kind) || retry >= 2 || this.attempts.length >= this.maxRequests || !attempt || this.controller.signal.aborted) {
@@ -174,12 +222,16 @@ export async function executeDirect<T>(resolved: ResolvedModel, request: DirectR
 
 export async function executeAgent(resolved: ResolvedModel, options: CallOptions, environment: GatewayEnvironment = {}, input?: AgentInput): Promise<CallResult> {
   const reserve = Math.min(32768, Math.max(128, Math.floor(resolved.model.contextWindow / 4)))
-  const session = new CallSession(resolved, 'agent', { ...options, maxTokens: Math.min(options.maxTokens ?? resolved.model.maxTokens ?? 8192, reserve) }, { ...environment, beforeRequest: input?.beforeRequest ?? environment.beforeRequest })
+  const maxTokens = options.useModelToolOutput
+    ? Math.min(options.maxTokens ?? resolved.model.maxTokens, resolved.model.maxTokens, resolved.model.contextWindow)
+    : Math.min(options.maxTokens ?? resolved.model.maxTokens ?? 8192, reserve)
+  const session = new CallSession(resolved, 'agent', { ...options, maxTokens }, { ...environment, beforeRequest: input?.beforeRequest ?? environment.beforeRequest })
   let last: AssistantMessage | undefined
   try {
     if (!input) throw new ModelError('validation', '请提供智能体任务输入。')
     const { Agent } = await awaitWithSignal(import('@earendil-works/pi-agent-core'), session.controller.signal)
     let contextRecovered = false
+    let skippedTools: SkippedToolCall[] = []
     const streamFn: AgentOptions['streamFn'] = (_model, context) => {
         const currentTools = input.getTools?.() ?? input.tools ?? []
         const turnContext = currentTools.length ? { ...context, tools: currentTools } : context
@@ -197,7 +249,14 @@ export async function executeAgent(resolved: ResolvedModel, options: CallOptions
               const recoveredContext = currentTools.length ? { ...recovered, tools: currentTools } : recovered
               turn = await session.runTurn(recoveredContext, { ...(firstRequestId ?? session.lastRequestId() ? { parentRequestId: firstRequestId ?? session.lastRequestId() } : {}), purpose: 'repair' })
             }
-            for (const event of turn.events) output.push(event); output.end(turn.message)
+            skippedTools = turn.skippedTools ?? []
+            for (const event of turn.events) {
+              // done 本身会锁定流的最终结果，必须携带同一份已恢复的消息。
+              output.push(event.type === 'done'
+                ? { ...event, message: turn.message, reason: turn.message.stopReason === 'toolUse' ? 'toolUse' : event.reason }
+                : event)
+            }
+            output.end(turn.message)
           }
           catch (error) { const message = session.errorMessage(error); output.push({ type: 'error', reason: message.stopReason === 'aborted' ? 'aborted' : 'error', error: message }); output.end(message) }
         })()
@@ -208,14 +267,29 @@ export async function executeAgent(resolved: ResolvedModel, options: CallOptions
       beforeToolCall: input.beforeToolCall, afterToolCall: input.afterToolCall, prepareRequest: input.prepareRequest,
     })
     agent.streamFunction = streamFn; agent.state.model = resolved.model; agent.state.tools = input.tools ?? []
-    agent.finishTurn = input.finishTurn; agent.beforeToolCall = input.beforeToolCall; agent.prepareRequest = input.prepareRequest
+    agent.finishTurn = (turn, signal) => {
+      if (skippedTools.length && !signal?.aborted) {
+        const names = [...new Set(skippedTools.map((tool) => tool.name || tool.id || '未收到名称的工具'))]
+        skippedTools = []
+        agent.steer({
+          role: 'user',
+          content: '上一轮参数截断，以下调用未执行：' + names.join('、') +
+            '。核对已执行结果，只重新发送尚未完成的调用及完整参数。',
+          timestamp: environment.now?.() ?? Date.now(),
+        })
+        return { action: 'continue' }
+      }
+      return input.finishTurn?.(turn, signal)
+    }; agent.beforeToolCall = input.beforeToolCall; agent.prepareRequest = input.prepareRequest
     agent.afterToolCall = input.afterToolCall
     if (input.agent && input.messages) agent.state.messages = input.messages
     input.onAgent?.(agent)
     let eventTail = Promise.resolve()
     let eventFailure: unknown
-    const unsubscribe = input.onEvent ? agent.subscribe(event => {
-      eventTail = eventTail.then(() => input.onEvent!(event)).catch(error => { eventFailure = error; agent.abort() })
+    const unsubscribe = input.onEvent || input.observeEvent ? agent.subscribe(event => {
+      // 运行观测以事件到达顺序关联请求，持久业务日志可以异步排队。
+      try { input.observeEvent?.(event) } catch { /* 观测失败不影响模型调用 */ }
+      if (input.onEvent) eventTail = eventTail.then(() => input.onEvent!(event)).catch(error => { eventFailure = error; agent.abort() })
     }) : undefined
     const abort = () => agent.abort()
     session.controller.signal.addEventListener('abort', abort, { once: true })

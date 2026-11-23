@@ -64,11 +64,11 @@ export async function searchStoryContext(store: AgentStore, bookId: string, sess
   }).filter(item => !terms.length || item.score > 0).sort((a, b) => b.score - a.score || text(a.row.id).localeCompare(text(b.row.id)))
   const offset = Number(args.offset ?? 0), limit = Math.min(Number(args.limit ?? 12), 20)
   const data: Row[] = ranked.slice(offset, offset + limit).map(item => {
+    if (item.kind === 'node') return storyView({ ...item.row, unassigned: !linkedNodes.has(text(item.row.id)) }, 'node', outline)
     if (!outline) return lightweight ? storyCatalogView(item.row, item.kind, ids) : ({ ...storyDigest(item.row, item.kind), matchedTerms: item.matched.slice(0, 8) })
     const { row, kind, matched } = item
-    if (kind === 'node') return storyView({ ...row, unassigned: !linkedNodes.has(text(row.id)) }, kind, true)
     const evidenceNodes = () => members(row).map(node => ({ node, score: matched.filter(term => searchable(node).includes(term)).length }))
-      .sort((a, b) => b.score - a.score).slice(0, 3).map(({ node }) => ({ ...storyView(node, 'node', true), summary: text(node.summary).slice(0, 500) }))
+      .sort((a, b) => b.score - a.score).slice(0, 3).map(({ node }) => storyView(node, 'node', true))
     if (kind === 'event') {
       const parents = lines.filter(line => strings(line.eventIds).includes(text(row.id)))
       return storyView({ ...row, nodeIds: undefined, lineIds: parents.slice(0, 12).map(line => line.id), lineCount: parents.length, lineId: parents[0]?.id, lineTitle: parents[0]?.title, eventId: row.id, eventTitle: row.title, memberCount: strings(row.nodeIds).length, evidenceNodes: evidenceNodes() }, kind, true)
@@ -84,7 +84,7 @@ export async function buildStoryContext(store: AgentStore, bookId: string, sessi
   const nodeIds = kind === 'node' ? rows.map(row => text(row.id)) : [...new Set(rows.flatMap(row => strings(row.nodeIds)))].slice(0, 20)
   const terms = rows.flatMap(row => termsOf([row.name, row.title, row.summary, row.statement, row.cause].map(text).join(' ').slice(0, 800))).slice(0, 12)
   const result = await searchStoryContext(store, bookId, sessionId, { node_ids: nodeIds, terms, limit: 12, include_future: includeFuture }, lightweight)
-  const assigned = rows.map(row => lightweight ? storyView(row, kind) : storyDigest(row, kind))
+  const assigned = rows.map(row => lightweight || kind === 'node' ? storyView(row, kind) : storyDigest(row, kind))
   const related: Row[] = []; let used = 0
   for (const row of result.data) {
     const cost = estimateTextTokens(JSON.stringify(row))

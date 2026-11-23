@@ -357,7 +357,7 @@ it('五分钟目标前提醒收尾，越过目标的在途响应仍正常结束'
     await db.table('pipelineRuns').update('lease:narrative', { expiresAt: Date.now() + 30000 })
     await db.table('storySessions').toCollection().modify({ leaseUntil: Date.now() + 30000 })
     aborted.push(!!init?.signal?.aborted)
-    return agentStream([{ name: 'get_story_detail', args: { kind: 'node', ids: input.workItems.map((item: { id: string }) => item.id) } }])
+    return agentStream([{ name: 'get_story_detail', args: { kind: 'node', fields: ['summary'], ids: input.workItems.map((item: { id: string }) => item.id) } }])
   })
   const fixture = await setup(1, [1], fetcher); db = fixture.db
   const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + elapsed)
@@ -385,7 +385,7 @@ it('第8章线索跨窗口召回，第165章查证后沿用原线并解决原事
     if (late) { expect(related.map(row => row.id)).toContain('C8-N001'); expect(clue).toBeDefined(); sawOldClue = true }
     if (commit) return agentStream([{ name: 'finish_story_batch', args: { summary: '已查证印章线索', items: input.workItems.map((work: { kind: string; id: string }) => ({ kind: work.kind, id: work.id, outcome: 'changed', reason: '按节点依据追加印章事件' })) } }])
     if (!replies.length) return agentStream([
-      { name: 'get_story_detail', args: { kind: 'node', ids: late ? ['C8-N001', 'C165-N002'] : ['C8-N001'] } },
+      { name: 'get_story_detail', args: { kind: 'node', fields: ['summary'], ids: late ? ['C8-N001', 'C165-N002'] : ['C8-N001'] } },
       { name: 'search_story_context', args: { kind: 'eventLine' } },
       ...(late ? [{ name: 'get_story_detail', args: { kind: 'eventLine', ids: [line.id] } }, { name: 'get_story_detail', args: { kind: 'note', ids: [clue!.id] } }] : []),
     ])
@@ -408,7 +408,7 @@ it('第8章线索跨窗口召回，第165章查证后沿用原线并解决原事
 it('独立节点可用分配目录直接说明保持现状，省去不必要的详情调用', async () => {
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
     const { input } = storyTask(JSON.parse(init?.body as string))
-    expect(input.contextHints.assigned[0]).toMatchObject({ kind: 'node', summary: '同一封信继续流转' })
+    expect(input.contextHints.assigned[0]).toMatchObject({ kind: 'node', chapterIndex: '1' })
     expect(input.contextHints.related).toEqual([])
     return agentStream([{ name: 'finish_story_batch', args: { summary: '独立事件，保持现状', items: input.workItems.map((work: { kind: string; id: string }) => ({ kind: work.kind, id: work.id, outcome: 'no_change', reason: '目录中没有需串联的其他事件' })) } }])
   })

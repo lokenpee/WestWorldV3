@@ -93,17 +93,24 @@ async function references(store: AgentStore, scope: Scope, names: string[], ids:
   })
 }
 export async function readTool(store: AgentStore, scope: Scope, name: string, args: Row, maxResults = 100): Promise<Row> {
+  if (scope.profile === 'story_editor') {
+    if (name === 'read_original' || name === 'get_original') throw new Error('SCOPE:P3 根据已解析的事件节点整理大纲。')
+    if (name === 'get_node_detail' || name === 'get_story_detail' && args.kind === 'node') {
+      const result = await readOutlineDetail(store, scope, { ...args, kind: 'node' }, maxResults)
+      return scope.outline ? result : page(result.data, {}, maxResults, { missingIds: result.missingIds })
+    }
+  }
   if (name === 'get_story_detail') {
-    if (scope.outline) return readOutlineDetail(store, scope, args, maxResults)
     if (scope.profile !== 'story_editor') throw new Error('SCOPE:故事详情仅供故事编辑使用。')
+    if (scope.outline) return readOutlineDetail(store, scope, args, maxResults)
     if (scope.workflow === 'story_pages_v3') {
       const kind = text(args.kind), table = ({ node: 'nodes', eventLine: 'eventLines', note: 'storyEditorNotes' } as Record<string, string>)[kind]
       const data: Row[] = [], missingIds: string[] = []
       for (const id of strings(args.ids)) {
         const source = await resolveAsset(store, scope, table, id)
         if (!source) { missingIds.push(id); continue }
-        const row = storyView(source, kind), field = kind === 'node' ? 'process' : kind === 'eventLine' ? 'summary' : 'statement'
-        const full = text(kind === 'node' ? source.process : row[field]), offset = Number(args.char_offset ?? 0), limit = Number(args.maxChars ?? 6000)
+        const row = storyView(source, kind), field = kind === 'eventLine' ? 'summary' : 'statement'
+        const full = text(row[field]), offset = Number(args.char_offset ?? 0), limit = Number(args.maxChars ?? 6000)
         row[field] = full.slice(offset, offset + limit)
         Object.assign(row, { charOffset: offset, totalChars: full.length, truncated: offset + limit < full.length, nextCharOffset: offset + limit < full.length ? offset + limit : null })
         if (kind === 'eventLine') {
@@ -114,7 +121,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
       }
       return page(data, {}, maxResults, { missingIds })
     }
-    if (args.kind !== 'eventLine') return readTool(store, scope, args.kind === 'node' ? 'get_node_detail' : 'get_editor_note_detail', { ids: args.ids, ...(args.char_offset === undefined ? {} : { char_offset: args.char_offset }), ...(args.maxChars === undefined ? {} : { maxChars: args.maxChars }) }, maxResults)
+    if (args.kind !== 'eventLine') return readTool(store, scope, 'get_editor_note_detail', { ids: args.ids, ...(args.char_offset === undefined ? {} : { char_offset: args.char_offset }), ...(args.maxChars === undefined ? {} : { maxChars: args.maxChars }) }, maxResults)
     const rows: Row[] = [], missingIds: string[] = []
     for (const id of strings(args.ids)) {
       const line = await resolveAsset(store, scope, 'eventLines', id)
@@ -481,7 +488,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
     const relevant = new Set(nodes.filter(node => [...strings(node.actors), ...strings(node.targets), ...strings(node.actorIds), ...strings(node.targetCharacterIds)].includes(text(args.character))).map(node => text(node.id)))
     rows = rows.filter(row => strings(row.nodeIds).some(id => relevant.has(id)))
   }
-  const projected = rows.map(row => table === 'characters' || table === 'locations' ? { id: row.id, name: row.name, aliases: strings(row.aliases), sourceChapters: strings(row.sourceChapters), revision: row.revision, [table === 'characters' ? 'identityHint' : 'descriptionHint']: text(table === 'characters' ? row.identity : row.description).slice(0, 160), estimatedDetailTokens: Math.ceil(JSON.stringify(row).length / 3), duplicateScore: Math.min(1, rows.filter(other => other.name === row.name && other.id !== row.id).length) } : table === 'nodes' ? { id: row.id, name: row.name, summary: text(row.summary).slice(0, 160), actors: strings(row.actors).slice(0, 8), chapterIndex: row.chapterIndex } : { id: row.id, title: row.title, chapters: row.chapters, lineStatus: row.lineStatus, nodeCount: strings(row.nodeIds).length, cause: text(row.cause).slice(0, 160), result: text(row.result).slice(0, 160) })
+  const projected = rows.map(row => table === 'characters' || table === 'locations' ? { id: row.id, name: row.name, aliases: strings(row.aliases), sourceChapters: strings(row.sourceChapters), revision: row.revision, [table === 'characters' ? 'identityHint' : 'descriptionHint']: text(table === 'characters' ? row.identity : row.description).slice(0, 160), estimatedDetailTokens: Math.ceil(JSON.stringify(row).length / 3), duplicateScore: Math.min(1, rows.filter(other => other.name === row.name && other.id !== row.id).length) } : table === 'nodes' && scope.profile === 'story_editor' ? storyView(row, 'node') : table === 'nodes' ? { id: row.id, name: row.name, summary: text(row.summary).slice(0, 160), actors: strings(row.actors).slice(0, 8), chapterIndex: row.chapterIndex } : { id: row.id, title: row.title, chapters: row.chapters, lineStatus: row.lineStatus, nodeCount: strings(row.nodeIds).length, cause: text(row.cause).slice(0, 160), result: text(row.result).slice(0, 160) })
   return page(projected, args, maxResults, { cursor: table === 'characters' || table === 'locations' })
 }
 

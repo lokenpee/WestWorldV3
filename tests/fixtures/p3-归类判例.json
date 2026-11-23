@@ -1,0 +1,18 @@
+[
+  {"level": "同线", "nodes": ["C13-N001", "C8-N004"], "expected": true, "reason": "授衔归出征准备"},
+  {"level": "同线", "nodes": ["C13-N001", "C20-N003"], "expected": true, "reason": "云光通匪归翠华山"},
+  {"level": "同线", "nodes": ["C13-N001", "C24-N001"], "expected": true, "reason": "范仪冤案归翠华山"},
+  {"level": "同线", "nodes": ["C13-N001", "C24-N003"], "expected": true, "reason": "战后议功归翠华山"},
+  {"level": "同事件", "nodes": ["C8-N002", "C10-N003"], "expected": true, "reason": "派护卫与传授衔口谕"},
+  {"level": "同事件", "nodes": ["C19-N001", "C24-N001"], "expected": true, "reason": "许诺为范仪申冤与命查"},
+  {"level": "同线", "nodes": ["C3-N005", "C4-N004"], "expected": true, "reason": "办族学归府务"},
+  {"level": "同线", "nodes": ["C3-N005", "C10-N001"], "expected": true, "reason": "拒拨银归府务"},
+  {"level": "同线", "nodes": ["C3-N005", "C28-N005"], "expected": true, "reason": "停印子钱归府务"},
+  {"level": "同线", "nodes": ["C3-N005", "C35-N001"], "expected": true, "reason": "查抄赖家归府务"},
+  {"level": "同线", "nodes": ["C35-N001", "C35-N002"], "expected": true, "reason": "西府自查与东府追赃共线"},
+  {"level": "同线", "nodes": ["C21-N001", "C22-N001"], "expected": true, "reason": "刊行与荣庆堂读书"},
+  {"level": "同线", "nodes": ["C3-N005", "C13-N001"], "expected": false, "reason": "宁府不混进出兵"},
+  {"level": "同线", "nodes": ["C3-N005", "C21-N001"], "expected": false, "reason": "宁府不混进刊书"},
+  {"level": "同线", "nodes": ["C13-N001", "C21-N001"], "expected": false, "reason": "剿匪不混进刊书"},
+  {"level": "同事件", "nodes": ["C8-N004", "C24-N003"], "expected": false, "reason": "出征前授衔与战后封爵分事件"}
+]

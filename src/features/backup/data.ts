@@ -157,6 +157,22 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
   for (const name of ['storyEditorMemory', 'storyEditorNotes', 'storyEditorCheckpoints', 'compileProgress'] as const) for (const row of tables[name]) if ((row.sessionId !== undefined && !sessions.has(row.sessionId)) || (row.editorSessionId !== undefined && !sessions.has(row.editorSessionId))) fail(`${name}/${row.id ?? row.stage}`, '引用的会话不存在。')
   const p1 = tables.compileProgress.find(row => row.stage === 'P1')
   const runs = new Map(tables.pipelineRuns.map(row => [row.id, row]))
+  for (const row of tables.pipelineRuns) {
+    const path = `pipelineRuns/${row.id}`
+    if (row.recordType === 'narrative_task' || row.recordType === 'narrative_receipt') {
+      const parent = runs.get(row.runId)
+      if (!parent?.narrative || parent.bookId !== row.bookId) fail(path,'所属叙事运行不存在。')
+      if (row.recordType === 'narrative_task' && ((row.snapshot as Row)?.id !== row.id || !rows(parent?.tasks).some(t => t.taskId === row.id))) fail(path,'任务快照与运行清单不符。')
+      if (row.recordType === 'narrative_receipt' && (runs.get(row.taskId)?.recordType !== 'narrative_task' || runs.get(row.taskId)?.runId !== row.runId)) fail(path,'回执指向错误的叙事任务。')
+    }
+    if (row.narrative) {
+      if (sessions.get(row.sessionId)?.runId !== row.id) fail(path,'叙事运行与会话不符。')
+      const active = (row.narrative as Row).active as Row | undefined
+      const snapshot=active ? runs.get(active.id) : undefined
+      if (active && (snapshot?.recordType!=='narrative_task' || snapshot.runId!==row.id || JSON.stringify(snapshot.snapshot)!==JSON.stringify(active))) fail(path,'当前叙事任务缺少快照。')
+      for (const task of rows(row.tasks)) if (runs.get(task.taskId)?.recordType !== 'narrative_task' || runs.get(task.taskId)?.runId !== row.id) fail(path,'叙事任务记录缺失。')
+    }
+  }
   const extractionInputs = new Set(tables.extractionInputs.map(row => row.id))
   for (const task of tables.extractionTasks) {
     const run = runs.get(task.runId)
@@ -208,7 +224,7 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
 export function pauseBookData(data: BookData): BookData {
   const result = structuredClone(data)
   for (const row of result.tables.compileProgress) delete row.completedSteps
-  result.tables.pipelineRuns = result.tables.pipelineRuns.filter(row => row.recordType === 'run' || row.recordType === 'asset_edit')
+  result.tables.pipelineRuns = result.tables.pipelineRuns.filter(row => ['run','asset_edit','narrative_task','narrative_receipt'].includes(String(row.recordType)))
   for (const task of result.tables.extractionTasks) if (['pending', 'running', 'prepared'].includes(task.status as string)) task.status = 'partial'
   for (const name of ['storySessions', 'compileProgress', 'pipelineRuns'] as const) for (const row of result.tables[name]) {
     delete row.leaseOwner; delete row.leaseUntil; delete row.owner; delete row.expiresAt; delete row.lockKey

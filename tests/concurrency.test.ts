@@ -73,11 +73,11 @@ it.each(['asset_editor', 'story_editor'] as const)('%s执行权被接管后，�
   const scope = { bookId: 'a', profile, phase: profile === 'asset_editor' ? 'ai_identity' : 'window_link', runId: 'run', taskId: 'task', owner: 'old', workItemIds: [workItemId] }
   const adapter = createAgentTools(repo, scope)
   const detail = adapter.tools.find(tool => tool.name === (profile === 'asset_editor' ? 'get_character_detail' : 'get_node_detail'))!
-  await detail.execute('read', { ids: [id] })
+  await detail.execute('read', { ids: [id], ...(profile === 'story_editor' ? { fields: ['name'] } : {}) })
   await repo.transaction(true, async store => { const lease = (await store.get('pipelineRuns', `lease:${domain}`))!; await store.put('pipelineRuns', { ...lease, owner: 'new' }) })
   const before = await repo.transaction(false, store => store.get('pipelineRuns', 'run'))
   await expect(adapter.tools.find(tool => tool.name === 'submit_result')!.execute('late-summary', { status: 'completed', commitIds: [], summary: '旧执行者', remainingWorkIds: [], reviewedItems: [{ workItemId, outcome: 'no_change', reason: '旧依据' }] })).rejects.toThrow('执行权')
-  await expect(detail.execute('late-read', { ids: [id] })).rejects.toThrow('执行权')
+  await expect(detail.execute('late-read', { ids: [id], ...(profile === 'story_editor' ? { fields: ['name'] } : {}) })).rejects.toThrow('执行权')
   expect(await repo.transaction(false, store => store.get('pipelineRuns', 'run'))).toEqual(before)
 })
 

@@ -72,8 +72,10 @@ test('P3 Agent 在本机书库暂停后续接同一事件并完成全书复核',
     const body = JSON.parse(init?.body as string)
     if (body.tools.length === 1 && body.tools[0].function.name === 'submit_result') return storyResponse(body)
     const { input } = storyTask(body)
-    expect(body.tools.map((tool: { function: { name: string } }) => tool.function.name).sort()).toEqual([
-      'finish_story_batch', 'get_story_detail', 'navigate_story_pages', ...(input.phase === 'global_review' ? ['read_original'] : []), 'save_story_notes', 'save_story_outline', ...(input.phase === 'global_review' ? ['search_story_context'] : []),
+    expect(body.tools.map((tool: { function: { name: string } }) => tool.function.name).sort()).toEqual(input.quick ? [
+      'get_story_detail', 'navigate_story_pages', 'save_story_notes', 'save_story_outline',
+    ] : [
+      'finish_story_batch', 'get_story_detail', 'navigate_story_pages', 'save_story_notes', 'save_story_outline', ...(input.phase === 'global_review' ? ['search_story_context'] : []),
     ])
     seen.push({ phase: input.phase, page: input.page.pageNumber })
     if (!resume && input.page.pageNumber === 2) {
@@ -99,7 +101,7 @@ test('P3 Agent 在本机书库暂停后续接同一事件并完成全书复核',
   seen.length = 0
   await resumed.start(bookId)
   expect(resumed.state(bookId)?.error).toBeUndefined()
-  expect(seen[0]).toEqual({ phase: 'window_link', page: 2 })
+  expect(seen[0]).toEqual({ phase: 'window_link', page: 1 })
   expect(await reopened.openBook(bookId).table('storyEvents').toArray()).toMatchObject([{ id: original.id, nodeIds: chapters.map(({ chapterIndex }) => `N${chapterIndex}`) }])
   await resumed.review(bookId)
   expect(resumed.state(bookId)?.error).toBeUndefined()

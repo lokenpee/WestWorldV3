@@ -223,7 +223,7 @@ it('两个正式书籍使用独立Pi实例，重建运行器仍恢复同一会�
   expect(JSON.stringify(restored)).not.toContain('PRIVATE_BOOK_b')
   const tables = emptyTables(); for (const name of tableNames) tables[name] = await workspace.openBook('a').table(name).toArray()
   expect(await validateBookData({ book: (await workspace.settings.books.get('a'))!, tables })).toEqual([])
-  expect(runner.mock.calls.every(([, options]) => options?.reasoning === undefined)).toBe(true)
+  expect(runner.mock.calls.every(([, options]) => options?.reasoning === 'low')).toBe(true)
 })
 
 it('混合最终总结与写入批次在副作用前拒绝，普通文本无法冒充成功', async () => {
@@ -282,7 +282,7 @@ it('叙事命令原子新增节点和事件线，派生排序与人物关联，�
   })
   const tools = createAgentTools(repo, scope)
   await tools.tools.find(tool => tool.name === 'get_editor_memory')!.execute('memory', {})
-  await tools.tools.find(tool => tool.name === 'get_node_detail')!.execute('nodes', { ids: ['old-node'] })
+  await tools.tools.find(tool => tool.name === 'get_node_detail')!.execute('nodes', { ids: ['old-node'], fields: ['name'] })
   const payload = { new_nodes: [{ client_id: 'new-node', chapterIndex: '1', name: '新增节点', summary: '第一章节点', actors: [], quote: '未能定位的参考引文', offset: 999 }], event_line_ops: [{ op: 'create', title: '事件线样本', node_ids: ['old-node', 'new-node'], cause: '起因', process: '经过', result: '结果', line_status: 'open', confidence: 1, reason: '原文依据', evidenceNodeIds: ['old-node'] }], memory_update: { workingSummary: '已串联', notes: [{ key: 'review-one', kind: 'review', status: 'active', statement: '待回查引文', nodeIds: ['new-node'], lineIds: [], evidence: [] }] } }
   await tools.tools.find(tool => tool.name === 'commit_story_changes')!.execute('commit', { operationKey: 'create-story', payload })
   const state = await repo.transaction(false, async store => ({ nodes: await store.rows('nodes'), lines: await store.rows('eventLines'), notes: await store.rows('storyEditorNotes'), memory: await store.rows('storyEditorMemory') }))
@@ -310,7 +310,7 @@ it('补充节点按原文定位排序，换命令键重放相同成员创建也�
   })
   const tools = createAgentTools(repo, scope)
   await tools.tools.find(tool => tool.name === 'get_editor_memory')!.execute('memory', {})
-  await tools.tools.find(tool => tool.name === 'get_node_detail')!.execute('node', { ids: ['late'] })
+  await tools.tools.find(tool => tool.name === 'get_node_detail')!.execute('node', { ids: ['late'], fields: ['name'] })
   const payload = { new_nodes: [{ client_id: 'early', chapterIndex: '1', name: '先发生', summary: '先发生', actors: [], quote: '先发生。' }], event_line_ops: [{ op: 'create', title: '完整事件', node_ids: ['late', 'early'], cause: '前因', process: '连续经过', result: '结果', line_status: 'open', confidence: 1, reason: '相邻原文', evidenceNodeIds: ['late'] }], memory_update: { workingSummary: '已排序', notes: [] } }
   await tools.tools.find(tool => tool.name === 'commit_story_changes')!.execute('create', { operationKey: 'first', payload })
   await tools.tools.find(tool => tool.name === 'commit_story_changes')!.execute('repeat', { operationKey: 'second', payload })

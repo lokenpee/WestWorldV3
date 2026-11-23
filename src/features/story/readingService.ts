@@ -1,3 +1,4 @@
+import { storyDirectory } from './reviewDirectory'
 import { briefItems } from './views'
 import { storyPagePrompt } from './readingPresentation'
 import { readReadingStatus } from './readingStatus'
@@ -33,7 +34,7 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
     if (!workspace.disk) storageChanged({ targets: tables.map(table => ({ scope: `book:${bookId}`, table, category: 'business' })) })
   }
   async function start(bookId: string, phase: 'window_link' | 'global_review' = 'window_link', restart?: LinkingMode) {
-    if (controls.has(bookId)) return
+    if (controls.has(bookId) || states.get(bookId)?.stopping === 'cancel') return
     const controller = new AbortController(), control: Control = { controller, phase }
     controls.set(bookId, control)
     set(bookId, { running: true, phase, stopping: undefined, runId: undefined, error: undefined, message: undefined, sessionStatus: undefined })
@@ -62,6 +63,9 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
         if (currentSession.leaseOwner && Number(currentSession.leaseUntil) > Date.now()) throw new Error('本书会话正在其他窗口运行。')
         const old = progress?.runId ? await store.get('pipelineRuns', text(progress.runId)) : undefined
         const reviewing = phase === 'global_review'
+        const cancelledRound = progress?.status === 'cancelled' && progress.phase === phase
+        if (cancelledRound && reviewing) restart = 'all'
+        else if (cancelledRound && !restart) restart = 'quick'
         const previousReview = (old?.storyReading as Record<string, ReadingState> | undefined)?.global_review
         const resumeReview = reviewing && !restart && activeSession.kind === 'review' && previousReview?.independent
         const newReview = reviewing && !resumeReview
@@ -71,7 +75,7 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
         let session = currentSession
         if (newReview) session = await createReviewSession(store, bookId, runId, currentSession, activeSession)
         else if (resumeReview) session = activeSession
-        else if (restart === 'replace' || restart === 'quick' || activeSession.kind === 'review') {
+        else if (restart === 'replace' || restart === 'quick' || cancelledRound || activeSession.kind === 'review') {
           session = await restartLinkingSession(store, bookId, runId, currentSession, restart !== 'replace', activeSession.id)
         }
         sessionId = session.id
@@ -79,10 +83,26 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
         const now = new Date().toISOString()
         await store.put('pipelineRuns', { ...(old?.id === runId ? old : { id: runId, bookId, recordType: 'run', stage: 'P3', startedAt: now, planVersion: '2.2', scope: 'fullBook', tasks: [], commandIntents: [], appliedCommands: [], coverageItems: [], aiMode: 'agent' }), ...(outline ? { storyOutlineVersion: 1 } : {}), status: 'running', phase })
         if (newReview) {
-          const last = restart === 'reuse' && previousReview?.independent ? previousReview : undefined
-          await saveReading(store, runId, phase, { independent: true, pages: last?.pages ?? [], currentPageId: null, receipts: [], decisions: last?.decisions ?? {}, questions: last?.questions ?? {} })
+          let last = restart === 'reuse' && previousReview?.independent ? previousReview : undefined
+          if (!restart && old?.phase === 'window_link_complete' && !previousReview) {
+            const earlier = (await store.rows('pipelineRuns')).filter(row => row.stage === 'P3' && row.phase === 'global_review' && row.status === 'completed')
+              .sort((a, b) => text(b.finishedAt).localeCompare(text(a.finishedAt)))[0]
+            const prior = (earlier?.storyReading as Record<string, ReadingState> | undefined)?.global_review
+            if (prior?.independent) last = prior
+          }
+          const noteKeys = new Set((await store.rows('storyEditorNotes')).filter(note => note.sessionId === sessionId).map(note => text(note.key)))
+          const questions = Object.fromEntries(Object.entries(last?.questions ?? {}).filter(([key]) => noteKeys.has(key)))
+          const decisions = Object.fromEntries(Object.entries(last?.decisions ?? {}).filter(([key]) => noteKeys.has(key)))
+          await saveReading(store, runId, phase, { independent: true, pages: last?.pages ?? [], currentPageId: null, receipts: [], decisions, questions })
         } else if (restart) await saveReading(store, runId, phase, { pages: [], currentPageId: null, receipts: [], reusedChecks })
-        if (previousLinking && phase === 'global_review') await saveReading(store, runId, 'window_link', previousLinking)
+        if (previousLinking && phase === 'global_review') {
+          await saveReading(store, runId, 'window_link', previousLinking)
+          const priorDirectory = (old?.stageDirectories as Row | undefined)?.window_link
+          if (priorDirectory) {
+            const reviewRun = (await store.get('pipelineRuns', runId))!
+            await store.put('pipelineRuns', { ...reviewRun, stageDirectories: { window_link: priorDirectory } })
+          }
+        }
         const linked = await refreshReading(store, runId, sessionId, 'window_link')
         if (restart === 'quick' && previousLinking) await scheduleQuickPages(store, linked, previousLinking)
         if (reviewing && !previousReview && progress?.phase !== 'global_review' && !readingProgress(linked).complete) throw new Error('请先完成当前资料的节点阅读与串联。')
@@ -114,7 +134,7 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
         const { brief, memory, count } = await repo.transaction(false, async store => ({ brief: await readingBrief(store, bookId, sessionId, phase, state, outline, quick), memory: await store.get('storyEditorMemory', sessionId) ?? { id: sessionId, sessionId, bookId, revision: 0, workingSummary: '', dataFingerprint: '', updatedAt: '' }, count: (await store.rows('chapters')).length }))
         const input = { bookId, runId, taskId, planVersion: '2.2', remainingCount: state.pages.filter(page => page.fingerprint !== page.checkedFingerprint).length, resume: { reason: 'continuation', appliedCommitIds: [], nextOperationKey: crypto.randomUUID(), remainingWorkIds: [] }, stage: 'P3', phase, sessionId, queue: text(brief?.queue) || 'window_nodes', window: phase === 'window_link' ? { start: 0, end: count, chapterIndices: [] } : null, workItems: [], existingLines: [], memory, afterWorkItemId: null }
         const businessPrompt = quick ? quickStoryPrompt : outline ? (phase === 'global_review' ? outlineReviewPrompt : outlineStoryPrompt) : (phase === 'global_review' ? reviewPrompt : storyPrompt)
-        const result = await runtime.run(repo, { profile: 'story_editor', workflow: 'story_pages_v3', outline, quickStoryCheck: quick, phase, sessionId, runId, taskId, leaseOwner: owner, retainLease: true, workItems: [], providedStoryItems: briefItems(brief), input, businessPrompt, prompt: storyPagePrompt(brief), signal: controller.signal, shouldPause: () => control.stop === 'pause', afterCommit: async () => publish(bookId, ['pipelineRuns', 'nodes', 'eventLines', 'storyEvents', 'storyEditorNotes', 'storyEditorMemory']) })
+        const result = await runtime.run(repo, { profile: 'story_editor', workflow: 'story_pages_v3', outline, quickStoryCheck: quick, phase, storyPageType: brief?.page.type, sessionId, runId, taskId, leaseOwner: owner, retainLease: true, workItems: [], providedStoryItems: briefItems(brief), input, businessPrompt, prompt: storyPagePrompt(brief), signal: controller.signal, shouldPause: () => control.stop === 'pause', afterCommit: async () => publish(bookId, ['pipelineRuns', 'nodes', 'eventLines', 'storyEvents', 'storyEditorNotes', 'storyEditorMemory']) })
         if (control.stop === 'pause') break
         if (result.itemFailure || !result.ok) throw new Error(result.itemFailure ?? result.error ?? '本轮阅读未完成，进度已保留。')
         if (!quick || result.summary?.status !== 'completed') break
@@ -126,13 +146,16 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
         await saveReading(store, runId, phase, current)
         const complete = readingProgress(current).complete, now = new Date().toISOString(), finalPhase = complete && phase === 'window_link' ? 'window_link_complete' : phase
         const run = (await store.get('pipelineRuns', runId))!, progress = (await store.get('compileProgress', 'P3'))!
-        await store.put('pipelineRuns', { ...run, status: complete ? 'completed' : 'paused', phase: finalPhase, finishedAt: now })
+        const stageDirectories = { ...(run.stageDirectories as Row ?? {}) }
+        if (complete && outline) stageDirectories[phase] = await storyDirectory(store)
+        await store.put('pipelineRuns', { ...run, ...(Object.keys(stageDirectories).length ? { stageDirectories } : {}), status: complete ? 'completed' : 'paused', phase: finalPhase, finishedAt: now })
         await store.put('compileProgress', { ...progress, status: complete ? 'completed' : 'paused', phase: finalPhase, validity: complete ? 'current' : 'stale', updatedAt: now })
         return current
       })
       set(bookId, { message: readingProgress(state).complete ? phase === 'window_link' ? '串联完成，可继续全书复核。' : '全书复核完成，已记录的疑点保留。' : control.stop === 'pause' ? (phase === 'global_review' ? '复核已暂停，可继续本轮。' : '串联已暂停，可继续本轮。') : '本轮成果已保存，当前页可继续。' })
     } catch (error) {
-      set(bookId, { error: heartbeatError || (controller.signal.aborted ? '整理已取消，已保存成果和当前页保留。' : error instanceof Error ? error.message : '阅读暂停。') })
+      if (control.stop === 'cancel' && !heartbeatError) set(bookId, { error: undefined, message: '本轮已取消，已保存的整理成果可查看。' })
+      else set(bookId, { error: heartbeatError || (error instanceof Error ? error.message : '阅读暂停。') })
       if (acquired) await repo.transaction(true, async store => {
         if ((await store.get('pipelineRuns', 'lease:narrative'))?.owner !== owner) return
         const run = (await store.get('pipelineRuns', runId))!, progress = (await store.get('compileProgress', 'P3'))!
@@ -174,26 +197,28 @@ export function createReadingStoryService(workspace: ReturnType<typeof createWor
     control.stop = 'pause'
     set(bookId, { stopping: 'pause' })
   }
-  async function cancel(bookId: string) {
+  async function cancel(bookId: string, expectedRunId?: string) {
     const control = controls.get(bookId)
     if (control) {
+      if (expectedRunId && states.get(bookId)?.runId !== expectedRunId) return
       control.stop = 'cancel'
       set(bookId, { stopping: 'cancel' })
       control.controller.abort()
       return
     }
     if (states.get(bookId)?.stopping === 'cancel') return
-    set(bookId, { stopping: 'cancel' })
+    set(bookId, { stopping: 'cancel', error: undefined, message: undefined })
     const repo = createBookAgentRepository(workspace, bookId)
     await repo.transaction(true, async store => {
       const progress = await store.get('compileProgress', 'P3')
-      if (progress?.status !== 'paused' || progress.phase !== 'window_link') return
+      if (!progress || !['paused', 'running'].includes(text(progress.status))
+        || !['window_link', 'global_review'].includes(text(progress.phase)) || expectedRunId && progress.runId !== expectedRunId) return
       const run = await store.get('pipelineRuns', text(progress.runId))
       const lease = await store.get('pipelineRuns', 'lease:narrative')
       if (!run || lease && Number(lease.expiresAt) > Date.now()) return
       const now = new Date().toISOString()
       await store.put('pipelineRuns', { ...run, status: 'cancelled', finishedAt: now })
-      await store.put('compileProgress', { ...progress, status: 'cancelled', updatedAt: now })
+      await store.put('compileProgress', { ...progress, status: 'cancelled', validity: 'stale', updatedAt: now })
     }).catch(error => set(bookId, { error: error instanceof Error ? error.message : '暂停任务取消失败。' }))
     publish(bookId, ['compileProgress', 'pipelineRuns'])
     set(bookId, { stopping: undefined })

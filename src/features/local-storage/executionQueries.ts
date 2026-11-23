@@ -11,7 +11,7 @@ function scopeHeaders(db: DatabaseSync, scope: string, options: ExecutionQuery):
   if (!options?.runId) throw new Error('缺少执行链运行编号。')
   const args: string[] = [scope, options.runId]
   let where = "scope=? AND tableName='storySessionEntries' AND json_extract(body,'$.type')='request_trace' AND json_extract(body,'$.runId')=?"
-  for (const key of ['unitId', 'sessionId', 'contextId'] as const) if (options[key]) {
+  for (const key of ['unitId', 'sessionId', 'contextId', 'taskId'] as const) if (options[key]) {
     where += key === 'unitId' ? " AND coalesce(nullif(json_extract(body,'$.unitId'),''),json_extract(body,'$.workId'),'')=?" : ` AND json_extract(body,'$.${key}')=?`
     args.push(options[key]!)
   }
@@ -82,6 +82,10 @@ export function executionBody(db: DatabaseSync, scope: string, options: Executio
     return { event }
   }
   const request = body(db, scope, headers[at].key)!
+  if (options.taskId && at > 0) {
+    const prior = db.prepare("SELECT json_extract(body,'$.input.messageHashes') AS hashes FROM records WHERE scope=? AND tableName='storySessionEntries' AND recordKey=?").get(scope,headers[at-1].key)
+    if (typeof prior?.hashes === 'string') request.previousMessageHashes = JSON.parse(prior.hashes)
+  }
   const input = record(request.input), ids = ['systemPromptSnapshotId', 'businessPromptSnapshotId', 'toolSchemaSnapshotId'].map(key => text(input[key])).filter(Boolean)
   return { request, snapshots: ids.map(id => body(db, scope, id)).filter(Boolean) }
 }

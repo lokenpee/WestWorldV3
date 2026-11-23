@@ -10,11 +10,12 @@ export interface ModelTraceStart {
   requestId: string; parentRequestId?: string; purpose: TracePurpose; model: { providerId: string; modelId: string }
   context: Context; turn: number; startedAt: string
 }
+export interface SkippedToolCall { id: string; name: string; contentIndex: number; reason: string }
 export interface ModelTraceEnd {
-  requestId: string; message?: AssistantMessage; usage?: Usage; attempts: Attempt[]; error?: ModelFailure
+  requestId: string; message?: AssistantMessage; usage?: Usage; attempts: Attempt[]; error?: ModelFailure; skippedTools?: SkippedToolCall[]
   status: 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
 }
-export interface ModelTraceHooks { start(value: ModelTraceStart): void; request?(value: { requestId: string; attemptId: string; body: Record<string, unknown> }): void; delta?(value: { requestId: string; event: AssistantMessageEvent }): void; modelEnd(value: ModelTraceEnd): void }
+export interface ModelTraceHooks { start(value: ModelTraceStart): void; request?(value: { requestId: string; attemptId: string; rawBody?: string; body: Record<string, unknown> }): void; delta?(value: { requestId: string; event: AssistantMessageEvent }): void; modelEnd(value: ModelTraceEnd): void }
 export interface ModelConfig {
   providerId: string; api: ModelApi; baseUrl: string; extractionModel: string; aggregationModel: string; aggregationContextWindow?: number
 }
@@ -40,7 +41,7 @@ export interface CallResult {
   usage: UsageSummary; error?: ModelFailure; message?: AssistantMessage
 }
 export interface CallProgress { state: 'preparing' | 'requesting' | 'waiting'; attempts: number; delayMs?: number }
-export interface CallOptions { beforeRequest?: () => Promise<void>; signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; cooperativeTimeout?: boolean; requestTimeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number; reasoning?: ThinkingLevel; unboundedRequests?: boolean; trace?: ModelTraceHooks; tracePurpose?: TracePurpose }
+export interface CallOptions { messagesLast?: boolean; beforeRequest?: () => Promise<void>; signal?: AbortSignal; onProgress?: (progress: CallProgress) => void; timeoutMs?: number; cooperativeTimeout?: boolean; requestTimeoutMs?: number; maxRequests?: number; maxTokens?: number; temperature?: number; reasoning?: ThinkingLevel | (() => ThinkingLevel); unboundedRequests?: boolean; useModelToolOutput?: boolean; trace?: ModelTraceHooks; tracePurpose?: TracePurpose }
 export interface DirectRequest<T = string> extends CallOptions {
   role: ModelRole; context: Context; validate?: (message: AssistantMessage) => T; repairPrompt?: string; repairAttempts?: number
 }

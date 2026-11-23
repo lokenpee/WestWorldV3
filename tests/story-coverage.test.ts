@@ -38,7 +38,7 @@ it('最终总结前依据发生变化时拒绝把旧结论记为完成', async (
   const repo = createMemoryAgentRepository('b', { nodes: [node], pipelineRuns: [{ id: 'run', bookId: 'b', tasks: [{ taskId: 'task', appliedCommitIds: [], input: { workItems: [{ workItemId, kind: 'node', id: 'A' }] } }] }] })
   const adapter = createAgentTools(repo, { bookId: 'b', profile: 'story_editor', phase: 'window_link', runId: 'run', taskId: 'task', owner: 'owner', workItemIds: [workItemId] })
   await repo.transaction(true, store => store.put('pipelineRuns', { id: 'lease:narrative', bookId: 'b', owner: 'owner', runId: 'run', expiresAt: Date.now() + 30000 }))
-  await adapter.tools.find(tool => tool.name === 'get_node_detail')!.execute('read', { ids: ['A'] })
+  await adapter.tools.find(tool => tool.name === 'get_node_detail')!.execute('read', { fields: ['name'], ids: ['A'] })
   await repo.transaction(true, store => store.put('nodes', { ...node, summary: '实际内容已变化', revision: 2 }))
   await expect(adapter.tools.find(tool => tool.name === 'submit_result')!.execute('final', { status: 'completed', commitIds: [], summary: '保持不变', remainingWorkIds: [], reviewedItems: [{ workItemId, outcome: 'no_change', reason: '旧结论' }] })).rejects.toThrow('CONFLICT')
   expect(adapter.summary).toBeUndefined()

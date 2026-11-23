@@ -37,3 +37,11 @@ it('同一条故事线逐事件连边，旧线继续按旧成员连边', () => {
   expect(draft.edges.map(edge => [edge.source, edge.target])).toEqual([['A', 'B'], ['B', 'C'], ['C', 'D']])
   expect(layout.nodes.filter(node => node.id === 'B')).toHaveLength(1)
 })
+
+it('第一批有事件且没有故事线时，按事件成员画边，保留单节点事件', () => {
+  const events = [{id:'E',nodeIds:['B','A']},{id:'F',nodeIds:['C']}] as StoryEvent[]
+  const graph = layoutNetwork(nodes, [], chapters, events)
+  expect(graph.edges).toMatchObject([{lineId:null,source:'A',target:'B',eventIds:['E']}])
+  expect(graph.nodes.find(n => n.id === 'C')?.memberships).toEqual([{lineId:null,eventId:'F'}])
+  expect(graph.nodes.find(n => n.id === 'D')?.memberships).toEqual([])
+})

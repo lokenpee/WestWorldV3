@@ -45,7 +45,7 @@ export function outlineStatistics(nodes: EventNode[]) {
   }
 }
 
-export async function synchronizeOutline(store: Pick<AgentStore, 'rows' | 'put'>, timestamp: string) {
+export async function synchronizeOutline(store: Pick<AgentStore, 'rows' | 'put'>, timestamp: string, normalizeEvents = true) {
   const [lines, events] = await Promise.all([
     store.rows('eventLines') as unknown as Promise<EventLine[]>,
     store.rows('storyEvents') as unknown as Promise<StoryEvent[]>,
@@ -54,7 +54,7 @@ export async function synchronizeOutline(store: Pick<AgentStore, 'rows' | 'put'>
   const [nodes, chapters] = await Promise.all([store.rows('nodes') as unknown as Promise<EventNode[]>, store.rows('chapters')])
   const chapterOrder = new Map(chapters.map(row => [String(row.chapterIndex), Number(row.order)]))
   const nodeById = new Map(nodes.map(node => [node.id, node]))
-  for (const event of events) {
+  for (const event of normalizeEvents ? events : []) {
     const ids = orderedStoryNodes(event.nodeIds, nodeById, chapterOrder).map(node => node.id)
     if (JSON.stringify(ids) !== JSON.stringify(event.nodeIds)) {
       event.nodeIds = ids

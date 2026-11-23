@@ -24,7 +24,11 @@ export async function sessionProjection(repo: AgentRepository, sessionId: string
     const session = await store.get('storySessions', sessionId)
     if (!session || session.bookId !== repo.bookId) throw new Error('会话不属于当前书籍。')
     const entries = unitId && store.sessionEntries ? await store.sessionEntries(sessionId) : (await store.rows('storySessionEntries')).filter(row => row.sessionId === sessionId)
-    const projectedEntries = lightweightStory ? entries.map(row => row.type === 'message' && (row.message as AgentMessage).role !== 'system' ? { ...row, message: storyMessages([row.message as AgentMessage], outline, session.kind === 'review')[0] } : row) : entries
+    const history = entries.filter(row => row.type === 'message' && (row.message as AgentMessage).role !== 'system')
+    const projected = lightweightStory ? storyMessages(history.map(row => row.message as AgentMessage), outline) : []
+    let index = 0
+    const projectedEntries = lightweightStory ? entries.map(row => row.type === 'message' && (row.message as AgentMessage).role !== 'system'
+      ? { ...row, message: projected[index++] } : row) : entries
     return { ...(unitId ? projectWorkSession(entries, unitId) : projectSession(projectedEntries, text(session.leafId) || undefined)), session, allEntries: entries }
   })
 }
@@ -80,7 +84,10 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
       options.signal?.throwIfAborted()
       await repo.transaction(false, store => checkLease(store, scope, options.signal))
       let validation: { code: string; path?: string; actualLength?: number; allowedLength?: number } | undefined
-      const result = await options.generate({ role: 'aggregation', context: { systemPrompt: `${compactPrompt}\n本次摘要最多${maxChars}字符。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。`, messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: outputSchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
+      const outlineGuide = scope.workflow === 'story_pages_v3' && scope.outline
+        ? `当期目录、归属和交接事项将从书库重新提供。只摘要仍影响下一批的决定、未决对象及必要回查编号，通常用 ${Math.min(600, maxChars)} 字以内。省去逐页台账、已提交成员清单和重复证据。`
+        : ''
+      const result = await options.generate({ role: 'aggregation', context: { systemPrompt: `${compactPrompt}\n本次摘要最多${maxChars}字符。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。${outlineGuide}`, messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: outputSchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
         validate(message) {
           const summaryError = (code: string, detail: string, extra: { actualLength?: number; allowedLength?: number } = {}) => {
             validation = { code, path: 'summary', ...extra }
@@ -96,7 +103,7 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
           if (args.summary.length > maxChars) throw summaryError('SUMMARY_TOO_LONG', `summary实际${args.summary.length}字符，允许最多${maxChars}字符。`, { actualLength: args.summary.length, allowedLength: maxChars })
           try { validate(outputSchema, args, '压缩摘要格式不符。') } catch (error) { throw summaryError('SUMMARY_TYPE', error instanceof Error ? error.message : 'summary结构不符合Schema。') }
           return { summary: args.summary }
-        }, repairPrompt: `请仅通过submit_result返回summary，摘要至多${maxChars}字符，合并重复信息，保留判断与回查编号。`, signal: options.signal, maxTokens, temperature: 0, trace: trace.hooks, tracePurpose: 'compaction' })
+        }, repairPrompt: `请仅通过submit_result返回summary，摘要至多${maxChars}字符，合并重复信息，保留判断与回查编号。${outlineGuide}`, signal: options.signal, maxTokens, temperature: 0, trace: trace.hooks, tracePurpose: 'compaction' })
       await repo.transaction(true, async store => {
         await checkLease(store, scope)
         await appendEntry(store, scope, { type: 'request_trace', attemptId: crypto.randomUUID(), purpose: validation ? 'compaction_repair' : 'compaction', ok: result.ok, errorCode: validation?.code ?? result.error?.kind, validation: validation ?? null, message: result.message ?? null, usage: result.usage, attempts: result.attempts }, { advanceLeaf: false })

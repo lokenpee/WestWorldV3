@@ -126,7 +126,7 @@ for (const file of activeDocs) {
   check(!body.includes('| 文档状态 | 2.2 目标规格待评审'), `文档状态过期：${file}`)
   check(!body.includes('当前代码仍raw HTTP'), `模型实现说明过期：${file}`)
 }
-check(!/^- \[[ x]\]/m.test(read('docs/分阶段实现与人工验收计划.md')), '旧计划仍在维护活动任务')
+if (exists('docs/分阶段实现与人工验收计划.md')) check(!/^- \[[ x]\]/m.test(read('docs/分阶段实现与人工验收计划.md')), '旧计划仍在维护活动任务')
 const counts = { capabilities: manifest.capabilities.length, pendingCapabilities: manifest.pendingCapabilities?.length ?? 0, requests: requestIds.size, documents: manifest.documents.length, sections: manifest.sections.length, requirementRows: manifest.requirementRows?.length ?? 0, resources: manifest.resources.length, runtimeAssets: manifest.runtimeAssets.length, markdown: markdown.length }
 console.log(JSON.stringify({ ok: issues.length === 0, counts, issues }, null, 2))
 if (issues.length) process.exitCode = 1

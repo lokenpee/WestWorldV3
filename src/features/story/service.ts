@@ -12,9 +12,9 @@ import { recoverStoryCoverage, saveStoryCoverage, storyFingerprint, validStoryCo
 import { hash, records, text } from '../agents/contracts'
 import { buildStoryContext, lineDigest, selectStoryBatch, storyBatchBudget } from './retrieval'
 import type { SessionStatus } from '../agents/compaction'
-import { readBookTrace } from '../agents/trace'
+import { readBookTrace, readExecutionChain } from '../agents/trace'
 import type { StoryExecutionPhase } from '../agents/executionPagingTypes'
-import { readStoryExecution } from './execution'
+import { readNarrativeOutcome, readNarrativeTasks, readStoryExecution } from './execution'
 import { isObservationEntry } from '../agents/context'
 import storyPrompt from '../../../docs/v2/resources/v2.2/prompts/active/p3-story.md?raw'
 import { storyTaskPrompt } from './prompt'
@@ -230,6 +230,11 @@ export function createWindowStoryService(workspace: Workspace, models: Pick<Mode
   return { start: (bookId: string) => start(bookId), review: (bookId: string) => start(bookId, 'global_review'), read, history, trace: (bookId: string, runId?: string) => readBookTrace(workspace, bookId, runId), execution: (bookId: string, phase: StoryExecutionPhase) => readStoryExecution(workspace, bookId, phase), state: (bookId: string) => states.get(bookId), cancel: (bookId: string) => { cancelled.add(bookId); controllers.get(bookId)?.abort() }, subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } } }
 }
 export function createStoryService(workspace: Workspace, models: Pick<ModelService, 'agent' | 'settings' | 'generate'>) {
-  return createReadingStoryService(workspace, models, createWindowStoryService(workspace, models))
+  const historical = createReadingStoryService(workspace, models, createWindowStoryService(workspace, models))
+  return { ...historical, narrative: createNarrativeService(workspace, models),
+    narrativeOutcome: (bookId:string,runId:string,taskId:string)=>readNarrativeOutcome(workspace,bookId,runId,taskId),
+    narrativeTasks: (bookId:string,runId:string)=>readNarrativeTasks(workspace,bookId,runId),
+    narrativeCalls: (bookId:string,runId:string,taskId:string)=>readExecutionChain(workspace,bookId,runId,{taskId}) }
 }
 export type StoryService = ReturnType<typeof createStoryService>
+import { createNarrativeService } from './narrativeService'

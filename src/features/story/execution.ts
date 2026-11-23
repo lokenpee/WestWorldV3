@@ -1,4 +1,7 @@
+import { eventCandidateSection, lineCandidateSection, reviewMaterialSections } from './narrativeInput'
+import { receiptOutcome, reviewReceiptOutcome, type Outcome } from './narrativeOutcome'
 import type { createWorkspace } from '../../lib/storage/workspace'
+import type { NarrativePlan, NarrativeTask } from './narrativePlan'
 import { records, text } from '../agents/contracts'
 import type { StoryExecutionPhase } from '../agents/executionPagingTypes'
 import { readExecutionChain } from '../agents/trace'
@@ -15,4 +18,44 @@ export async function readStoryExecution(workspace: ReturnType<typeof createWork
   return { runId, chain }
 }
 
+export async function readNarrativeTasks(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string) {
+  const run = await workspace.openBook(bookId).table('pipelineRuns').get(runId)
+  if (!run?.narrative || run.bookId !== bookId) return []
+  const active = (run.narrative as NarrativePlan).active?.id
+  return records(run.tasks).map(task => {
+    const input = task.input as NarrativeTask
+    const status = input.part !== 'batch' && task.taskId === active && (run.status === 'paused' || run.status === 'cancelled')
+      ? run.status : text(task.status)
+    return { id: text(task.taskId), mode: input.mode, part: input.part, ids: input.ids, phase: task.phase, status }
+  })
+}
+
 export type StoryExecution = Awaited<ReturnType<typeof readStoryExecution>>
+
+export async function readNarrativeOutcome(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string, taskId: string) {
+  const db = workspace.openBook(bookId)
+  const table = db.table('pipelineRuns')
+  const saved = await table.get(taskId)
+  if (saved?.runId !== runId || saved.recordType !== 'narrative_task') return null
+  if (Array.isArray(saved.outcome)) return {label:'确认时的归属', groups:saved.outcome as Outcome, notes:[], review:undefined}
+  const task = saved.snapshot as NarrativeTask
+  const receipts = (await table.where('id').startsWith(taskId + ':').toArray())
+    .filter(r => r.runId === runId && r.taskId === taskId && r.recordType === 'narrative_receipt')
+    .sort((a,b) => text(a.startedAt).localeCompare(text(b.startedAt)))
+  const confirm = receipts.find(r => r.name === 'confirm' && r.status === 'completed')
+  if (task.part !== 'batch') {
+    const material = JSON.parse(task.prompt)
+    const targets = records(material[eventCandidateSection] ?? material[lineCandidateSection] ?? material[reviewMaterialSections[task.part]] ?? material.本段复核资料 ?? material.targets)
+    const tables = { node: 'nodes', event: 'storyEvents', line: 'eventLines', doubt: 'storyEditorNotes' } as const
+    const review = await reviewReceiptOutcome(task, material, targets, receipts.filter(r => r.status === 'completed'),
+      confirm, async (ids, kind) => {
+        if (!ids.length) return []
+        return (await db.table(tables[kind]).bulkGet(ids)).flatMap(row =>
+          row ? [{ id: text(row.id), title: text(row.title ?? row.name ?? row.statement) }] : [])
+      })
+    return {label:'复核成果',groups:[],notes:[],review}
+  }
+  const args = confirm?.arguments as Record<string,unknown> | undefined
+  const notes = records(args?.retained_unassigned_nodes).map(r => text(r.node_id) + ' · ' + text(r.note))
+  return {label:'本批已保存的成员变更',groups:receiptOutcome(receipts,task),notes,review:undefined}
+}

@@ -1,8 +1,203 @@
 {
+  "narrativeV4": {
+    "common": {
+      "get_detail": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "node",
+                    "event",
+                    "line"
+                  ]
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "kind",
+                "id",
+                "fields"
+              ]
+            }
+          }
+        },
+        "required": [
+          "requests"
+        ]
+      },
+      "get_outline": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "events",
+              "lines",
+              "unassigned_nodes",
+              "unassigned_events"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "manage_doubts": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "list",
+              "create",
+              "update",
+              "resolve",
+              "reopen",
+              "merge",
+              "delete"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "otherId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "NODE_ASSIGNMENT",
+              "EVENT_ASSIGNMENT",
+              "OTHER"
+            ]
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "eventIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "lineIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "confirm": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "handled_event_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "retained_unassigned_nodes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "node_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "note": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "node_id",
+                "note"
+              ]
+            }
+          }
+        },
+        "required": []
+      }
+    },
+    "eventOps": [
+      "create_event",
+      "update_event",
+      "delete_event",
+      "attach_nodes",
+      "detach_nodes"
+    ],
+    "lineOps": [
+      "create_line",
+      "update_line",
+      "delete_line",
+      "attach_event",
+      "detach_event"
+    ]
+  },
   "version": "2.2",
   "uniqueReadToolCount": 23,
   "assetEditorReadToolCount": 16,
-  "storyEditorReadToolCount": 16,
+  "storyEditorReadToolCount": 15,
   "profiles": {
     "asset_editor": [
       {
@@ -3526,7 +3721,8 @@
           "additionalProperties": false,
           "type": "object",
           "required": [
-            "ids"
+            "ids",
+            "fields"
           ],
           "properties": {
             "ids": {
@@ -3547,6 +3743,24 @@
               "minimum": 1,
               "maximum": 6000,
               "description": "每项详情JSON片段最多返回的字符数。长详情自动分页，使用返回的nextCharOffset继续。"
+            },
+            "fields": {
+              "type": "array",
+              "description": "节点必填。可同时选择名称、章节索引、概述、详细经过、人物、地点或线索。",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "name",
+                  "chapterIndex",
+                  "summary",
+                  "process",
+                  "actors",
+                  "locationNames",
+                  "clues"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
             }
           }
         },
@@ -3794,74 +4008,6 @@
         "maxResults": 20,
         "maxBytes": 65536,
         "dependencyTracking": "actual-id-revision-and-redirect-resolution"
-      },
-      {
-        "name": "read_original",
-        "description": "按书内章节索引或资产编号读取原文核实具体疑点。提供 chapter_indices、chapter_range、asset_ids 中至少一项，组合使用时取交集。返回受字数、字节上限约束。P2 人物资料、关系整理每人每步最多成功查阅一次，暂停恢复不重置；额度耗尽后按现有资料提交结论。",
-        "parameters": {
-          "additionalProperties": false,
-          "type": "object",
-          "properties": {
-            "asset_ids": {
-              "minItems": 1,
-              "maxItems": 20,
-              "description": "人物、地点或事件节点资产编号，例如 C8-P002。书内章节索引用 chapter_indices。",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "chapter_range": {
-              "minItems": 2,
-              "maxItems": 2,
-              "description": "连续书内章节范围，例如 [\"8\",\"10\"] 读取 8 至 10。",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "offset": {
-              "minimum": 0,
-              "type": "integer"
-            },
-            "maxChars": {
-              "minimum": 1,
-              "maximum": 200000,
-              "type": "integer"
-            },
-            "chapter_indices": {
-              "type": "array",
-              "minItems": 1,
-              "maxItems": 20,
-              "items": {
-                "type": "string"
-              },
-              "description": "只读取列出的书内章节索引，例如 [\"8\",\"19\"]。可直接使用 sourceChapters 中的值。"
-            },
-            "cursor": {
-              "type": "object",
-              "properties": {
-                "chapterIndex": {
-                  "type": "string"
-                },
-                "offset": {
-                  "type": "integer",
-                  "minimum": 0
-                }
-              },
-              "required": [
-                "chapterIndex",
-                "offset"
-              ],
-              "additionalProperties": false,
-              "description": "使用上次返回的 nextCursor 继续读取。"
-            }
-          }
-        },
-        "kind": "read",
-        "maxResults": 200,
-        "maxBytes": 65536,
-        "dependencyTracking": "code-records-actual-id-revision-and-redirect-resolution; read_original-records-text-fingerprint"
       },
       {
         "name": "get_editor_memory",
@@ -5458,7 +5604,7 @@
       {
         "name": "get_story_detail",
         "kind": "read",
-        "description": "按编号读取节点详细经过、事件线概述与成员或工作线索。长文本按nextCharOffset续读，成员按nextMemberOffset翻页。",
+        "description": "按编号读取故事线、事件、节点或待复核事项。节点必须在 fields 选择字段，多个节点可共用一次选择。详细经过按 nextCharOffset 续读。事项可用当前会话中的 key。",
         "parameters": {
           "type": "object",
           "properties": {
@@ -5495,13 +5641,50 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 100
+            },
+            "fields": {
+              "type": "array",
+              "description": "节点必填。可同时选择名称、章节索引、概述、详细经过、人物、地点或线索。",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "name",
+                  "chapterIndex",
+                  "summary",
+                  "process",
+                  "actors",
+                  "locationNames",
+                  "clues"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
             }
           },
           "required": [
             "kind",
             "ids"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "node"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "fields"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "fields"
+              ]
+            }
+          }
         },
         "maxResults": 10,
         "maxBytes": 65536,
@@ -5547,13 +5730,50 @@
               "type": "integer",
               "minimum": 1,
               "description": "单独读取事件线经过的某一段；编号来自processSegments。"
+            },
+            "fields": {
+              "type": "array",
+              "description": "节点必填。可同时选择名称、章节索引、概述、详细经过、人物、地点或线索。",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "name",
+                  "chapterIndex",
+                  "summary",
+                  "process",
+                  "actors",
+                  "locationNames",
+                  "clues"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
             }
           },
           "required": [
             "kind",
             "ids"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "node"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "fields"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "fields"
+              ]
+            }
+          }
         },
         "outlineParameters": {
           "type": "object",
@@ -5599,13 +5819,50 @@
                 "parent_lines",
                 "legacy_nodes"
               ]
+            },
+            "fields": {
+              "type": "array",
+              "description": "节点必填。可同时选择名称、章节索引、概述、详细经过、人物、地点或线索。",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "name",
+                  "chapterIndex",
+                  "summary",
+                  "process",
+                  "actors",
+                  "locationNames",
+                  "clues"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
             }
           },
           "required": [
             "kind",
             "ids"
           ],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "node"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "fields"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "fields"
+              ]
+            }
+          }
         }
       },
       {
@@ -6936,7 +7193,7 @@
   "uniqueWriteToolCount": 20,
   "uniqueBusinessToolCount": 44,
   "assetEditorBusinessToolCount": 32,
-  "storyEditorBusinessToolCount": 21,
+  "storyEditorBusinessToolCount": 20,
   "finalizer": {
     "name": "submit_result",
     "kind": "finalize",
@@ -6978,19 +7235,15 @@
     "story_lines_v2": [
       "search_story_context",
       "get_story_detail",
-      "read_original",
       "save_story_lines",
       "save_story_notes",
-      "add_story_nodes",
       "finish_story_batch"
     ],
     "story_pages_v3": [
       "search_story_context",
       "get_story_detail",
-      "read_original",
       "save_story_lines",
       "save_story_notes",
-      "add_story_nodes",
       "finish_story_batch",
       "navigate_story_pages"
     ]

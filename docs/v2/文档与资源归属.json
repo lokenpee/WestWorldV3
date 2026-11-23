@@ -4182,6 +4182,43 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-narrative-v4.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativeService.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-node_batch.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-event_cycle.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-event_review.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-event_group.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-line_cycle.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-line_review.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
     }
   ],
   "runtimeAssets": [
@@ -4276,7 +4313,7 @@
         "src/features/story/service.ts",
         "src/features/story/readingService.ts"
       ],
-      "sha256": "ffca5326e7542f044e3078176cd021b20d621ec60957e103df80446c827f8f6b"
+      "sha256": "ace7b6ced31c32f4890adf2d9290d87e22e948f27e1235146f60cc142ce15bf5"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p3-review.md",
@@ -4284,7 +4321,7 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ],
-      "sha256": "ef1a549c9d11993574874268031e2744e99a33e817c6849fc0d8d8ba56b5a498"
+      "sha256": "a01ee1e67f82504ec1fc64e0e4866775a63e3dbe38e42d450c7f12a42d9cf957"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/probe_asset.txt",
@@ -4324,7 +4361,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "9c5d5775966bdec503ece7d96c80631bbdfcecd57552265db2c7c26f352078f0"
+      "sha256": "c8a66aa1781688b0cdab5a1eecf2a132e83bae87365a62e945398b83391d6ed5"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4332,7 +4369,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "112b2eff26c2dd0b4c343b52c66f6d5862c992d43c64595eeb53e4aac366a49f"
+      "sha256": "2c162ef9e8998725785475ceb6149e54c61e680a0cff5bdf93237c57d9f4ef42"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4340,7 +4377,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "b2830446add032ed40d40309ea1e7f4aaa6baca377da6c2d69490cc22b4fa2a2"
+      "sha256": "a6814723a7653fa8d04d866edda5682f6b0e3494658d8c4950f1df0ba2cd94af"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",
@@ -4388,7 +4425,7 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ],
-      "sha256": "d4fa16cc7a32a6f4ed7f9afe806431e823c53ac2c0dfdc27cfa0d2432711bacd"
+      "sha256": "a6b04e90d000a467c0f8c66633e80aa31ba6bea16e1c739a908ffeb6c9598bc9"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p3-outline-review.md",
@@ -4396,7 +4433,7 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ],
-      "sha256": "39f0ec3e1541815ab1d9b97f09a46f0bd0ace81199ed9dea0f85341fccd1ddfd"
+      "sha256": "47d64b5af91d0d60fe5c156495a31c62e2c91a9c8668002ff81bc131df3ae969"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p3-quick-check.md",
@@ -4404,7 +4441,15 @@
       "consumers": [
         "src/features/story/readingService.ts"
       ],
-      "sha256": "836a30614e71c2024fd422f20800b254e41b5c1f34e7650d076fae259c24cf7b"
+      "sha256": "86aead75b11cc172d62c6139e875815d18311b0bf2d2e2feaa289f148f86285d"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-narrative-v4.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativeService.ts"
+      ],
+      "sha256": "8a5407b3b62403d567f7293b07a6fc9c7956a808e89b29559d37189ed3622f35"
     }
   ],
   "decisions": [

@@ -7,7 +7,7 @@ import { assetReviewTools, checkLease, commitCommand, relationTools, saveTask, t
 import { noteOrganizationRead } from './organizationReview'
 import { isStoryWrite, storyToolNames, readingToolNames, outlineToolNames } from './storyCommands'
 import { OutlineError } from '../story/outlineCommands'
-import { compactOutlineParameters, linkingDetailDescription, outlineOperations, quickOutlineOps } from '../story/outlineToolSchema'
+import { compactOutlineParameters, outlineOperations, quickOutlineOps } from '../story/outlineToolSchema'
 import { navigateStoryReading, readingProgress, refreshReading } from '../story/reading'
 import { briefItems, recordStoryReads } from '../story/views'
 import { presentStoryPage } from '../story/readingPresentation'
@@ -15,8 +15,8 @@ import { limitsOriginalRead, readOrganizationOriginal } from './organizationRead
 
 const tableOf: Record<string, string> = { query_character_catalog: 'characters', get_character_detail: 'characters', get_location_detail: 'locations', get_node_detail: 'nodes', get_event_line_detail: 'eventLines', query_characters: 'characters', query_locations: 'locations', query_nodes: 'nodes', query_event_lines: 'eventLines', query_editor_notes: 'storyEditorNotes', get_editor_note_detail: 'storyEditorNotes' }
 const isOutlineLinking = (scope: Scope) => scope.outline && scope.workflow === 'story_pages_v3' && scope.phase === 'window_link' && !scope.probe
-const pageTools = (scope: Scope) => scope.outline && scope.phase === 'global_review' ? [...outlineToolNames, 'read_original'] : scope.outline ? outlineToolNames : readingToolNames
-const quickStoryTools = ['save_story_outline', 'save_story_notes', 'navigate_story_pages']
+const pageTools = (scope: Scope) => scope.outline ? outlineToolNames : readingToolNames
+const quickStoryTools = ['get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages']
 const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.probe) return scope.profile === 'asset_editor'
     ? ['get_character_detail', 'read_original', 'commit_asset_changes', 'submit_result']
@@ -35,10 +35,10 @@ const initialToolNames = (scope: Scope): string[] | null => {
   if (scope.phase === 'asset_review') return scope.reviewScope === 'relations'
     ? ['get_character_relation', 'get_legacy_relation_records', 'get_character_detail', 'read_original', 'set_character_relation', 'delete_character_relation', 'submit_result']
     : ['get_character_detail', 'get_location_detail', 'get_node_detail', 'get_event_line_detail', 'get_character_relation', 'read_original', 'edit_character', 'edit_location', 'edit_event_node', 'edit_event_line', 'set_character_relation', 'delete_character_relation', 'submit_result']
-  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...pageTools(scope), 'navigate_story_pages'].filter(name => !isOutlineLinking(scope) || name !== 'search_story_context') : scope.workflow === 'story_lines_v2' ? storyToolNames.filter(name => name !== 'save_story_outline') : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'read_original', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
+  if (scope.profile === 'story_editor') return scope.workflow === 'story_pages_v3' ? [...pageTools(scope), 'navigate_story_pages'].filter(name => !isOutlineLinking(scope) || name !== 'search_story_context') : scope.workflow === 'story_lines_v2' ? storyToolNames.filter(name => name !== 'save_story_outline') : ['get_node_detail', 'query_nodes', 'query_event_lines', 'get_event_line_detail', 'get_editor_memory', 'query_editor_notes', 'get_editor_note_detail', 'search_story_context', 'commit_story_changes', 'submit_result']
   return null
 }
-export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet } = {}) {
+export function createAgentTools(repo: AgentRepository, scope: Scope, options: { afterCommit?: (ack: CommitAck) => Promise<void>; initialReadSet?: ReadSet; onStoryPage?: (pageType?: string) => void } = {}) {
   const reads: ReadSet = structuredClone(options.initialReadSet ?? { records: [], queries: [] })
   let summary: Summary | undefined
   let readCalls = 0; let writeCalls = 0
@@ -88,7 +88,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
     .filter(contract => !linking || contract.name !== 'search_story_context')
     .filter(contract => !scope.quickStoryCheck || quickStoryTools.includes(contract.name))
     .filter(contract => !relationOnly || contract.kind !== 'write' || (relationTools as readonly string[]).includes(contract.name))
-  const allTools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: linking && contract.name === 'get_story_detail' ? linkingDetailDescription : contract.description, label: contract.name,
+  const allTools: AgentTool[] = contracts.map(contract => ({ name: contract.name, description: contract.description, label: contract.name,
     parameters: modelParameters(contract.name, parametersFor(contract, scope.workflow, scope.outline)),
     outputSchema: resultFor(contract.name, scope.outline),
     async execute(toolCallId, parameters, signal) {
@@ -102,7 +102,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
         validate(parametersFor(contract, scope.workflow, scope.outline), parameters)
       }
       catch (error) {
-        if (contract.name !== 'save_story_outline') throw error
+        if (!['save_story_outline', 'get_story_detail'].includes(contract.name)) throw error
         const value = { ok: false, code: 'INVALID_ARGS', message: error instanceof Error ? error.message : String(error) }
         return { content: [{ type: 'text', text: JSON.stringify(value) }], details: value, structuredContent: value, isError: true }
       }
@@ -115,6 +115,7 @@ export function createAgentTools(repo: AgentRepository, scope: Scope, options: {
           await recordStoryReads(store, reads, briefItems(value.page)); await saveTask(store, scope, { readSet: reads })
           return value
         })
+        options.onStoryPage?.(value.page?.page.type)
         if (value.complete) {
           completedWork = true
           const actual = await repo.transaction(false, async store => strings((await taskOf(store, scope)).task.appliedCommitIds))

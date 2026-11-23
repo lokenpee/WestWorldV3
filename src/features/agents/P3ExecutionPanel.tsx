@@ -10,6 +10,7 @@ type LoadExecution = (bookId: string, phase: StoryExecutionPhase) => Promise<Sto
 
 export function P3ExecutionPanel({ bookId, initialPhase, loadExecution, onClose }: {
   bookId: string
+
   initialPhase: StoryExecutionPhase
   loadExecution: LoadExecution
   onClose: () => void

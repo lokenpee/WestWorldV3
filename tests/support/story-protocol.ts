@@ -4,14 +4,14 @@ type Item = Record<string, unknown>
 const contentOf = (value: unknown) => typeof value === 'string' ? value : Array.isArray(value) ? value.map(part => part.text ?? '').join('') : ''
 function pageInput(input: any) {
   if (input?.阶段 === '全书复核') {
-    const page = input.本页, type = ({ 故事线归属: 'line_structure', 散落节点: 'node_page', 成员复核: 'line_segment', 事件说明: 'event_summary', 故事线说明: 'line_summary', 待复核事项: 'note_page' } as Record<string, string>)[page.类型]
+    const page = input.本页, type = ({ 全书目录初查: 'directory_open', 全书目录复查: 'directory_final', 批量成员核对: 'member_batch', 故事线归属: 'line_structure', 散落节点: 'node_page', 成员复核: 'line_segment', 事件说明: 'event_summary', 故事线说明: 'line_summary', 待复核事项: 'note_page' } as Record<string, string>)[page.类型]
     const item = (row: any, kind: string) => row && { kind, id: row.编号, title: row.名称, summary: row.概况, coreClue: row.核心关键线索,
       ...(kind === 'eventLine' ? { outlinePending: !!row.待切换旧线, ...(row.待切换旧线 ? {} : { eventIds: (input.所属事件 ?? []).map((event: any) => event.编号) }) } : {}) }
     const event = item(input.当前事件, 'event'), line = item(input.当前故事线, 'eventLine')
     const eventGroup = input.本页事件说明?.map((row: any) => item(row, 'event'))
     const workItems = type === 'event_summary' ? eventGroup ?? [event] : ['line_summary', 'line_structure'].includes(type) ? [line]
       : type === 'note_page' ? (input.本页待判断事项 ?? input.待复核事项).map((row: any) => ({ kind: 'note', id: row.编号, key: row.标识 }))
-      : input.本页待阅读节点.flatMap((chapter: any) => chapter.节点.map((node: any) => ({ kind: 'node', id: node.编号, name: node.名称, summary: node.概述, process: node.详细经过, clues: node.线索, chapterIndex: chapter.章节索引 })))
+      : (input.本页待阅读节点 ?? []).flatMap((chapter: any) => chapter.节点.map((node: any) => ({ kind: 'node', id: node.编号, name: node.名称, summary: node.概述, process: node.详细经过, clues: node.线索, chapterIndex: chapter.章节索引 })))
     return { phase: 'global_review', queue: type === 'node_page' ? 'orphans' : type === 'note_page' ? 'review_notes' : 'event_lines',
       page: { id: page.页编号, type, pageNumber: page.页码, totalPages: page.总页数, ids: workItems.map((row: Item) => row.id), segment: page.成员分段, totalSegments: page.总分段数 },
       workItems, eventGroup, event, line, reviewNotes: input.本页待判断事项, lineEvents: (input.所属事件 ?? []).map((row: any) => item(row, 'event')), related: [] }
@@ -56,7 +56,7 @@ export function storyResponse(body: Item, options: { inputMemory?: boolean; reus
   const { input, messages } = storyTask(body)
   const results = messages.filter(row => row.role === 'tool').flatMap(row => { try { return [JSON.parse(contentOf(row.content))] } catch { return [] } })
   const commit = results.find(row => row.ok && row.commitId)
-  const nodes = results.flatMap(row => row.data ?? []).filter((row: Item) => row.chapterIndex)
+  const nodes = results.flatMap(row => row.data ?? []).filter((row: Item) => row.kind === 'node')
   const line = results.flatMap(row => row.data ?? []).find((row: Item) => row.memberCount !== undefined)
   const candidate = results.flatMap(row => row.data ?? []).find((row: Item) => row.kind === 'eventLine')
   if (input.page) {
@@ -88,20 +88,20 @@ export function storyResponse(body: Item, options: { inputMemory?: boolean; reus
     if (candidate && !line) return agentStream([{ name: 'get_story_detail', args: { kind: 'eventLine', ids: [candidate.id] } }])
     if (nodes.length) return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: line ? 'append' : 'create', ...(line ? { lineId: line.id } : { title: '信件流转' }), nodeIds: input.workItems.map((item: Item) => item.id), summary: '交信、传信与归还，信件持续流转。', reason: '同一封信的连续事件' }] } }])
     return agentStream([
-      ...Array.from({ length: Math.ceil(input.workItems.length / 10) }, (_, i) => ({ name: 'get_story_detail', args: { kind: 'node', ids: input.workItems.slice(i * 10, i * 10 + 10).map((item: Item) => item.id) } })),
+      ...Array.from({ length: Math.ceil(input.workItems.length / 10) }, (_, i) => ({ name: 'get_story_detail', args: { kind: 'node', fields: ['summary'], ids: input.workItems.slice(i * 10, i * 10 + 10).map((item: Item) => item.id) } })),
       { name: 'search_story_context', args: { kind: 'eventLine', terms: ['信件流转'], limit: 20 } },
     ])
   }
-  const finish = (changed: boolean) => agentStream([{ name: 'finish_story_batch', args: { summary: '按原文核对连续事件。', items: input.workItems.map((item: Item) => ({ kind: item.kind, id: item.id, outcome: changed && !(nodes.find((row: Item) => row.id === item.id)?.eventLineIds ?? []).includes(line?.id) ? 'changed' : 'no_change', reason: '按实际归属和本批保存结果核对。' })) } }])
+  const finish = (changed: boolean) => agentStream([{ name: 'finish_story_batch', args: { summary: '按原文核对连续事件。', items: input.workItems.map((item: Item) => ({ kind: item.kind, id: item.id, outcome: changed && !(line?.nodeIds ?? []).includes(item.id) ? 'changed' : 'no_change', reason: '按实际归属和本批保存结果核对。' })) } }])
   if (input.phase === 'global_review' || options.readOnly) {
     if (results.length) return finish(false)
-    return agentStream(Array.from({ length: Math.ceil(input.workItems.length / 10) }, (_, i) => ({ name: 'get_story_detail', args: { kind: input.workItems[0].kind, ids: input.workItems.slice(i * 10, i * 10 + 10).map((item: Item) => item.id) } })))
+    return agentStream(Array.from({ length: Math.ceil(input.workItems.length / 10) }, (_, i) => ({ name: 'get_story_detail', args: { kind: input.workItems[0].kind, ...(input.workItems[0].kind === 'node' ? { fields: ['summary'] } : {}), ids: input.workItems.slice(i * 10, i * 10 + 10).map((item: Item) => item.id) } })))
   }
   if (commit) return finish(true)
   if (candidate && !line) return agentStream([{ name: 'get_story_detail', args: { kind: 'eventLine', ids: [candidate.id] } }])
   if (nodes.length) return agentStream([{ name: 'save_story_lines', args: { operations: [{ action: line ? 'append' : 'create', ...(line ? { lineId: line.id } : { title: '信件流转' }), nodeIds: input.workItems.map((item: Item) => item.id), cause: '信件待转交', process: '交信、传信与归还', result: '按原文继续核对', lineStatus: 'open', confidence: 1, reason: '原文说明同一封信的连续事件', evidenceNodeIds: input.workItems.map((item: Item) => item.id) }] } }])
   return agentStream([
-    ...Array.from({ length: Math.ceil(input.workItems.length / 10) }, (_, i) => ({ name: 'get_story_detail', args: { kind: 'node', ids: input.workItems.slice(i * 10, i * 10 + 10).map((item: Item) => item.id) } })),
+    ...Array.from({ length: Math.ceil(input.workItems.length / 10) }, (_, i) => ({ name: 'get_story_detail', args: { kind: 'node', fields: ['summary'], ids: input.workItems.slice(i * 10, i * 10 + 10).map((item: Item) => item.id) } })),
     { name: 'search_story_context', args: { kind: 'eventLine', terms: ['信件流转'], limit: 20 } },
   ])
 }

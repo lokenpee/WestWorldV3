@@ -89,6 +89,30 @@
                     "hint"
                   ],
                   "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "node"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "chapterIndex": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "chapterIndex"
+                  ],
+                  "additionalProperties": false
                 }
               ]
             }
@@ -471,6 +495,61 @@
                     "charOffset",
                     "truncated",
                     "nextCharOffset"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "node"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "chapterIndex": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "process": {
+                      "type": "string"
+                    },
+                    "charOffset": {
+                      "type": "integer"
+                    },
+                    "nextCharOffset": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "actors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "clues": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "locationNames": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
                   ],
                   "additionalProperties": false
                 }
@@ -6374,13 +6453,50 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 100
+          },
+          "fields": {
+            "type": "array",
+            "description": "节点必填。可同时选择名称、章节索引、概述、详细经过、人物、地点或线索。",
+            "items": {
+              "type": "string",
+              "enum": [
+                "name",
+                "chapterIndex",
+                "summary",
+                "process",
+                "actors",
+                "locationNames",
+                "clues"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
           }
         },
         "required": [
           "kind",
           "ids"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "node"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "fields"
+          ]
+        },
+        "else": {
+          "not": {
+            "required": [
+              "fields"
+            ]
+          }
+        }
       },
       "success": {
         "type": "object",
@@ -7395,5 +7511,240 @@
       }
     }
   ],
-  "note": "14 read tools + 2 controlled write tools. submit_result is separate finalization; write tools commit inside Pi Agent execution."
+  "note": "14 read tools + 2 controlled write tools. submit_result is separate finalization; write tools commit inside Pi Agent execution.",
+  "narrativeV4": {
+    "confirm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confirmed",
+        "taskId"
+      ],
+      "properties": {
+        "confirmed": {
+          "const": true
+        },
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "edit_events": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "changed": {
+          "type": "boolean"
+        },
+        "created": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "opIndex": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "kind": {
+                "enum": [
+                  "event",
+                  "eventLine"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "action": {
+                "enum": [
+                  "created",
+                  "updated",
+                  "deleted"
+                ]
+              },
+              "addedIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "removedIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "opIndex",
+              "kind",
+              "id",
+              "action"
+            ]
+          }
+        }
+      },
+      "required": [
+        "changed",
+        "created",
+        "changes"
+      ]
+    },
+    "edit_storylines": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "changed": {
+          "type": "boolean"
+        },
+        "created": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "opIndex": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "kind": {
+                "enum": [
+                  "event",
+                  "eventLine"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "action": {
+                "enum": [
+                  "created",
+                  "updated",
+                  "deleted"
+                ]
+              },
+              "addedIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "removedIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "opIndex",
+              "kind",
+              "id",
+              "action"
+            ]
+          }
+        }
+      },
+      "required": [
+        "changed",
+        "created",
+        "changes"
+      ]
+    },
+    "get_outline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rows": {
+          "type": "array"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "rows",
+        "total",
+        "next"
+      ]
+    },
+    "get_detail": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "values": {
+            "type": "object"
+          },
+          "message": { "type": "string" },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "values",
+          "unavailable"
+        ]
+      }
+    },
+    "manage_doubts": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "action"
+          ]
+        }
+      ]
+    }
+  }
 }

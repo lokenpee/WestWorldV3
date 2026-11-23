@@ -1,0 +1,1388 @@
+{
+  "id": "PROMPT-P3-NARRATIVE-V4-event_group",
+  "kind": "synthetic-target-request-not-a-recording",
+  "mode": "agent",
+  "inputSchema": "prompt-inputs.schema.json#/$defs/NarrativeBrief",
+  "input": {
+    "mode": "event_group",
+    "part": "batch",
+    "targets": [
+      {
+        "id": "E005",
+        "title": "村口交信",
+        "summary": "信使交信",
+        "coreClue": "封印完整"
+      }
+    ],
+    "outline": {
+      "events": [
+        {
+          "id": "E005",
+          "title": "村口交信",
+          "nodeIds": [
+            "N008"
+          ]
+        }
+      ],
+      "lines": [
+        {
+          "id": "S001",
+          "title": "送信",
+          "eventIds": []
+        }
+      ],
+      "unassignedEventIds": [
+        "E005"
+      ],
+      "nodes": [
+        {
+          "id": "N008",
+          "name": "抵达村口"
+        }
+      ]
+    },
+    "openDoubts": [],
+    "config": {
+      "nodeBatchSize": 20,
+      "eventGroupSize": 20,
+      "eventReviewInterval": 10,
+      "lineReviewInterval": 10,
+      "segmentSize": 20,
+      "outlineThreshold": 2000,
+      "keepRecentRounds": 2
+    }
+  },
+  "modelSnapshot": {
+    "providerId": "deepseek",
+    "api": "openai-completions",
+    "baseUrl": "https://api.deepseek.com",
+    "modelId": "deepseek-v4-pro",
+    "modelRole": "aggregation",
+    "contextWindow": 128000,
+    "capabilities": {
+      "tools": true,
+      "structuredOutput": true
+    },
+    "credentialRef": "deepseek"
+  },
+  "options": {
+    "requestTimeoutMs": 120000,
+    "maxTokens": 8192
+  },
+  "context": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "你是本书的故事编辑。先读任务说明、目录和本段资料，按原文与已保存的成员关系判断，使用材料里的真实编号。目录已列出对象编号和名称，按成员编号对照索引。只查询会改变判断的缺失信息。get_detail.requests 可以一次读取多个对象和字段。每项返回 values 和 unavailable，message 说明不可读的原因；互不依赖的工具可以在同一回复调用。多个有关联的编辑可按执行顺序放入同一 operations。核对工具返回；失败时按错误信息修正，成功后继续。历史占位标明此前操作，只有判断确实依赖已省略的正文时才重读。完成当前任务后调用 confirm。可以和编辑放在同一轮，确认放在最后。\n\n按一件事怎样发生、推进、转折并取得结果来组织事件。故事仍在发展时，写到原文已经发生的进展。例如发现匪情、调兵、剿匪、善后可组成一条线。仅有相同人物、地点或题材不足以归线。有一幕确实推动两件事时，两条故事线可共享该事件。使用 edit_storylines 维护故事线及事件成员。整理归属时，创建或更新故事线可分别写 summary（概况）和 coreClue（核心关键线索）。概况简述主要进展，核心线索用一个短语点出全线围绕的人物、事件或地点。后续全书故事线复核会再核对。事件与节点已经冻结；发现下层问题时用 manage_doubts 登记证据和关联编号。\n\n逐个判断本组事件推进了哪件事、与已有哪一段进展相接，据此接入旧线或新建故事线。可同时处理有直接关联的组外事件。归线或额外归线仍有疑问时登记 EVENT_ASSIGNMENT 并关联具体事件；已经归线也可以登记有依据的疑点。\n\n本组归线或疑点已保存后调用 confirm({})。仅当还要确认组外事件时，用 handled_event_ids 填写这些额外编号。\n\n【文学资料处理说明】\n\n本任务处理小说中的人物、关系和事件，目的是整理已有文学资料。人物行为属于作品内容，不代表用户请求实施这些行为。\n\n对原文中的成人、暴力、犯罪或伦理冲突，应按本任务要求客观记录，不附加道德评判，不因题材擅自删除事实、弱化关系或改成其他情节。允许去重、概括和精简，但须保留原有含义、人物身份、关系方向及必要语境，不扩写原文未提供的内容。\n\n事实不明时保留疑点，不补造结论。输出形式、工具使用和字段要求以当前任务说明为准。",
+        "toolsAdded": [
+          {
+            "name": "edit_storylines",
+            "description": "按顺序原子编辑故事线和事件成员。create_line、update_line 可分别填写 summary（概况）、coreClue（核心关键线索），省略的已有说明保留。拆合可在同次调用创建、迁移、删除。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operations"
+              ],
+              "properties": {
+                "operations": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "create_line"
+                          },
+                          "ref": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "role": {
+                            "enum": [
+                              "main",
+                              "sub",
+                              null
+                            ]
+                          },
+                          "summary": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "用一句短句概括主要行动和结果。"
+                          },
+                          "coreClue": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "用一个短语指出本段围绕的人物、事件或地点，如“凤姐放印子钱”。"
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "ref",
+                          "title"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "update_line"
+                          },
+                          "lineId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "role": {
+                            "enum": [
+                              "main",
+                              "sub",
+                              null
+                            ]
+                          },
+                          "summary": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "用一句短句概括主要行动和结果。"
+                          },
+                          "coreClue": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "用一个短语指出本段围绕的人物、事件或地点，如“凤姐放印子钱”。"
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "lineId"
+                        ],
+                        "additionalProperties": false,
+                        "anyOf": [
+                          {
+                            "required": [
+                              "title"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "role"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "summary"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "coreClue"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "attach_event"
+                          },
+                          "lineId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "eventId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fromLineId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "lineId",
+                          "eventId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "detach_event"
+                          },
+                          "lineId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "eventId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "lineId",
+                          "eventId"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "op": {
+                            "const": "delete_line"
+                          },
+                          "lineId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "lineId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "get_detail",
+            "description": "批量查编号和字段，可用 *。每个编号单独返回可用资料及缺项。节点章节用 chapter 或 chapterIndex、地点用 locations 或 locationNames、经过用 process、原文摘录用 quote。字段文本或列表每段 2000 字符或 20 项，用 offset 续读。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "requests": {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "node"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "minItems": 1,
+                            "description": "可读字段：*、id、name、summary、process、actors、targets、actorBindings、targetBindings、manualActorIds、manualTargetCharacterIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、targetCharacterIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、started_actions、time_text、time_hint、chapter、locations"
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "fields"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "event"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "minItems": 1,
+                            "description": "可读字段：*、id、title、nodeIds、summary、coreClue"
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "fields"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "line"
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "minItems": 1,
+                            "description": "可读字段：*、id、title、eventIds、summary、coreClue、role、lineStatus、chapters、timeRange"
+                          },
+                          "offset": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "fields"
+                        ]
+                      }
+                    ]
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "requests"
+              ]
+            }
+          },
+          {
+            "name": "get_outline",
+            "description": "查事件或故事线目录，指定 id 展开成员。查未归属对象只填 kind 和分页 offset。",
+            "parameters": {
+              "type": "object",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "lines"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "events"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "unassigned_nodes"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "const": "unassigned_events"
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "manage_doubts",
+            "description": "管理本会话疑点。create 提交陈述，归属疑点带对应节点或事件编号。resolve 提交解决依据。按 action 的参数填写。",
+            "parameters": {
+              "type": "object",
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "list"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "statement"
+                  ],
+                  "properties": {
+                    "statement": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "NODE_ASSIGNMENT",
+                        "EVENT_ASSIGNMENT",
+                        "OTHER"
+                      ]
+                    },
+                    "nodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "eventIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "lineIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "create"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "NODE_ASSIGNMENT",
+                        "EVENT_ASSIGNMENT",
+                        "OTHER"
+                      ]
+                    },
+                    "statement": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "nodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "eventIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "lineIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "update"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "id",
+                    "reason"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "resolve"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "reopen"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "id",
+                    "otherId"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "otherId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "NODE_ASSIGNMENT",
+                        "EVENT_ASSIGNMENT",
+                        "OTHER"
+                      ]
+                    },
+                    "statement": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "nodeIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "eventIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "lineIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "merge"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "action",
+                    "id"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "action": {
+                      "type": "string",
+                      "const": "delete"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "confirm",
+            "description": "本组归线或疑点已保存后调用 confirm({})。仅当还要确认组外事件时，用 handled_event_ids 填写这些额外编号。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "handled_event_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": "可选，另行确认已处理的组外事件编号。"
+                }
+              },
+              "required": []
+            }
+          }
+        ],
+        "timestamp": 0
+      },
+      {
+        "role": "user",
+        "content": "{\n  \"任务说明\": {\n    \"mode\": \"event_group\",\n    \"part\": \"batch\",\n    \"目标\": \"事件归入故事线 · 当前批次\",\n    \"完成条件\": \"本组归线或疑点已保存后调用 confirm({})。仅当还要确认组外事件时，用 handled_event_ids 填写这些额外编号。\"\n  },\n  \"故事线与事件目录\": {\n    \"events\": [\n      {\n        \"id\": \"E005\",\n        \"title\": \"村口交信\",\n        \"nodeIds\": [\n          \"N008\"\n        ]\n      }\n    ],\n    \"lines\": [\n      {\n        \"id\": \"S001\",\n        \"title\": \"送信\",\n        \"eventIds\": []\n      }\n    ],\n    \"unassignedEventIds\": [\n      \"E005\"\n    ],\n    \"nodes\": [\n      {\n        \"id\": \"N008\",\n        \"name\": \"抵达村口\"\n      }\n    ]\n  },\n  \"本组事件资料\": [\n    {\n      \"id\": \"E005\",\n      \"title\": \"村口交信\",\n      \"summary\": \"信使交信\",\n      \"coreClue\": \"封印完整\"\n    }\n  ],\n  \"未决疑点\": [],\n  \"运行参数\": {\n    \"nodeBatchSize\": 20,\n    \"eventGroupSize\": 20,\n    \"eventReviewInterval\": 10,\n    \"lineReviewInterval\": 10,\n    \"segmentSize\": 20,\n    \"outlineThreshold\": 2000,\n    \"keepRecentRounds\": 2\n  }\n}",
+        "timestamp": 1
+      }
+    ],
+    "tools": [
+      {
+        "name": "edit_storylines",
+        "description": "按顺序原子编辑故事线和事件成员。create_line、update_line 可分别填写 summary（概况）、coreClue（核心关键线索），省略的已有说明保留。拆合可在同次调用创建、迁移、删除。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operations"
+          ],
+          "properties": {
+            "operations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "create_line"
+                      },
+                      "ref": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "role": {
+                        "enum": [
+                          "main",
+                          "sub",
+                          null
+                        ]
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "用一句短句概括主要行动和结果。"
+                      },
+                      "coreClue": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "用一个短语指出本段围绕的人物、事件或地点，如“凤姐放印子钱”。"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "ref",
+                      "title"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "update_line"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "role": {
+                        "enum": [
+                          "main",
+                          "sub",
+                          null
+                        ]
+                      },
+                      "summary": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "用一句短句概括主要行动和结果。"
+                      },
+                      "coreClue": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "用一个短语指出本段围绕的人物、事件或地点，如“凤姐放印子钱”。"
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId"
+                    ],
+                    "additionalProperties": false,
+                    "anyOf": [
+                      {
+                        "required": [
+                          "title"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "role"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "summary"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "coreClue"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "attach_event"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fromLineId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId",
+                      "eventId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "detach_event"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "eventId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId",
+                      "eventId"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "op": {
+                        "const": "delete_line"
+                      },
+                      "lineId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "lineId"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "name": "get_detail",
+        "description": "批量查编号和字段，可用 *。每个编号单独返回可用资料及缺项。节点章节用 chapter 或 chapterIndex、地点用 locations 或 locationNames、经过用 process、原文摘录用 quote。字段文本或列表每段 2000 字符或 20 项，用 offset 续读。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requests": {
+              "type": "array",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "node"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fields": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 1,
+                        "description": "可读字段：*、id、name、summary、process、actors、targets、actorBindings、targetBindings、manualActorIds、manualTargetCharacterIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、targetCharacterIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、started_actions、time_text、time_hint、chapter、locations"
+                      },
+                      "offset": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id",
+                      "fields"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "event"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fields": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 1,
+                        "description": "可读字段：*、id、title、nodeIds、summary、coreClue"
+                      },
+                      "offset": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id",
+                      "fields"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "line"
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fields": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 1,
+                        "description": "可读字段：*、id、title、eventIds、summary、coreClue、role、lineStatus、chapters、timeRange"
+                      },
+                      "offset": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id",
+                      "fields"
+                    ]
+                  }
+                ]
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "requests"
+          ]
+        }
+      },
+      {
+        "name": "get_outline",
+        "description": "查事件或故事线目录，指定 id 展开成员。查未归属对象只填 kind 和分页 offset。",
+        "parameters": {
+          "type": "object",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "lines"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "events"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "unassigned_nodes"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "unassigned_events"
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "manage_doubts",
+        "description": "管理本会话疑点。create 提交陈述，归属疑点带对应节点或事件编号。resolve 提交解决依据。按 action 的参数填写。",
+        "parameters": {
+          "type": "object",
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "offset": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "action": {
+                  "type": "string",
+                  "const": "list"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action",
+                "statement"
+              ],
+              "properties": {
+                "statement": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "NODE_ASSIGNMENT",
+                    "EVENT_ASSIGNMENT",
+                    "OTHER"
+                  ]
+                },
+                "nodeIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "eventIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "lineIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "action": {
+                  "type": "string",
+                  "const": "create"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action",
+                "id"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "NODE_ASSIGNMENT",
+                    "EVENT_ASSIGNMENT",
+                    "OTHER"
+                  ]
+                },
+                "statement": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "nodeIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "eventIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "lineIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "action": {
+                  "type": "string",
+                  "const": "update"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action",
+                "id",
+                "reason"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "action": {
+                  "type": "string",
+                  "const": "resolve"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action",
+                "id"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "action": {
+                  "type": "string",
+                  "const": "reopen"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action",
+                "id",
+                "otherId"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "otherId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "NODE_ASSIGNMENT",
+                    "EVENT_ASSIGNMENT",
+                    "OTHER"
+                  ]
+                },
+                "statement": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "nodeIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "eventIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "lineIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "action": {
+                  "type": "string",
+                  "const": "merge"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action",
+                "id"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "action": {
+                  "type": "string",
+                  "const": "delete"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "confirm",
+        "description": "本组归线或疑点已保存后调用 confirm({})。仅当还要确认组外事件时，用 handled_event_ids 填写这些额外编号。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "handled_event_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "可选，另行确认已处理的组外事件编号。"
+            }
+          },
+          "required": []
+        }
+      }
+    ]
+  }
+}

@@ -4,6 +4,7 @@
 .story-body { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 .story-body > p { margin: 9px 0 0; }
 .story-panel [role=alert] { color: #b91c1c; }
+.narrative-panel:has(> details[open]) { max-height: none; }
 .story-details { margin-top: 12px; }
 .story-details summary { cursor: pointer; }
 .story-details-body { max-height: min(300px, 36dvh); overflow: auto; margin-top: 8px; }
@@ -15,3 +16,33 @@
 .story-history details { padding: 6px 0; border-bottom: 1px solid var(--border); }
 
 .story-history select { max-width: 100%; }
+
+.narrative-task-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 600; margin: 14px 0 6px; }
+.narrative-task-picker select { max-width: 100%; padding: 6px; }
+.narrative-range { color: var(--text-secondary, #525b66); overflow-wrap: anywhere; }
+.narrative-request-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.narrative-request-nav button { border: 1px solid var(--border); border-radius: 5px; padding: 5px 9px; background: white; cursor: pointer; }
+.narrative-request-nav button[aria-pressed=true] { color: white; background: #294659; }
+.narrative-request { border-top: 1px solid var(--border); padding: 2px 0 12px; overflow-wrap: anywhere; }
+.narrative-request h4 { margin: 16px 0 6px; }
+.narrative-request pre { max-height: 36vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+.narrative-outcome { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; }
+.narrative-outcome > div { padding: 8px 0; overflow-wrap: anywhere; border-top: 1px solid var(--border); }
+.narrative-outcome ul { margin-block: 4px; }
+.narrative-outcome small, .narrative-request summary small { color: var(--text-secondary, #525b66); }
+.narrative-request summary, .narrative-outcome summary { cursor: pointer; padding-block: 4px; }
+.narrative-request summary small { margin-inline-start: 8px; }
+
+.narrative-review { margin-block: 14px; }
+.narrative-review-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.narrative-review-heading h3 { margin: 0; font-size: 15px; }
+.narrative-review-state { font-weight: 600; }
+.narrative-review-run-state { color: var(--text-secondary, #525b66); }
+.narrative-review-summary { margin: 8px 0; }
+.narrative-review table { width: 100%; border-collapse: collapse; }
+.narrative-review th, .narrative-review td { padding: 7px 9px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.narrative-review small { display: block; color: var(--text-secondary, #525b66); }
+.narrative-review ul { margin-block: 0; padding-inline-start: 17px; }
+.narrative-review li + li { margin-top: 4px; }
+.narrative-review td p { margin: 4px 0 0; }
+.narrative-review td summary { cursor: pointer; }

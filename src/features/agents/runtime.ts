@@ -1,5 +1,5 @@
 import { storyMessages, recordStoryReads } from '../story/views'
-import { storyPagePrompt } from '../story/readingPresentation'
+import { storyPagePrompt, storyPageReasoning } from '../story/readingPresentation'
 import type { Agent, AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core'
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai'
 import type { AgentInput } from '../models/gateway'
@@ -32,6 +32,7 @@ export interface AgentTaskOptions {
   reviewScope?: 'all_assets' | 'relations'
   workflow?: 'character_organization_v1' | 'story_lines_v2' | 'story_pages_v3'
   outline?: boolean
+  storyPageType?: string
   quickStoryCheck?: boolean
   providedStoryItems?: Row[]; contextId?: string; unitId?: string; organizationWorkKind?: 'directory' | 'candidate' | 'profile' | 'relations'; organizationStep?: string; shouldPause?: () => boolean; shouldCancel?: () => boolean
 }
@@ -59,6 +60,13 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
     const controller = new AbortController(); const abort = () => controller.abort()
     options.signal?.addEventListener('abort', abort, { once: true }); if (options.signal?.aborted) abort()
     const identity = !options.probe && options.profile === 'asset_editor' && options.phase === 'ai_identity'
+    let storyPageType = options.storyPageType
+    let reasoning: CallOptions['reasoning']
+    if (!scope.probe && (organization || scope.profile === 'story_editor')) {
+      reasoning = scope.workflow === 'story_pages_v3' && scope.phase === 'global_review'
+        ? () => storyPageReasoning(scope.phase, storyPageType)
+        : 'low'
+    }
     const storyProbe = options.probe && options.profile === 'story_editor'
     const resumable = identity || organization || !options.probe && (options.profile === 'story_editor' || options.phase === 'asset_review')
     const maxRequests = options.probe ? 3 : options.maxRequests ?? 1_000_000
@@ -129,11 +137,11 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
       const characterId = scope.unitId?.startsWith('profile:') || scope.unitId?.startsWith('relations:') ? scope.unitId.split(':')[1] : undefined
       if (!scope.probe && scope.sessionId) trace = new TraceSession(repo, { bookId: scope.bookId, runId: scope.runId, executionId: scope.executionId ?? scope.runId, taskId: scope.taskId, sessionId: scope.sessionId, ...(scope.contextId ? { contextId: scope.contextId } : {}), ...(scope.unitId ? { workId: scope.unitId } : {}), ...(characterId ? { characterId } : {}) }, { businessPrompt: options.businessPrompt, purpose: 'work' })
       const systemPrompt = options.businessPrompt
-      if (scope.workflow === 'story_pages_v3') loadedMessages = storyMessages(loadedMessages, scope.outline, scope.phase === 'global_review')
+      if (scope.workflow === 'story_pages_v3') loadedMessages = storyMessages(loadedMessages, scope.outline)
       if (!organization && loadedMessages.length) loadedMessages.push({ role: 'system', content: systemPrompt, timestamp: Date.now() })
       persistedMessages = organization ? loadedMessages.length : loadedMessages.length ? loadedMessages.length - 1 : 0
       const prior = await repo.transaction(false, store => taskOf(store, scope))
-      adapter = createAgentTools(repo, scope, { afterCommit: options.afterCommit, initialReadSet: prior.task.readSet as unknown as ReadSet })
+      adapter = createAgentTools(repo, scope, { afterCommit: options.afterCommit, initialReadSet: prior.task.readSet as unknown as ReadSet, onStoryPage: type => { storyPageType = type } })
       const tools = adapter
       // P2 由 service 层统一续租；运行层只保留 P3 的心跳，避免同一次运行出现两套执行者。
       if (!organization) {
@@ -172,7 +180,9 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           prompt: scope.workflow === 'story_pages_v3' ? '' : options.prompt,
           ...(scope.workflow === 'story_pages_v3' ? { currentTask: () => repo.transaction(false, async store => {
             const current = await refreshReading(store, scope.runId, scope.sessionId!, scope.phase)
-            return storyPagePrompt(await readingBrief(store, scope.bookId, scope.sessionId!, scope.phase, current, scope.outline, scope.quickStoryCheck))
+            const brief = await readingBrief(store, scope.bookId, scope.sessionId!, scope.phase, current, scope.outline, scope.quickStoryCheck)
+            storyPageType = brief?.page.type
+            return storyPagePrompt(brief)
           }) } : {}),
           systemMessage: effectiveSystem ? { ...effectiveSystem, content: systemPrompt } : undefined, force, signal: controller.signal, onStatus: sessionOptions.onStatus })
         await repo.transaction(true, async store => { await rebaseReadSet(store, scope, tools.reads, true); await saveTask(store, scope, { readSet: tools.reads }) })
@@ -191,7 +201,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
         prepareRequest: async ({ context, model }) => {
           const messages = await prepareContext(context, model.contextWindow)
           if (!scope.probe) {
-            const rawBase = scope.workflow === 'story_pages_v3' ? [{ role: 'system' as const, content: systemPrompt, timestamp: Date.now() }, ...storyMessages(messages ?? context.messages, scope.outline, scope.phase === 'global_review')] : messages ?? context.messages
+            const rawBase = scope.workflow === 'story_pages_v3' ? [{ role: 'system' as const, content: systemPrompt, timestamp: Date.now() }, ...storyMessages(messages ?? context.messages, scope.outline)] : messages ?? context.messages
             let seenPrompt = false
             const base = organization ? rawBase.filter(message => {
               if (message.role !== 'user' || contentText(message) !== options.prompt) return true
@@ -317,7 +327,7 @@ export function createAgentRuntime(runner: AgentRunner, sessionOptions?: { gener
           }
           throw new ModelError(usedRequests >= maxRequests ? 'budget' : 'validation', usedRequests >= maxRequests ? 'BUDGET:子任务预算已用完，剩余工作交后续批次。' : '当前任务尚未收到工具的完成确认，已保存进度。')
         },
-      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), ...(organization && !scope.probe ? { reasoning: 'low' as const } : {}), ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
+      }, { signal: controller.signal, maxRequests, timeoutMs: resumable ? duration : Math.min(options.timeoutMs ?? (scope.probe ? 30000 : 180000), 180000), ...(resumable ? { cooperativeTimeout: true, requestTimeoutMs: identity ? 60000 : 120000 } : {}), maxTokens: options.maxTokens ?? (scope.probe ? 1024 : 8192), reasoning, ...(scope.probe ? { temperature: 0 } : { unboundedRequests: true }), ...(trace ? { trace: trace.hooks, tracePurpose: 'work' as const } : {}) })
       outcome.summary = adapter.summary
       if (resumable && !outcome.itemFailure && outcome.result.error && ['validation', 'context_length', 'content_policy'].includes(outcome.result.error.kind)) outcome.itemFailure = outcome.result.error.message
       if (resumable && !outcome.summary && (outcome.result.ok || outcome.itemFailure || outcome.result.error?.kind === 'budget')) {

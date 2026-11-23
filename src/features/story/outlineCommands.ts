@@ -23,7 +23,8 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
   const additions = new Set<string>()
   const savedReading = scope.quickStoryCheck ? ((await store.get('pipelineRuns', scope.runId))?.storyReading as Row | undefined)?.window_link as Row | undefined : undefined
   const currentIds = scope.quickStoryCheck ? new Set(strings(records(savedReading?.pages).find(page => page.id === savedReading?.currentPageId)?.ids)) : undefined
-  const run = scope.phase === 'global_review' ? await store.get('pipelineRuns', scope.runId) : undefined
+  const narrative = scope.workflow === 'narrative_v4'
+  const run = !narrative && scope.phase === 'global_review' ? await store.get('pipelineRuns', scope.runId) : undefined
   const review = (run?.storyReading as Row | undefined)?.global_review as ReadingState | undefined
   const reviewPages = records(review?.pages)
   const currentPage = reviewPages.find(page => page.id === review?.currentPageId)
@@ -53,7 +54,7 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
     }
     const title = () => text(operation.title).trim() || fail('INVALID_ARGS', '请输入名称。')
     const changesDescription = operation.summary !== undefined || operation.coreClue !== undefined
-    if (changesDescription && scope.phase !== 'global_review') fail('INVALID_ARGS', '概况和核心关键线索只能在全书复核阶段填写。')
+    if (changesDescription && !narrative && scope.phase !== 'global_review') fail('INVALID_ARGS', '概况和核心关键线索只能在全书复核阶段填写。')
     if (changesDescription && review?.independent) {
       const expected = operation.op === 'update_event' ? 'event_summary' : 'line_summary'
       const id = text(operation.eventId ?? operation.lineId)
@@ -63,6 +64,16 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
     }
     const withDescription = (row: Row): Row => {
       if (!changesDescription) return row
+      if (narrative) {
+        const updated = { ...row }
+        for (const field of ['summary', 'coreClue']) {
+          if (operation[field] === undefined) continue
+          const description = text(operation[field]).trim()
+          if (!description) fail('INVALID_ARGS', '请填写有内容的说明。可以只提交需要填写的一项。')
+          updated[field] = description
+        }
+        return updated
+      }
       const updated = { ...row, summary: text(operation.summary ?? row.summary).trim(), coreClue: text(operation.coreClue ?? row.coreClue).trim() }
       if (!hasOutlineDescription(updated)) fail('INVALID_ARGS', '概况和核心关键线索均为必填，请一并填写。')
       return updated
@@ -94,23 +105,23 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
     switch (operation.op) {
       case 'create_line': {
         const id = newId('L')
-        await write('eventLines', undefined, { id, bookId: scope.bookId, title: title(), summary: '', coreClue: '', eventIds: [], nodeIds: [], chapters: [], lineStatus: 'open', cause: '', process: '', result: '', createdBy: 'P3', ...(operation.role ? { role: operation.role } : {}) }, 'created')
+        await write('eventLines', undefined, withDescription({ id, bookId: scope.bookId, title: title(), summary: '', coreClue: '', eventIds: [], nodeIds: [], chapters: [], lineStatus: 'open', cause: '', process: '', result: '', createdBy: 'P3', ...(operation.role ? { role: operation.role } : {}) }), 'created')
         await lifecycle(id, 'live')
         break
       }
       case 'update_line': {
         const line = await get('eventLines', operation.lineId)
-        if (changesDescription && !usesOutline(line)) fail('INVALID_ARGS', '此旧线尚未切换到三层大纲，请先核对归属并切换。')
+        if (changesDescription && !narrative && !usesOutline(line)) fail('INVALID_ARGS', '此旧线尚未切换到三层大纲，请先核对归属并切换。')
         const updated = withDescription({ ...line, ...(operation.title !== undefined ? { title: title() } : {}), ...(operation.role ? { role: operation.role } : {}) })
         if (operation.role === null) delete updated.role
         await write('eventLines', line, updated, 'updated')
         break
       }
       case 'create_event': {
-        const line = await get('eventLines', operation.lineId)
+        const line = scope.workflow === 'narrative_v4' && operation.lineId === undefined ? undefined : await get('eventLines', operation.lineId)
         const id = newId('E')
-        await write('storyEvents', undefined, { id, bookId: scope.bookId, title: title(), nodeIds: union([], nodeIds), summary: '', coreClue: '' }, 'created')
-        await write('eventLines', line, lineWithEvents(line, union(strings(line.eventIds), [id])), 'updated')
+        await write('storyEvents', undefined, withDescription({ id, bookId: scope.bookId, title: title(), nodeIds: union([], nodeIds), summary: '', coreClue: '' }), 'created')
+        if (line) await write('eventLines', line, lineWithEvents(line, union(strings(line.eventIds), [id])), 'updated')
         break
       }
       case 'rename_event': {
@@ -160,7 +171,7 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
         const event = await get('storyEvents', operation.eventId)
         const id = text(event.id)
         const lines = (await store.rows('eventLines')).filter(line => line.bookId === scope.bookId && strings(line.eventIds).includes(id))
-        const expected = strings(operation.expectedLineIds).map(resolve).sort()
+        const expected = scope.workflow === 'narrative_v4' ? lines.map(line => text(line.id)).sort() : strings(operation.expectedLineIds).map(resolve).sort()
         if (JSON.stringify(expected) !== JSON.stringify(lines.map(line => text(line.id)).sort())) fail('CONFLICT', `所属故事线发生变化，请重新读取事件 ${id}。`)
         for (const line of lines) await write('eventLines', line, lineWithEvents(line, without(strings(line.eventIds), [id])), 'updated')
         await write('storyEvents', event, event, 'deleted')
@@ -179,6 +190,6 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
       default: fail('INVALID_ARGS', '未知的大纲操作。')
     }
   }
-  if (changes.length) await synchronizeOutline(store, timestamp)
+  if (changes.length) await synchronizeOutline(store, timestamp, scope.workflow !== 'narrative_v4' || changes.some(change => change.kind === 'event'))
   return { changed: changes.length > 0, created: Object.fromEntries(created), changes }
 }

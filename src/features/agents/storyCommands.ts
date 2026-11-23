@@ -4,8 +4,8 @@ import type { Scope } from './queries'
 import { lineSummary } from '../story/views'
 
 export const storyWriteTools = ['save_story_lines', 'save_story_notes', 'add_story_nodes', 'save_story_outline'] as const
-export const storyToolNames = ['search_story_context', 'get_story_detail', 'read_original', ...storyWriteTools, 'finish_story_batch']
-export const readingToolNames = storyToolNames.filter(name => !['read_original', 'add_story_nodes', 'save_story_outline'].includes(name))
+export const storyToolNames = ['search_story_context', 'get_story_detail', ...storyWriteTools.filter(name => name !== 'add_story_nodes'), 'finish_story_batch']
+export const readingToolNames = storyToolNames.filter(name => name !== 'save_story_outline')
 export const outlineToolNames = readingToolNames.map(name => name === 'save_story_lines' ? 'save_story_outline' : name)
 export const isStoryWrite = (name: string) => (storyWriteTools as readonly string[]).includes(name)
 

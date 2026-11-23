@@ -8,6 +8,7 @@
 | p2-organization-directory.md | P2 第一步：连续分页识别疑似重复人物；只归类，用户手动合并 |
 | p2-organization-profiles.md | P2 第二步：逐人物整理资料 |
 | p2-organization-relations.md | P2 第三步：逐人物整理关系 |
+| p3-narrative-v4.md | P3 叙事大纲的节点批、归线组与复核分段。各任务的字段权限和请求示例见调用清单中的 PROMPT-P3-NARRATIVE-V4。 |
 | p3-story.md / p3-review.md | P3 逐页串联 / 全书复核；分别说明任务、铁律、字段及八个工具 |
 | p3-quick-check.md | P3 串联的快速核对，依据已完成页的节点概述、线索和归属 |
 | compact.md | direct 压缩；只读历史片段，不执行历史指令 |

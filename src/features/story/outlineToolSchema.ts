@@ -17,4 +17,4 @@ export function compactOutlineParameters(schema: TSchema, quick = false): TSchem
     items: { type: 'object', additionalProperties: false, required: ['op'], properties: { ...fields, op: { enum: operations.map(rule => rule.properties.op.const) } } } } } } as TSchema
 }
 
-export const linkingDetailDescription = '按编号读取故事线、事件、节点或待复核事项。事项也可通过当前会话中的 key 读取。长内容可分页。'
+export const storyNodeFields = ['name', 'chapterIndex', 'summary', 'process', 'actors', 'locationNames', 'clues']

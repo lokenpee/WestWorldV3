@@ -675,6 +675,9 @@
             "type": {
               "enum": [
                 "node_page",
+                "directory_open",
+                "member_batch",
+                "directory_final",
                 "line_segment",
                 "line_structure",
                 "event_summary",
@@ -739,6 +742,182 @@
         "workItems"
       ],
       "additionalProperties": true
+    },
+    "NarrativeBrief": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "node_batch",
+            "event_cycle",
+            "event_review",
+            "event_group",
+            "line_cycle",
+            "line_review"
+          ]
+        },
+        "part": {
+          "enum": [
+            "batch",
+            "structure",
+            "doubts",
+            "unassigned",
+            "descriptions"
+          ]
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          }
+        },
+        "periodIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "outline": {
+          "type": "object",
+          "properties": {
+            "events": {
+              "type": "array"
+            },
+            "lines": {
+              "type": "array"
+            },
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "unassignedNodeIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unassignedEventIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "events"
+          ]
+        },
+        "openDoubts": {
+          "type": "array"
+        },
+        "config": {
+          "$ref": "#/$defs/NarrativeConfig"
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "nodes": { "type": "array", "items": { "type": "object" } },
+            "events": { "type": "array", "items": { "type": "object" } }
+          },
+          "additionalProperties": false
+        },
+        "reviewProgress": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "环节",
+              "已核",
+              "待核"
+            ],
+            "properties": {
+              "环节": {
+                "type": "string"
+              },
+              "已核": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "待核": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "mode",
+        "part",
+        "targets"
+      ]
+    },
+    "NarrativeConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nodeBatchSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "eventGroupSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "eventReviewInterval": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lineReviewInterval": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "segmentSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "outlineThreshold": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "keepRecentRounds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "nodeBatchSize",
+        "eventGroupSize",
+        "eventReviewInterval",
+        "lineReviewInterval",
+        "segmentSize",
+        "outlineThreshold",
+        "keepRecentRounds"
+      ]
     }
   }
 }

@@ -7,13 +7,15 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { compactOutlineParameters, linkingDetailDescription } from '../src/features/story/outlineToolSchema.ts'
-import { storyPagePrompt } from '../src/features/story/readingPresentation.ts'
+import { formatNarrativeInput, narrativeSystemPrompt } from '../src/features/story/narrativeInput.ts'
+import { narrativeToolDescription, narrativeToolSchemas } from '../src/features/story/narrativeToolSchema.ts'
+import { compactOutlineParameters } from '../src/features/story/outlineToolSchema.ts'
+import { storyPagePrompt, storyPageReasoning } from '../src/features/story/readingPresentation.ts'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const resources = path.join(root, 'docs/v2/resources')
 const activePrompts = path.join(resources, 'v2.2/prompts/active')
-const storyToolNames = ['read_original', 'search_story_context', 'get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch']
+const storyToolNames = ['search_story_context', 'get_story_detail', 'save_story_outline', 'save_story_notes', 'navigate_story_pages', 'finish_story_batch']
 const examplesDir = path.join(resources, 'v2.2/request-examples')
 const manifest = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/prompt-call-manifest.json'), 'utf8'))
 const ownershipPath = path.join(root, 'docs/v2/文档与资源归属.json')
@@ -22,6 +24,20 @@ const flags = new Set(process.argv.slice(2))
 const dry = flags.has('--dry-run')
 const full = flags.has('--full')
 const normalize = value => value.replace(/\r\n/g, '\n')
+// 串联正文是分类判例的维护入口，复核与快检收到相同的正文。
+const standardPattern = /## 共同分类标准[\s\S]*?(?=\n## )/
+const standard = normalize(fs.readFileSync(path.join(activePrompts, 'p3-outline-story.md'), 'utf8')).match(standardPattern)?.[0]
+if (!standard) throw new Error('串联提示词缺少共同分类标准')
+for (const name of ['p3-outline-review.md', 'p3-quick-check.md']) {
+  const file = path.join(activePrompts, name)
+  const source = normalize(fs.readFileSync(file, 'utf8'))
+  if (!standardPattern.test(source)) throw new Error(name + ' 缺少共同分类标准')
+  const updated = source.replace(standardPattern, () => standard)
+  if (source !== updated) {
+    if (dry) throw new Error(name + ' 分类标准尚未同步')
+    fs.writeFileSync(file, updated)
+  }
+}
 const sha256 = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 const writeJson = (file, value) => {
   const eol = fs.readFileSync(file, 'utf8').includes('\r\n') ? '\r\n' : '\n'
@@ -32,6 +48,16 @@ const calls = [...manifest.calls].sort((a, b) => b.id.length - a.id.length)
 const callOf = id => calls.find(call => id === call.id || id.startsWith(`${call.id}-`))
 const promptFile = call => call?.prompt ? path.join(resources, call.prompt) : undefined
 const changes = { hashes: [], examples: [], missing: [] }
+
+const manifestFile = path.join(resources, 'v2.2/prompt-call-manifest.json')
+let manifestChanged = false
+for (const call of calls.filter(item => ['PROMPT-P3-WINDOW', 'PROMPT-P3-GLOBAL', 'PROMPT-P3-NARRATIVE-V4'].includes(item.id))) {
+  const digest = sha256(promptFile(call))
+  if (call.promptSha256 === digest) continue
+  manifestChanged = true
+  call.promptSha256 = digest
+}
+if (manifestChanged) writeJson(manifestFile, manifest)
 
 for (const asset of ownership.runtimeAssets ?? []) {
   if (!String(asset.path).startsWith('docs/v2/resources/v2.2/prompts/')) continue
@@ -51,6 +77,16 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
   if (!source || !fs.existsSync(source)) continue
   const beforeExample = JSON.stringify(example)
   let prompt = normalize(fs.readFileSync(source, 'utf8'))
+  if (call.id === 'PROMPT-P3-NARRATIVE-V4') {
+    const contract = JSON.parse(fs.readFileSync(path.join(resources,'v2.2/tool-contracts.json'),'utf8'))
+    const spec = contract.profiles.story_editor.find(t=>t.name==='save_story_outline').parameters
+    const schemas = narrativeToolSchemas(example.input, contract.narrativeV4, spec)
+    const tools = Object.entries(schemas).map(([name,parameters])=>({name,description:narrativeToolDescription(name,example.input),parameters}))
+    const discipline=normalize(fs.readFileSync(path.join(activePrompts,'output-discipline.txt'),'utf8')).trim()
+    example.context = {messages:[{role:'system',content:narrativeSystemPrompt(prompt,example.input)+'\n\n'+discipline,toolsAdded:tools,timestamp:0},{role:'user',content:formatNarrativeInput(example.input),timestamp:1}],tools}
+    if (beforeExample !== JSON.stringify(example)) { changes.examples.push(name); writeJson(file, example) }
+    continue
+  }
   const extractionSchema = call.id === 'PROMPT-P1-WORLD' ? 'WorldAssetsExtractionSchema' : call.id === 'PROMPT-P1-NARRATIVE' ? 'NarrativeAssetsExtractionSchema' : undefined
   if (extractionSchema) {
     prompt = prompt.replace(/^---[\s\S]*?---\s*/, '')
@@ -61,22 +97,32 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
   if (story) {
     const review = call.id === 'PROMPT-P3-GLOBAL'
     const contracts = JSON.parse(fs.readFileSync(path.join(resources, 'v2.2/tool-contracts.json'), 'utf8')).profiles.story_editor
-    example.context.tools = storyToolNames.filter(name => review || !['search_story_context', 'read_original'].includes(name)).map(name => {
+    example.context.tools = storyToolNames.filter(name => review || name !== 'search_story_context').map(name => {
       const tool = contracts.find(item => item.name === name)
       const parameters = structuredClone(tool.outlineParameters ?? tool.parameters)
       if (!review) delete parameters.properties.noteResults
       delete parameters.properties.operationKey
-      return { name, description: !review && name === 'get_story_detail' ? linkingDetailDescription : tool.description,
+      return { name, description: tool.description,
         parameters: !review && name === 'save_story_outline' ? compactOutlineParameters(parameters) : parameters }
     })
     const input = example.input
     const hints = input.contextHints ?? { assigned: input.workItems.map(item => ({ kind: item.kind, id: item.id, title: '三河帮的线索', summary: '发现三河帮活动的迹象', chapters: ['1'] })), related: [] }
     const page = { id: review ? 'orphans:1' : 'nodes:1', pageNumber: 1, totalPages: 1, type: 'node_page', ids: input.workItems.map(item => item.id) }
     const brief = input.page ? input : { phase: input.phase, queue: input.queue, page, remainingCount: input.remainingCount, workItems: hints.assigned, related: hints.related, moreRelated: hints.truncated === true, workingSummary: input.memory?.workingSummary ?? '' }
-    const view = row => row.kind === 'node' ? { id: row.id, kind: 'node', name: row.name ?? row.title, summary: row.summary ?? '', chapterIndex: row.chapterIndex ?? row.chapters?.[0] ?? '' } : row.kind === 'eventLine' ? { id: row.id, kind: 'eventLine', title: row.title, summary: row.summary ?? [row.cause, row.process, row.result].filter(Boolean).join('\n\n'), nodeIds: row.nodeIds ?? [], lineStatus: row.lineStatus ?? 'open' } : row
-    brief.workItems = brief.workItems.map(row => row.kind === 'node' ? { ...view(row), chapterName: row.chapterName ?? '第一章', process: row.process ?? '从遗留信封的印记确认线索。', clues: row.clues ?? ['信封上的印记'] } : view(row))
-    if (review) brief.outlineReview = true
-    else brief.outline ??= { lines: [], events: [] }
+    const view = row => row.kind === 'node' ? { id: row.id, kind: 'node', name: row.name ?? row.title, chapterIndex: row.chapterIndex ?? row.chapters?.[0] ?? '' } : row.kind === 'eventLine' ? { id: row.id, kind: 'eventLine', title: row.title, summary: row.summary ?? [row.cause, row.process, row.result].filter(Boolean).join('\n\n'), nodeIds: row.nodeIds ?? [], lineStatus: row.lineStatus ?? 'open' } : row
+    brief.workItems = brief.workItems.map(row => row.kind === 'node' ? { ...view(row), chapterName: row.chapterName ?? '第一章' } : view(row))
+    if (review) {
+      brief.outlineReview = true
+      brief.independent = true
+      brief.queue = 'event_lines'
+      brief.page = { id: 'directory_open::0', pageNumber: 1, totalPages: 3, type: 'directory_open', ids: [] }
+      brief.outline = { lines: [], events: [], orphans: brief.workItems.map(row => ({ id: row.id, name: row.name, chapterIndex: row.chapterIndex, kind: 'node' })) }
+      brief.directoryNotes = []
+    }
+    else {
+      brief.outline ??= { lines: [], events: [] }
+      if (brief.page.pageNumber === 1) brief.preview = brief.workItems.map(row => ({ 章: row.chapterIndex, 节点: row.name }))
+    }
     for (const field of ['remainingCount', 'related', 'moreRelated', 'workingSummary']) delete brief[field]
     example.input = brief
     example.inputSchema = 'prompt-inputs.schema.json#/$defs/StoryReadingBrief'
@@ -88,6 +134,7 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
     delete example.options.maxSteps
     delete example.options.timeoutMs
     example.options.requestTimeoutMs = 120000
+    example.options.reasoning = storyPageReasoning(brief.phase, brief.page.type)
     if (beforeExample !== JSON.stringify(example)) { changes.examples.push(name); writeJson(file, example) }
     continue
   }

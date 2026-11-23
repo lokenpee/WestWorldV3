@@ -58,15 +58,15 @@ it('长节点详情通过字符游标完整续读，每页满足工具结构和�
   const scope: Scope = { bookId: 'book', profile: 'story_editor', phase: 'window_link', sessionId: 's', runId: 'r', taskId: 't', owner: 'o', workItemIds: [] }
   let offset = 0, joined = '', pages = 0
   do {
-    const result = await repo.transaction(false, store => readTool(store, scope, 'get_node_detail', { ids: ['long'], char_offset: offset, maxChars: 2000 }))
+    const result = await repo.transaction(false, store => readTool(store, scope, 'get_node_detail', { ids: ['long'], fields: ['process'], char_offset: offset, maxChars: 2000 }))
     validate(resultContracts.get('get_node_detail')!, result)
     const part = (result.data as Row[])[0]
-    expect(String(part.text).length).toBeLessThanOrEqual(2000)
-    joined += part.text; pages++
-    if (!part.truncated) break
+    expect(String(part.process).length).toBeLessThanOrEqual(2000)
+    joined += part.process; pages++
+    if (part.nextCharOffset === null) break
     expect(Number(part.nextCharOffset)).toBeGreaterThan(offset)
     offset = Number(part.nextCharOffset)
   } while (pages < 20)
   expect(pages).toBeGreaterThan(1)
-  expect(JSON.parse(joined)).toMatchObject({ id: 'long', process: row.process })
+  expect(joined).toBe(row.process)
 })

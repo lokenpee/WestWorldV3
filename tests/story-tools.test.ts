@@ -2,18 +2,18 @@ import { expect, it } from 'vitest'
 import { createMemoryAgentRepository, type Row } from '../src/features/agents/repository'
 import { createAgentTools } from '../src/features/agents/tools'
 import { hash, inputSchema, resultContracts, validate } from '../src/features/agents/contracts'
-import type { Scope } from '../src/features/agents/queries'
+import { readTool, type Scope } from '../src/features/agents/queries'
 import { storyTaskPrompt } from '../src/features/story/prompt'
 
 const node = (id: string, chapterIndex: string): Row => ({ id, bookId: 'b', name: `三河帮事件${id}`, summary: '三河帮追查旧信', process: '信件的线索得到回应', actors: [], quote: '', chapterIndex, chapterName: chapterIndex, order: 0, confidence: 1, revision: 1, createdBy: 'P1', eventLineIds: [] })
-async function fixture(chapters = ['1', '20', '120'], workflow = 'story_lines_v2', outline = false) {
+async function fixture(chapters = ['1', '20', '120'], workflow = 'story_lines_v2', outline = false, phase = 'window_link') {
   const nodes = chapters.map((chapter, index) => node(`N${index + 1}`, chapter))
   const workItems = nodes.map(row => ({ kind: 'node', id: row.id, workItemId: `w:${row.id}` }))
   const memory = { id: 's', bookId: 'b', sessionId: 's', workingSummary: '三河帮线索待核对', revision: 1, dataFingerprint: '', updatedAt: new Date().toISOString() }
-  const scope: Scope = { bookId: 'b', profile: 'story_editor', phase: 'window_link', workflow, outline, runId: 'r', taskId: 't', owner: 'o', sessionId: 's', workItemIds: workItems.map(item => item.workItemId) }
+  const scope: Scope = { bookId: 'b', profile: 'story_editor', phase, workflow, outline, runId: 'r', taskId: 't', owner: 'o', sessionId: 's', workItemIds: workItems.map(item => item.workItemId) }
   const repo = createMemoryAgentRepository('b', { nodes, chapters: chapters.map((chapterIndex, order) => ({ bookId: 'b', chapterIndex, chapterName: chapterIndex, order })), chapterTexts: chapters.map(chapterIndex => ({ bookId: 'b', chapterIndex, text: '三河帮收到旧信，信中说明旧事的来由。' })), storyEditorMemory: [memory],
     storySessions: [{ id: 's', bookId: 'b', leaseOwner: 'o', leaseUntil: Date.now() + 60000, nextOrdinal: 0 }],
-    pipelineRuns: [{ id: 'lease:narrative', bookId: 'b', runId: 'r', owner: 'o', expiresAt: Date.now() + 60000 }, { id: 'r', bookId: 'b', status: 'running', tasks: [{ taskId: 't', phase: 'window_link', input: { workItems }, appliedCommitIds: [], reviewedItems: [] }], appliedCommands: [], commandIntents: [] }],
+    pipelineRuns: [{ id: 'lease:narrative', bookId: 'b', runId: 'r', owner: 'o', expiresAt: Date.now() + 60000 }, { id: 'r', bookId: 'b', status: 'running', tasks: [{ taskId: 't', phase, input: { workItems }, appliedCommitIds: [], reviewedItems: [] }], appliedCommands: [], commandIntents: [] }],
   })
   const adapter = createAgentTools(repo, scope, { initialReadSet: { queries: [], records: [{ table: 'storyEditorMemory', id: 's', resolvedId: 's', revision: 1, factFingerprint: await hash(memory) }] } })
   const call = async (name: string, args: Row, id: string = crypto.randomUUID()) => {
@@ -22,7 +22,7 @@ async function fixture(chapters = ['1', '20', '120'], workflow = 'story_lines_v2
     return JSON.parse(result.content.filter(part => part.type === 'text').map(part => part.text).join('')) as Row
   }
   const rows = (table: string) => repo.transaction(false, store => store.rows(table))
-  const detail = (kind: string, ids: string[], extra: Row = {}) => call('get_story_detail', { kind, ids, ...extra })
+  const detail = (kind: string, ids: string[], extra: Row = {}) => call('get_story_detail', { kind, ids, ...(kind === 'node' ? { fields: ['name'] } : {}), ...extra })
   const create = (title: string, nodeIds: string[]) => call('save_story_lines', { operations: [workflow === 'story_pages_v3' ? { action: 'create', title, nodeIds, summary: '旧信留下疑问，线索持续发展，尚待后续。' } : { action: 'create', title, nodeIds, cause: '旧信留下疑问', process: '线索持续发展', result: '待后续', lineStatus: 'open', reason: '同一封旧信', confidence: 1, evidenceNodeIds: nodeIds }] })
   return { repo, scope, adapter, call, rows, detail, create, workItems }
 }
@@ -113,9 +113,9 @@ it('旧线先保留原成员，整线复核核对去向后切换', async () => {
   expect(await f.rows('eventLines')).toMatchObject([{ outlinePending: false, nodeIds: ['N1', 'N2'], legacyNodeIds: ['N1', 'N2', 'N3'], summary: '原整理内容' }])
 })
 
-it('只开放七工具，跨章追加保留脉络且不重写记忆，一节点可属于两线', async () => {
+it('旧流程仅开放整理工具，跨章追加保留脉络且不重写记忆，一节点可属于两线', async () => {
   const f = await fixture()
-  expect(f.adapter.initialTools.map(tool => tool.name).sort()).toEqual(['search_story_context', 'get_story_detail', 'read_original', 'save_story_lines', 'save_story_notes', 'add_story_nodes', 'finish_story_batch'].sort())
+  expect(f.adapter.initialTools.map(tool => tool.name).sort()).toEqual(['search_story_context', 'get_story_detail', 'save_story_lines', 'save_story_notes', 'finish_story_batch'].sort())
   expect(JSON.stringify(f.adapter.initialTools.map(tool => tool.parameters))).not.toContain('operationKey')
   await f.detail('node', ['N1', 'N2', 'N3'])
   const first = await f.create('三河帮旧信', ['N1']), id = (first.lineIds as string[])[0]
@@ -146,20 +146,15 @@ it('同节点可构成不同主题的线，合线及调整成员保持其他归�
   expect((await f.rows('eventLines')).map(row => row.id)).not.toContain(c)
 })
 
-it('读过原文才能补点，回执丢失重放和新调用重试都复用已保存节点', async () => {
-  const f = await fixture()
-  const args = { nodes: [{ chapterIndex: '20', name: '收到旧信', summary: '三河帮收到旧信', actors: [], quote: '三河帮收到旧信' }] }
-  await expect(f.call('add_story_nodes', args)).rejects.toThrow('读取对应章节原文')
-  await f.call('read_original', { chapter_indices: ['20'] })
-  const first = await f.call('add_story_nodes', args, 'lost-receipt')
-  const replay = await f.call('add_story_nodes', args, 'lost-receipt')
-  expect(replay).toMatchObject({ alreadyApplied: true, nodes: first.nodes, commitId: first.commitId })
-  const repeated = await f.call('add_story_nodes', args)
-  expect(repeated).toMatchObject({ changed: false, nodes: [{ id: (first.nodes as Row[])[0].id, reused: true }] })
-  expect(await f.rows('nodes')).toHaveLength(4)
-  const id = String((first.nodes as Row[])[0].id)
-  await f.detail('node', [id]); await f.create('补提旧信事件', [id])
-  expect((await f.rows('eventLines'))[0].nodeIds).toEqual([id])
+it.each(['window_link', 'global_review'])('%s 只按指定字段读取节点，无法查原文', async phase => {
+  const f = await fixture(undefined, 'story_pages_v3', true, phase)
+  expect(f.adapter.tools.map(tool => tool.name)).not.toContain('read_original')
+  await expect(f.repo.transaction(false, store => readTool(store, f.scope, 'read_original', { chapter_indices: ['1'] }))).rejects.toThrow('SCOPE')
+  for (const fields of [undefined, [], ['quote'], ['*']]) {
+    expect(await f.call('get_story_detail', { kind: 'node', ids: ['N1'], ...(fields ? { fields } : {}) })).toMatchObject({ code: 'INVALID_ARGS' })
+  }
+  expect((await f.detail('node', ['N1', 'N2'], { fields: ['summary', 'actors'] })).data).toEqual(
+    ['N1', 'N2'].map(id => ({ id, kind: 'node', summary: '三河帮追查旧信', actors: [] })))
 })
 
 it('批量有一项无依据时全部回滚，失败不产生成功提交', async () => {
@@ -267,18 +262,18 @@ it('当前P3只有六工具，搜索目录足以保存，续接省略概述时�
   expect((await f.rows('eventLines'))[0].summary).toBe('后文回应旧信，来历已明。')
 })
 
-it('节点详情按正文分页且不泄露证据和存储字段，目录概述不截断', async () => {
+it('节点详情按正文分页且不泄露证据和存储字段，搜索只返回节点索引', async () => {
   const f = await fixture(undefined, 'story_pages_v3')
   await f.repo.transaction(true, async store => {
     const row = (await store.get('nodes', 'N1'))!
     await store.put('nodes', { ...row, summary: '重要伏笔'.repeat(200), process: '详细经过'.repeat(300), quote: '秘密引文', relationEvidence: ['秘密关系'] })
   })
   const search = await f.call('search_story_context', { kind: 'node' })
-  expect((search.data as Row[]).find(row => row.id === 'N1')?.summary).toBe('重要伏笔'.repeat(200))
-  const first = (await f.detail('node', ['N1'], { maxChars: 100 })).data as Row[]
+  expect((search.data as Row[]).find(row => row.id === 'N1')).not.toHaveProperty('summary')
+  const first = (await f.detail('node', ['N1'], { fields: ['process'], maxChars: 100 })).data as Row[]
   expect(first[0]).toMatchObject({ process: '详细经过'.repeat(25), nextCharOffset: 100 })
   expect(JSON.stringify(first)).not.toMatch(/秘密|bookId|revision|confidence|quote|relationEvidence/)
-  const next = (await f.detail('node', ['N1'], { char_offset: 100, maxChars: 100 })).data as Row[]
+  const next = (await f.detail('node', ['N1'], { fields: ['process'], char_offset: 100, maxChars: 100 })).data as Row[]
   expect(next[0].process).toBe('详细经过'.repeat(25))
 })
 

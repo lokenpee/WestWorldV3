@@ -21,6 +21,7 @@ export interface TraceIdentity {
   contextId?: string; workId?: string; characterId?: string
 }
 export interface TraceSessionOptions {
+  captureRawBody?: boolean
   businessPrompt?: string
   purpose?: TracePurpose
   now?: () => number
@@ -156,7 +157,7 @@ export class TraceSession {
     this.notify()
   }
 
-  private request(value: { requestId: string; attemptId: string; body: Row }) {
+  private request(value: { requestId: string; attemptId: string; rawBody?: string; body: Row }) {
     const record = this.records.get(value.requestId)
     if (!record) return
     const { messages: _messages, input: _input, system: _system, instructions: _instructions, tools: _tools, ...parameters } = value.body
@@ -172,6 +173,7 @@ export class TraceSession {
       record.text = ''; record.thinking = ''; record.toolCalls = []
     }
     record.input = { ...prior, messages: clone(messages), messageHashes: messages.map(message => digest(message)), messageFormat: 'provider-request/v1',
+      ...(this.options.captureRawBody && value.rawBody !== undefined ? { rawBodies: { ...(prior.rawBodies as Record<string,string>), [value.attemptId]: value.rawBody } } : {}),
       toolSchemaSnapshotId: snapshotId, requestParameters: parameters, transportAttemptIds: [...attempts, value.attemptId] }
     this.enqueue(record); this.notify()
   }
@@ -199,7 +201,16 @@ export class TraceSession {
     record.text = parts.text || text(record.text)
     record.thinking = parts.thinking || text(record.thinking)
     const prior = Array.isArray(record.toolCalls) ? record.toolCalls as Row[] : []
-    record.toolCalls = parts.tools.map(tool => ({ ...(prior.find(row => row.toolCallId === tool.toolCallId) ?? {}), ...tool }))
+    record.toolCalls = parts.tools.map(tool => {
+      const observed = { ...(prior.find(row => row.toolCallId === tool.toolCallId) ?? {}), ...tool }
+      const skipped = value.skippedTools?.find(row => row.id === tool.toolCallId)
+      if (!skipped) return observed
+      const result = { content: [{ type: 'text', text: JSON.stringify({
+        ok: false, code: 'OUTPUT_TRUNCATED', tool: skipped.name || skipped.id, reason: skipped.reason,
+        hint: '只补发尚未执行的工具调用及完整参数。',
+      }) }] }
+      return { ...observed, state: 'failed', isError: true, result, resultPreview: preview(result) }
+    })
     record.usage = usageOf(value.usage)
     record.attemptIds = value.attempts.map(attempt => attempt.attemptId).filter((id): id is string => !!id)
     if (value.status !== 'succeeded' || this.options.purpose !== 'work') record.final = true
@@ -321,6 +332,7 @@ export class TraceSession {
         const input = { ...(row.input as Row) }; input.completeness = 'partial'; input.incompleteReason = '浏览器存储空间不足，仅保存摘要。'
         input.messages = Array.isArray(input.messages) ? input.messages.map(message => ({ role: (message as Row).role, content: [{ type: 'text', text: '[存储空间不足，未保存完整内容]' }], timestamp: (message as Row).timestamp })) : []
         delete input.requestParameters
+        delete input.rawBodies
         const toolCalls = Array.isArray(row.toolCalls) ? (row.toolCalls as Row[]).map(tool => ({ ...tool, ...(tool.result !== undefined ? { result: undefined, resultPreview: preview(tool.result), resultTruncated: true } : {}) })) : []
         return { ...row, input, toolCalls, complete: false }
       }
@@ -485,17 +497,17 @@ export interface ExecutionChain {
   paging?: { events: ExecutionEvent[]; hasEarlier: boolean; loadEarlier: () => Promise<ExecutionChain>; loadEvent: (event: ExecutionEvent) => Promise<ExecutionEvent>; loadRequest: (request: Row) => Promise<{ request: Row; snapshots: Map<string, Row> }> }
 }
 
-export async function readExecutionChain(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string, options: { unitId?: string; contextId?: string; sessionId?: string; storyPhase?: StoryExecutionPhase } = {}): Promise<ExecutionChain> {
+export async function readExecutionChain(workspace: ReturnType<typeof createWorkspace>, bookId: string, runId: string, options: { taskId?: string; unitId?: string; contextId?: string; sessionId?: string; storyPhase?: StoryExecutionPhase } = {}): Promise<ExecutionChain> {
   const db = workspace.openBook(bookId)
   const run = await db.table('pipelineRuns').get(runId)
   if (!run) return { entries: [], requests: [], snapshots: new Map() }
   const sessionId = text(options.sessionId) || text(run.sessionId)
   const phaseTasks = options.storyPhase ? records(run.tasks).filter(task => run.stage === 'P3' && task.phase === options.storyPhase) : undefined
   const taskIds = phaseTasks && new Set(phaseTasks.map(task => text(task.taskId)).filter(Boolean))
-  const inPhase = (row: Row) => !taskIds || taskIds.has(text(row.taskId))
+  const inPhase = (row: Row) => (!taskIds || taskIds.has(text(row.taskId))) && (!options.taskId || row.taskId === options.taskId)
   const runStatus = text(phaseTasks ? phaseTasks.at(-1)?.status : run.status)
   if (workspace.disk) {
-    const paged = await readPagedExecution(workspace, bookId, { runId, ...(sessionId ? { sessionId } : {}), ...(options.unitId && run.scope !== 'character' ? { unitId: options.unitId } : {}), ...(options.storyPhase ? { storyPhase: options.storyPhase } : {}), ...(['P2', 'P3'].includes(run.stage) ? { includeFirst: true } : {}) }, runStatus)
+    const paged = await readPagedExecution(workspace, bookId, { runId, ...(options.taskId ? {taskId:options.taskId} : {}), ...(sessionId ? { sessionId } : {}), ...(options.unitId && run.scope !== 'character' ? { unitId: options.unitId } : {}), ...(options.storyPhase ? { storyPhase: options.storyPhase } : {}), ...(['P2', 'P3'].includes(run.stage) ? { includeFirst: true } : {}) }, runStatus)
     if (paged) return paged
   }
   const all = sessionId ? await db.table('storySessionEntries').where('sessionId').equals(sessionId).toArray() : await db.table('storySessionEntries').toArray()
@@ -504,6 +516,7 @@ export async function readExecutionChain(workspace: ReturnType<typeof createWork
   const entries = all.filter(row => {
     if (row.type !== 'message' && row.type !== 'compaction') return false
     if (sessionId && row.sessionId !== sessionId) return false
+    if (options.taskId && row.taskId !== options.taskId) return false
     if (options.storyPhase && (row.runId !== runId || !inPhase(row))) return false
     if (unitId && !targeted && row.unitId !== unitId) return false
     if (!unitId && options.contextId && row.contextId && row.contextId !== options.contextId) return false
