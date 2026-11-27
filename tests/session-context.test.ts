@@ -69,7 +69,6 @@ it.each([
   { label: '缺字段', call: { name: 'submit_result', arguments: {} }, code: 'SUMMARY_MISSING' },
   { label: '类型错误', call: { name: 'submit_result', arguments: { summary: 42 } }, code: 'SUMMARY_TYPE' },
   { label: '空白', call: { name: 'submit_result', arguments: { summary: '   ' } }, code: 'SUMMARY_EMPTY' },
-  { label: '超长', call: { name: 'submit_result', arguments: { summary: 'x'.repeat(600) } }, code: 'SUMMARY_TOO_LONG' },
   { label: '错误工具', call: { name: 'other', arguments: { summary: '有效' } }, code: 'SUMMARY_TOOL' },
   { label: '输出截断', content: [], stopReason: 'length', code: 'OUTPUT_TRUNCATED' },
 ] as const)('summary错误分类可追踪：$label', async ({ call, content, stopReason, code }) => {

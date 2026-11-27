@@ -228,8 +228,8 @@ export function createImportService(workspace: Workspace, environment: Environme
   return {
     importNovel,
     pendingOperationsCount: () => settings.appSettings.where('key').startsWith('book.lifecycle:').count(),
-    importData(book: Book, prepare: (bookId: string) => Promise<BookTables>) {
-      return importPrepared((id, timestamp) => ({ ...book, id, title: `${book.title}（导入）`, createdAt: timestamp }), async (db, bookId) => {
+    importData(book: Book, prepare: (bookId: string) => Promise<BookTables>, title = `${book.title}（导入）`) {
+      return importPrepared((id, timestamp) => ({ ...book, id, title, createdAt: timestamp }), async (db, bookId) => {
         const tables = await prepare(bookId)
         const errors = await validateBookData({ book: { ...book, id: bookId }, tables })
         if (errors.length) throw new Error(`恢复校验失败：${errors[0].path} ${errors[0].message}`)

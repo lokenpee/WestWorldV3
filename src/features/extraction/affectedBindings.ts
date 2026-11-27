@@ -27,12 +27,11 @@ export function addedCharacterBindingScope(before: Character[], after: Character
     },
     node(node: EventNode) {
       if (!added.length) return false
-      const groups = [...(node.actorBindings ?? []), ...(node.targetBindings ?? [])]
-      if ([...node.actors, ...(node.targets ?? []), ...groups.map(group => group.mention)].some(matchesName)) return true
+      const groups = [...(node.actorBindings ?? [])]
+      if ([...node.actors, ...groups.map(group => group.mention)].some(matchesName)) return true
       return [
-        ...(node.actorIds ?? []), ...(node.targetCharacterIds ?? []),
-        ...(node.manualActorIds ?? []), ...(node.manualTargetCharacterIds ?? []),
-        ...(node.legacyActorIds ?? []), ...(node.legacyTargetCharacterIds ?? []),
+        ...(node.actorIds ?? []),
+        ...(node.manualActorIds ?? []),
         ...groups.flatMap(group => group.ids),
       ].some(id => addedIds.has(id))
     },

@@ -8,7 +8,6 @@ import { searchStoryContext } from '../story/retrieval'
 import type { Character, CharacterRelation, CharacterRelationEdit, Lifecycle } from '../assets/types'
 import { refreshReview } from './organizationReview'
 import { profileWork, relationWork } from './organizationData'
-import { storyProcessSegments } from './storyCommands'
 import { characterDetails, relationOverview } from './assetViews'
 import { storyView } from '../story/views'
 
@@ -129,29 +128,7 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
       const members = strings(line.nodeIds), start = Number(args.memberOffset ?? 0), limit = Number(args.memberLimit ?? 50)
       const nodeIds = members.slice(start, start + limit)
       const memberPage = { nodeIds, memberOffset: start, memberCount: members.length, membersTruncated: start + nodeIds.length < members.length, nextMemberOffset: start + nodeIds.length < members.length ? start + nodeIds.length : null }
-      const segments = storyProcessSegments(line.process)
-      if (args.processSegment !== undefined) {
-        const segment = segments.find(row => row.segment === args.processSegment)
-        const offset = Number(args.char_offset ?? 0), length = Number(args.maxChars ?? 6000)
-        const snippet = segment?.text.slice(offset, offset + length) ?? ''
-        rows.push({ id: line.id, title: line.title, revision: line.revision, lineStatus: line.lineStatus, ...memberPage,
-          processSegmentCount: segments.length, processSegments: segment ? [{ segment: segment.segment, text: snippet, charOffset: offset, totalChars: segment.text.length, truncated: offset + snippet.length < segment.text.length, nextCharOffset: offset + snippet.length < segment.text.length ? offset + snippet.length : null }] : [],
-          ...(segment ? {} : { hint: '当前段落不存在，可按processSegmentCount选择已有段落。' }) })
-      } else {
-        const row = { ...line, ...memberPage }, full = JSON.stringify(row)
-        const detail = detailFragments([row], args)[0]
-        if (detail.text === undefined) rows.push({ ...detail, processSegmentCount: segments.length, processSegments: segments.map(({ segment, text }) => ({ segment, text })) })
-        else {
-          const processStart = full.indexOf('"process":') + '"process":'.length + 1
-          const from = Number(detail.charOffset), to = from + text(detail.text).length
-          const visible = segments.filter(segment => {
-            const start = processStart + JSON.stringify(text(line.process).slice(0, segment.start)).length - 2
-            const end = start + JSON.stringify(segment.text).length - 2
-            return start < to && end > from
-          })
-          rows.push({ ...detail, processSegmentCount: segments.length, processSegments: visible.map(({ segment }) => ({ segment, hint: '本段部分内容在当前片段中；可用processSegment读取该段。' })) })
-        }
-      }
+      rows.push(detailFragments([{ ...line, ...memberPage }], args)[0])
     }
     return page(rows, {}, maxResults, { missingIds })
   }
@@ -463,11 +440,11 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
       if (!found) { missing.push(id); continue }
       const row: Row = table === 'characters' ? characterDetails(found, scope.phase === 'character_organization' && ['directory', 'candidate'].includes(scope.workKind ?? '')) : { ...found }
       if (!args.include_facts) for (const key of ['mergeFacts', 'optimizedFactIds', 'optimizationFingerprint']) delete row[key]
-      if (table === 'nodes') row.characterReferences = await references(store, scope, [...strings(row.actors), ...strings(row.targets)], [...strings(row.actorIds), ...strings(row.targetCharacterIds)])
+      if (table === 'nodes') row.characterReferences = await references(store, scope, [...strings(row.actors)], [...strings(row.actorIds)])
       if (table === 'eventLines') {
         const nodes = (await scopedRows(store, scope, 'nodes')).filter(node => strings(row.nodeIds).includes(text(node.id)))
-        row.characterIds = [...new Set(nodes.flatMap(node => [...strings(node.actorIds), ...strings(node.targetCharacterIds)]))]
-        row.characterReferences = await references(store, scope, nodes.flatMap(node => [...strings(node.actors), ...strings(node.targets)]), strings(row.characterIds))
+        row.characterIds = [...new Set(nodes.flatMap(node => [...strings(node.actorIds)]))]
+        row.characterReferences = await references(store, scope, nodes.flatMap(node => [...strings(node.actors)]), strings(row.characterIds))
       }
       const existing = rows.find(item => item.id === row.id)
       if (existing) existing.resolvedFrom = [...new Set([...strings(existing.resolvedFrom), ...strings(row.resolvedFrom)])]
@@ -485,10 +462,10 @@ export async function readTool(store: AgentStore, scope: Scope, name: string, ar
   if (args.actor) rows = rows.filter(row => [...strings(row.actors), ...strings(row.actorIds)].includes(text(args.actor)))
   if (args.character) {
     const nodes = await scopedRows(store, scope, 'nodes')
-    const relevant = new Set(nodes.filter(node => [...strings(node.actors), ...strings(node.targets), ...strings(node.actorIds), ...strings(node.targetCharacterIds)].includes(text(args.character))).map(node => text(node.id)))
+    const relevant = new Set(nodes.filter(node => [...strings(node.actors), ...strings(node.actorIds)].includes(text(args.character))).map(node => text(node.id)))
     rows = rows.filter(row => strings(row.nodeIds).some(id => relevant.has(id)))
   }
-  const projected = rows.map(row => table === 'characters' || table === 'locations' ? { id: row.id, name: row.name, aliases: strings(row.aliases), sourceChapters: strings(row.sourceChapters), revision: row.revision, [table === 'characters' ? 'identityHint' : 'descriptionHint']: text(table === 'characters' ? row.identity : row.description).slice(0, 160), estimatedDetailTokens: Math.ceil(JSON.stringify(row).length / 3), duplicateScore: Math.min(1, rows.filter(other => other.name === row.name && other.id !== row.id).length) } : table === 'nodes' && scope.profile === 'story_editor' ? storyView(row, 'node') : table === 'nodes' ? { id: row.id, name: row.name, summary: text(row.summary).slice(0, 160), actors: strings(row.actors).slice(0, 8), chapterIndex: row.chapterIndex } : { id: row.id, title: row.title, chapters: row.chapters, lineStatus: row.lineStatus, nodeCount: strings(row.nodeIds).length, cause: text(row.cause).slice(0, 160), result: text(row.result).slice(0, 160) })
+  const projected = rows.map(row => table === 'characters' || table === 'locations' ? { id: row.id, name: row.name, aliases: strings(row.aliases), sourceChapters: strings(row.sourceChapters), revision: row.revision, [table === 'characters' ? 'identityHint' : 'descriptionHint']: text(table === 'characters' ? row.identity : row.description).slice(0, 160), estimatedDetailTokens: Math.ceil(JSON.stringify(row).length / 3), duplicateScore: Math.min(1, rows.filter(other => other.name === row.name && other.id !== row.id).length) } : table === 'nodes' && scope.profile === 'story_editor' ? storyView(row, 'node') : table === 'nodes' ? { id: row.id, name: row.name, summary: text(row.summary).slice(0, 160), actors: strings(row.actors).slice(0, 8), chapterIndex: row.chapterIndex } : { id: row.id, title: row.title, chapters: row.chapters, lineStatus: row.lineStatus, nodeCount: strings(row.nodeIds).length, summary: text(row.summary).slice(0, 160) })
   return page(projected, args, maxResults, { cursor: table === 'characters' || table === 'locations' })
 }
 

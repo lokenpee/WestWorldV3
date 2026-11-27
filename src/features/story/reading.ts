@@ -132,7 +132,7 @@ export async function refreshReading(store: AgentStore, runId: string, sessionId
       if (!staged) await eventSegments(event, extra)
       if (reused('event_summary', id)) return
       const members = strings(event.nodeIds).flatMap(id => nodeById.has(id) ? [nodeById.get(id)!] : [])
-      await add('event_summary', 'event_lines', [event], { ...extra, eventId: event.id, ...(staged ? { descriptionLength: 160 + text(event.summary).length + text(event.coreClue).length + members.reduce((n, row) => n + 80 + text(row.summary).length, 0) } : {}) }, { event: storyContent('storyEvents', event), nodes: members.map(node => storyContent('nodes', node)) })
+      await add('event_summary', 'event_lines', [event], { ...extra, eventId: event.id, ...(staged ? { descriptionLength: 160 + text(event.summary).length + strings(event.clues).join('、').length + members.reduce((n, row) => n + 80 + text(row.summary).length, 0) } : {}) }, { event: storyContent('storyEvents', event), nodes: members.map(node => storyContent('nodes', node)) })
     }
     for (const [lineIndex, line] of lines.entries()) {
       const members = strings(line.nodeIds).map(id => nodeById.get(id)).filter((row): row is Row => !!row)

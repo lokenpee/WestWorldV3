@@ -63,7 +63,7 @@ test('固定响应贯通P1至P3，备份从Edge恢复到Firefox并保留网络�
     await other.getByRole('button', { name: '资产', exact: true }).click()
     await expect(other.getByRole('region', { name: '事件线窗口串联', exact: true })).toContainText('全书复核完成', { timeout: 15000 })
     await expect(other.getByRole('region', { name: '事件线窗口串联', exact: true })).toContainText('已完成 1/1 个窗口')
-    await other.getByRole('button', { name: /^事件节点 2$/ }).click()
+    await other.getByRole('button', { name: /^节点 2$/ }).click()
     await other.getByRole('button', { name: '事件网络', exact: true }).click()
     await expect(other.getByRole('region', { name: '事件网络', exact: true })).toContainText('显示 2 / 2 个节点 · 1 条事件线')
     expect(await other.getByRole('region', { name: '事件网络', exact: true }).evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)

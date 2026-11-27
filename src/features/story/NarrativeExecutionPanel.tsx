@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { EventTaskOutcome } from './EventTaskOutcomePanel'
 import { bookInterests, useLiveResult } from '../../hooks/useLiveResult'
 import { executionStats } from '../agents/executionStats'
 import type { ExecutionChain } from '../agents/trace'
@@ -11,7 +12,10 @@ import { NarrativeRequest } from './NarrativeRequest'
 type Tasks = Awaited<ReturnType<StoryService['narrativeTasks']>>
 type TaskOption = ReturnType<typeof taskOptions>[number]
 const phases = [
-  ['window_link', '节点归入事件'],
+  ['link_node', '节点串联'],
+  ['review_boundaries', '宏观复核'],
+  ['review_sequence', '逐事件主审'],
+  ['review_event', '旧版事件复核'],
   ['global_review', '事件归入故事线'],
 ] as const
 const states: Record<string, string> = {
@@ -32,7 +36,7 @@ function taskOptions(tasks: Tasks) {
     if (task.mode.endsWith('_cycle') && previous?.mode !== task.mode) cycle++
     segment = previous?.mode === task.mode && previous.part === task.part ? segment + 1 : 1
     const title =
-      task.part === 'batch'
+      ['link_node','review_boundaries','review_sequence','review_event'].includes(task.mode) ? labels[task.mode] + ' · ' + (task.displayNames || task.ids.join('、') || '未归属节点') : task.part === 'batch'
         ? (task.mode === 'node_batch' ? '节点批次 ' : '归线组 ') + batch
         : labels[task.mode] +
           (task.mode.endsWith('_cycle') ? ' ' + cycle : '') +
@@ -50,23 +54,31 @@ export function NarrativeExecutionPanel({
   runId,
   service,
   initialPhase,
+  initialEventReview = false,
   reviewOnly = false,
+  reviewStage,
   onClose,
-}: Common & { initialPhase: StoryExecutionPhase; reviewOnly?: boolean; onClose: () => void }) {
+}: Common & { initialPhase: StoryExecutionPhase; initialEventReview?: boolean; reviewStage?:'review_boundaries'|'review_sequence'; reviewOnly?: boolean; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const dialog = ref.current
     dialog?.showModal()
     return () => dialog?.close()
   }, [])
-  const [phase, setPhase] = useState(initialPhase),
+  const [phase, setPhase] = useState<(typeof phases)[number][0]>(
+    initialPhase === 'global_review' ? 'global_review' : initialEventReview || reviewOnly ? reviewStage ?? 'review_boundaries' : 'link_node'
+  ),
     [picked, setPicked] = useState('')
   const tasks = useLiveResult(
     useCallback(() => service.narrativeTasks(bookId, runId), [bookId, runId, service]),
     0,
     bookInterests(bookId, ['pipelineRuns'])
   )
-  const options = taskOptions(tasks.status === 'ready' ? tasks.value.filter((t) => t.phase === phase) : [])
+  const options = taskOptions(tasks.status === 'ready' ? tasks.value.filter(t => {
+    if (phase === 'global_review') return t.phase === phase
+    if (t.phase !== 'window_link') return false
+    return t.mode === phase
+  }) : [])
   const choices = reviewOnly ? options.filter((t) => t.part !== 'batch') : options
   const task = choices.find((t) => t.id === picked) ?? choices.at(-1)
   return (
@@ -84,7 +96,7 @@ export function NarrativeExecutionPanel({
       </header>
       <div className="merge-dialog-body run-detail-body">
         <nav className="run-window-tabs" aria-label="P3 整理阶段">
-          {phases.map(([id, label]) => (
+          {phases.filter(([id]) => (!reviewOnly || id !== 'link_node') && (id!=='review_event' || (tasks.status==='ready' && tasks.value.some(t=>t.mode==='review_event')))).map(([id, label]) => (
             <button
               key={id}
               aria-pressed={phase === id}
@@ -119,7 +131,7 @@ export function NarrativeExecutionPanel({
               </ol>
             )}
             <label className="narrative-task-picker">
-              批次或复核分段{' '}
+              {phase === 'link_node' ? '节点任务' : phase !== 'global_review' ? '事件任务' : '归线任务'}{' '}
               <select value={task.id} onChange={(e) => setPicked(e.target.value)}>
                 {choices.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -134,6 +146,7 @@ export function NarrativeExecutionPanel({
                 {task.ids.join('、')}
               </details>
             )}
+            {task.degraded && <p role="status">检索降级 · {task.degraded}</p>}
             <TaskOutcome
               key={'outcome' + task.id}
               task={task}
@@ -160,6 +173,7 @@ function TaskOutcome({ task, bookId, runId, service }: Common & { task: TaskOpti
   if (data.status !== 'ready')
     return <p role="status">{data.status === 'error' ? data.message : '正在读取成果…'}</p>
   if (!data.value) return null
+  if (data.value.eventOutcome) return <EventTaskOutcome key={taskId} result={data.value.eventOutcome} />
   const { label, groups, notes } = data.value
   if (data.value.review) {
     const { rows, confirmed, membershipCount, descriptionCount, targetCount } = data.value.review

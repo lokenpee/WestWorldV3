@@ -150,8 +150,8 @@ export async function reviewReceiptOutcome(
           if (change.action === 'updated' && previous !== title)
             save(id, 'title', previous ? '名称从「' + previous + '」改为「' + title + '」' : '保存名称', previous ? undefined : title)
         }
-        for (const [field, label] of [['summary', '保存概况'], ['coreClue', '保存核心关键线索']] as const) {
-          const value = text(operation[field]).trim()
+        for (const [field, label] of [['summary', '保存概况'], [operation.clues === undefined ? 'coreClue' : 'clues', '保存核心关键线索']] as const) {
+          const value = field === 'clues' ? strings(operation.clues).join('、') : text(operation[field]).trim()
           if (!value) continue
           descriptions.add(id)
           save(id, field, label, value)

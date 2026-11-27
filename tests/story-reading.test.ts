@@ -43,181 +43,308 @@ async function setup(count = 25, fetcher: typeof fetch = vi.fn(async (_url, init
 }
 const bodyOf = (init?: RequestInit) => JSON.parse(init?.body as string)
 
-it('V4 经正式模型接口按幕建事件、归线、确认和备份恢复', async () => {
-  const inputs: string[] = []
-  let invalidSent=false, correctionSeen=false, fieldCorrectionSeen=false
-  const fetcher: typeof fetch = async (_url, init) => {
+it('逐节点串联后逐事件复核，外部不可用时保存降级，复核待核实时暂停归线', async () => {
+  const inputs:string[]=[]
+  let hold=true
+  const {service,db,workspace} = await setup(2, async (_url,init) => {
     const body = bodyOf(init)
     const task = body.messages.map((m:Row)=>narrativeMaterial(messageText(m.content))).find(Boolean)
-    const system = body.messages.filter((m:Row)=>m.role==='system').map((m:Row)=>messageText(m.content)).join(' ')
-    expect(system).toContain(task.mode === 'event_group' || task.mode.startsWith('line_') ? 'edit_storylines' : 'edit_events')
-    expect(body).toMatchObject({ thinking: { type: 'enabled' }, reasoning_effort: 'low' })
-    if (['batch','structure','unassigned'].includes(task.part))
-      expect(task.outline.nodes[0]).toMatchObject({ id: 'N001', name: '信件事件1' })
-    else expect(task.outline).toBeUndefined()
-    const tools = body.tools.map((tool: { function: { name: string } }) => tool.function.name)
-    expect(tools.includes('get_outline')).toBe(task.part === 'batch' || task.part === 'unassigned')
-    if (['structure','descriptions'].includes(task.part)) expect(task.reviewProgress.find((r:Row)=>r.待核 as number > 0)).toBeDefined()
-    if (task.mode === 'event_review' && task.part === 'structure') {
-      expect(task.evidence.nodes).toHaveLength(2)
-      expect(task.evidence.nodes[0]).toMatchObject({ id: 'N001', summary: '同一封信继续流转' })
+    if (task.mode === 'link_node') {
+      const count = task.targets[0].id === 'N001' ? 0 : 1
+      const material = body.messages.map((m:Row)=>messageText(m.content)).find((s:string)=>s.startsWith('【当前节点概览开始】'))
+      expect(material).toContain('事件库共 ' + count + ' 条，已列出全部事件')
+      expect(body.tools.map((tool:{function:{name:string}})=>tool.function.name)).not.toContain('search_nodes')
+      expect(messageText(body.messages[0].content)).toContain('6. **按事实维护状态**')
+      const results = body.messages.filter((m:Row)=>m.role==='tool')
+      if (results.length) {
+        expect(results).toHaveLength(1)
+        expect(JSON.parse(messageText(results[0].content))).toMatchObject({ok:true})
+        return agentStream([{name:'confirm',args:{result:'completed',reviewed_event_ids:['aeda97c2-e5f0-4a04-9b7e-ce03cc29d693']}}])
+      }
+      const candidate = task.material.候选事件[0]
+      if (candidate) return agentStream([{name:'edit_events',args:{changes:[{op:'update',event_id:candidate.event_id,
+        fields:{nodeIds:[...candidate.members.map((n:Row)=>n.node_id),task.targets[0].id]},reason:'密信继续传递'}]}}])
     }
-    if (task.mode === 'event_group') expect(task.outline.events[0].nodeIds).toEqual(['N001','N002'])
-    if (task.part === 'descriptions') {
-      const target = task.targets[0]
-      if (task.mode === 'event_review') expect(target).toMatchObject({ summary: '信使交信', coreClue: '' })
-      else expect(target).toMatchObject({ summary: '', coreClue: '封印完整' })
-    }
-    if (!invalidSent && body.messages.some((m:Row)=>m.role==='tool') && task.mode==='node_batch') {
-      invalidSent=true
-      return agentStream([{name:'confirm',args:{handled_event_ids:['wrong-phase']}}])
-    }
-    if (invalidSent && !correctionSeen) {
-      expect(JSON.parse(messageText(body.messages.at(-1).content))).toMatchObject({
-        tool:'confirm', code:'INVALID_ARGUMENT', fields:['handled_event_ids'],
-        reason:expect.stringContaining('当前任务不接受 handled_event_ids'),
-        hint:expect.stringContaining('confirm({})'),
-      })
-      correctionSeen=true
-      return agentStream([{name:'get_detail',args:{requests:[{kind:'node',id:'N001',fields:['text','summary']}]}}])
-    }
-    if (correctionSeen && !fieldCorrectionSeen) {
-      const [result] = JSON.parse(messageText(body.messages.at(-1).content))
-      expect(result).toMatchObject({ values:{summary:'同一封信继续流转'},unavailable:['text'],message:expect.stringContaining('原文摘录用 quote') })
-      fieldCorrectionSeen=true
+    if (task.mode === 'review_sequence' && hold) {
+      expect(task.material.主审事件.event_id).toBeTruthy()
+      expect(task.material.成员时间表.map((n:Row)=>n.node_id)).toEqual(['N001','N002'])
+      const rules = messageText(body.messages[0].content)
+      expect(rules).toContain('微观复核 · 逐事件核实经过')
+      expect(rules).toContain('return_to_macro')
+      expect(rules).not.toContain('【事件串联规则开始】')
+      expect(body.tools.map((tool:{function:{name:string}})=>tool.function.name)).toContain('search_nodes')
+      hold=false
+      return agentStream([{name:'confirm',args:{result:'pending_review',pending_issues:[{issue:'交付对象待查',checked_scope:'前两章',reason:'证词有冲突'}]}}])
     }
     return narrativeResponse(body, inputs)
-  }
-  const {workspace,db,service,models} = await setup(2, fetcher)
-  await models.settings.save({ ...defaultConfig, aggregationModel:'deepseek-flash', baseUrl:'https://reading-fixture.invalid/v1' }, 'fixture-only')
-  await service.narrative.start('a')
-  const state = await service.narrative.read('a')
-  expect(state?.status,service.narrative.message('a')).toBe('completed')
-  expect(fieldCorrectionSeen).toBe(true)
-  expect(state?.plan.batches).toEqual({event:1,line:1})
-  expect(await db.table('storyEvents').count()).toBe(1)
-  expect(await db.table('eventLines').count()).toBe(1)
-  expect(inputs).toContain('line_review/unassigned')
-  expect(inputs).toContain('line_review/descriptions')
-  const tasks=await service.narrativeTasks('a',state!.runId)
-  const nodeTask=tasks.find(t=>t.mode==='node_batch')!,lineTask=tasks.find(t=>t.mode==='event_group')!
-  const nodeCalls=await service.narrativeCalls('a',state!.runId,nodeTask.id)
-  const lineCalls=await service.narrativeCalls('a',state!.runId,lineTask.id)
-  const structureTask = tasks.find(t => t.mode === 'event_review' && t.part === 'structure')!
-  const structureCalls = await service.narrativeCalls('a',state!.runId,structureTask.id)
-  expect(structureCalls.requests).toHaveLength(1)
-  const structureRequest = structureCalls.requests[0]
-  const structureBody = structureCalls.paging ? (await structureCalls.paging.loadRequest(structureRequest)).request : structureRequest
-  expect(structureBody.toolCalls).toMatchObject([{ name:'confirm', state:'succeeded' }])
-  expect(nodeCalls.requests).toHaveLength(4)
-  const firstRequest = nodeCalls.requests[0]
-  const recorded = nodeCalls.paging ? (await nodeCalls.paging.loadRequest(firstRequest)).request : firstRequest
-  expect(recorded).toMatchObject({ thinking: '先按本段原文核实成员。' })
-  expect(lineCalls.requests).toHaveLength(2)
-  expect(lineCalls.requests.some(l=>nodeCalls.requests.some(n=>n.requestId===l.requestId))).toBe(false)
-  expect((await service.narrativeCalls('a',state!.runId,'missing-task')).requests).toHaveLength(0)
-  const tables=emptyTables()
-  for (const table of tableNames) tables[table]=await db.table(table).toArray()
-  for (const receipt of tables.extractionReceipts) Object.assign(receipt,{inputFingerprint:'fixture',committedAt:new Date().toISOString(),runId:'p1-fixture'})
-  const backup=await encodeBackup({book:(await workspace.settings.books.get('a'))!,tables})
-  const inspected=await inspectBackup(backup.bytes)
-  expect(inspected.ok,JSON.stringify(inspected.errors)).toBe(true)
-  expect(inspected.manifest?.formatVersion).toBe(14)
-  const copy=await restoredTables(inspected.data!,'copy')
-  expect(copy.pipelineRuns.some(r=>r.recordType==='narrative_receipt' && r.bookId==='copy')).toBe(true)
-}, 60000)
-it('疑点段只发疑点表，节点归属复查同时发送目录，确认后切换材料', async () => {
-  let batchStep = 0
-  const seen: string[] = []
-  const { service } = await setup(2, async (_url, init) => {
-    const body = bodyOf(init)
-    const material = body.messages.filter((row: Row) => row.role === 'user')
-      .map((row: Row) => messageText(row.content)).find((content: string) => narrativeMaterial(content))
-    const raw = JSON.parse(material)
-    const task = narrativeMaterial(material)
-    if (task.mode === 'node_batch') {
-      if (batchStep++ === 0)
-        return agentStream([{ name: 'edit_events', args: {
-          operations: [{ op: 'create_event', ref: 'scene', title: '交信', nodeIds: ['N001'] }],
-        } }])
-      if (batchStep === 2)
-        return agentStream([{ name: 'manage_doubts', args: {
-          action: 'create', category: 'NODE_ASSIGNMENT', statement: '后一节点的场景仍需核实', nodeIds: ['N002'],
-        } }])
-      return agentStream([{ name: 'confirm', args: {} }])
-    }
-    if (task.part === 'doubts') {
-      seen.push(task.mode + '/doubts')
-      expect(Object.keys(raw)).toEqual(['任务说明', '本段待复核疑点表'])
-      expect(raw.本段待复核疑点表[0]).toMatchObject({ nodeIds: ['N002'], status: 'active' })
-      return agentStream([{ name: 'confirm', args: {} }])
-    }
-    if (task.mode === 'event_review' && task.part === 'unassigned') {
-      seen.push('event_review/unassigned')
-      expect(Object.keys(raw)).toEqual(['任务说明', '事件与可见节点目录', '本段未归属节点和单节点事件'])
-      expect(raw.本段未归属节点和单节点事件).toMatchObject([{ id: 'N001', 入选原因: '所在事件仅含此节点' }, { id: 'N002', name: '信件事件2', 入选原因: '未归属' }])
-      return agentStream([{ name: 'confirm', args: {} }])
-    }
-    return narrativeResponse(body, [])
   })
+  const nodes = await db.table('nodes').toArray()
+  await db.table('nodes').bulkPut(nodes.map(node => ({...node, clues:['密信']})))
   await service.narrative.start('a')
-  expect((await service.narrative.read('a'))?.status, service.narrative.message('a')).toBe('completed')
-  expect(seen).toEqual(['event_review/doubts','event_review/unassigned','line_review/doubts'])
-}, 60000)
-
-it('输出截断时仍执行完整工具，只重发半截调用', async () => {
-  let attempts = 0
-  let maxOutput = 0, retryInput = '', afterFirstEdit: Row[] = []
-  const inputs: string[] = []
-  const {db, service, models} = await setup(2, async (_url, init) => {
-    const body = bodyOf(init)
-    const task = body.messages.map((row:Row) => narrativeMaterial(messageText(row.content))).find(Boolean)
-    if (task.mode === 'node_batch' && attempts++ === 0) {
-      maxOutput = body.max_tokens
-      const first = JSON.stringify({operations:[{op:'create_event',ref:'已接收',title:'交信',nodeIds:['N001']}]})
-      const messages = [
-        {delta:{role:'assistant', tool_calls:[
-          {index:0,id:'complete',type:'function',function:{name:'edit_events',arguments:first}},
-          {index:1,id:'incomplete',type:'function',function:{name:'edit_events',arguments:'{"operations":[{"op":"create_event"'}},
-        ]},finish_reason:null},
-        {delta:{},finish_reason:'length'},
-      ]
-      return new Response(messages.map(choice => `data: ${JSON.stringify({
-        id:'length-call',object:'chat.completion.chunk',model:'fixture',created:1,choices:[{index:0,...choice}],
-      })}\n\n`).join('')+'data: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}})
-    }
-    if (task.mode === 'node_batch' && attempts === 2) {
-      retryInput = JSON.stringify(body.messages)
-      afterFirstEdit = await db.table('storyEvents').toArray()
-      return agentStream([
-        {name:'edit_events',args:{operations:[{op:'create_event',ref:'scene2',title:'回信',nodeIds:['N002']}]}},
-        {name:'confirm',args:{}},
-      ])
-    }
-    // 两个事件用一次批量编辑归入同一故事线。
-    if (task.mode === 'event_group' && !body.messages.some((row:Row) => row.role === 'tool'))
-      return agentStream([{name:'edit_storylines',args:{operations:[
-        {op:'create_line',ref:'line',title:'密信'},
-        ...task.targets.map((row:Row) => ({op:'attach_event',lineId:'$line',eventId:row.id})),
-      ]}}])
-    return narrativeResponse(body, inputs)
-  })
-  await models.settings.save({ ...defaultConfig, aggregationModel:'deepseek-flash', baseUrl:'https://reading-fixture.invalid/v1' }, 'fixture-only')
+  const paused = await service.narrative.read('a')
+  expect(paused?.status,service.narrative.message('a')).toBe('paused')
+  expect(paused?.error).toContain('待核实')
+  expect(await db.table('eventLines').count()).toBe(0)
+  const tasks = await service.narrativeTasks('a',paused!.runId)
+  expect(tasks.filter(t=>t.mode==='link_node').map(t=>t.ids)).toEqual([['N001'],['N002']])
+  expect(tasks[1].degraded).toContain('向量未完成，已使用本地关键词继续。')
+  expect(tasks[1].degraded).toContain('密钥')
   await service.narrative.start('a')
-  const state = (await service.narrative.read('a'))!
-  expect(maxOutput).toBeGreaterThan(8192)
-  expect(retryInput).toContain('只重新发送尚未完成的调用及完整参数')
-  expect(afterFirstEdit).toMatchObject([{ title:'交信',nodeIds:['N001'] }])
-  expect(state.status, service.narrative.message('a')).toBe('completed')
-  const task = (await service.narrativeTasks('a', state.runId)).find(t => t.mode === 'node_batch')!
-  const chain = await service.narrativeCalls('a',state.runId,task.id)
-  const request = chain.paging ? (await chain.paging.loadRequest(chain.requests[0])).request : chain.requests[0]
-  expect(request.toolCalls).toMatchObject([
-    { name:'edit_events', toolCallId:'complete', state:'succeeded' },
-    { name:'edit_events', toolCallId:'incomplete', state:'failed', isError:true },
-  ])
-  expect(JSON.stringify(request.toolCalls)).toContain('OUTPUT_TRUNCATED')
+  expect(await service.narrative.read('a')).toMatchObject({status:'paused',plan:{awaitingStorylines:true,complete:false}})
+  const events=await db.table('storyEvents').toArray()
+  expect(events).toMatchObject([{nodeIds:['N001','N002'],status:'进行中'}])
+  expect(await db.table('eventLines').count()).toBe(0)
+  const callsAtCheckpoint = inputs.length
+  await service.narrative.start('a')
+  expect(inputs).toHaveLength(callsAtCheckpoint)
+  expect(await service.narrative.read('a')).toMatchObject({runId:paused!.runId,status:'paused',plan:{awaitingStorylines:true}})
+  for (const r of await db.table('extractionReceipts').toArray())
+    await db.table('extractionReceipts').put({...r,inputFingerprint:'test',committedAt:new Date().toISOString(),runId:'p1-test'})
+  const importer=createImportService(workspace)
+  try {
+    const backups=createBackupService(workspace,importer)
+    const archive=await backups.exportBook('a')
+    const inspected=await inspectBackup(archive.bytes)
+    expect(inspected.ok,JSON.stringify(inspected.errors)).toBe(true)
+    const copy=await backups.createNarrativeCopy('a'), dest=workspace.openBook(copy.id)
+    expect(await dest.table('nodes').count()).toBe(2)
+    expect(await dest.table('storyEvents').count()).toBe(0)
+    expect(await dest.table('eventLines').count()).toBe(0)
+    expect(await db.table('storyEvents').get(events[0].id)).toEqual(events[0])
+  } finally { importer.close() }
 },60000)
+
+it.each([false,true])('继续第二个节点，来源变更 %s，等待向量落库并使用对应版本的输入',async(changed)=>{
+  let resume = false
+  let unblock!: () => void
+  let waiting!: () => void
+  const requestStarted = new Promise<void>(resolve=>{waiting=resolve})
+  const release = new Promise<void>(resolve=>{unblock=resolve})
+  const agentCalls:string[] = []
+  const {service,db,workspace} = await setup(2,async(url,init)=>{
+    const body = bodyOf(init)
+    if (String(url).endsWith('/embeddings')) {
+      if (resume) { waiting(); await release }
+      return Response.json({data:body.input.map((_:string,index:number)=>({index,embedding:[1,0]}))})
+    }
+    if (String(url).endsWith('/rerank')) return Response.json({results:body.documents.map((_:string,index:number)=>({index,relevance_score:1}))})
+    const task = body.messages.map((m:Row)=>narrativeMaterial(messageText(m.content))).find(Boolean)
+    if (['review_sequence','review_boundaries'].includes(task.mode)) return agentStream([{name:'confirm',args:{result:'completed'}}])
+    const id = task.targets[0].id
+    if (id==='N002' && resume && changed) {
+      expect(task.material.当前节点).toMatchObject({detail:'暂停后修订的经过',summary:'新的摘要'})
+      expect(task.material.候选事件.map((e:Row)=>e.event_id)).toEqual(['E'])
+    }
+    agentCalls.push(id)
+    if (id==='N002' && !resume) return new Response(null,{status:401})
+    return agentStream([{name:'confirm',args:{result:'completed',unassigned_reason:'场景过渡'}}])
+  })
+  await workspace.settings.table('credentials').put({providerId:'p3-siliconflow-retrieval',type:'api_key',key:'fixture'})
+  await service.narrative.start('a')
+  const paused = await service.narrative.read('a')
+  expect(paused).toMatchObject({status:'paused',plan:{active:{ids:['N002'],retrieval:{configVersion:expect.any(String)}},nodes:{N001:'completed'}}})
+  if (changed) {
+    await db.table('nodes').update('N002',{process:'暂停后修订的经过',summary:'新的摘要',revision:2})
+    await db.table('storyEvents').put({id:'E',bookId:'a',title:'暂停期间补录的事件',nodeIds:['N001'],clues:[],unresolved:'',revision:1})
+  }
+  await db.table('eventRetrievalVectors').clear()
+  resume=true
+  agentCalls.length=0
+  const run=service.narrative.start('a')
+  try {
+    await Promise.race([requestStarted,run.then(()=>{throw Error('恢复任务跳过向量准备')})])
+    expect(service.narrative.message('a')).toContain('正在计算向量 · 已就绪 0/' + (changed ? 2 : 1))
+    expect(agentCalls).toEqual([])
+    expect((await service.narrativeTasks('a',paused!.runId)).at(-1)?.status).toBe('running')
+  } finally {unblock();await run}
+  expect(agentCalls).toEqual(['N002'])
+  expect(await db.table('eventRetrievalVectors').count()).toBe(changed ? 2 : 1)
+  expect(await service.narrative.read('a')).toMatchObject({runId:paused!.runId,plan:{nodes:{N001:'completed',N002:'completed'}}})
+},15000)
+
+it('当前书独立复核从宏观到逐件，暂停恢复沿用编辑，主流程进度保留',async()=>{
+  const seen:string[]=[]
+  const reasoning:unknown[]=[]
+  let resumed=false
+  const {service,db,models}=await setup(2,async(_url,init)=>{
+    const body=bodyOf(init)
+    const task=body.messages.map((m:Row)=>narrativeMaterial(messageText(m.content))).find(Boolean)
+    expect(body.messages.filter((m:Row)=>m.role==='user' && narrativeMaterial(messageText(m.content)))).toHaveLength(1)
+    expect(Object.keys(task.material)[0]).toBe('资料说明')
+    seen.push(task.mode)
+    reasoning.push([body.thinking?.type,body.reasoning_effort])
+    const saved=body.messages.some((m:Row)=>m.role==='tool' && messageText(m.content).includes('updated'))
+    if (task.mode==='review_boundaries') {
+      expect(task.material.本组事件.map((e:Row)=>e.event_id).sort()).toEqual(['A','B'])
+      return agentStream([{name:'confirm',args:{result:'completed'}}])
+    }
+    const id=task.targets[0].id
+    if (id==='A' && !saved) return agentStream([{name:'edit_events',args:{changes:[{op:'update',event_id:id,
+      fields:{latest_progress:'暂停之前已保存'},reason:'模拟保存后中断'}]}}])
+    if (id==='A' && !resumed) return new Response(null,{status:401})
+    return agentStream([{name:'confirm',args:{result:'completed'}}])
+  })
+  await models.settings.save({...defaultConfig,aggregationModel:'deepseek-v4-pro'},'fixture-only')
+  await db.table('storyEvents').bulkPut(['A','B'].map(id=>({bookId:'a',id,title:'事件'+id,nodeIds:['N001','N002'],
+    summary:'传递密信',latestProgress:'送信',unresolved:'',status:'进行中',clues:['密信'],revision:1})))
+  const original=await db.table('compileProgress').get('P3')
+  await service.narrative.start('a',true)
+  expect(await service.narrative.read('a',true)).toMatchObject({status:'paused',plan:{active:{mode:'review_sequence',ids:['A']}}})
+  const checkpoint=await service.narrative.read('a',true)
+  const runs=db.table('pipelineRuns')
+  const run=await runs.get(checkpoint!.runId)
+  const active=run.narrative.active
+  const material=JSON.parse(active.prompt)
+  delete material.资料说明
+  const old={...active,prompt:JSON.stringify(material)}
+  await runs.put({...run,narrative:{...run.narrative,active:old}})
+  await runs.update(active.id,{taskInputVersion:1,snapshot:old})
+  resumed=true
+  await service.narrative.start('a',true)
+  expect(await service.narrative.read('a',true)).toMatchObject({status:'completed',stats:{microDone:2,macroDone:1}})
+  expect(await db.table('compileProgress').get('P3')).toEqual(original)
+  expect((await db.table('pipelineRuns').toArray()).filter(r=>r.name==='edit_events')).toHaveLength(1)
+  expect(seen[0]).toBe('review_boundaries')
+  expect(seen).toContain('review_sequence')
+  expect(reasoning).toEqual(seen.map(()=>['enabled','high']))
+},30000)
+
+it.each([false,true])('取消本书 P3 后复核从首组重开（取消时正在执行 %s）',async inFlight=>{
+  const modes:string[]=[]
+  let reached!:()=>void
+  const atMicro=new Promise<void>(resolve=>{reached=resolve})
+  let restarting=false
+  let firstRequest: {names: string[]; containsToolResult:boolean} | undefined
+  const {service,db}=await setup(2, async (_url,init)=>{
+    const {messages}=bodyOf(init)
+    const task=messages.map((m:Row)=>narrativeMaterial(messageText(m.content))).find(Boolean)
+    modes.push(task.mode)
+    if (restarting) {
+      firstRequest={names:task.material.本组事件?.map((e:Row)=>String(e.name)) ?? [],
+        containsToolResult:messages.some((m:Row)=>m.role==='tool')}
+      return new Response(null,{status:401})
+    }
+    if (task.mode==='review_boundaries') return agentStream([{name:'confirm',args:{result:'completed'}}])
+    reached()
+    if (!inFlight) return new Response(null,{status:401})
+    return new Promise<Response>((_,reject)=>init!.signal!.addEventListener('abort',()=>reject(Error('取消')),{once:true}))
+  })
+  const runs=db.table('pipelineRuns')
+  await runs.put({bookId:'a',id:'main',recordType:'run',status:'paused',stage:'P3'})
+  await db.table('compileProgress').put({bookId:'a',stage:'P3',planKey:'narrative-events-v1',runId:'main',status:'paused'})
+  await db.table('storyEvents').bulkPut(['A','B'].map(id=>({bookId:'a',id,title:id,nodeIds:['N001','N002'],
+    summary:'传递密信',latestProgress:'送信',unresolved:'',status:'进行中',clues:['密信'],revision:1})))
+  const started=service.narrative.start('a',true)
+  await Promise.race([atMicro,started.then(()=>{if (!modes.includes('review_sequence')) throw Error('未进入逐件复核')})])
+  if (!inFlight) await started
+  const previous=(await service.narrative.read('a',true))!
+  expect(previous.stats.macroDone).toBe(1)
+  await service.narrative.stop('a',true)
+  await started
+  expect(await db.table('compileProgress').get('P3')).toMatchObject({status:'cancelled'})
+  expect(await runs.get('main')).toMatchObject({status:'cancelled'})
+  const oldRun=await runs.get(previous.runId)
+  expect(oldRun.status).toBe('cancelled')
+  expect(modes).toEqual(['review_boundaries','review_sequence'])
+  await db.table('storyEvents').update('A',{title:'更新后的事件名称',revision:2})
+  restarting=true
+  await service.narrative.start('a',true)
+  const fresh=(await service.narrative.read('a',true))!
+  expect(modes.at(-1)).toBe('review_boundaries')
+  expect(firstRequest?.names).toContain('更新后的事件名称')
+  expect(firstRequest?.containsToolResult).toBe(false)
+  expect(fresh.stats.macroDone).toBe(0)
+  expect(fresh.runId).not.toBe(previous.runId)
+  const newRun=await runs.get(fresh.runId)
+  expect(newRun.sessionId).not.toBe(oldRun.sessionId)
+  expect(newRun.tasks).toHaveLength(1)
+  expect((await runs.get(previous.runId)).tasks).toEqual(oldRun.tasks)
+},15000)
+
+it('宏观组超过保留轮数及恢复后仍发送已读详情，下一任务不带入', async () => {
+  const evidence = '黄泰先前已托儿子求援'
+  let round = 0
+  let resumed = false
+  const {service,db} = await setup(2,async (_url,init) => {
+    const {messages} = bodyOf(init)
+    const task = messages.map((m:Row)=>narrativeMaterial(messageText(m.content))).find(Boolean)
+    const replies = messages.filter((m:Row)=>m.role==='tool').map((m:Row)=>messageText(m.content))
+    if (task.mode==='review_sequence') {
+      expect(replies.join('')).not.toContain(evidence)
+      return agentStream([{name:'confirm',args:{result:'completed'}}])
+    }
+    round++
+    if (round===1) return agentStream([
+      {name:'get_nodes',args:{node_ids:['N001']}},
+      {name:'get_event',args:{event_id:'A'}},
+    ])
+    if (round<=3) return agentStream([{name:'search_events',args:{groups:[['密信']]}}])
+    expect(replies.some((s:string)=>s.includes(evidence))).toBe(true)
+    expect(replies.some((s:string)=>s.includes('"members"') && s.includes('N002'))).toBe(true)
+    if (!resumed) return new Response(null,{status:401})
+    return agentStream([{name:'confirm',args:{result:'completed'}}])
+  })
+  await db.table('nodes').update('N001',{process:evidence})
+  await db.table('storyEvents').bulkPut(['A','B'].map(id=>({bookId:'a',id,title:'事件'+id,nodeIds:['N001','N002'],
+    summary:'传递密信',latestProgress:'送信',unresolved:'',status:'进行中',clues:['密信'],revision:1})))
+  await service.narrative.start('a',true)
+  const paused=await service.narrative.read('a',true)
+  expect(paused?.status).toBe('paused')
+  expect(round).toBe(4)
+  // 旧版本已为第一轮存过占位。恢复时仍以该任务的原始消息为据。
+  await db.table('pipelineRuns').update(paused!.plan.active!.id,{placeholders:{'1':'[第 1 轮] get_nodes 执行成功，返回正文已省略'}})
+  resumed=true
+  await service.narrative.start('a',true)
+  expect(await service.narrative.read('a',true)).toMatchObject({status:'completed',stats:{microDone:2,macroDone:1}})
+  expect(round).toBe(5)
+},30000)
+
+it('继续旧未归属节点页时保留历史并直接主审存续事件',async()=>{
+  let resume=false
+  const requests:string[]=[]
+  const {service,db}=await setup(2,async(_url,init)=>{
+    if(!resume) return new Response(null,{status:401})
+    const task=bodyOf(init).messages.map((m:Row)=>narrativeMaterial(messageText(m.content))).find(Boolean)
+    requests.push(task.mode)
+    return agentStream([{name:'confirm',args:{result:'completed'}}])
+  })
+  await db.table('storyEvents').put({id:'E',bookId:'a',title:'已存事件',nodeIds:['N001'],revision:1})
+  await service.narrative.start('a',true)
+  const checkpoint=(await service.narrative.read('a',true))!
+  const runs=db.table('pipelineRuns'), run=await runs.get(checkpoint.runId)
+  const old={...run.narrative.active,mode:'review_boundaries',part:'unassigned',ids:[],orphanIds:['N002'],prompt:'旧页资料'}
+  const snapshot=await runs.get(old.id)
+  await runs.put({...snapshot,snapshot:old,systemPrompt:'旧页规则'})
+  await runs.put({...run,narrative:{...run.narrative,active:old,twoStep:{...run.narrative.twoStep,phase:'macro',
+    pausedGroup:{ids:[],orphanIds:['N002']},macroIssue:[{issue:'旧页疑点'}]}},
+    tasks:run.tasks.map((t:Row)=>({...t,input:old}))})
+  resume=true
+  await service.narrative.start('a',true)
+  expect(requests).toEqual(['review_sequence'])
+  expect(await runs.get(old.id)).toMatchObject({status:'cancelled',systemPrompt:'旧页规则'})
+  expect(await db.table('storyEvents').get('E')).toMatchObject({revision:1,nodeIds:['N001']})
+  expect(await service.narrative.read('a',true)).toMatchObject({status:'completed',stats:{microDone:1,macroDone:0}})
+})
+
+it('向量准备中暂停或取消，活动节点详情随主运行更新',async()=>{
+  let started!:()=>void
+  const calculating=new Promise<void>(resolve=>{started=resolve})
+  const {service,workspace}=await setup(1,async(url,init)=>{
+    if (!String(url).endsWith('/embeddings')) throw Error('准备中不应调用 Agent')
+    started()
+    return new Promise<Response>((_,reject)=>init!.signal!.addEventListener('abort',()=>reject(Error('已暂停')),{once:true}))
+  })
+  await workspace.settings.table('credentials').put({providerId:'p3-siliconflow-retrieval',type:'api_key',key:'fixture'})
+  const running=service.narrative.start('a')
+  await Promise.race([calculating,running.then(()=>{throw Error('未进入向量准备')})])
+  await service.narrative.stop('a')
+  await running
+  const paused=await service.narrative.read('a')
+  expect(paused?.status).toBe('paused')
+  expect((await service.narrativeTasks('a',paused!.runId))[0]).toMatchObject({ids:['N001'],status:'paused'})
+  await service.narrative.stop('a',true)
+  expect((await service.narrativeTasks('a',paused!.runId))[0].status).toBe('cancelled')
+},15000)
 
 it('文字总结及经过五分钟均留在原任务，只有 confirm 切换任务',async()=>{
   let time=1_000_000,calls=0
@@ -227,112 +354,14 @@ it('文字总结及经过五分钟均留在原任务，只有 confirm 切换任�
     if(++calls===1){time+=6*60_000;return agentTextStream('已经整理完成。')}
     if(calls===2){
       const state=await service.narrative.read('a')
-      expect(state?.plan).toMatchObject({batches:{event:0,line:0},active:{mode:'node_batch'}})
+      expect(state?.plan).toMatchObject({batches:{event:0,line:0},active:{mode:'link_node'}})
       expect(JSON.stringify(body.messages)).toContain('当前任务尚未确认')
     }
     return narrativeResponse(body,inputs)
   },()=>time)
   await service.narrative.start('a')
-  expect((await service.narrative.read('a'))?.status,service.narrative.message('a')).toBe('completed')
+  expect(await service.narrative.read('a')).toMatchObject({status:'paused',plan:{awaitingStorylines:true}})
 },30000)
-it('格式13副本首次启动沿用事件和故事线，旧直连节点回到待分配',async()=>{
-  let request=''
-  const {workspace,db,service}=await setup(2,async(_url,init)=>{request=init?.body as string;return new Response('本地检查首批',{status:401})})
-  for(const row of await db.table('extractionReceipts').toArray()) await db.table('extractionReceipts').put({...row,inputFingerprint:'fixture',committedAt:new Date().toISOString(),runId:'p1-fixture'})
-  await db.table('storyEvents').put({id:'E005',bookId:'a',title:'村口交信',nodeIds:['N001'],summary:'',coreClue:'',revision:1})
-  const base={bookId:'a',title:'送信',cause:'',process:'',result:'',lineStatus:'open',createdBy:'P3',revision:1,updatedAt:new Date().toISOString()}
-  await db.table('eventLines').bulkPut([{...base,id:'S001',nodeIds:['N001'],eventIds:['E005'],chapters:['1']},{...base,id:'OLD',nodeIds:['N002'],chapters:['2']}])
-  await db.table('nodes').update('N001',{eventLineIds:['S001']})
-  await db.table('nodes').update('N002',{eventLineIds:['OLD']})
-  const importer=createImportService(workspace),backups=createBackupService(workspace,importer)
-  try{
-    const {bytes}=await backups.exportBook('a')
-    expect((await inspectBackup(bytes)).manifest?.formatVersion).toBe(13)
-    const copy=await backups.importBackup(bytes)
-    await service.narrative.start(copy.id)
-    expect(request).toContain('E005')
-    const first=await service.narrative.read(copy.id),dbCopy=workspace.openBook(copy.id)
-    expect(first?.plan).toMatchObject({batches:{event:0,line:0},active:{mode:'node_batch',ids:['N002']}})
-    expect(await dbCopy.table('eventLines').get('S001')).toMatchObject({eventIds:['E005'],nodeIds:['N001']})
-    expect(await dbCopy.table('eventLines').get('OLD')).toMatchObject({eventIds:[],nodeIds:[]})
-    expect((await dbCopy.table('nodes').get('N002')).eventLineIds).toEqual([])
-    expect((await db.table('nodes').get('N002')).eventLineIds).toEqual(['OLD'])
-  }finally{importer.close()}
-})
-it('取消后再开 P3，已写入的事件直接进复核，两阶段保留原关系', async () => {
-  let paused = false
-  const inputs: string[] = []
-  const {db, service} = await setup(2, async (_url, init) => {
-    const body = bodyOf(init)
-    if (!paused && body.messages.some((m: Row) => m.role === 'tool')) {
-      paused = true
-      return new Response('本地中断', {status:401})
-    }
-    return narrativeResponse(body, inputs)
-  })
-  await service.narrative.start('a')
-  const old = (await service.narrative.read('a'))!
-  const saved = (await db.table('storyEvents').toArray())[0]
-  expect(old.status).toBe('paused')
-  await service.narrative.stop('a', true)
-  expect((await service.narrative.read('a'))?.status).toBe('cancelled')
-  inputs.length = 0
-  await service.narrative.start('a')
-  const reopened = (await service.narrative.read('a'))!
-  expect(reopened.status, service.narrative.message('a')).toBe('completed')
-  expect(reopened.runId).not.toBe(old.runId)
-  expect(reopened.plan.batches).toEqual({event:0,line:1})
-  expect(inputs[0]).toBe('event_review/structure')
-  expect(inputs).not.toContain('node_batch/batch')
-  expect(await db.table('storyEvents').get(saved.id)).toMatchObject({nodeIds:saved.nodeIds})
-  expect(await db.table('storyEvents').count()).toBe(1)
-},60000)
-it.each(['node_batch','event_review','line_review'])('V4 在 %s 中断后导出副本，恢复原任务且不重复写入',async mode=>{
-  let interrupted=false
-  const inputs:string[]=[]
-  const {workspace,db,service}=await setup(2,async(_url,init)=>{
-    const body=bodyOf(init)
-    const task=body.messages.map((m:Row)=>narrativeMaterial(messageText(m.content))).find(Boolean)
-    const pauseHere = mode === 'line_review' ? task.part === 'unassigned' : mode === 'event_review' || body.messages.some((m:Row)=>m.role==='tool')
-    if(!interrupted && task.mode===mode && pauseHere){
-      interrupted=true
-      return new Response('测试中断',{status:401})
-    }
-    return narrativeResponse(body,inputs)
-  })
-  for(const row of await db.table('extractionReceipts').toArray()) await db.table('extractionReceipts').put({...row,inputFingerprint:'fixture',committedAt:new Date().toISOString(),runId:'p1-fixture'})
-  await service.narrative.start('a')
-  const before=await service.narrative.read('a')
-  expect(before?.status).toBe('paused')
-  expect(await db.table('storyEvents').count()).toBe(1)
-  const savedTask = await db.table('pipelineRuns').get(before!.plan.active!.id)
-  const schemas = savedTask.toolSchemas as Row
-  const edit = (mode === 'line_review' ? schemas.edit_storylines : schemas.edit_events) as { properties: { operations: { items: { oneOf: { properties: Row }[] } } } }
-  for (const op of edit.properties.operations.items.oneOf) {
-    delete op.properties.summary
-    delete op.properties.coreClue
-  }
-  savedTask.taskInputVersion = mode === 'line_review' ? 6 : 2
-  await db.table('pipelineRuns').put({ ...savedTask, systemPrompt: '旧任务提示词', toolSchemas: schemas })
-  const importer=createImportService(workspace),backups=createBackupService(workspace,importer)
-  try{
-    const backup=await backups.exportBook('a')
-    const copy=await backups.importBackup(backup.bytes)
-    const resumed=await service.narrative.read(copy.id)
-    expect(resumed?.plan.active?.id).toBe(before?.plan.active?.id)
-    await service.narrative.start(copy.id)
-    expect((await service.narrative.read(copy.id))?.status,service.narrative.message(copy.id)).toBe('completed')
-    const copyDb = workspace.openBook(copy.id)
-    expect(await copyDb.table('storyEvents').count()).toBe(1)
-    const updatedTask = await copyDb.table('pipelineRuns').get(resumed!.plan.active!.id)
-    expect(updatedTask.systemPrompt).toContain(mode === 'node_batch' ? '创建或更新事件可分别写 summary' : mode === 'line_review' ? '单事件故事线的成员' : '先扫本段结构核对表')
-    expect(updatedTask.taskInputVersion).toBe(mode === 'line_review' ? 7 : 6)
-    expect(updatedTask.contextStartOrdinal).toBeGreaterThan(0)
-    expect(updatedTask.snapshot.prompt).toContain(mode === 'node_batch' ? '本批节点资料' : mode === 'line_review' ? '本段未归线事件和单事件故事线' : '本段查证材料')
-    expect(JSON.stringify(updatedTask.toolSchemas)).toContain('"summary"')
-    expect((await service.narrative.read('a'))?.status).toBe('paused')
-  }finally{importer.close()}
-},60000)
 const reading = async (service: ReturnType<typeof createStoryService>) => (await service.read('a')).reading
 const messageText = (value: unknown) => typeof value === 'string' ? value : Array.isArray(value) ? value.map(part => typeof part?.text === 'string' ? part.text : '').join('') : ''
 function thinkingLengthStream(thinking: string, content?: string) {
@@ -538,7 +567,7 @@ it('同一会话由AI翻过三页，多次保存持续续接原事件', async ()
   const tables = emptyTables()
   for (const name of tableNames) if (name !== 'extractionReceipts') tables[name] = await db.table(name).toArray()
   const backup = await encodeBackup({ book, tables })
-  expect(backup.manifest.formatVersion).toBe(13)
+  expect(backup.manifest.formatVersion).toBe(15)
   const inspected = await inspectBackup(backup.bytes)
   expect(inspected.ok).toBe(true)
   const restored = await restoredTables(inspected.data!, 'copy')

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="950" viewBox="0 0 1040 950" role="img" aria-labelledby="title desc" lang="zh-CN">
+  <title id="title">从选择资产包到回合结算、申诉与末轮改写</title>
+  <desc id="desc">新开档和继续已有档都到单列聊天。导演决定本轮动作、回应和收束处，程序核对后交写手写成小说，正文和本轮变化保存成功后解锁。拒绝可申诉一次。改写失败可沿原版继续。刷新后按存档恢复。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.2" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#766959"/></marker>
+  </defs>
+  <style>
+    text { font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #302e30 }
+    .title { font-size: 27px; font-weight: 650 } .section { font-size: 19px; font-weight: 650 }
+    .main { font-size: 17px; font-weight: 600 } .note { fill: #57535a; font-size: 14px }
+    .tag { fill: #695739; font-size: 13px }
+    .panel { fill: #fcfbf9; stroke: #d7d1c7 }
+    .box { fill: #f4f1ec; stroke: #bdb5aa } .accent { fill: #efe4d4; stroke: #b39b79 }
+    .edge { fill: none; stroke: #766959; stroke-width: 1.8; marker-end: url(#arrow) }
+  </style>
+  <rect width="1040" height="950" rx="12" fill="#f5f2ed"/>
+  <text x="38" y="50" class="title">从资产包进入游戏，一轮行动如何生效</text>
+  <rect x="24" y="75" width="992" height="220" rx="12" class="panel"/>
+  <text x="49" y="113" class="section">进入存档</text>
+  <rect x="53" y="166" width="157" height="58" rx="8" class="box"/>
+  <text x="131" y="202" text-anchor="middle" class="main">选择资产包</text>
+  <path d="M210 195 H249 V153 H291" class="edge"/>
+  <path d="M249 195 V240 H291" class="edge"/>
+  <rect x="294" y="124" width="348" height="58" rx="8" class="box"/>
+  <text x="467" y="149" text-anchor="middle" class="main">新建存档</text>
+  <text x="467" y="170" text-anchor="middle" class="note">核对起点，点击「开始」</text>
+  <rect x="294" y="211" width="348" height="58" rx="8" class="box"/>
+  <text x="467" y="236" text-anchor="middle" class="main">选择已有存档</text>
+  <text x="467" y="257" text-anchor="middle" class="note">点击「继续」，恢复历史</text>
+  <path d="M642 153 H695 V195 H747" class="edge"/>
+  <path d="M642 240 H695 V195" fill="none" stroke="#766959" stroke-width="1.8"/>
+  <rect x="750" y="161" width="235" height="68" rx="8" class="accent"/>
+  <text x="867" y="189" text-anchor="middle" class="main">聊天窗口</text>
+  <text x="867" y="214" text-anchor="middle" class="note">新局等待开场，已有局接着玩</text>
+
+  <rect x="24" y="311" width="992" height="341" rx="12" class="panel"/>
+  <text x="49" y="349" class="section">发送行动与申诉</text>
+  <rect x="53" y="397" width="154" height="68" rx="8" class="box"/>
+  <text x="130" y="426" text-anchor="middle" class="main">发送行动</text>
+  <text x="130" y="450" text-anchor="middle" class="note">本轮处理时暂停发送</text>
+  <path d="M207 431 H253" class="edge"/>
+  <rect x="256" y="397" width="152" height="68" rx="8" class="box"/>
+  <text x="332" y="437" text-anchor="middle" class="main">导演审核、裁定</text>
+  <path d="M408 431 H469" class="edge"/>
+  <text x="438" y="420" text-anchor="middle" class="tag">通过</text>
+  <rect x="472" y="388" width="288" height="86" rx="8" class="box"/>
+  <text x="616" y="414" text-anchor="middle" class="main">写手生成正文</text>
+  <text x="616" y="438" text-anchor="middle" class="note">按核准的动作、回应和收束处写成小说</text>
+  <text x="616" y="458" text-anchor="middle" class="note">写完待保存时显示「待结算」</text>
+  <path d="M760 431 H820" class="edge"/>
+  <text x="790" y="420" text-anchor="middle" class="tag">提交</text>
+  <rect x="823" y="397" width="162" height="68" rx="8" class="accent"/>
+  <text x="904" y="426" text-anchor="middle" class="main">本轮已结算</text>
+  <text x="904" y="450" text-anchor="middle" class="note">可发下一次行动</text>
+  <path d="M332 465 V510" class="edge"/>
+  <text x="346" y="495" class="tag">驳回</text>
+  <rect x="218" y="514" width="228" height="70" rx="8" class="box"/>
+  <text x="332" y="543" text-anchor="middle" class="main">该条行动已撤回</text>
+  <text x="332" y="568" text-anchor="middle" class="note">看理由，另发行动或申诉</text>
+  <path d="M446 549 H491" class="edge"/>
+  <rect x="494" y="514" width="266" height="70" rx="8" class="box"/>
+  <text x="627" y="543" text-anchor="middle" class="main">本条可补充说明一次</text>
+  <text x="627" y="568" text-anchor="middle" class="note">通过则生成回复，再驳回可另发</text>
+  <text x="53" y="624" class="note">取消或最终失败　撤下待结算正文，保留玩家输入，回到上次已结算进度。玩家可重试。</text>
+
+  <rect x="24" y="670" width="992" height="257" rx="12" class="panel"/>
+  <text x="49" y="709" class="section">改写最后一轮</text>
+  <rect x="53" y="756" width="194" height="66" rx="8" class="box"/>
+  <text x="150" y="785" text-anchor="middle" class="main">末条回复菜单</text>
+  <text x="150" y="809" text-anchor="middle" class="note">写下希望怎样改</text>
+  <path d="M247 789 H303" class="edge"/>
+  <rect x="306" y="756" width="245" height="66" rx="8" class="box"/>
+  <text x="428" y="785" text-anchor="middle" class="main">从该轮行动前重算</text>
+  <text x="428" y="809" text-anchor="middle" class="note">重算期间可读原回复</text>
+  <path d="M551 789 H590 V759 H630" class="edge"/>
+  <path d="M590 789 V822 H630" class="edge"/>
+  <rect x="633" y="736" width="352" height="46" rx="7" class="accent"/>
+  <text x="809" y="765" text-anchor="middle" class="main">成功　新正文与本局变化一起替换</text>
+  <rect x="633" y="799" width="352" height="46" rx="7" class="box"/>
+  <text x="809" y="828" text-anchor="middle" class="main">驳回、取消或失败　沿原结果继续</text>
+  <path d="M50 865 H988" stroke="#d8d1c7"/>
+  <text x="53" y="899" class="note">刷新或返回　重开存档可接着上次结算的剧情继续。若上次生成中断，可点重试。</text>
+</svg>

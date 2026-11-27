@@ -66,8 +66,8 @@ for (const name of ['project-local', 'project-full']) {
   check(name === 'project-full' ? tasks.requires.includes('design') : !ids.has('design'), `${name} 与需求分级不符`)
   const proposalTemplate = read(`openspec/schemas/${name}/templates/proposal.md`)
   const detailTemplate = name === 'project-full' ? read(`openspec/schemas/${name}/templates/design.md`) : proposalTemplate
-  for (const title of ['讨论结论', '接手说明']) check(proposalTemplate.includes(`## ${title}`), `${name} 提案模板缺少${title}`)
-  for (const title of ['字段变化', '数据流转', '触发逻辑']) check(detailTemplate.includes(`## ${title}`), `${name} 模板缺少${title}`)
+  for (const title of ['讨论结论', '接手说明', '术语入口', 'gstack 工程方案审查']) check(proposalTemplate.includes(`## ${title}`), `${name} 提案模板缺少${title}`)
+  for (const title of ['字段变化', '数据流转', '触发逻辑', 'Agent 方案材料']) check(detailTemplate.includes(`## ${title}`), `${name} 模板缺少${title}`)
 }
 
 // 需求池只维护索引与整体状态，实施细节继续在对应变更中检查。

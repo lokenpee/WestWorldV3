@@ -153,39 +153,11 @@
               "type": "string",
               "minLength": 1
             }
-          },
-          "retained_unassigned_nodes": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "node_id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "note": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              },
-              "required": [
-                "node_id",
-                "note"
-              ]
-            }
           }
         },
         "required": []
       }
     },
-    "eventOps": [
-      "create_event",
-      "update_event",
-      "delete_event",
-      "attach_nodes",
-      "detach_nodes"
-    ],
     "lineOps": [
       "create_line",
       "update_line",
@@ -675,8 +647,7 @@
                             },
                             "quote": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 1000
+                              "minLength": 1
                             },
                             "memberIds": {
                               "type": "array",
@@ -752,8 +723,7 @@
                                   },
                                   "quote": {
                                     "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 1000
+                                    "minLength": 1
                                   }
                                 },
                                 "required": [
@@ -1383,19 +1353,7 @@
                     "type": "string"
                   }
                 },
-                "targets": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
                 "actorIds": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "targetCharacterIds": {
                   "type": "array",
                   "items": {
                     "type": "string"
@@ -1414,12 +1372,6 @@
                   }
                 },
                 "new_facts": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "started_actions": {
                   "type": "array",
                   "items": {
                     "type": "string"
@@ -1626,20 +1578,14 @@
                     "type": "string"
                   }
                 },
-                "cause": {
-                  "type": "string"
-                },
-                "process": {
-                  "type": "string"
-                },
-                "result": {
-                  "type": "string"
-                },
                 "lineStatus": {
                   "enum": [
                     "open",
                     "closed"
                   ]
+                },
+                "summary": {
+                  "type": "string"
                 }
               }
             },
@@ -4062,7 +4008,6 @@
                   "type": "integer"
                 },
                 "workingSummary": {
-                  "maxLength": 2000,
                   "type": "string"
                 },
                 "dataFingerprint": {
@@ -4104,7 +4049,6 @@
                   },
                   "key": {
                     "minLength": 1,
-                    "maxLength": 120,
                     "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                     "type": "string"
                   },
@@ -4134,7 +4078,6 @@
                   },
                   "statement": {
                     "minLength": 1,
-                    "maxLength": 1000,
                     "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                     "type": "string"
                   },
@@ -4142,7 +4085,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -4150,7 +4092,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -4234,7 +4175,6 @@
               "type": "string"
             },
             "key": {
-              "maxLength": 120,
               "type": "string"
             },
             "status": {
@@ -4308,7 +4248,6 @@
                 "properties": {
                   "key": {
                     "minLength": 1,
-                    "maxLength": 120,
                     "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                     "type": "string"
                   },
@@ -4338,7 +4277,6 @@
                   },
                   "statement": {
                     "minLength": 1,
-                    "maxLength": 1000,
                     "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                     "type": "string"
                   },
@@ -4346,7 +4284,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -4354,7 +4291,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -4376,7 +4312,6 @@
                         },
                         "quote": {
                           "minLength": 1,
-                          "maxLength": 1000,
                           "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                           "type": "string"
                         }
@@ -4599,7 +4534,6 @@
                 "properties": {
                   "key": {
                     "minLength": 1,
-                    "maxLength": 120,
                     "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                     "type": "string"
                   },
@@ -4629,7 +4563,6 @@
                   },
                   "statement": {
                     "minLength": 1,
-                    "maxLength": 1000,
                     "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                     "type": "string"
                   },
@@ -4637,7 +4570,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -4645,7 +4577,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -4667,7 +4598,6 @@
                         },
                         "quote": {
                           "minLength": 1,
-                          "maxLength": 1000,
                           "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                           "type": "string"
                         }
@@ -4930,9 +4860,6 @@
                           "op",
                           "line_id",
                           "node_ids",
-                          "cause",
-                          "process",
-                          "result",
                           "line_status",
                           "confidence",
                           "reason",
@@ -4955,18 +4882,6 @@
                               "type": "string"
                             }
                           },
-                          "cause": {
-                            "description": "补充后的起因",
-                            "type": "string"
-                          },
-                          "process": {
-                            "description": "补充后的经过",
-                            "type": "string"
-                          },
-                          "result": {
-                            "description": "补充后的结果",
-                            "type": "string"
-                          },
                           "line_status": {
                             "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
                             "anyOf": [
@@ -4994,6 +4909,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       },
@@ -5004,9 +4922,6 @@
                           "op",
                           "title",
                           "node_ids",
-                          "cause",
-                          "process",
-                          "result",
                           "line_status",
                           "confidence",
                           "reason",
@@ -5029,18 +4944,6 @@
                               "type": "string"
                             }
                           },
-                          "cause": {
-                            "description": "起因",
-                            "type": "string"
-                          },
-                          "process": {
-                            "description": "经过",
-                            "type": "string"
-                          },
-                          "result": {
-                            "description": "结果",
-                            "type": "string"
-                          },
                           "line_status": {
                             "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
                             "anyOf": [
@@ -5068,6 +4971,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       },
@@ -5078,9 +4984,6 @@
                           "op",
                           "line_id",
                           "node_ids",
-                          "cause",
-                          "process",
-                          "result",
                           "line_status",
                           "confidence",
                           "reason",
@@ -5101,15 +5004,6 @@
                               "type": "string"
                             }
                           },
-                          "cause": {
-                            "type": "string"
-                          },
-                          "process": {
-                            "type": "string"
-                          },
-                          "result": {
-                            "type": "string"
-                          },
                           "line_status": {
                             "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
                             "anyOf": [
@@ -5137,6 +5031,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       },
@@ -5148,9 +5045,6 @@
                           "keep_line_id",
                           "merge_line_ids",
                           "node_ids",
-                          "cause",
-                          "process",
-                          "result",
                           "line_status",
                           "confidence",
                           "reason",
@@ -5178,15 +5072,6 @@
                               "type": "string"
                             }
                           },
-                          "cause": {
-                            "type": "string"
-                          },
-                          "process": {
-                            "type": "string"
-                          },
-                          "result": {
-                            "type": "string"
-                          },
                           "line_status": {
                             "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
                             "anyOf": [
@@ -5214,6 +5099,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       }
@@ -5255,13 +5143,6 @@
                           "type": "string"
                         }
                       },
-                      "targets": {
-                        "description": "对象 / 承受者。例：[\"王熙凤\"]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
                       "world_delta": {
                         "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
                         "type": "array",
@@ -5271,13 +5152,6 @@
                       },
                       "new_facts": {
                         "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "started_actions": {
-                        "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
                         "type": "array",
                         "items": {
                           "type": "string"
@@ -5320,7 +5194,6 @@
                   "properties": {
                     "workingSummary": {
                       "minLength": 1,
-                      "maxLength": 2000,
                       "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
                       "type": "string"
                     },
@@ -5343,7 +5216,6 @@
                         "properties": {
                           "key": {
                             "minLength": 1,
-                            "maxLength": 120,
                             "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                             "type": "string"
                           },
@@ -5373,7 +5245,6 @@
                           },
                           "statement": {
                             "minLength": 1,
-                            "maxLength": 1000,
                             "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                             "type": "string"
                           },
@@ -5381,7 +5252,6 @@
                             "maxItems": 20,
                             "type": "array",
                             "items": {
-                              "maxLength": 128,
                               "type": "string"
                             }
                           },
@@ -5389,7 +5259,6 @@
                             "maxItems": 20,
                             "type": "array",
                             "items": {
-                              "maxLength": 128,
                               "type": "string"
                             }
                           },
@@ -5411,7 +5280,6 @@
                                 },
                                 "quote": {
                                   "minLength": 1,
-                                  "maxLength": 1000,
                                   "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                                   "type": "string"
                                 }
@@ -5726,11 +5594,6 @@
               "minimum": 1,
               "maximum": 100
             },
-            "processSegment": {
-              "type": "integer",
-              "minimum": 1,
-              "description": "单独读取事件线经过的某一段；编号来自processSegments。"
-            },
             "fields": {
               "type": "array",
               "description": "节点必填。可同时选择名称、章节索引、概述、详细经过、人物、地点或线索。",
@@ -5970,18 +5833,6 @@
                         "type": "string",
                         "minLength": 1
                       },
-                      "cause": {
-                        "type": "string",
-                        "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                      },
-                      "process": {
-                        "type": "string",
-                        "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                      },
-                      "result": {
-                        "type": "string",
-                        "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                      },
                       "lineStatus": {
                         "enum": [
                           "open",
@@ -6007,41 +5858,14 @@
                         "type": "number",
                         "description": "可选的自评把握，不作为语义质量门槛。"
                       },
-                      "processAppend": {
-                        "type": "string",
-                        "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                      },
-                      "processEdits": {
-                        "type": "array",
-                        "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "segment": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "description": "processSegments中的段落编号。"
-                            },
-                            "text": {
-                              "type": "string",
-                              "description": "这一段修改后的内容。"
-                            }
-                          },
-                          "required": [
-                            "segment",
-                            "text"
-                          ],
-                          "additionalProperties": false
-                        }
+                      "summary": {
+                        "type": "string"
                       }
                     },
                     "required": [
                       "action",
                       "title",
                       "nodeIds",
-                      "cause",
-                      "process",
-                      "result",
                       "lineStatus"
                     ],
                     "additionalProperties": false
@@ -6070,18 +5894,6 @@
                         "type": "string",
                         "minLength": 1
                       },
-                      "cause": {
-                        "type": "string",
-                        "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                      },
-                      "process": {
-                        "type": "string",
-                        "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                      },
-                      "result": {
-                        "type": "string",
-                        "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                      },
                       "lineStatus": {
                         "enum": [
                           "open",
@@ -6107,32 +5919,8 @@
                         "type": "number",
                         "description": "可选的自评把握，不作为语义质量门槛。"
                       },
-                      "processAppend": {
-                        "type": "string",
-                        "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                      },
-                      "processEdits": {
-                        "type": "array",
-                        "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "segment": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "description": "processSegments中的段落编号。"
-                            },
-                            "text": {
-                              "type": "string",
-                              "description": "这一段修改后的内容。"
-                            }
-                          },
-                          "required": [
-                            "segment",
-                            "text"
-                          ],
-                          "additionalProperties": false
-                        }
+                      "summary": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -6166,18 +5954,6 @@
                         "type": "string",
                         "minLength": 1
                       },
-                      "cause": {
-                        "type": "string",
-                        "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                      },
-                      "process": {
-                        "type": "string",
-                        "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                      },
-                      "result": {
-                        "type": "string",
-                        "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                      },
                       "lineStatus": {
                         "enum": [
                           "open",
@@ -6203,32 +5979,8 @@
                         "type": "number",
                         "description": "可选的自评把握，不作为语义质量门槛。"
                       },
-                      "processAppend": {
-                        "type": "string",
-                        "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                      },
-                      "processEdits": {
-                        "type": "array",
-                        "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "segment": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "description": "processSegments中的段落编号。"
-                            },
-                            "text": {
-                              "type": "string",
-                              "description": "这一段修改后的内容。"
-                            }
-                          },
-                          "required": [
-                            "segment",
-                            "text"
-                          ],
-                          "additionalProperties": false
-                        }
+                      "summary": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -6260,18 +6012,6 @@
                         "type": "string",
                         "minLength": 1
                       },
-                      "cause": {
-                        "type": "string",
-                        "description": "触发条件、人物目的与必要前因；提供时更新整个起因字段，省略保留。"
-                      },
-                      "process": {
-                        "type": "string",
-                        "description": "更新后的完整经过，按阶段说明事件怎样承接；仅追加新发展时用processAppend，局部修订用processEdits。"
-                      },
-                      "result": {
-                        "type": "string",
-                        "description": "目前已发生的结果及对后续的影响；提供时更新整个结果字段，省略保留。"
-                      },
                       "lineStatus": {
                         "enum": [
                           "open",
@@ -6297,32 +6037,8 @@
                         "type": "number",
                         "description": "可选的自评把握，不作为语义质量门槛。"
                       },
-                      "processAppend": {
-                        "type": "string",
-                        "description": "本次新增的发展段，程序接在旧经过之后，无需重写旧内容。"
-                      },
-                      "processEdits": {
-                        "type": "array",
-                        "description": "按已读取详情返回的段落编号修订，只填写改后的内容。",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "segment": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "description": "processSegments中的段落编号。"
-                            },
-                            "text": {
-                              "type": "string",
-                              "description": "这一段修改后的内容。"
-                            }
-                          },
-                          "required": [
-                            "segment",
-                            "text"
-                          ],
-                          "additionalProperties": false
-                        }
+                      "summary": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -6468,12 +6184,15 @@
                       "summary": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "全书复核填写的事件概况，完成说明页前与 coreClue 均须有内容"
+                        "description": "全书复核填写的事件概况，完成说明页前与 clues 均须有内容"
                       },
-                      "coreClue": {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "有原文依据且推动或联结事件的具体线索，说明其作用"
+                      "clues": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true
                       }
                     },
                     "required": [
@@ -6494,7 +6213,7 @@
                       },
                       {
                         "required": [
-                          "coreClue"
+                          "clues"
                         ]
                       }
                     ]
@@ -6770,7 +6489,6 @@
                 "properties": {
                   "key": {
                     "minLength": 1,
-                    "maxLength": 120,
                     "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                     "type": "string"
                   },
@@ -6807,7 +6525,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -6815,7 +6532,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -6823,7 +6539,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   }
@@ -6862,7 +6577,6 @@
                 "properties": {
                   "key": {
                     "minLength": 1,
-                    "maxLength": 120,
                     "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                     "type": "string"
                   },
@@ -6899,7 +6613,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -6907,7 +6620,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -6993,13 +6705,6 @@
                       "type": "string"
                     }
                   },
-                  "targets": {
-                    "description": "对象 / 承受者。例：[\"王熙凤\"]",
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
                   "world_delta": {
                     "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
                     "type": "array",
@@ -7009,13 +6714,6 @@
                   },
                   "new_facts": {
                     "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "started_actions": {
-                    "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
                     "type": "array",
                     "items": {
                       "type": "string"

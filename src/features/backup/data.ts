@@ -1,3 +1,4 @@
+import { migrateNarrativeFields } from '../assets/narrativeMigration'
 import type { Book } from '../../lib/storage/workspace'
 import { bindNodeCharacters } from '../assets/characterLinks'
 import { migrateCharacterRelations, migrateNodeBindings } from '../assets/migrate'
@@ -55,7 +56,7 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
   for (const [index, chapter] of tables.chapters.entries()) {
     const text = texts.get(chapter.chapterIndex)?.text
     if (typeof text === 'string' && /[\uD800-\uDFFF]/u.test(text)) fail(`chapterTexts/${chapter.chapterIndex}`, '章节正文含不完整字符，请核对原文后重新导入。', 'SCHEMA')
-    if (!/^\d+(?:\.\d+)*$/.test(chapter.chapterIndex as string) || !orders.has(index) || typeof text !== 'string' || !text.length || text.length > 10000 || text.length !== chapter.charCount) fail(`chapters[${index}]`, '章节顺序、编号或正文字符数不符。')
+    if (!/^\d+(?:\.\d+)*$/.test(chapter.chapterIndex as string) || !orders.has(index) || typeof text !== 'string' || !text.length || text.length !== chapter.charCount) fail(`chapters[${index}]`, '章节顺序、编号或正文字符数不符。')
   }
   const hasChapter = (value: unknown) => chapters.has(value) || [...chapters.keys()].some(key => (key as string).startsWith(`${value}.`))
   for (const name of ['characters', 'locations', 'nodes'] as const) for (const row of tables[name]) {
@@ -70,7 +71,7 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
     for (const id of strings(event.nodeIds)) if (!nodes.has(id)) fail(`storyEvents/${event.id}`, `成员节点不存在：${id}`)
   }
   for (const node of tables.nodes) {
-    for (const id of [...strings(node.actorIds), ...strings(node.targetCharacterIds)]) if (!characters.has(id)) fail(`nodes/${node.id}`, `人物关联不存在：${id}`)
+    for (const id of [...strings(node.actorIds)]) if (!characters.has(id)) fail(`nodes/${node.id}`, `人物关联不存在：${id}`)
     for (const id of strings(node.eventLineIds)) if (!strings(lines.get(id)?.nodeIds).includes(node.id as string)) fail(`nodes/${node.id}`, `事件线反向关联不符：${id}`)
   }
   for (const line of tables.eventLines) {
@@ -121,7 +122,7 @@ export async function validateBookData(data: BookData): Promise<BackupError[]> {
     if (edit.state !== 'active' && edit.state !== 'deleted') fail(`${path}/state`, '关系编辑状态无效。')
     if (edit.state === 'active' && !forward.length && !reverse.length) fail(`${path}`, '有效关系至少一个方向要有标签。')
     if (edit.state === 'deleted' && (forward.length || reverse.length)) fail(`${path}`, '已删除关系不能保留标签。')
-    if (forward.length > 20 || reverse.length > 20 || [...forward, ...reverse].some(label => !label.trim() || label.length > 100)) fail(`${path}`, '关系标签数量或长度不符。')
+    if (forward.length > 20 || reverse.length > 20 || [...forward, ...reverse].some(label => !label.trim())) fail(`${path}`, '关系标签超出数量限制或含空白项。')
     for (const evidence of rows(edit.evidence)) if (!hasChapter(evidence.chapterIndex)) fail(`${path}/evidence`, '关系编辑依据章节不存在。')
     if (!Number.isSafeInteger(edit.revision) || Number(edit.revision) < 1) fail(`${path}/revision`, '关系编辑修订号无效。')
     if (!['manual', 'agent', 'migration'].includes(String(edit.updatedBy)) || !String(edit.commitId ?? '').trim()) fail(`${path}`, '关系编辑来源或确认号缺失。')
@@ -271,12 +272,12 @@ export function migrateLegacy(data: BookData, legacy: Record<string, unknown>): 
       if (row.speech_style_sample !== undefined) { row.speechStyleSample = row.speech_style_sample; delete row.speech_style_sample }
     }
   }
+  migrateNarrativeFields(data.tables)
   data.tables.nodes = data.tables.nodes.map(row => {
     row.revision ??= 1
     const characters = data.tables.characters as unknown as Character[]
     const actorIds = strings(row.actorIds).filter(id => characters.some(person => person.id === id))
-    const targetIds = strings(row.targetCharacterIds).filter(id => characters.some(person => person.id === id))
-    return bindNodeCharacters({ ...row, legacyActorIds: actorIds, legacyTargetCharacterIds: targetIds } as unknown as EventNode, characters) as unknown as Row
+    return bindNodeCharacters({ ...row, manualActorIds: row.manualActorIds ?? (row.actorBindings ? [] : actorIds) } as unknown as EventNode, characters) as unknown as Row
   })
   for (const line of data.tables.eventLines) { line.revision ??= 1; line.createdBy ??= 'P3'; delete line.characterIds }
   const timestamp = new Date().toISOString()

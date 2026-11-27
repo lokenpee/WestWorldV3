@@ -34,7 +34,7 @@ export async function applyAliasChecks(store: AgentStore, scope: Scope, checks: 
       }
     }
     const afterAliases = aliases.filter(alias => !removals.has(alias)), verifiedAliases = [...verified].filter(alias => afterAliases.includes(alias))
-    const affectedNodeIds = kind === 'character' && removals.size ? (await store.rows('nodes')).filter(node => [...strings(node.actorIds), ...strings(node.targetCharacterIds)].includes(id) && [...strings(node.actors), ...strings(node.targets), text(node.quote), text(node.process), text(node.summary)].some(value => [...removals].some(alias => value.includes(alias)))).map(node => text(node.id)) : []
+    const affectedNodeIds = kind === 'character' && removals.size ? (await store.rows('nodes')).filter(node => [...strings(node.actorIds)].includes(id) && [...strings(node.actors), text(node.quote), text(node.process), text(node.summary)].some(value => [...removals].some(alias => value.includes(alias)))).map(node => text(node.id)) : []
     const createdAt = new Date().toISOString()
     await store.put(table, { ...row, aliases: afterAliases, verifiedAliases, revision: Number(row.revision) + 1, updatedAt: createdAt })
     const run = (await store.get('pipelineRuns', scope.runId))!

@@ -8,6 +8,7 @@ artifacts:
     template: proposal.md
     instruction: |
       先按 AGENTS.md 判级并登记需求池；写清讨论结论、影响、字段变化、数据流转、触发逻辑、验收及接手说明。中型需求将实施方法写入提案。
+      涉及应用 Agent 时按 AGENTS.md 的“Agent 方案材料”在提案交付详细设计和贯穿样例。全部材料齐备后执行 gstack 工程方案审查，审查包含全套文档的可读性和提案的术语入口，结论写回提案，再提交用户确认。
     requires: []
   - id: specs
     generates: "specs/**/*.md"
@@ -21,7 +22,7 @@ artifacts:
     description: tasks，按根目录 AGENTS.md 执行
     template: tasks.md
     instruction: |
-      按 AGENTS.md 写带编号的复选框任务、对应需求、检查方法和证据；自动检查和用户验收分别登记。
+      按 AGENTS.md 写带编号的复选框任务、对应需求、检查方法和证据；安排实现后的 gstack 改动审查，自动检查、审查和用户验收分别登记。
     requires: [specs]
 apply:
   requires: [tasks]

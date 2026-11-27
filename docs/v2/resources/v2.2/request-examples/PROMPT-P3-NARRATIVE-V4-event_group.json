@@ -11,7 +11,9 @@
         "id": "E005",
         "title": "村口交信",
         "summary": "信使交信",
-        "coreClue": "封印完整"
+        "clues": [
+          "封印完整"
+        ]
       }
     ],
     "outline": {
@@ -43,9 +45,7 @@
     },
     "openDoubts": [],
     "config": {
-      "nodeBatchSize": 20,
       "eventGroupSize": 20,
-      "eventReviewInterval": 10,
       "lineReviewInterval": 10,
       "segmentSize": 20,
       "outlineThreshold": 2000,
@@ -290,7 +290,7 @@
                               "minLength": 1
                             },
                             "minItems": 1,
-                            "description": "可读字段：*、id、name、summary、process、actors、targets、actorBindings、targetBindings、manualActorIds、manualTargetCharacterIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、targetCharacterIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、started_actions、time_text、time_hint、chapter、locations"
+                            "description": "可读字段：*、id、name、summary、process、actors、actorBindings、manualActorIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、time_text、time_hint、chapter、locations"
                           },
                           "offset": {
                             "type": "integer",
@@ -322,7 +322,7 @@
                               "minLength": 1
                             },
                             "minItems": 1,
-                            "description": "可读字段：*、id、title、nodeIds、summary、coreClue"
+                            "description": "可读字段：*、id、title、nodeIds、summary、latestProgress、unresolved、clues、status"
                           },
                           "offset": {
                             "type": "integer",
@@ -729,7 +729,7 @@
       },
       {
         "role": "user",
-        "content": "{\n  \"任务说明\": {\n    \"mode\": \"event_group\",\n    \"part\": \"batch\",\n    \"目标\": \"事件归入故事线 · 当前批次\",\n    \"完成条件\": \"本组归线或疑点已保存后调用 confirm({})。仅当还要确认组外事件时，用 handled_event_ids 填写这些额外编号。\"\n  },\n  \"故事线与事件目录\": {\n    \"events\": [\n      {\n        \"id\": \"E005\",\n        \"title\": \"村口交信\",\n        \"nodeIds\": [\n          \"N008\"\n        ]\n      }\n    ],\n    \"lines\": [\n      {\n        \"id\": \"S001\",\n        \"title\": \"送信\",\n        \"eventIds\": []\n      }\n    ],\n    \"unassignedEventIds\": [\n      \"E005\"\n    ],\n    \"nodes\": [\n      {\n        \"id\": \"N008\",\n        \"name\": \"抵达村口\"\n      }\n    ]\n  },\n  \"本组事件资料\": [\n    {\n      \"id\": \"E005\",\n      \"title\": \"村口交信\",\n      \"summary\": \"信使交信\",\n      \"coreClue\": \"封印完整\"\n    }\n  ],\n  \"未决疑点\": [],\n  \"运行参数\": {\n    \"nodeBatchSize\": 20,\n    \"eventGroupSize\": 20,\n    \"eventReviewInterval\": 10,\n    \"lineReviewInterval\": 10,\n    \"segmentSize\": 20,\n    \"outlineThreshold\": 2000,\n    \"keepRecentRounds\": 2\n  }\n}",
+        "content": "{\n  \"任务说明\": {\n    \"mode\": \"event_group\",\n    \"part\": \"batch\",\n    \"目标\": \"事件归入故事线 · 当前批次\",\n    \"完成条件\": \"本组归线或疑点已保存后调用 confirm({})。仅当还要确认组外事件时，用 handled_event_ids 填写这些额外编号。\"\n  },\n  \"故事线与事件目录\": {\n    \"events\": [\n      {\n        \"id\": \"E005\",\n        \"title\": \"村口交信\",\n        \"nodeIds\": [\n          \"N008\"\n        ]\n      }\n    ],\n    \"lines\": [\n      {\n        \"id\": \"S001\",\n        \"title\": \"送信\",\n        \"eventIds\": []\n      }\n    ],\n    \"unassignedEventIds\": [\n      \"E005\"\n    ],\n    \"nodes\": [\n      {\n        \"id\": \"N008\",\n        \"name\": \"抵达村口\"\n      }\n    ]\n  },\n  \"本组事件资料\": [\n    {\n      \"id\": \"E005\",\n      \"title\": \"村口交信\",\n      \"summary\": \"信使交信\",\n      \"clues\": [\n        \"封印完整\"\n      ]\n    }\n  ],\n  \"未决疑点\": [],\n  \"运行参数\": {\n    \"eventGroupSize\": 20,\n    \"lineReviewInterval\": 10,\n    \"segmentSize\": 20,\n    \"outlineThreshold\": 2000,\n    \"keepRecentRounds\": 2\n  }\n}",
         "timestamp": 1
       }
     ],
@@ -949,7 +949,7 @@
                           "minLength": 1
                         },
                         "minItems": 1,
-                        "description": "可读字段：*、id、name、summary、process、actors、targets、actorBindings、targetBindings、manualActorIds、manualTargetCharacterIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、targetCharacterIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、started_actions、time_text、time_hint、chapter、locations"
+                        "description": "可读字段：*、id、name、summary、process、actors、actorBindings、manualActorIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、time_text、time_hint、chapter、locations"
                       },
                       "offset": {
                         "type": "integer",
@@ -981,7 +981,7 @@
                           "minLength": 1
                         },
                         "minItems": 1,
-                        "description": "可读字段：*、id、title、nodeIds、summary、coreClue"
+                        "description": "可读字段：*、id、title、nodeIds、summary、latestProgress、unresolved、clues、status"
                       },
                       "offset": {
                         "type": "integer",

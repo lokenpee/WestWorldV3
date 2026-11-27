@@ -1,3 +1,4 @@
+import { migrateNarrativeFields } from '../assets/narrativeMigration'
 import type { Book } from '../../lib/storage/workspace'
 import { checksumOf, encodeBackup, inspectBackup, restoredTables, type BackupInspection, type BackupProgress, type ExportResult } from './codec'
 import { migrateRelationsData, type BookData, type BookTables } from './data'
@@ -55,6 +56,7 @@ export function createBackupProcessor() {
         }
         case 'migrate': {
           if (!migration) throw new Error('旧库准备结果已失效，请重新迁移。')
+          if (migration.version < 12) migrateNarrativeFields(migration.data.tables)
           const data = migration.version < 6 ? migrateRelationsData(migration.data) : migration.data
           const inspected = await inspectBackup((await encodeBackup(data, onProgress)).bytes, onProgress)
           if (!inspected.ok || !inspected.data) throw new Error(`《${data.book.title}》迁移核对失败：${inspected.errors[0]?.message}`)

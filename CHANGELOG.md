@@ -1,5 +1,9 @@
 # 版本记录
 
+## v0.7 · 自下而上的事件串联与复核
+
+已完成自下而上的事件串联与复核。故事串联仍待优化。游玩阶段已形成方案，尚未实施。[事件串联与复核](openspec/changes/recast-p3-event-workflow/proposal.md) · [游玩方案](openspec/changes/play-three-agent-mvp/proposal.md)
+
 ## v0.6.3 · P3 两阶段整理与复核
 
 - P3 先整理节点与事件，再组织故事线，两阶段均支持分段复核、归属复用和暂停续跑。

@@ -163,6 +163,30 @@
                           "hint"
                         ],
                         "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "node"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "chapterIndex": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "name",
+                          "chapterIndex"
+                        ],
+                        "additionalProperties": false
                       }
                     ]
                   }
@@ -227,7 +251,6 @@
                           "name",
                           "summary",
                           "actors",
-                          "confidence",
                           "id",
                           "bookId",
                           "order",
@@ -257,13 +280,6 @@
                               "type": "string"
                             }
                           },
-                          "targets": {
-                            "description": "对象 / 承受者。例：[\"王熙凤\"]",
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
                           "world_delta": {
                             "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
                             "type": "array",
@@ -273,13 +289,6 @@
                           },
                           "new_facts": {
                             "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "started_actions": {
-                            "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
                             "type": "array",
                             "items": {
                               "type": "string"
@@ -425,13 +434,6 @@
                               "additionalProperties": false
                             }
                           },
-                          "targetCharacterIds": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            },
-                            "description": "涉及对象中属于人物的稳定编号。"
-                          },
                           "quoteStatus": {
                             "enum": [
                               "matched",
@@ -439,6 +441,13 @@
                               "empty"
                             ],
                             "description": "参考引文定位状态。"
+                          },
+                          "clues": {
+                            "description": "可选。用于找回相关剧情的原文名称或短语，如关键人物、家族、物品、地点或事项。",
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         }
                       },
@@ -461,6 +470,100 @@
                         "required": [
                           "fields_omitted",
                           "hint"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "totalChars": {
+                            "type": "integer"
+                          },
+                          "charOffset": {
+                            "type": "integer"
+                          },
+                          "truncated": {
+                            "type": "boolean"
+                          },
+                          "nextCharOffset": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "totalChars",
+                          "charOffset",
+                          "truncated",
+                          "nextCharOffset"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "node"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "chapterIndex": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "process": {
+                            "type": "string"
+                          },
+                          "charOffset": {
+                            "type": "integer"
+                          },
+                          "nextCharOffset": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "actors": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "clues": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "locationNames": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind"
                         ],
                         "additionalProperties": false
                       }
@@ -580,14 +683,11 @@
                               }
                             ]
                           },
-                          "cause": {
-                            "type": "string"
-                          },
-                          "result": {
-                            "type": "string"
-                          },
                           "nodeCount": {
                             "type": "integer"
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -686,9 +786,6 @@
                           "title",
                           "nodeIds",
                           "chapters",
-                          "cause",
-                          "process",
-                          "result",
                           "lineStatus",
                           "updatedAt",
                           "revision",
@@ -728,18 +825,6 @@
                             "items": {
                               "type": "string"
                             }
-                          },
-                          "cause": {
-                            "description": "起因",
-                            "type": "string"
-                          },
-                          "process": {
-                            "description": "经过",
-                            "type": "string"
-                          },
-                          "result": {
-                            "description": "结果",
-                            "type": "string"
                           },
                           "lineStatus": {
                             "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
@@ -817,6 +902,9 @@
                               ],
                               "additionalProperties": false
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       },
@@ -839,6 +927,45 @@
                         "required": [
                           "fields_omitted",
                           "hint"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "totalChars": {
+                            "type": "integer"
+                          },
+                          "charOffset": {
+                            "type": "integer"
+                          },
+                          "truncated": {
+                            "type": "boolean"
+                          },
+                          "nextCharOffset": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "text",
+                          "totalChars",
+                          "charOffset",
+                          "truncated",
+                          "nextCharOffset"
                         ],
                         "additionalProperties": false
                       }
@@ -925,8 +1052,7 @@
                             }
                           },
                           "identityHint": {
-                            "type": "string",
-                            "maxLength": 160
+                            "type": "string"
                           },
                           "sourceChapters": {
                             "type": "array",
@@ -1434,8 +1560,7 @@
                             }
                           },
                           "descriptionHint": {
-                            "type": "string",
-                            "maxLength": 160
+                            "type": "string"
                           },
                           "sourceChapters": {
                             "type": "array",
@@ -1895,7 +2020,6 @@
                       "type": "integer"
                     },
                     "workingSummary": {
-                      "maxLength": 2000,
                       "type": "string"
                     },
                     "dataFingerprint": {
@@ -1937,7 +2061,6 @@
                       },
                       "key": {
                         "minLength": 1,
-                        "maxLength": 120,
                         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                         "type": "string"
                       },
@@ -1967,7 +2090,6 @@
                       },
                       "statement": {
                         "minLength": 1,
-                        "maxLength": 1000,
                         "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                         "type": "string"
                       },
@@ -1975,7 +2097,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -1983,7 +2104,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -2066,7 +2186,6 @@
                   "type": "string"
                 },
                 "key": {
-                  "maxLength": 120,
                   "type": "string"
                 },
                 "status": {
@@ -2137,7 +2256,6 @@
                     "properties": {
                       "key": {
                         "minLength": 1,
-                        "maxLength": 120,
                         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                         "type": "string"
                       },
@@ -2167,7 +2285,6 @@
                       },
                       "statement": {
                         "minLength": 1,
-                        "maxLength": 1000,
                         "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                         "type": "string"
                       },
@@ -2175,7 +2292,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -2183,7 +2299,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -2205,7 +2320,6 @@
                             },
                             "quote": {
                               "minLength": 1,
-                              "maxLength": 1000,
                               "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                               "type": "string"
                             }
@@ -2413,7 +2527,6 @@
                     "properties": {
                       "key": {
                         "minLength": 1,
-                        "maxLength": 120,
                         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                         "type": "string"
                       },
@@ -2443,7 +2556,6 @@
                       },
                       "statement": {
                         "minLength": 1,
-                        "maxLength": 1000,
                         "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                         "type": "string"
                       },
@@ -2451,7 +2563,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -2459,7 +2570,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -2481,7 +2591,6 @@
                             },
                             "quote": {
                               "minLength": 1,
-                              "maxLength": 1000,
                               "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                               "type": "string"
                             }
@@ -2947,7 +3056,6 @@
                                   },
                                   "summary": {
                                     "minLength": 1,
-                                    "maxLength": 64000,
                                     "type": "string"
                                   },
                                   "firstKeptEntryId": {
@@ -3128,7 +3236,6 @@
                                     "type": "string"
                                   },
                                   "summary": {
-                                    "maxLength": 2000,
                                     "type": "string"
                                   }
                                 }
@@ -3686,7 +3793,6 @@
                       "properties": {
                         "workingSummary": {
                           "minLength": 1,
-                          "maxLength": 2000,
                           "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
                           "type": "string"
                         },
@@ -3709,7 +3815,6 @@
                             "properties": {
                               "key": {
                                 "minLength": 1,
-                                "maxLength": 120,
                                 "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                                 "type": "string"
                               },
@@ -3739,7 +3844,6 @@
                               },
                               "statement": {
                                 "minLength": 1,
-                                "maxLength": 1000,
                                 "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                                 "type": "string"
                               },
@@ -3747,7 +3851,6 @@
                                 "maxItems": 20,
                                 "type": "array",
                                 "items": {
-                                  "maxLength": 128,
                                   "type": "string"
                                 }
                               },
@@ -3755,7 +3858,6 @@
                                 "maxItems": 20,
                                 "type": "array",
                                 "items": {
-                                  "maxLength": 128,
                                   "type": "string"
                                 }
                               },
@@ -3777,7 +3879,6 @@
                                     },
                                     "quote": {
                                       "minLength": 1,
-                                      "maxLength": 1000,
                                       "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                                       "type": "string"
                                     }
@@ -3882,8 +3983,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1000
+                        "minLength": 1
                       }
                     },
                     "required": [
@@ -4146,8 +4246,7 @@
                   },
                   "reason": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1000
+                    "minLength": 1
                   }
                 },
                 "required": [

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="648" viewBox="0 0 920 648" role="img" aria-labelledby="title desc" lang="zh-CN">
+  <title id="title">游玩准备页：选择赖家线资产包，新建或继续已有存档</title>
+  <desc id="desc">资产包是这本书已整理的人物、地点和事件等资料。当前选中新档，开局从资料能支持的最早事件开始。主角是贾珩，场景是长安节度使府官厅。云光先改称贾珩为恩主。官厅已经谈过翠华山匪情，两人仍在厅里，玩家从这里接手。页面底部是开始游玩按钮。</desc>
+  <style>
+    text { font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; fill: #f0eeeb }
+    .bar { font-weight: 600; font-size: 17px } .dim { fill: #b6b4bc }
+    .label { fill: #c9c6cf; font-size: 15px } .body { font-size: 17px }
+    .head { font-size: 26px; font-weight: 650 } .sub { font-weight: 600; font-size: 17px }
+    .small { font-size: 14px; fill: #c2bec7 } .link { fill: #dec9aa; font-size: 14px }
+    .btn { fill: #262321; font-size: 16px; font-weight: 650 }
+  </style>
+  <rect width="920" height="648" rx="14" fill="#19191d"/>
+  <path d="M0 55 H920" stroke="#434148"/>
+  <text x="40" y="35" class="bar">WestWorld</text>
+  <text x="156" y="35" class="bar dim">/　游玩</text>
+  <text x="64" y="111" class="head">选择游玩存档</text>
+  <text x="64" y="153" class="label">资产包</text>
+  <rect x="64" y="165" width="792" height="48" rx="8" fill="#2b2a30" stroke="#58555e"/>
+  <text x="82" y="196" class="body">红楼之挽天倾 · 赖家线（仅第 15 至 25 章节点）</text>
+  <path d="M822 185 l7 7 7 -7" fill="none" stroke="#cbc7d0" stroke-width="2"/>
+  <text x="64" y="254" class="label">存档</text>
+  <rect x="64" y="268" width="314" height="78" rx="8" fill="#39322e" stroke="#d7b892" stroke-width="1.5"/>
+  <circle cx="91" cy="307" r="9" fill="none" stroke="#dfc299" stroke-width="1.5"/>
+  <circle cx="91" cy="307" r="4" fill="#dfc299"/>
+  <text x="117" y="302" class="sub">新建存档</text>
+  <text x="117" y="326" class="small">从资产包起点开始</text>
+  <rect x="64" y="356" width="314" height="78" rx="8" fill="#252429" stroke="#444148"/>
+  <circle cx="91" cy="395" r="9" fill="none" stroke="#98949d" stroke-width="1.5"/>
+  <text x="117" y="390" class="sub">存档 1</text>
+  <text x="117" y="414" class="small">贾珩 · 已结算 1 轮</text>
+  <rect x="398" y="268" width="458" height="250" rx="9" fill="#26252a" stroke="#454149"/>
+  <text x="421" y="306" class="sub">开局位置</text>
+  <text x="421" y="345" class="body">贾珩 · 长安节度使府官厅</text>
+  <text x="421" y="377" class="small">官厅已谈过翠华山匪情，两人仍在厅里。</text>
+  <text x="421" y="402" class="small">你从这里接手贾珩的行动。</text>
+  <path d="M421 429 H833" stroke="#4a464e"/>
+  <text x="421" y="461" class="small">起点对应的事件　贾珩闯云光官厅问罪</text>
+  <text x="421" y="491" class="link">查看节点 ›</text>
+  <path d="M64 551 H856" stroke="#434148"/>
+  <rect x="716" y="572" width="140" height="46" rx="8" fill="#dec29d"/>
+  <text x="786" y="601" text-anchor="middle" class="btn">开始</text>
+</svg>

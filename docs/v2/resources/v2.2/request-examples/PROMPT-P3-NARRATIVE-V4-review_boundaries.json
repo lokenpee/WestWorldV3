@@ -1,0 +1,1067 @@
+{
+  "id": "PROMPT-P3-NARRATIVE-V4-review_boundaries",
+  "kind": "synthetic-target-request-not-a-recording",
+  "mode": "agent",
+  "inputSchema": "prompt-inputs.schema.json#/$defs/NarrativeBrief",
+  "input": {
+    "mode": "review_boundaries",
+    "part": "structure",
+    "material": {
+      "资料说明": "事件卡已给出 event_id、name、overview、latest_progress、unresolved、clues、status。时间表给出 node_id、name、summary、event_ids。按 event_ids 中的事件编号筛选，即得该卡的全部成员。可直接使用这些资料。具体行动不清时，用 get_nodes 读取存疑节点的详细经过。需要展开组外事件，或核对已变动的事件资料时，再用 get_event。",
+      "本组事件": [
+        {
+          "event_id": "E005",
+          "name": "信使向守卫交信",
+          "overview": "信使在村口送交密信",
+          "latest_progress": "守卫已接信",
+          "unresolved": "",
+          "clues": [
+            "密信"
+          ],
+          "status": "已闭环"
+        }
+      ],
+      "节点时间表": [
+        {
+          "node_id": "N008",
+          "name": "信使交信",
+          "summary": "守卫收下密信",
+          "event_ids": [
+            {
+              "event_id": "E005",
+              "name": "信使向守卫交信"
+            }
+          ]
+        }
+      ],
+      "本轮任务": "比较本组事件的边界和成员，处理后确认本组。"
+    }
+  },
+  "modelSnapshot": {
+    "providerId": "deepseek",
+    "api": "openai-completions",
+    "baseUrl": "https://api.deepseek.com",
+    "modelId": "deepseek-v4-pro",
+    "modelRole": "aggregation",
+    "contextWindow": 128000,
+    "capabilities": {
+      "tools": true,
+      "structuredOutput": true
+    },
+    "credentialRef": "deepseek"
+  },
+  "options": {
+    "requestTimeoutMs": 120000,
+    "maxTokens": 8192
+  },
+  "context": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "# 宏观复核 · 划清事件边界\n\n## 一、本轮要解决什么问题\n\n你是本书的叙事结构编辑。逐节点串联时，前面建的事件可能越收越大，后面又为其中一段另建了事件；同一件事也可能因为换了章节、人物或说法，被分开记录。本轮给你一组值得放在一起比较的事件。你要回答：这段剧情究竟发生了哪几件事？各件从哪里开始，追踪的是什么，发展到了哪里？\n\n节点记一幕发生了什么，事件追踪一件事怎样发展。几件事共同推动的更大剧情，后续会串成故事线。\n\n事件可以围绕一次查办、一项承诺、一场冲突或一次关系变化展开。已结束的，要能指出具体结果；尚在进行的，要能说清仍在等什么。突发遇袭、身份揭露等事情，也可以在一个节点内成立。\n\n## 二、怎样读本组资料\n\n先沿「节点时间表」辨认人物各自在处理什么事，再对照「本组事件」，弄清每个现有名称和概况把什么当成了核心，再看最新进展和待解决问题究竟落在哪件事上。标题只是前一轮的概括。若标题说的是“定计”，成员却一直收到了战后处置，就要从成员事实重新判断这张卡该写多大。\n\n时间表按原文顺序排列，event_ids 列出每个节点当前所属的事件。沿每张卡从头到尾读它的成员。读到共享节点时，分别说清人物做了什么，以及这一步使各件事有了什么进展。若大卡收了小卡的全部节点，先查有争议的节点为何属于大卡，再判断小卡是否重复。已有归属也可能挂错。两件也可能没有共享节点。此时查看前件留下的承诺、证据或未决事项，是否由后件的行动接续。共同线索只给出了比较的理由。\n\n## 三、怎样判断是一件还是几件\n\n### 1. 一个大事件是否包住了几件各有结果的事？\n\n“翠华山剿匪”可以串成一条故事线。取得云光通贼的证据、击退岔口贼军、攻下山寨，都可能服务于剿匪。判断时分别问：哪条证据使通贼之事得到证实？哪次交战决定了岔口的胜负？哪一步使官军取得山寨？若节点分别交代了这些行动及其结果，就有分别追踪的依据。\n\n再回看大事件独有的成员：如果它们确实讲了贾珩怎样议定两路出兵，可以把原卡收窄到这次定计，进展写到计议落定。如果原卡只是把几路行动再讲一遍，核清成员去向后可以撤销。不能因为大卡与小卡重叠，就把小卡统统并回大卡。\n\n### 2. 两张卡是否各自只记了同一件事的一段？\n\n发现赖家贪污、决定清查、抓捕赖二、审问和查封，动作各有结果。若抓捕正是为了查案，审问取得的口供又成为查封依据，这些节点合起来才讲清“清查赖家贪污”。即使跨章、换场景，也应保住这段经过。遇到只记了一次传话、一次交接的卡，查它从何而来、后来推动了什么，再决定并入、补足还是独立保留。\n\n### 3. 是重复记录，还是两件事恰好在同一幕交接？\n\n例如“讯问范仪蒙冤始末”和“为范仪讨公道”都可能收到贾珩许诺的节点。看许诺前后：若讯问问清了什么人因何伤了范仪，而许诺让贾珩从知情者变成了答应追究此事的人，两件各有可追踪的变化，这一幕可以同时属于两件。若两张卡实际都从诉冤记到追究、都在等待同一个裁处结果，则要检查是否把同一件申冤事记了两遍。以本组实际材料决定。\n\n### 4. 是个别节点挂错了，还是事件的名称写偏了？\n\n把有争议的成员放回它前后的一段读。多数成员都在追查泄密，只有一幕借绢与追查无关，可以移出借绢这条归属。若成员从问明风声到搜得书信始终围绕查找内应，只是旧标题把整件事写成了“贾珩询问黄泰”，则应修正标题。若必须把“问清冤情”改成“整场谈话”才能容下一个成员，先重查这条归属。一次谈话也可能改变双方关系或引出新的承诺；只要这个变化在节点中有据可查，即使暂时只有一幕，也可以独立记录。\n\n## 四、如何核实和调整\n\n节点概述省略了决定分界的事实，用 get_nodes 合并读取有关节点的详细经过。怀疑还有一张卡记录同一事项，可用 search_events 查名称和概况；组外事件只在归属栏出现时，用 get_event 读全成员再调整。已有资料足以解释边界时直接使用。\n\n先定各件的核心，再分成员。节点中另有独立事项，已有卡都未记录时，即使这些节点已有归属，也应补建。若 B 同时混入了 A 的查案和 C 的作战，要分别处理 B 的两部分。准备移出成员时，先用时间表和已读的经过判断它在原事件中起了什么作用。若它交代了本件的起因、证据、行动或结果，保留这条归属。仅凭“已经挂在另一张卡上”移出，会丢掉本件经过。撤销原卡前，核清哪些成员确实接续同一事项，哪些记录了另一场有自身结果的行动。外人介入使一次行动落空，也可能使这件事结束。成员都在讲同一件事而标题失准时，只需改标题和受影响的字段。\n\n## 五、三组判断示例\n\n**例一 · 逐条判断共享节点。** C15-N002 写贾珩离开官厅，云光生出杀意，等剿寇时再计较。它既能收束官厅问罪，也能交代报复的起因。到 C18-N002，官军打赢岔口伏击，是否也意味着云光借刀杀人失败？把密信的意图和当日出战经过对起来。能指明这场交战怎样使他的安排落空，才把它写作报复的结果。仅有同一场剿匪的背景，还缺这层联系。每条归属分开判断，保留几个节点由这些事实决定。写进展也只写到已发生的一步：密信送达，张午与范仪商议应对。要写张午已决定将计就计，还要有他定下这项行动的依据。\n\n**例二 · 同一次交付被建成两张卡。** A“奉命送信”记 N1 领信、N2 出发，概况写明要把此信交到守将手中。B“将密信交给守将”记 N3 到营、N4 守将签收。两卡说的是同一封信、同一个收件人；签收恰好完成 A 追踪的那次交付。保留 A 的编号，补全后半程并闭环，撤销 B。把两项操作放进同一次 edit_events，示例编号在实际调用中换成本组编号。\n\n```json\n{\n  \"changes\": [\n    {\n      \"op\": \"update\", \"event_id\": \"A\",\n      \"fields\": {\n        \"name\": \"奉命送交密信\", \"overview\": \"送信人奉命将密信送到守将营中\",\n        \"latest_progress\": \"守将已当面签收密信\", \"unresolved\": \"\", \"status\": \"已闭环\",\n        \"nodeIds\": [\"N1\", \"N2\", \"N3\", \"N4\"]\n      },\n      \"reason\": \"到营、签收接续此前的领信和出发，完成同一次交付。\"\n    },\n    {\n      \"op\": \"delete\", \"event_id\": \"B\", \"replacement_event_ids\": [\"A\"],\n      \"reason\": \"B 记录的到营与签收两步已完整归入 A。\"\n    }\n  ]\n}\n```\n\nreplacement_event_ids 记录撤销后的去向。成员靠保留卡的 nodeIds 保存。看回包确认两项操作成功后，调用 confirm 提交 completed。\n\n**例三 · 从查办云光的成员中发现漏记的问罪。** “贾珩查办云光通贼”收了 C20-N002、C20-N003，库中没有记录云光处分黄泰的卡。先看 C20-N002。云光命人摘黄泰官帽、押入大牢；黄泰先前已托儿子求援。这些事实交代了问罪。贾珩在 C19-N004 已议定拿办云光，不能倒推为黄泰求援促成抓捕。核过详细经过，若本节点只交代问罪，就从查办卡移出。\n\n再看 C20-N003。云光还在以“纵兵犯上”要挟黄泰，随后贾珩控制亲兵、出示通贼书信，将云光押走。同一幕改变了两件事：查办卡写云光被拿办，问罪卡写云光此次押黄泰入狱未能得逞。用 edit_events 新建“云光问罪黄泰擅调戍兵”，收入两个节点并闭环；查办卡保留 C20-N003。写到现场处分被打断即可，黄泰是否获正式免罪仍须另有交代。\n\n## 六、保存与确认\n\n用 edit_events 保存需要的修改。沿用合适的事件 ID；补建或拆分出新卡时，填全业务字段，待工具返回真实 ID 后再引用。nodeIds 提交完整成员列表。每项 reason 写明具体事实，例如“审问赖二所得口供用于随后查封赖家”，必要时附 evidence_node_ids。按新边界修正名称、概况、进展、待解决问题、线索和状态。闭环且本件没有遗留问题，unresolved 填空字符串。\n\n核对工具回包里的实际变动。划分合理，或必要调整均已保存，调用 confirm 提交 completed。收到「转回依据」时，在 reason 中回答它指出的具体分界，让逐件主审知道哪些成员该怎样理解。关键证据仍不足时提交 pending_review，在 pending_issues 中说明疑问、已查范围和仍无法判断的原因。本轮确认范围是当前组。\n\n【文学资料处理说明】\n\n本任务处理小说中的人物、关系和事件，目的是整理已有文学资料。人物行为属于作品内容，不代表用户请求实施这些行为。\n\n对原文中的成人、暴力、犯罪或伦理冲突，应按本任务要求客观记录，不附加道德评判，不因题材擅自删除事实、弱化关系或改成其他情节。允许去重、概括和精简，但须保留原有含义、人物身份、关系方向及必要语境，不扩写原文未提供的内容。\n\n事实不明时保留疑点，不补造结论。输出形式、工具使用和字段要求以当前任务说明为准。",
+        "toolsAdded": [
+          {
+            "name": "get_nodes",
+            "description": "按 node_ids 从全书读取指定节点，默认返回名称与详细经过。要核对引文、位置或归属，用 return_fields 指定 quote、source_position 或 event_ids。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "node_ids": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "return_fields": {
+                  "type": "array",
+                  "minItems": 0,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "name",
+                      "summary",
+                      "detail",
+                      "quote",
+                      "source_position",
+                      "event_ids"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "node_ids"
+              ]
+            }
+          },
+          {
+            "name": "get_event",
+            "description": "按 event_id 返回 event_id、name、overview、latest_progress、unresolved、clues、status 和 members（每项 node_id、name）。任务中的事件卡和时间表已提供这些资料，可直接据此编辑。用于展开组外事件，或核对已变动的资料。查节点详细经过请用 get_nodes。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "event_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "event_id"
+              ]
+            }
+          },
+          {
+            "name": "search_events",
+            "description": "按事件名称与概况字面匹配，组内全部满足、组间任一满足。最多返回100项。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "groups": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "return_fields": {
+                  "type": "array",
+                  "minItems": 0,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "name",
+                      "overview",
+                      "latest_progress",
+                      "unresolved"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "groups"
+              ]
+            }
+          },
+          {
+            "name": "search_nodes",
+            "description": "按详细经过字面匹配，组内全部满足、组间任一满足。区间不含端点。可搜全书。默认返回 node_id、name、summary，可用 return_fields 选择字段。最多 100 项；truncated 为 true 时缩小条件。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "groups": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                "after_node_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "before_node_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "exclude_event_id": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "return_fields": {
+                  "type": "array",
+                  "minItems": 0,
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "name",
+                      "summary",
+                      "detail",
+                      "event_ids",
+                      "source_position"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "groups"
+              ]
+            }
+          },
+          {
+            "name": "edit_events",
+            "description": "同一批 changes 可新建、更新、撤销事件，每项写 reason。合并时 update 保留卡（nodeIds 为完整成员），delete 重复卡并用 replacement_event_ids 指向保留卡。组内成员已完整提供。修改组外成员或撤销组外卡前用 get_event 读取。先保存新建事件再引用其 ID。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "changes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "op": {
+                            "const": "create"
+                          },
+                          "fields": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "overview": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "latest_progress": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "unresolved": {
+                                "type": "string"
+                              },
+                              "clues": {
+                                "type": "array",
+                                "minItems": 0,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "进行中",
+                                  "暂时搁置",
+                                  "已闭环"
+                                ]
+                              },
+                              "nodeIds": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "uniqueItems": true
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "overview",
+                              "latest_progress",
+                              "unresolved",
+                              "clues",
+                              "status",
+                              "nodeIds"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "evidence_node_ids": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "fields",
+                          "reason"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "op": {
+                            "const": "update"
+                          },
+                          "event_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fields": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "overview": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "latest_progress": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "unresolved": {
+                                "type": "string"
+                              },
+                              "clues": {
+                                "type": "array",
+                                "minItems": 0,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "进行中",
+                                  "暂时搁置",
+                                  "已闭环"
+                                ]
+                              },
+                              "nodeIds": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "uniqueItems": true
+                              }
+                            },
+                            "required": [],
+                            "minProperties": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "evidence_node_ids": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "event_id",
+                          "fields",
+                          "reason"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "op": {
+                            "const": "delete"
+                          },
+                          "event_id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "replacement_event_ids": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "evidence_node_ids": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "op",
+                          "event_id",
+                          "reason"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "changes"
+              ]
+            }
+          },
+          {
+            "name": "confirm",
+            "description": "只确认本组结构。completed 可附 reason 说明分界或转回结论。缺少依据用 pending_review 和 pending_issues。",
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "result": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "pending_review"
+                  ]
+                },
+                "pending_issues": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "issue": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "checked_scope": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "issue",
+                      "checked_scope",
+                      "reason"
+                    ]
+                  }
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "result"
+              ],
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "result": {
+                      "const": "completed"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "result": {
+                      "const": "pending_review"
+                    },
+                    "pending_issues": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "issue": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "checked_scope": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "issue",
+                          "checked_scope",
+                          "reason"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "result",
+                    "pending_issues"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "timestamp": 0
+      },
+      {
+        "role": "user",
+        "content": "{\"资料说明\":\"事件卡已给出 event_id、name、overview、latest_progress、unresolved、clues、status。时间表给出 node_id、name、summary、event_ids。按 event_ids 中的事件编号筛选，即得该卡的全部成员。可直接使用这些资料。具体行动不清时，用 get_nodes 读取存疑节点的详细经过。需要展开组外事件，或核对已变动的事件资料时，再用 get_event。\",\"本组事件\":[{\"event_id\":\"E005\",\"name\":\"信使向守卫交信\",\"overview\":\"信使在村口送交密信\",\"latest_progress\":\"守卫已接信\",\"unresolved\":\"\",\"clues\":[\"密信\"],\"status\":\"已闭环\"}],\"节点时间表\":[{\"node_id\":\"N008\",\"name\":\"信使交信\",\"summary\":\"守卫收下密信\",\"event_ids\":[{\"event_id\":\"E005\",\"name\":\"信使向守卫交信\"}]}],\"本轮任务\":\"比较本组事件的边界和成员，处理后确认本组。\"}",
+        "timestamp": 1
+      }
+    ],
+    "tools": [
+      {
+        "name": "get_nodes",
+        "description": "按 node_ids 从全书读取指定节点，默认返回名称与详细经过。要核对引文、位置或归属，用 return_fields 指定 quote、source_position 或 event_ids。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "node_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "return_fields": {
+              "type": "array",
+              "minItems": 0,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "name",
+                  "summary",
+                  "detail",
+                  "quote",
+                  "source_position",
+                  "event_ids"
+                ]
+              }
+            }
+          },
+          "required": [
+            "node_ids"
+          ]
+        }
+      },
+      {
+        "name": "get_event",
+        "description": "按 event_id 返回 event_id、name、overview、latest_progress、unresolved、clues、status 和 members（每项 node_id、name）。任务中的事件卡和时间表已提供这些资料，可直接据此编辑。用于展开组外事件，或核对已变动的资料。查节点详细经过请用 get_nodes。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "event_id"
+          ]
+        }
+      },
+      {
+        "name": "search_events",
+        "description": "按事件名称与概况字面匹配，组内全部满足、组间任一满足。最多返回100项。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "groups": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "return_fields": {
+              "type": "array",
+              "minItems": 0,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "name",
+                  "overview",
+                  "latest_progress",
+                  "unresolved"
+                ]
+              }
+            }
+          },
+          "required": [
+            "groups"
+          ]
+        }
+      },
+      {
+        "name": "search_nodes",
+        "description": "按详细经过字面匹配，组内全部满足、组间任一满足。区间不含端点。可搜全书。默认返回 node_id、name、summary，可用 return_fields 选择字段。最多 100 项；truncated 为 true 时缩小条件。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "groups": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "after_node_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before_node_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "exclude_event_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "return_fields": {
+              "type": "array",
+              "minItems": 0,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "name",
+                  "summary",
+                  "detail",
+                  "event_ids",
+                  "source_position"
+                ]
+              }
+            }
+          },
+          "required": [
+            "groups"
+          ]
+        }
+      },
+      {
+        "name": "edit_events",
+        "description": "同一批 changes 可新建、更新、撤销事件，每项写 reason。合并时 update 保留卡（nodeIds 为完整成员），delete 重复卡并用 replacement_event_ids 指向保留卡。组内成员已完整提供。修改组外成员或撤销组外卡前用 get_event 读取。先保存新建事件再引用其 ID。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "changes": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "create"
+                      },
+                      "fields": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "overview": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "latest_progress": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "unresolved": {
+                            "type": "string"
+                          },
+                          "clues": {
+                            "type": "array",
+                            "minItems": 0,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "进行中",
+                              "暂时搁置",
+                              "已闭环"
+                            ]
+                          },
+                          "nodeIds": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "overview",
+                          "latest_progress",
+                          "unresolved",
+                          "clues",
+                          "status",
+                          "nodeIds"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "evidence_node_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "fields",
+                      "reason"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "update"
+                      },
+                      "event_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "fields": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "overview": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "latest_progress": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "unresolved": {
+                            "type": "string"
+                          },
+                          "clues": {
+                            "type": "array",
+                            "minItems": 0,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "进行中",
+                              "暂时搁置",
+                              "已闭环"
+                            ]
+                          },
+                          "nodeIds": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
+                          }
+                        },
+                        "required": [],
+                        "minProperties": 1
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "evidence_node_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "event_id",
+                      "fields",
+                      "reason"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "op": {
+                        "const": "delete"
+                      },
+                      "event_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "replacement_event_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "evidence_node_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "op",
+                      "event_id",
+                      "reason"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "required": [
+            "changes"
+          ]
+        }
+      },
+      {
+        "name": "confirm",
+        "description": "只确认本组结构。completed 可附 reason 说明分界或转回结论。缺少依据用 pending_review 和 pending_issues。",
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "result": {
+              "type": "string",
+              "enum": [
+                "completed",
+                "pending_review"
+              ]
+            },
+            "pending_issues": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "issue": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "checked_scope": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "issue",
+                  "checked_scope",
+                  "reason"
+                ]
+              }
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "result"
+          ],
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "result": {
+                  "const": "completed"
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "result"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "result": {
+                  "const": "pending_review"
+                },
+                "pending_issues": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "issue": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "checked_scope": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "issue",
+                      "checked_scope",
+                      "reason"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "result",
+                "pending_issues"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

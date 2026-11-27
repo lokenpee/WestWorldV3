@@ -50,8 +50,9 @@ const emptyUsage = (): Usage => ({ input: 0, output: 0, cacheRead: 0, cacheWrite
 // 保留服务商原生协议，仅把随轮次变化的消息数组放到请求体末尾。
 function messagesLast(payload: unknown) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload
-  const { messages, input, ...fixed } = payload as Record<string,unknown>
-  return { ...fixed, ...(messages !== undefined ? {messages} : {}), ...(input !== undefined ? {input} : {}) }
+  const { system, instructions, tools, messages, input, ...fixed } = payload as Record<string,unknown>
+  return { ...fixed, ...(system !== undefined ? {system} : {}), ...(instructions !== undefined ? {instructions} : {}),
+    ...(tools !== undefined ? {tools} : {}), ...(messages !== undefined ? {messages} : {}), ...(input !== undefined ? {input} : {}) }
 }
 
 // 调用与实际请求预算遵循 docs/decisions/model-connection.md。

@@ -47,7 +47,7 @@ it('叙事探针逐步提供当前工具，避免工具发现消耗三次请求'
   const { models } = await setup(fetcher)
   const result = await models.probeTools()
   expect(result.results.find(row => row.suite === 'story')).toMatchObject({ ok: true, readCalls: 1, writeCalls: 1, attempts: 3 })
-  expect(requests.slice(3)).toEqual([['get_editor_memory'], ['commit_story_changes'], ['submit_result']])
+  expect(requests.slice(3)).toEqual(Array(3).fill(['get_nodes','get_event','search_events','search_prior_nodes','edit_events','confirm']))
 })
 
 it('叙事探针遇到普通文字时报告没有调用读取工具', async () => {
@@ -59,7 +59,7 @@ it('叙事探针遇到普通文字时报告没有调用读取工具', async () =
   const result = await models.probeTools()
   const story = result.results.find(row => row.suite === 'story')
   expect(story).toMatchObject({ ok: false, readCalls: 0, writeCalls: 0, attempts: 3, commitIds: [] })
-  expect(story?.error).toContain('读取工作记忆')
+  expect(story?.error).toContain('读取节点')
   expect(story?.error).toContain('模型未调用工具')
 })
 

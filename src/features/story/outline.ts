@@ -2,7 +2,7 @@ import type { AgentStore, Row } from '../agents/repository'
 import type { EventLine, EventNode, StoryEvent, StoryMembership } from '../assets/types'
 
 export const usesOutline = (line: EventLine | Row) => Array.isArray(line.eventIds) && !line.outlinePending
-export const hasOutlineDescription = (row: Row | undefined) => [row?.summary, row?.coreClue].every(value => typeof value === 'string' && value.trim().length > 0)
+export const hasOutlineDescription = (row: Row | undefined) => [row?.summary, Array.isArray(row?.clues) ? row.clues.join('').trim() : row?.coreClue].every(value => typeof value === 'string' && value.trim().length > 0)
 
 export function storyMemberships(nodes: EventNode[], lines: EventLine[], events: StoryEvent[]) {
   const memberships = new Map(nodes.map(node => [node.id, [] as StoryMembership[]]))
@@ -34,11 +34,10 @@ export function outlineLineMembers(line: EventLine, events: ReadonlyMap<string, 
 export function outlineStatistics(nodes: EventNode[]) {
   return {
     chapters: [...new Set(nodes.map(node => node.chapterIndex))],
-    characterIds: [...new Set(nodes.flatMap(node => [...(node.actorIds ?? []), ...(node.targetCharacterIds ?? [])]))],
+    characterIds: [...new Set(nodes.flatMap(node => [...(node.actorIds ?? [])]))],
     characterNames: [...new Set(nodes.flatMap(node => {
       return [
         ...(node.actors ?? []).filter(name => !node.actorBindings?.some(group => group.mention === name && group.ids.length)),
-        ...(node.targets ?? []).filter(name => !node.targetBindings?.some(group => group.mention === name && group.ids.length)),
       ]
     }))],
     locationNames: [...new Set(nodes.flatMap(node => node.locationNames ?? []))],

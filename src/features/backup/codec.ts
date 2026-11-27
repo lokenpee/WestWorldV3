@@ -1,3 +1,4 @@
+import { migrateNarrativeFields } from '../assets/narrativeMigration'
 import { strFromU8, strToU8, unzipSync, zip, type Zippable } from 'fflate'
 import { version as appVersion } from '../../../package.json'
 import type { Book } from '../../lib/storage/workspace'
@@ -24,14 +25,12 @@ export async function encodeBackup(input: BookData, onProgress?: BackupProgress)
   const errors = await repairValidatedBookData(data)
   if (errors.length) throw new Error(`备份资料校验失败：${errors[0].path} ${errors[0].message}`)
   onProgress?.('正在编码备份资料…')
-  const hasNarrative = data.tables.pipelineRuns.some(run => run.narrative)
-  const hasOutline = hasNarrative || data.tables.storyEvents.length > 0 || data.tables.eventLines.some(line => Array.isArray(line.eventIds)) || data.tables.pipelineRuns.some(run => run.storyOutlineVersion === 1)
-  const exportedTables = tableNames.filter(name => name !== 'chapterTexts' && (hasOutline || name !== 'storyEvents'))
+  const exportedTables = tableNames.filter(name => name !== 'chapterTexts')
   const contents = ['book', ...exportedTables]
   const files: Record<string, Uint8Array> = { 'data/book.json': strToU8(JSON.stringify(data.book)) }
   for (const name of exportedTables) files[`data/${name}.json`] = strToU8(JSON.stringify(data.tables[name]))
   for (const row of data.tables.chapterTexts) files[chapterFileName(row.chapterIndex as string)] = strToU8(row.text as string)
-  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: hasNarrative ? 14 : hasOutline ? 13 : 12, appVersion, exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
+  const manifest: BackupManifest = { format: 'westworld-v2', formatVersion: 15, appVersion, exportedAt: new Date().toISOString(), book: { id: data.book.id, title: data.book.title, chapterCount: data.tables.chapters.length }, contents, excludes: ['apiKey', 'appSettings', 'credentials', 'leases'], checksums: Object.fromEntries(await Promise.all(Object.entries(files).map(async ([name, bytes]) => [name, await checksumOf(bytes)]))) }
   files['manifest.json'] = strToU8(JSON.stringify(manifest))
   onProgress?.('正在压缩备份…')
   const bytes = await new Promise<Uint8Array<ArrayBuffer>>((resolve, reject) => zip(files as Zippable, { level: 6 }, (error, result) => error ? reject(error) : resolve(new Uint8Array(result))))
@@ -53,7 +52,7 @@ export async function inspectBackup(bytes: Uint8Array, onProgress?: BackupProgre
     const parse = (name: string): unknown => { path = name; if (!files[name]) throw new Error('备份中缺少文件。'); return JSON.parse(strFromU8(files[name])) }
     const value = parse(path)
     if (!object(value) || value.format !== 'westworld-v2' || !Number.isInteger(value.formatVersion) || typeof value.appVersion !== 'string' || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)) || !object(value.book) || typeof value.book.id !== 'string' || typeof value.book.title !== 'string' || !Number.isInteger(value.book.chapterCount) || !Array.isArray(value.contents) || !value.contents.every(item => typeof item === 'string') || !Array.isArray(value.excludes) || !value.excludes.every(item => typeof item === 'string') || !object(value.checksums)) return fail('MANIFEST', path, '备份清单结构不完整。')
-    if (![4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].includes(value.formatVersion as number)) return fail('VERSION', path, Number(value.formatVersion) > 14 ? '备份版本较新，请使用支持该版本的应用。' : '备份版本不受支持。')
+    if (![4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(value.formatVersion as number)) return fail('VERSION', path, Number(value.formatVersion) > 15 ? '备份版本较新，请使用支持该版本的应用。' : '备份版本不受支持。')
     const manifest = value as unknown as BackupManifest
     onProgress?.('正在核对文件完整性…')
     for (const name of Object.keys(files)) if (name !== 'manifest.json' && !Object.hasOwn(manifest.checksums, name)) return fail('CHECKSUM', name, '文件缺少校验和。')
@@ -106,6 +105,7 @@ export async function inspectBackup(bytes: Uint8Array, onProgress?: BackupProgre
     onProgress?.('正在转换并核对资料…')
     markMissingTraceRefs(data.tables)
     if (manifest.formatVersion === 4) data = migrateLegacy(data, legacy)
+    else if (manifest.formatVersion < 15) migrateNarrativeFields(data.tables)
     if (manifest.formatVersion < 6) data = migrateRelationsData(data)
     if (manifest.formatVersion >= 6 && data.tables.characterRelations.some(row => isLegacyRelationRow(row))) {
       const timestamp = new Date().toISOString(), migrationId = `legacy-migration:${crypto.randomUUID()}`

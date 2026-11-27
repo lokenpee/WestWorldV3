@@ -143,7 +143,8 @@ export function createLocalStorageServer(directory: string, protector: Credentia
         const counts = body.counts as Record<string, number>, writes: RecordWrite[] = []
         for (const table of Object.keys(schemaFor(target))) {
           const rows = store.query(pending, table)
-          if (rows.length !== counts[table]) throw new Error('迁移记录数量不符，请重新复制。')
+          const expected = table === 'eventRetrievalVectors' ? counts[table] ?? 0 : counts[table]
+          if (rows.length !== expected) throw new Error('迁移记录数量不符，请重新复制。')
           for (const row of rows) { writes.push({ scope: target, table, key: row.key, value: row.value }); writes.push({ scope: pending, table, key: row.key }) }
         }
         writes.push({ scope: 'settings', table: 'books', key: id, value: book })

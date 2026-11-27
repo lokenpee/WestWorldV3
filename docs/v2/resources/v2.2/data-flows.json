@@ -328,7 +328,7 @@
           "input": "节点人物编号与当前人物变更",
           "read": "当前人物编号、主名及合并映射",
           "transform": "删除移除关联，改名更新名称，合并替换为保留编号并去重",
-          "write": "节点actorIds/targetCharacterIds及actors/targets；事件线人物集合由节点派生",
+          "write": "节点actorIds及actors；事件线人物集合由节点派生",
           "commit": "人物变更与节点关联同事务",
           "failure": "同名未绑定项由明确身份选择，原文章节与参考引文保留",
           "consumer": "节点/线详情和筛选随当前实体立即刷新"

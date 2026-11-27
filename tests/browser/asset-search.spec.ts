@@ -20,8 +20,12 @@ async function prepare(page: Page) {
         { ...common, id: 'other', name: '晴雯', identity: '侍女', roleWeight: 'NPC' },
       ],
       locations: [{ ...common, id: 'L1', name: '东院', description: '宁国府内的院子' }, { ...common, id: 'L2', name: '宁国府' }, { ...common, id: 'L3', name: '宁府', aliases: ['宁国府'] }],
-      nodes: [{ ...common, id: 'N1', name: '薛蟠案', summary: '案件开始', order: 0, actors: [], quote: '', eventLineIds: ['E1'] }, { ...common, id: 'N2', name: '宝钗探问', summary: '询问薛蟠案经过', order: 1, actors: [], quote: '', eventLineIds: ['E2'] }],
-      eventLines: [{ id: 'E1', bookId, title: '薛蟠案', nodeIds: ['N1'], chapters: ['1'], cause: '', process: '', result: '', lineStatus: 'open', revision: 1, createdBy: 'P3', updatedAt: new Date().toISOString() }, { id: 'E2', bookId, title: '宝钗探问', nodeIds: ['N2'], chapters: ['1'], cause: '薛蟠案牵动亲族', process: '询问审讯情况', result: '等待结案', lineStatus: 'open', revision: 1, createdBy: 'P3', updatedAt: new Date().toISOString() }],
+      nodes: [{ ...common, id: 'N1', name: '薛蟠案', summary: '案件开始', order: 0, actors: ['薛文龙'], actorIds: ['A1'], quote: '', eventLineIds: ['E1'] }, { ...common, id: 'N2', name: '宝钗探问', summary: '询问薛蟠案经过', order: 1, actors: [], quote: '', eventLineIds: ['E2'] }],
+      storyEvents: [
+        { id: 'EV1', bookId, title: '审理案件', summary: '核实经过', clues: ['证词'], status: '进行中', nodeIds: ['N1'], revision: 1 },
+        { id: 'EV2', bookId, title: '亲友追问', summary: '亲友寻访', clues: ['询问'], nodeIds: ['N1', 'N2'], revision: 1 },
+      ],
+      eventLines: [{ id: 'E1', bookId, eventIds: ['EV1'], title: '薛蟠案', nodeIds: ['N1'], chapters: ['1'], lineStatus: 'open', revision: 1, createdBy: 'P3', updatedAt: new Date().toISOString() }, { id: 'E2', bookId, title: '宝钗探问', nodeIds: ['N2'], chapters: ['1'], summary: '薛蟠案牵动亲族，询问审讯情况，等待结案', lineStatus: 'open', revision: 1, createdBy: 'P3', updatedAt: new Date().toISOString() }],
     }
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(Object.keys(rows), 'readwrite')
@@ -32,6 +36,32 @@ async function prepare(page: Page) {
   await page.reload()
   await expect(page.getByRole('button', { name: /^人物 6$/ })).toBeVisible()
 }
+
+test('字段筛选区分参与者与概述，事件详情显示成员并可回到节点', async ({ page }) => {
+  await prepare(page)
+  await page.getByRole('button', { name: /^节点 2$/ }).click()
+  const field = page.getByLabel('检索字段')
+  const query = page.getByLabel('搜索资产')
+  await field.selectOption('people')
+  await query.fill('薛蟠')
+  await expect(page.locator('.asset-list code')).toHaveText(['N1'])
+  await field.selectOption('summary')
+  await expect(page.locator('.asset-list code')).toHaveText(['N2'])
+  await page.getByRole('button', { name: /^事件 2$/ }).click()
+  const details = page.getByRole('article', { name: '事件详情' })
+  await page.getByRole('button', { name: /亲友追问/ }).click()
+  await expect(details).toContainText('尚未归线')
+  await expect(details.getByRole('button')).toHaveCount(2)
+  await page.getByRole('button', { name: /审理案件/ }).click()
+  await expect(details).toContainText('进行中')
+  await expect(details).toContainText('薛蟠案')
+  await field.selectOption('clues')
+  await query.fill('不存在')
+  await expect(details).toHaveCount(0)
+  await query.fill('证词')
+  await details.getByRole('button', { name: '第一章 开始 · 薛蟠案' }).click()
+  await expect(page.getByRole('button', { name: /^节点 2$/ })).toHaveAttribute('aria-pressed', 'true')
+})
 
 test('姓名排在别名和正文之前，同名按章序，层级筛选与合并选择保留', async ({ page }, testInfo) => {
   await prepare(page)
@@ -71,10 +101,10 @@ test('地点别名、事件概述和事件线正文均可搜，标题匹配优�
   await page.getByRole('button', { name: /^地点 3$/ }).click()
   await page.getByLabel('搜索资产', { exact: true }).fill('宁国府')
   await expect(panel.locator('.asset-list code')).toHaveText(['L2', 'L3', 'L1'])
-  await page.getByRole('button', { name: /^事件节点 2$/ }).click()
+  await page.getByRole('button', { name: /^节点 2$/ }).click()
   await page.getByLabel('搜索资产', { exact: true }).fill('薛蟠案')
   await expect(panel.locator('.asset-list code')).toHaveText(['N1', 'N2'])
-  await page.getByRole('button', { name: /^事件线 2$/ }).click()
+  await page.getByRole('button', { name: /^故事线 2$/ }).click()
   await page.getByLabel('搜索资产', { exact: true }).fill('薛蟠案')
   await expect(panel.locator('.asset-list code')).toHaveText(['E1', 'E2'])
   for (const query of ['亲族', '审讯', '结案']) {

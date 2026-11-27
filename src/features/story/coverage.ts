@@ -6,7 +6,7 @@ export function storyContent(table: string, value: Row | null) {
   const { revision: _revision, updatedAt: _updatedAt, ...row } = value
   if (table === 'nodes') {
     delete row.eventLineIds; delete row.order; delete row.offset
-    for (const field of ['actors', 'targets', 'actorIds', 'targetCharacterIds']) if (!strings(row[field]).length) delete row[field]
+    for (const field of ['actors', 'actorIds']) if (!strings(row[field]).length) delete row[field]
   }
   if (table === 'characters' || table === 'locations') {
     delete row.frequency

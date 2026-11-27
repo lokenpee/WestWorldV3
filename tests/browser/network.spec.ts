@@ -26,7 +26,7 @@ async function prepare(page: Page, outlined = false) {
     }); db.close()
   }, outlined)
   await page.reload()
-  await page.getByRole('button', { name: /^事件节点 4$/ }).click()
+  await page.getByRole('button', { name: /^节点 4$/ }).click()
   await page.getByRole('button', { name: '事件网络', exact: true }).click()
 }
 
@@ -123,7 +123,7 @@ test('P3 从节点建立三层大纲，整理详情分阶段查看实际请求',
     await expect(fullSystem.locator('pre')).toHaveText(requests[1].system)
   }
   await close.click()
-  await page.getByRole('button', { name: '事件线 1', exact: true }).click()
+  await page.getByRole('button', { name: '故事线 1', exact: true }).click()
   await page.getByText('剧情大纲', { exact: true }).click()
   const outline = page.getByLabel('剧情大纲内容')
   await outline.getByText('信件流转', { exact: true }).click()
@@ -231,7 +231,7 @@ test('千节点网络可搜索定位末项，筛选后保持实际总数', async
     }); db.close()
   })
   await page.reload()
-  await page.getByRole('button', { name: /^事件节点 1000$/ }).click()
+  await page.getByRole('button', { name: /^节点 1000$/ }).click()
   await page.getByRole('button', { name: '事件网络', exact: true }).click()
   const network = page.getByRole('region', { name: '事件网络', exact: true })
   await expect(network).toContainText('显示 1000 / 1000 个节点', { timeout: 15000 })
@@ -278,7 +278,7 @@ test('滑轮以鼠标为锚点缩放，筛选恢复画布后仍能缩放且页�
 
 test('事件线栏目按节点选所属线，共享节点仅列所属线，孤点不打开错误编辑器', async ({ page }, testInfo) => {
   await prepare(page)
-  await page.getByRole('button', { name: /^事件线 2$/ }).click()
+  await page.getByRole('button', { name: /^故事线 2$/ }).click()
   const network = page.getByRole('region', { name: '事件网络', exact: true })
   await network.getByRole('button', { name: '查看节点 共同节点 N2', exact: true }).click()
   const choices = network.getByLabel('选择节点所属事件线')
@@ -287,7 +287,7 @@ test('事件线栏目按节点选所属线，共享节点仅列所属线，孤�
   await choices.selectOption('L2')
   await expect(page.getByRole('region', { name: '编辑事件线', exact: true })).toBeVisible()
   await expect(page.getByLabel('标题', { exact: true })).toHaveValue('人物支线')
-  await expect(page.getByRole('button', { name: /^事件线 2$/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: /^故事线 2$/ })).toHaveAttribute('aria-pressed', 'true')
   await network.getByRole('button', { name: '查看全图', exact: true }).click()
   await expect(network.locator('[data-network-node="N1"]')).toHaveAttribute('opacity', '0.3')
   await network.getByRole('button', { name: '查看节点 共同节点 N2', exact: true }).click()
@@ -303,7 +303,7 @@ test('事件线栏目按节点选所属线，共享节点仅列所属线，孤�
   await network.getByRole('button', { name: '查看节点 独立日常 N4', exact: true }).click()
   await expect(network).toContainText('该节点尚未归入事件线')
   await expect(page.getByRole('region', { name: /^编辑事件/ })).toHaveCount(0)
-  await page.getByRole('button', { name: /^事件节点 4$/ }).click()
+  await page.getByRole('button', { name: /^节点 4$/ }).click()
   await network.getByRole('button', { name: '查看全图', exact: true }).click()
   await network.getByRole('button', { name: '查看节点 共同节点 N2', exact: true }).click()
   await expect(page.getByLabel('名称', { exact: true })).toHaveValue('共同节点')

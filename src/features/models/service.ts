@@ -6,7 +6,7 @@ import { ModelError, type Attempt, type CallMode, type CallOptions, type CallRes
 import type { ToolProbeOptions } from '../agents/probe'
 
 export function createModelService(workspace: ReturnType<typeof createWorkspace>, environment: GatewayEnvironment = {}) {
-  const settings = createModelConfigStore(workspace)
+  const settings = createModelConfigStore(workspace,environment.fetch)
   const now = environment.now ?? Date.now
   async function invoke<T>(role: ModelRole, mode: 'direct' | 'agent', options: CallOptions, direct?: DirectRequest<T>, agentInput?: AgentInput): Promise<CallResult & { value?: T }> {
     const started = now()

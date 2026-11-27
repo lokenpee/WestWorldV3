@@ -12,9 +12,9 @@ export function resolveReferences(nodes: EventNode[], characters: Character[]): 
   }
   return Object.fromEntries(nodes.map(node => {
     const result: References = { actorIds: [], ambiguities: [], missingNames: [] }
-    const bound = [...(node.actorIds ?? []), ...(node.targetCharacterIds ?? [])].filter(id => byId.has(id))
+    const bound = [...(node.actorIds ?? [])].filter(id => byId.has(id))
     result.actorIds.push(...bound)
-    for (const name of new Set([...node.actors, ...(node.targets ?? [])])) {
+    for (const name of new Set([...node.actors])) {
       if (bound.some(id => knownNames.get(id)!.has(name))) continue
       const ids = [...(index.get(name.trim()) ?? [])].sort()
       if (bound.some(id => ids.includes(id))) continue

@@ -30,7 +30,7 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
   const currentPage = reviewPages.find(page => page.id === review?.currentPageId)
   const descriptionIds = currentPage?.type === 'event_summary' ? eventDescriptionBatch(review).flatMap(page => page.ids) : strings(currentPage?.ids)
   const operations = records(args.operations)
-  const writingDescription = (op: Row) => op.summary !== undefined || op.coreClue !== undefined
+  const writingDescription = (op: Row) => op.summary !== undefined || op.coreClue !== undefined || op.clues !== undefined
   if (review?.independent && operations.some(writingDescription)) {
     if (!operations.every(writingDescription)) throw new OutlineError('INVALID_ARGS', '请先单独保存归属修改并核对，再填写说明。')
     const latest = await refreshReading(store, scope.runId, scope.sessionId!, scope.phase)
@@ -53,7 +53,7 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
       return row
     }
     const title = () => text(operation.title).trim() || fail('INVALID_ARGS', '请输入名称。')
-    const changesDescription = operation.summary !== undefined || operation.coreClue !== undefined
+    const changesDescription = operation.summary !== undefined || operation.coreClue !== undefined || operation.clues !== undefined
     if (changesDescription && !narrative && scope.phase !== 'global_review') fail('INVALID_ARGS', '概况和核心关键线索只能在全书复核阶段填写。')
     if (changesDescription && review?.independent) {
       const expected = operation.op === 'update_event' ? 'event_summary' : 'line_summary'
@@ -64,18 +64,17 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
     }
     const withDescription = (row: Row): Row => {
       if (!changesDescription) return row
-      if (narrative) {
-        const updated = { ...row }
-        for (const field of ['summary', 'coreClue']) {
-          if (operation[field] === undefined) continue
-          const description = text(operation[field]).trim()
-          if (!description) fail('INVALID_ARGS', '请填写有内容的说明。可以只提交需要填写的一项。')
-          updated[field] = description
-        }
-        return updated
-      }
-      const updated = { ...row, summary: text(operation.summary ?? row.summary).trim(), coreClue: text(operation.coreClue ?? row.coreClue).trim() }
-      if (!hasOutlineDescription(updated)) fail('INVALID_ARGS', '概况和核心关键线索均为必填，请一并填写。')
+      const updated = { ...row }
+      const event = operation.op === 'create_event' || operation.op === 'update_event'
+      if (operation.summary !== undefined) updated.summary = text(operation.summary).trim()
+      if (event && operation.clues !== undefined) {
+        const clues = strings(operation.clues).map(value => value.trim())
+        if (!clues.length || clues.some(value => !value)) fail('INVALID_ARGS', '事件线索须为有内容的数组。')
+        updated.clues = [...new Set(clues)]
+      } else if (!event && operation.coreClue !== undefined) updated.coreClue = text(operation.coreClue).trim()
+      if (operation.summary !== undefined && !updated.summary || !event && operation.coreClue !== undefined && !updated.coreClue)
+        fail('INVALID_ARGS', '请填写有内容的说明。')
+      if (!narrative && !hasOutlineDescription(updated)) fail('INVALID_ARGS', '概况和核心关键线索均为必填，请一并填写。')
       return updated
     }
     const newId = (prefix: string) => {
@@ -105,7 +104,7 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
     switch (operation.op) {
       case 'create_line': {
         const id = newId('L')
-        await write('eventLines', undefined, withDescription({ id, bookId: scope.bookId, title: title(), summary: '', coreClue: '', eventIds: [], nodeIds: [], chapters: [], lineStatus: 'open', cause: '', process: '', result: '', createdBy: 'P3', ...(operation.role ? { role: operation.role } : {}) }), 'created')
+        await write('eventLines', undefined, withDescription({ id, bookId: scope.bookId, title: title(), summary: '', coreClue: '', eventIds: [], nodeIds: [], chapters: [], lineStatus: 'open', createdBy: 'P3', ...(operation.role ? { role: operation.role } : {}) }), 'created')
         await lifecycle(id, 'live')
         break
       }
@@ -120,7 +119,7 @@ export async function applyOutline(store: AgentStore, scope: Scope, args: Row, r
       case 'create_event': {
         const line = scope.workflow === 'narrative_v4' && operation.lineId === undefined ? undefined : await get('eventLines', operation.lineId)
         const id = newId('E')
-        await write('storyEvents', undefined, withDescription({ id, bookId: scope.bookId, title: title(), nodeIds: union([], nodeIds), summary: '', coreClue: '' }), 'created')
+        await write('storyEvents', undefined, withDescription({ id, bookId: scope.bookId, title: title(), nodeIds: union([], nodeIds), summary: '', clues: [] }), 'created')
         if (line) await write('eventLines', line, lineWithEvents(line, union(strings(line.eventIds), [id])), 'updated')
         break
       }

@@ -1,5 +1,5 @@
 /** 搜索只依赖这些字段，供浏览器与本机分页共用同一排序。 */
-export interface SearchAsset { id: string; name?: string; title?: string; aliases?: string[]; chapters?: string[]; sourceChapters?: string[]; chapterIndex?: string; summary?: string; identity?: string; description?: string; cause?: string; process?: string; result?: string; roleWeight?: string }
+export interface SearchAsset { id: string; name?: string; title?: string; aliases?: string[]; chapters?: string[]; sourceChapters?: string[]; chapterIndex?: string; summary?: string; identity?: string; description?: string; roleWeight?: string }
 interface Chapter { chapterIndex: string; order: number }
 type Asset = SearchAsset
 interface Character extends SearchAsset { name: string }
@@ -20,7 +20,7 @@ function rankAsset(row: Asset, query: string): Rank | undefined {
     if (offset >= 0) matches.push([offset === 0 ? 2 : 3, field, offset, value.length - query.length])
   }
   if (matches.length) return matches.sort(compareRank)[0]
-  const body = 'title' in row ? [row.cause, row.process, row.result] : 'summary' in row ? [row.summary] : 'identity' in row ? [row.identity ?? ''] : 'description' in row ? [row.description ?? ''] : []
+  const body = 'title' in row ? [row.summary ?? ''] : 'summary' in row ? [row.summary] : 'identity' in row ? [row.identity ?? ''] : 'description' in row ? [row.description ?? ''] : []
   if (body.some(value => normalize(value ?? '').includes(query))) return [4, 0, 0, 0]
   return undefined
 }

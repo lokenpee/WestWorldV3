@@ -144,7 +144,7 @@ export function assertPreview(preview: ImportPreview) {
   const ids = new Set<string>()
   let offset = 0
   for (const [order, chapter] of preview.chapters.entries()) {
-    if (!chapter.chapterName.trim() || !chapter.chapterIndex || ids.has(chapter.chapterIndex) || chapter.order !== order || !Number.isSafeInteger(chapter.charCount) || chapter.charCount < 1 || chapter.charCount > 10000) throw new Error('导入预览的章节信息不完整，请重新预览。')
+    if (!chapter.chapterName.trim() || !chapter.chapterIndex || ids.has(chapter.chapterIndex) || chapter.order !== order || !Number.isSafeInteger(chapter.charCount) || chapter.charCount < 1) throw new Error('导入预览的章节信息不完整，请重新预览。')
     const end = offset + chapter.charCount
     if ('text' in chapter ? chapter.text.length !== chapter.charCount || chapter.text !== preview.text.slice(offset, end)
       : chapter.start !== offset || chapter.end !== end || end > preview.text.length) throw new Error('导入预览正文不一致，请重新预览。')

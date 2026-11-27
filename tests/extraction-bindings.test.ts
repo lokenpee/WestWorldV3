@@ -13,7 +13,7 @@ import { agentStream } from './support/agent-protocol'
 
 const timestamp = '2026-11-19T00:00:00.000Z'
 const person = (id: string, name: string, aliases: string[] = []): Character => ({ id, bookId: 'a', name, aliases, confidence: 1, revision: 1, createdBy: 'P1' })
-const node = (id: string, actors: string[], targets: string[] = []): EventNode => ({ id, bookId: 'a', name: id, summary: id, actors, targets, chapterIndex: '1', chapterName: '第一章', order: 0, quote: '', eventLineIds: [], confidence: 1, revision: 1, createdBy: 'P1' })
+const node = (id: string, actors: string[], targets: string[] = []): EventNode => ({ id, bookId: 'a', name: id, summary: id, actors: [...actors, ...targets], chapterIndex: '1', chapterName: '第一章', order: 0, quote: '', eventLineIds: [], confidence: 1, revision: 1, createdBy: 'P1' })
 const relation = (id: string, targetName: string, targetIds: string[] = [], originCharacterId = 'source'): CharacterRelation => ({ id, bookId: 'a', originCharacterId, sourceName: '张三', sourceId: originCharacterId === 'source' ? 'source' : null, targetName, targetIds, relationType: 'friend', forwardLabel: '朋友', reverseLabel: '朋友', direction: 'bidirectional', evidence: [], revision: 1, createdAt: timestamp, updatedAt: timestamp })
 const mapping = (originId: string, currentId: string): Lifecycle => ({ key: `character:${originId}`, bookId: 'a', kind: 'character', originId, currentId, state: 'merged', revision: 1, updatedAt: timestamp })
 
@@ -42,7 +42,7 @@ it('新增主名和有效别名补齐未绑定与同名记录，结果逐对象�
   expect(result.selectedNodes.map(value => value.id)).toEqual(['late', 'same', 'alias'])
   expect(result.selectedRelations.map(value => value.id)).toEqual(['late', 'same', 'alias'])
   expect(result.nextNodes[1].actorIds).toEqual(['shen', 'same'])
-  expect(result.nextNodes[2].targetCharacterIds).toEqual(['alias'])
+  expect(result.nextNodes[2].actorIds).toEqual(['alias'])
   expect(result.nextRelations[1].targetIds).toEqual(['same', 'shen'])
   expect(result.nextNodes[3]).toBe(nodes[3])
   expect(result.nextRelations[3]).toBe(rows[3])
@@ -52,11 +52,11 @@ it('节点保留原始称呼，关系通过旧别名绑定后仍参与主名扩�
   const before = [person('source', '张三'), person('shen', '沈青', ['沈公子']), person('other', '顾衡', ['信使'])]
   const nodes = [links.bindNodeCharacters(node('old-alias', ['沈公子']), before), links.bindNodeCharacters(node('target-alias', [], ['信使']), before)]
   expect(nodes[0].actors).toEqual(['沈青'])
-  expect(nodes[1].targets).toEqual(['顾衡'])
+  expect(nodes[1].actors).toEqual(['顾衡'])
   const rows = [relation('bound-by-alias', '沈公子', ['shen'])]
   const result = compareWithFull(before, [person('new-shen', '沈青'), person('new-alias', '新来客', ['沈公子', '信使'])], nodes, rows)
   expect(result.nextNodes[0].actorIds).toEqual(['shen', 'new-alias'])
-  expect(result.nextNodes[1].targetCharacterIds).toEqual(['other', 'new-alias'])
+  expect(result.nextNodes[1].actorIds).toEqual(['other', 'new-alias'])
   expect(result.nextRelations[0].targetIds).toEqual(['new-alias', 'new-shen', 'shen'])
 })
 
@@ -81,13 +81,11 @@ it('通用别称仍不自动命中，作为人物主名时仍完整匹配', () =
   expect(result.nextRelations[1]).toBe(rows[1])
 })
 
-it('既有编号在本批出现时保留节点的人工和旧资料来源', () => {
+it('既有编号在本批出现时保留节点的人工关联', () => {
   const before = [person('source', '张三')]
   const manual = { ...node('manual', []), actorIds: ['new'], manualActorIds: ['new'] }
-  const legacy = { ...node('legacy', []), targetCharacterIds: ['new'], legacyTargetCharacterIds: ['new'] }
-  const result = compareWithFull(before, [person('new', '新人物')], [manual, legacy], [])
+  const result = compareWithFull(before, [person('new', '新人物')], [manual], [])
   expect(result.nextNodes[0]).toMatchObject({ actors: ['新人物'], manualActorIds: ['new'] })
-  expect(result.nextNodes[1]).toMatchObject({ targets: ['新人物'], legacyTargetCharacterIds: ['new'] })
 })
 
 it('不同新增主名和别名组合与原全量结果一致', () => {

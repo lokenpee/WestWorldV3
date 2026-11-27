@@ -35,11 +35,11 @@ it('地点按名称、别名和描述匹配，名称精确结果优先', () => {
   expect(ids(searchAssets(rows, '宁国府'))).toEqual(['exact', 'alias', 'body'])
 })
 
-it('事件节点的名称结果优先于概述提及，事件线可按起因经过结果查找', () => {
+it('事件节点的名称结果优先于概述提及，故事线可按概述查找', () => {
   const node = (id: string, name: string, summary: string): EventNode => ({ id, bookId: 'a', revision: 1, createdBy: 'P1', name, summary, actors: [], quote: '', chapterIndex: '1', chapterName: '第一章', order: 0, confidence: 1 })
   expect(ids(searchAssets([node('body', '宝钗探问', '谈起薛蟠案'), node('exact', '薛蟠案', '')], '薛蟠案'))).toEqual(['exact', 'body'])
-  const line = (id: string, title: string, field: 'cause' | 'process' | 'result' = 'cause'): EventLine => ({ id, bookId: 'a', revision: 1, createdBy: 'P3', title, nodeIds: [], chapters: [], cause: '', process: '', result: '', [field]: '涉及薛蟠案', lineStatus: 'open', updatedAt: '' })
-  const lines = [line('cause', '案情缘起'), line('process', '审讯经过', 'process'), line('result', '结案处置', 'result'), line('exact', '薛蟠案')]
+  const line = (id: string, title: string): EventLine => ({ id, bookId: 'a', revision: 1, createdBy: 'P3', title, nodeIds: [], chapters: [], summary: '涉及薛蟠案', lineStatus: 'open', updatedAt: '' })
+  const lines = [line('cause', '案情缘起'), line('process', '审讯经过'), line('result', '结案处置'), line('exact', '薛蟠案')]
   expect(searchAssets(lines, '薛蟠案')[0].id).toBe('exact')
   expect(ids(searchAssets(lines, '薛蟠案')).sort()).toEqual(['cause', 'exact', 'process', 'result'])
 })

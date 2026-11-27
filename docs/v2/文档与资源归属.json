@@ -46,7 +46,7 @@
     },
     {
       "path": "docs/v2/08-追溯与验证记录.md",
-      "role": "历史证据索引",
+      "role": "资产与任务追溯",
       "baselineSha256": "d4c32e12e999c28c5b72e626ec176043356eb81f967095084cb8b9d5ff0a94b5"
     },
     {
@@ -1347,371 +1347,371 @@
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "0. 2.2本次规格变更与验证边界",
       "anchor": "0-22本次规格变更与验证边界",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/v2.2-document-validation.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "1. 基线与取证边界",
       "anchor": "1-基线与取证边界",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/baseline.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "2. 验证记录",
       "anchor": "2-验证记录",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/contract-validation.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "2.1 独立重建状态",
       "anchor": "21-独立重建状态",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/semantic-coverage-review.md",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "3. 需求到实现与验收映射",
       "anchor": "3-需求到实现与验收映射",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/governance-baseline/12-验收执行与覆盖矩阵.md",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "4. 源码证据索引",
       "anchor": "4-源码证据索引",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E01",
       "anchor": "e01",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E02",
       "anchor": "e02",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E03",
       "anchor": "e03",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E04",
       "anchor": "e04",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E05",
       "anchor": "e05",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E06",
       "anchor": "e06",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E07",
       "anchor": "e07",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E08",
       "anchor": "e08",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E09",
       "anchor": "e09",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E10",
       "anchor": "e10",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E11",
       "anchor": "e11",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E12",
       "anchor": "e12",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E13",
       "anchor": "e13",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E14",
       "anchor": "e14",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E15",
       "anchor": "e15",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E16",
       "anchor": "e16",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E17",
       "anchor": "e17",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E18",
       "anchor": "e18",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E19",
       "anchor": "e19",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E20",
       "anchor": "e20",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E21",
       "anchor": "e21",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E22",
       "anchor": "e22",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E23",
       "anchor": "e23",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E24",
       "anchor": "e24",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E25",
       "anchor": "e25",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E26",
       "anchor": "e26",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E27",
       "anchor": "e27",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E28",
       "anchor": "e28",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E29",
       "anchor": "e29",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E30",
       "anchor": "e30",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E31",
       "anchor": "e31",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E32",
       "anchor": "e32",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E33",
       "anchor": "e33",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E34",
       "anchor": "e34",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E35",
       "anchor": "e35",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E36",
       "anchor": "e36",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E37",
       "anchor": "e37",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E38",
       "anchor": "e38",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "E39",
       "anchor": "e39",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/source-references.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "5. 可复查UI记录",
       "anchor": "5-可复查ui记录",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/coverage-validation.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "6. 资源和接口覆盖",
       "anchor": "6-资源和接口覆盖",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/resource-manifest-2.1.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "7. 2.1历史维护与检查命令（不得覆盖2.2）",
       "anchor": "7-21历史维护与检查命令不得覆盖22",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/scripts/README.md",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "8. 2.1本轮验证",
       "anchor": "8-21本轮验证",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/portable-baseline-results.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "2026-10-23 · 字段、工具与Pi接入复核",
       "anchor": "2026-10-23--字段工具与pi接入复核",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/2026-10-23-contract-validation.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "2026-10-23 · 第二次可重建性审查",
       "anchor": "2026-10-23--第二次可重建性审查",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/2026-10-23-reconstruction-review.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "2026-10-24 · 需求补全与验证",
       "anchor": "2026-10-24--需求补全与验证",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/2026-10-24-gap-validation.json",
       "status": "历史证据"
     },
     {
       "source": "docs/v2/08-追溯与验证记录.md",
       "heading": "2026-10-24 · 缺陷优先修复规格",
       "anchor": "2026-10-24--缺陷优先修复规格",
-      "owner": "docs/v2/08-追溯与验证记录.md",
+      "owner": "docs/v2/evidence/2026-10-24-bugfix-spec-validation.json",
       "status": "历史证据"
     },
     {
@@ -2916,6 +2916,14 @@
     }
   ],
   "resources": [
+    {
+      "path": "docs/v2/项目技术说明.md",
+      "role": "工具、接口、提示词与技术变更统一说明",
+      "consumers": [
+        "AGENTS.md",
+        "docs/v2/00-阅读入口与术语.md"
+      ]
+    },
     {
       "path": "docs/v2/resources/acceptance-cases.json",
       "role": "历史取证或基础参考",
@@ -4184,24 +4192,14 @@
       ]
     },
     {
-      "path": "docs/v2/resources/v2.2/prompts/active/p3-narrative-v4.md",
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-event-link.md",
       "role": "运行时权威资源",
       "consumers": [
-        "src/features/story/narrativeService.ts"
+        "src/features/story/narrativePrompts.ts"
       ]
     },
     {
-      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-node_batch.json",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-event_cycle.json",
-      "role": "设计样例与技术参考",
-      "consumers": []
-    },
-    {
-      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-event_review.json",
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-link_node.json",
       "role": "设计样例与技术参考",
       "consumers": []
     },
@@ -4211,14 +4209,94 @@
       "consumers": []
     },
     {
-      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-line_cycle.json",
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-line_cycle-unassigned.json",
       "role": "设计样例与技术参考",
       "consumers": []
     },
     {
-      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-line_review.json",
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-line_review-descriptions.json",
       "role": "设计样例与技术参考",
       "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-event-boundaries.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-review_boundaries.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-event-sequence.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-review_sequence.json",
+      "role": "设计样例与技术参考",
+      "consumers": []
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-group.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-cycle-structure.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-cycle-doubts.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-cycle-unassigned.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-review-structure.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-review-doubts.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-review-unassigned.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-review-descriptions.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ]
     }
   ],
   "runtimeAssets": [
@@ -4238,7 +4316,7 @@
         "src/features/extraction/contracts.ts",
         "src/features/world/optimization.ts"
       ],
-      "sha256": "2439d3ce165b2a735f9ed2a37de99d7cb7c9f3901ed198e117426dee015ab7dd"
+      "sha256": "d3e27f1d9685c9f05f4a2f594a6cc5ab9b9762b22002734d2651a01658deec57"
     },
     {
       "path": "docs/v2/resources/v2.2/model-output-contract.json",
@@ -4247,7 +4325,7 @@
         "src/features/agents/contracts.ts",
         "src/features/world/optimization.ts"
       ],
-      "sha256": "6c9388c2202f64d50555ed80a7520340908b64d9aaa2ba3a3fcb8a7e1c2d42ce"
+      "sha256": "632dbaf7438c6834ca1080d6858c99cad5d3c69bbeb40277114e7a4dd076266d"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/character-optimize.md",
@@ -4337,7 +4415,7 @@
       "consumers": [
         "src/features/agents/probe.ts"
       ],
-      "sha256": "275abc24345628bc9ffaf25b46a70760bcd13b4d56c2a0566c6dbe9a37917d53"
+      "sha256": "20591a8484c3464cb75a584e4d1b5255cfcade6cea6be56ab13290ef3f81bafb"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/probe_system.txt",
@@ -4361,7 +4439,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "c8a66aa1781688b0cdab5a1eecf2a132e83bae87365a62e945398b83391d6ed5"
+      "sha256": "ccef83b97f9bf043515b875290ba0be70bdebd4218a50c67bd2969099b1cc047"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-contracts.json",
@@ -4369,7 +4447,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "2c162ef9e8998725785475ceb6149e54c61e680a0cff5bdf93237c57d9f4ef42"
+      "sha256": "eb056263d2820566e7b2e075283b4304cc73edf4838224de2bd4ccddefafac82"
     },
     {
       "path": "docs/v2/resources/v2.2/tool-results.schema.json",
@@ -4377,7 +4455,7 @@
       "consumers": [
         "src/features/agents/contracts.ts"
       ],
-      "sha256": "a6814723a7653fa8d04d866edda5682f6b0e3494658d8c4950f1df0ba2cd94af"
+      "sha256": "377e345bcb8b61e53b7e10f8e617123209a1a585d20d32ead9975d2fd5277a7c"
     },
     {
       "path": "docs/v2/resources/v2.2/prompts/active/p2-asset-review.md",
@@ -4444,12 +4522,92 @@
       "sha256": "86aead75b11cc172d62c6139e875815d18311b0bf2d2e2feaa289f148f86285d"
     },
     {
-      "path": "docs/v2/resources/v2.2/prompts/active/p3-narrative-v4.md",
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-event-link.md",
       "role": "运行时权威资源",
       "consumers": [
-        "src/features/story/narrativeService.ts"
+        "src/features/story/narrativePrompts.ts"
       ],
-      "sha256": "8a5407b3b62403d567f7293b07a6fc9c7956a808e89b29559d37189ed3622f35"
+      "sha256": "76b8ea0dd2ec954cf2d1ac122676aa6653497087f227e432173910c31cca2145"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-event-boundaries.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "53c6305f07322ce4211a5434c28f61dbef5122159fa685d067efbdc7e93b09be"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-event-sequence.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "286402d419291cf9a8e983d36b28be1b681defa6379ebcebe8718ba5fb48e2ba"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-group.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "5503bd5903a4f679d9b0d153029d25898955ca2ee8a3b37e60a7969f4ac44785"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-cycle-structure.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "60d0f668f31a66bbe16359cec31989e28aaa4b317ad08ce5025f4634bff3e9f4"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-cycle-doubts.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "0861fcd0aecdbfa31adc0d00c9ca9668e09f8db79b0a3ef953b6e1193004ec29"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-cycle-unassigned.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "d6088a8005bb12004acbae922886cb0834429fc864409ac474500ec981211139"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-review-structure.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "4e2e9d6bf047f31965a66589de5fb4368c6d4ad1f4fe77c6d55b9ef6ea8cd46f"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-review-doubts.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "6dc8ace31d36d6e46ce0b92fbf4179b7bae4053553aafaf9fc08f0f9387b6ae9"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-review-unassigned.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "1c09033067980d1437e786c602d8b583bd22051f11c688016001e53d430704fb"
+    },
+    {
+      "path": "docs/v2/resources/v2.2/prompts/active/p3-line-review-descriptions.md",
+      "role": "运行时权威资源",
+      "consumers": [
+        "src/features/story/narrativePrompts.ts"
+      ],
+      "sha256": "ea5c458dd7a9105cf1cb382f98a26faf00bd017af95009bd3ec502293733078a"
     }
   ],
   "decisions": [

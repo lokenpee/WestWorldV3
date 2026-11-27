@@ -33,7 +33,7 @@ test('隐藏选择保留，预览明确选择主名，合并同步节点与持�
   await expect(page.getByRole('button', { name: '编辑 张三', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '编辑 张清', exact: true })).toBeVisible()
   await expect(page.getByLabel('别名', { exact: true })).toHaveValue(/张三/)
-  await page.getByRole('button', { name: /^事件节点 \d/ }).click()
+  await page.getByRole('button', { name: /^节点 \d/ }).click()
   await page.getByRole('button', { name: '编辑 交付信件', exact: true }).click()
   await expect(page.getByRole('button', { name: /^移除人物 张清 / })).toHaveCount(1)
   await expect(page.getByLabel('已选人物')).toContainText('李四')

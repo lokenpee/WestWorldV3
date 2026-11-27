@@ -7,7 +7,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { formatNarrativeInput, narrativeSystemPrompt } from '../src/features/story/narrativeInput.ts'
+import { formatLinkNodeInput, formatNarrativeInput, withReviewMaterialGuide } from '../src/features/story/narrativeInput.ts'
 import { narrativeToolDescription, narrativeToolSchemas } from '../src/features/story/narrativeToolSchema.ts'
 import { compactOutlineParameters } from '../src/features/story/outlineToolSchema.ts'
 import { storyPagePrompt, storyPageReasoning } from '../src/features/story/readingPresentation.ts'
@@ -51,7 +51,7 @@ const changes = { hashes: [], examples: [], missing: [] }
 
 const manifestFile = path.join(resources, 'v2.2/prompt-call-manifest.json')
 let manifestChanged = false
-for (const call of calls.filter(item => ['PROMPT-P3-WINDOW', 'PROMPT-P3-GLOBAL', 'PROMPT-P3-NARRATIVE-V4'].includes(item.id))) {
+for (const call of calls.filter(item => ['PROMPT-P3-WINDOW', 'PROMPT-P3-GLOBAL'].includes(item.id) || item.id.startsWith('PROMPT-P3-NARRATIVE-V4'))) {
   const digest = sha256(promptFile(call))
   if (call.promptSha256 === digest) continue
   manifestChanged = true
@@ -77,13 +77,16 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
   if (!source || !fs.existsSync(source)) continue
   const beforeExample = JSON.stringify(example)
   let prompt = normalize(fs.readFileSync(source, 'utf8'))
-  if (call.id === 'PROMPT-P3-NARRATIVE-V4') {
+  if (call.id.startsWith('PROMPT-P3-NARRATIVE-V4')) {
+    if (['review_boundaries', 'review_sequence'].includes(example.input.mode))
+      example.input.material = withReviewMaterialGuide(example.input.material)
+    const systemPrompt = prompt.trim()
     const contract = JSON.parse(fs.readFileSync(path.join(resources,'v2.2/tool-contracts.json'),'utf8'))
     const spec = contract.profiles.story_editor.find(t=>t.name==='save_story_outline').parameters
     const schemas = narrativeToolSchemas(example.input, contract.narrativeV4, spec)
     const tools = Object.entries(schemas).map(([name,parameters])=>({name,description:narrativeToolDescription(name,example.input),parameters}))
     const discipline=normalize(fs.readFileSync(path.join(activePrompts,'output-discipline.txt'),'utf8')).trim()
-    example.context = {messages:[{role:'system',content:narrativeSystemPrompt(prompt,example.input)+'\n\n'+discipline,toolsAdded:tools,timestamp:0},{role:'user',content:formatNarrativeInput(example.input),timestamp:1}],tools}
+    example.context = {messages:[{role:'system',content:systemPrompt+'\n\n'+discipline,toolsAdded:tools,timestamp:0},{role:'user',content:example.input.mode === 'link_node' ? formatLinkNodeInput(example.input.material, example.input.material.候选事件) : example.input.material ? JSON.stringify(example.input.material) : formatNarrativeInput(example.input),timestamp:1}],tools}
     if (beforeExample !== JSON.stringify(example)) { changes.examples.push(name); writeJson(file, example) }
     continue
   }
@@ -109,7 +112,7 @@ for (const name of fs.readdirSync(examplesDir).filter(name => name.endsWith('.js
     const hints = input.contextHints ?? { assigned: input.workItems.map(item => ({ kind: item.kind, id: item.id, title: '三河帮的线索', summary: '发现三河帮活动的迹象', chapters: ['1'] })), related: [] }
     const page = { id: review ? 'orphans:1' : 'nodes:1', pageNumber: 1, totalPages: 1, type: 'node_page', ids: input.workItems.map(item => item.id) }
     const brief = input.page ? input : { phase: input.phase, queue: input.queue, page, remainingCount: input.remainingCount, workItems: hints.assigned, related: hints.related, moreRelated: hints.truncated === true, workingSummary: input.memory?.workingSummary ?? '' }
-    const view = row => row.kind === 'node' ? { id: row.id, kind: 'node', name: row.name ?? row.title, chapterIndex: row.chapterIndex ?? row.chapters?.[0] ?? '' } : row.kind === 'eventLine' ? { id: row.id, kind: 'eventLine', title: row.title, summary: row.summary ?? [row.cause, row.process, row.result].filter(Boolean).join('\n\n'), nodeIds: row.nodeIds ?? [], lineStatus: row.lineStatus ?? 'open' } : row
+    const view = row => row.kind === 'node' ? { id: row.id, kind: 'node', name: row.name ?? row.title, chapterIndex: row.chapterIndex ?? row.chapters?.[0] ?? '' } : row.kind === 'eventLine' ? { id: row.id, kind: 'eventLine', title: row.title, summary: row.summary ?? '', nodeIds: row.nodeIds ?? [], lineStatus: row.lineStatus ?? 'open' } : row
     brief.workItems = brief.workItems.map(row => row.kind === 'node' ? { ...view(row), chapterName: row.chapterName ?? '第一章' } : view(row))
     if (review) {
       brief.outlineReview = true

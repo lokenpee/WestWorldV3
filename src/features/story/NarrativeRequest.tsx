@@ -109,6 +109,10 @@ export function NarrativeRequest({
       return typeof name === 'string' ? [{ ...call, name }] : []
     }),
     usage = requestRecord(request.usage)
+  const inputTokens = typeof usage.totalTokens === 'number' && typeof usage.output === 'number'
+    ? usage.totalTokens - usage.output : undefined
+  const cacheShare = inputTokens && typeof usage.cacheRead === 'number'
+    ? (usage.cacheRead * 100 / inputTokens).toFixed(1) + '%' : undefined
   const seen = new Map<string, number>()
   if (Array.isArray(previousHashes))
     for (const hash of previousHashes) seen.set(hash, (seen.get(hash) ?? 0) + 1)
@@ -128,7 +132,7 @@ export function NarrativeRequest({
         if (part.type === 'toolCall') fn.push({ id: part.id, name: part.name })
       for (const call of fn) names.set(String(call.id), String(call.name))
       const placeholder = role === 'user' && /^\[第 \d+ 轮\]/.test(content)
-      const material = role === 'user' && /^\{\s*"(任务说明|mode)"/.test(content)
+      const material = role === 'user' && (content.startsWith('【当前节点概览开始】') || /^\{\s*"(资料说明|本组事件|主审事件|全书事件目录|当前事件|任务说明|mode)"/.test(content))
       const title = placeholder ? '历史占位' : material ? '任务材料' : (roleName[role] ?? role)
       const tool = names.get(String(message.tool_call_id ?? message.toolCallId))
       const action = fn.map((c) => c.name).join('、') || tool
@@ -185,10 +189,8 @@ export function NarrativeRequest({
       </h3>
       <p>
         {String(request.model ?? '')} · {new Date(String(request.startedAt)).toLocaleString('zh-CN')} · 输入{' '}
-        {typeof usage.totalTokens === 'number' && typeof usage.output === 'number'
-          ? usage.totalTokens - usage.output
-          : '待返回'}{' '}
-        token · 缓存读取 {String(usage.cacheRead ?? '待返回')} · 输出 {String(usage.output ?? '待返回')} token
+        {inputTokens ?? '待返回'}{' '}
+        token · 缓存读取 {String(usage.cacheRead ?? '待返回')}{cacheShare && '（占输入 ' + cacheShare + '）'} · 输出 {String(usage.output ?? '待返回')} token
       </p>
       <h4>{actual ? '发送给 API' : '调用前保存的上下文'}</h4>
       {messages(true)}
@@ -205,10 +207,10 @@ export function NarrativeRequest({
           )
         }
       </LazyDetails>
+      {messages(false)}
       <LazyDetails className="run-role run-request-parameters" summary="请求参数">
         {() => <pre>{displayContent(input.requestParameters)}</pre>}
       </LazyDetails>
-      {messages(false)}
       {input.completeness === 'partial' || input.missingRefs ? (
         <p role="status">输入记录不完整。{String(input.incompleteReason ?? '')}</p>
       ) : null}

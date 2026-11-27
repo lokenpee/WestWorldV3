@@ -1,3 +1,4 @@
+import { migrateNarrativeFields, type NarrativeTables } from '../../features/assets/narrativeMigration'
 import { transact } from './transaction'
 import Dexie, { type Table } from 'dexie'
 import { remoteDatabase, type StorageCall } from '../../features/local-storage/client'
@@ -32,7 +33,7 @@ export const MAIN_SCOPE: DatabaseScope = {
   settingsName: 'westworld_settings',
   bookPrefix: 'westworld_canon_',
 }
-export const BOOK_SCHEMA_VERSION = 10
+export const BOOK_SCHEMA_VERSION = 12
 
 export interface BookSummary {
   bookId: string
@@ -165,7 +166,14 @@ class BookDatabase extends Dexie {
       extractionTasks: 'id, runId, [runId+ordinal], [runId+status]',
       extractionInputs: 'id',
     })
-    this.version(BOOK_SCHEMA_VERSION).stores({ storyEvents: 'id' })
+    this.version(10).stores({ storyEvents: 'id' })
+    this.version(11).stores({ eventRetrievalVectors: 'id' })
+    this.version(BOOK_SCHEMA_VERSION).stores({}).upgrade(async tx => {
+      const tables: NarrativeTables = { nodes: [], storyEvents: [], eventLines: [], characters: [] }
+      for (const name of Object.keys(tables) as (keyof NarrativeTables)[]) tables[name] = await tx.table(name).toArray()
+      migrateNarrativeFields(tables)
+      for (const name of ['nodes', 'storyEvents', 'eventLines'] as const) await tx.table(name).bulkPut(tables[name])
+    })
     this.on('ready', () => this.transaction('rw', this.tables, async () => {
       await repairRelationBindings(dexieMergeStore(this), bookId)
     }))

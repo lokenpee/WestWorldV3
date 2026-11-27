@@ -77,7 +77,7 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
   const outlineLine = kind === 'eventLine' && baseline && usesOutline(baseline as EventLine) ? baseline as EventLine : undefined
   const memberships = kind === 'node' && baseline ? snapshot.storyMemberships?.[baseline.id] ?? [] : []
 
-  const update = (key: keyof FormValues, value: string) => { setValues(current => ({ ...current, [key]: value, ...(key === 'actors' ? { actorIds: '' } : key === 'targets' ? { targetCharacterIds: '' } : {}) })); setFieldError(undefined); setSavedMessage('') }
+  const update = (key: keyof FormValues, value: string) => { setValues(current => ({ ...current, [key]: value, ...(key === 'actors' ? { actorIds: '' } : {}) })); setFieldError(undefined); setSavedMessage('') }
   const error = (failure: unknown) => { setFieldError({ field: failure instanceof AssetError ? failure.field : undefined, message: failure instanceof Error ? failure.message : '操作失败，请重试。' }) }
 
   async function save(): Promise<boolean> {
@@ -171,7 +171,7 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
           void repository.readChapter(bookId, values.chapterIndex).then(text => setReader({ text, title: chapters.find(chapter => chapter.chapterIndex === values.chapterIndex)?.chapterName ?? '章节原文' })).catch(error)
         }}>查看所选章节原文</button>
         {field('process', true)}
-        <NodeCharacters characters={snapshot.characters} ids={memberIds(values.participantIds)} names={values.unlinkedParticipants} disabled={disabled || conflict} error={fieldError?.field && ['participantIds', 'unlinkedParticipants', 'actors', 'actorIds', 'targets', 'targetCharacterIds'].includes(fieldError.field) ? fieldError.message : undefined} onChange={(ids, names) => {
+        <NodeCharacters characters={snapshot.characters} ids={memberIds(values.participantIds)} names={values.unlinkedParticipants} disabled={disabled || conflict} error={fieldError?.field && ['participantIds', 'unlinkedParticipants', 'actors', 'actorIds'].includes(fieldError.field) ? fieldError.message : undefined} onChange={(ids, names) => {
           setValues(current => ({ ...current, participantIds: ids.join('\n'), unlinkedParticipants: names }))
           setFieldError(undefined); setSavedMessage('')
         }} />
@@ -187,7 +187,6 @@ export const AssetEditor = forwardRef<AssetEditorHandle, {
         {outlineLine ? <OutlineEventMembers line={outlineLine} nodes={snapshot.nodes} events={snapshot.storyEvents ?? []} disabled={disabled || conflict || dirty} save={(event, nodeIds) => service.updateOutlineEventNodes(bookId, outlineLine.id, event.id, event.revision, nodeIds)} /> : <fieldset className="node-choices" disabled={disabled}><legend>成员节点</legend>{snapshot.nodes.length === 0 && <p>请先新增事件节点。</p>}{snapshot.nodes.map(node => <label key={node.id}><input type="checkbox" checked={memberIds(values.nodeIds).includes(node.id)} onChange={event => update('nodeIds', (event.target.checked ? [...memberIds(values.nodeIds), node.id] : memberIds(values.nodeIds).filter(id => id !== node.id)).join('\n'))} />{node.name}<small>{node.chapterName}</small></label>)}{memberIds(values.nodeIds).filter(id => !snapshot.nodes.some(node => node.id === id)).map(id => <button type="button" className="text-button" key={id} onClick={() => update('nodeIds', memberIds(values.nodeIds).filter(value => value !== id).join('\n'))}>移除失效节点 {id}</button>)}</fieldset>}
         {fieldError?.field === 'nodeIds' && <p role="alert" className="field-error">{fieldError.message}</p>}
         {field('summary', true)}
-        <details><summary>原有起因、经过与结果</summary>{field('cause', true)}{field('process', true)}{field('result', true)}</details>
       </>}
       {baseline && kind === 'character' && <RelationEditor ref={relationRef} bookId={bookId} character={baseline as Character} snapshot={snapshot} service={service} locked={locked || busy} onDirtyChange={setRelationDirty} />}
       {baseline && <details className="asset-metadata"><summary>来源与事实底稿</summary><p>创建来源：{baseline.createdBy === 'manual' ? '人工' : '提取'}；修订：{baseline.revision}</p>{'sourceChapters' in baseline && <p>来源章节：{baseline.sourceChapters?.join('、') || '无'}</p>}{'mergeNotes' in baseline && baseline.mergeNotes?.map((note, index) => <p key={index}>{note}</p>)}{'mergeFacts' in baseline && baseline.mergeFacts?.map(fact => <p key={fact.id}>{fact.text}（来源：{fact.chapters.join('、') || '人工'}）</p>)}</details>}

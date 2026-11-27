@@ -11,6 +11,15 @@ export function agentStream(calls: { name: string; args: unknown }[], thinking?:
 }
 
 export function agentResponse(body: { tools: { function: { name: string } }[]; messages: unknown[] }): Response {
+    if (body.tools.some(t=>t.function.name==='get_nodes')) {
+      const messages=body.messages as {role:string;content:unknown}[]
+      const count=messages.filter(m=>m.role==='tool').length
+      if (!count) return agentStream([{name:'get_nodes',args:{node_ids:['N001']}}])
+      if (count===1) return agentStream([{name:'edit_events',args:{changes:[{op:'create',reason:'守卫接过密信',fields:{
+        name:'信使向守卫交信',overview:'信使将密信送至村口交由守卫接收',latest_progress:'守卫已当场收下信使交来的密信',
+        unresolved:'密信尚待守卫转交给指定收件人',clues:['密信'],status:'进行中',nodeIds:['N001']}}]}}])
+      return agentStream([{name:'confirm',args:{result:'completed'}}])
+    }
     const story = body.tools.some((tool: { function: { name: string } }) => ['get_editor_memory', 'commit_story_changes'].includes(tool.function.name))
     const messages = body.messages as { role: string; content: unknown; tool_calls?: unknown[] }[]
     const user = messages.filter(row => row.role === 'user').map(row => contentOf(row.content)).join('\n')
@@ -28,8 +37,19 @@ export function agentResponse(body: { tools: { function: { name: string } }[]; m
 
 export function narrativeMaterial(content: string) {
   let value
-  try { value = JSON.parse(content) } catch { return undefined }
+  if (content.startsWith('【当前节点概览开始】')) {
+    const section = (name: string) => content.split('【' + name + '开始】\n')[1].split('\n【' + name + '结束】')[0]
+    const candidates = section('排序召回事件')
+    value = {当前节点:JSON.parse(section('当前节点概览')), 候选事件:candidates.startsWith('[') ? JSON.parse(candidates.split('\n')[0]) : []}
+  } else {
+    try { value = JSON.parse(content) } catch { return undefined }
+  }
   if (value?.mode && value.targets) return value
+  if (value?.当前节点) return {mode:'link_node',part:'batch',targets:[{id:value.当前节点.node_id}],material:value}
+  if (value?.主审事件) return {mode:'review_sequence',part:'structure',targets:[{id:value.主审事件.event_id}],material:value}
+  if (Array.isArray(value?.本组事件)) return {mode:'review_boundaries',part:value.本组事件.length ? 'structure':'unassigned',targets:value.本组事件.map((e:Row)=>({id:e.event_id})),material:value}
+  if (value?.本轮重点事件及直接关联事件) return {mode:'review_event',part:'structure',targets:[{id:value.本轮重点事件及直接关联事件.重点事件ID}],material:value}
+  if (value?.当前事件) return {mode:'review_event',part:'structure',targets:[{id:value.当前事件.event_id}],material:value}
   if (!value?.任务说明) return undefined
   const part = value.任务说明.part as keyof typeof reviewMaterialSections
   return {...value.任务说明, targets:value.本批节点资料 ?? value.本组事件资料 ?? value[eventCandidateSection] ?? value[lineCandidateSection] ?? value[reviewMaterialSections[part]] ?? value.本段复核资料,
@@ -44,10 +64,22 @@ export function narrativeResponse(body: {messages: Row[]}, inputs:string[]) {
     const targets = task.targets.map((r: Row) => r.id)
     const called = body.messages.some((m: Row) => m.role === 'tool')
     const call = (name: string, args: Row) => agentStream([{name,args}], '先按本段原文核实成员。')
-    const alreadyGrouped = task.mode === 'node_batch' && targets.every((id: string) =>
-      task.outline.events.some((event: Row) => (event.nodeIds as string[]).includes(id)))
-    if (!called && task.mode === 'node_batch' && !alreadyGrouped) return call('edit_events',{operations:[{op:'create_event',ref:'scene',title:'密信抵达',summary:'信使交信',nodeIds:targets}]})
-    if (!called && task.mode === 'event_group') return call('edit_storylines',{operations:[{op:'create_line',ref:'line',title:'追查密信',coreClue:'封印完整'},{op:'attach_event',eventId:targets[0],lineId:'$line'}]})
+    if (task.mode === 'link_node') {
+      const results=body.messages.filter(m=>m.role==='tool').map(m=>JSON.parse(contentOf(m.content)))
+      if (results.some(r=>r.ok && Array.isArray(r.created))) return call('confirm',{result:'completed'})
+      const previous = task.material.候选事件[0]
+      if (previous && !results.some(r=>r.event_id===previous.event_id)) return call('get_event',{event_id:previous.event_id})
+      if (previous) return call('edit_events',{changes:[{op:'update',event_id:previous.event_id,
+        fields:{nodeIds:[...results.find(r=>r.event_id===previous.event_id).members.map((member:Row)=>member.node_id),...targets]},reason:'密信继续传递'}]})
+      return call('edit_events',{changes:[{op:'create',reason:'信使开始递交密信',fields:{
+        name:'信使向守卫交信',overview:'信使将密信送至村口交由守卫接收',latest_progress:'守卫已当场收下信使交来的密信',
+        unresolved:'密信尚待守卫转交给指定收件人',clues:['密信'],status:'进行中',nodeIds:targets}}]})
+    }
+    if (['review_sequence','review_boundaries','review_event'].includes(task.mode)) return call('confirm',{result:'completed'})
+    if (!called && task.mode === 'event_group') return call('edit_storylines',{operations:[
+      {op:'create_line',ref:'line',title:'追查密信',coreClue:'封印完整'},
+      ...targets.map((eventId:string)=>({op:'attach_event',eventId,lineId:'$line'})),
+    ]})
     if (!called && task.part === 'descriptions') {
       const event = task.mode === 'event_review'
       return call(event?'edit_events':'edit_storylines',{operations:targets.map((id:string)=>({op:event?'update_event':'update_line',[event?'eventId':'lineId']:id,summary:'密信抵达并引发追查',coreClue:'信上留有印记'}))})

@@ -1,4 +1,1 @@
-探针taskId={taskId}。每次直接调用当前提供的工具，等待工具返回后进入下一步。
-第1次调用 get_editor_memory，参数为 {}。
-第2次调用 commit_story_changes，参数为 {"operationKey":"{operationKey}","payload":{"event_line_ops":[],"new_nodes":[],"memory_update":{"workingSummary":"隔离探针摘要","notes":[]}}}。
-第3次调用 submit_result，填写 status="completed"、上一步返回的 commitId 列表、简短 summary、remainingWorkIds=[]、reviewedItems=[]。
+这是设置页的隔离书籍。先用 get_nodes 读取 N001，再按其经过用 edit_events 创建包含 N001 的事件，最后用 confirm 提交 completed。请在三次请求内完成。

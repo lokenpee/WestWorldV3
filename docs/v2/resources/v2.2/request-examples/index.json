@@ -19,11 +19,11 @@
     "VARIANT-P3-RECOVERY.json",
     "VARIANT-P3-WRITE-REPAIR.json",
     "VARIANT-P3-FINAL-REPAIR.json",
-    "PROMPT-P3-NARRATIVE-V4-node_batch.json",
-    "PROMPT-P3-NARRATIVE-V4-event_cycle.json",
-    "PROMPT-P3-NARRATIVE-V4-event_review.json",
+    "PROMPT-P3-NARRATIVE-V4-link_node.json",
     "PROMPT-P3-NARRATIVE-V4-event_group.json",
-    "PROMPT-P3-NARRATIVE-V4-line_cycle.json",
-    "PROMPT-P3-NARRATIVE-V4-line_review.json"
+    "PROMPT-P3-NARRATIVE-V4-line_cycle-unassigned.json",
+    "PROMPT-P3-NARRATIVE-V4-line_review-descriptions.json",
+    "PROMPT-P3-NARRATIVE-V4-review_boundaries.json",
+    "PROMPT-P3-NARRATIVE-V4-review_sequence.json"
   ]
 }

@@ -50,7 +50,7 @@ export async function repairRelationBindings(store: MergeStore, bookId: string, 
   }))
   const remappedNodes = remapCharacterLinks(nodes, characters, characters, redirects)
   for (const [index, node] of nodes.entries()) {
-    const ids = [...(node.actorIds ?? []), ...(node.targetCharacterIds ?? [])]
+    const ids = [...(node.actorIds ?? [])]
     if (ids.some(id => !known.has(id) && !redirects.has(id))) continue
     const next = remappedNodes[index]
     if (next === node) continue

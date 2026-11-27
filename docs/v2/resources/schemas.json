@@ -850,7 +850,6 @@
       },
       "quote": {
         "minLength": 1,
-        "maxLength": 1000,
         "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
         "type": "string"
       }
@@ -866,7 +865,6 @@
     "properties": {
       "workingSummary": {
         "minLength": 1,
-        "maxLength": 2000,
         "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
         "type": "string"
       },
@@ -889,7 +887,6 @@
           "properties": {
             "key": {
               "minLength": 1,
-              "maxLength": 120,
               "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
               "type": "string"
             },
@@ -919,7 +916,6 @@
             },
             "statement": {
               "minLength": 1,
-              "maxLength": 1000,
               "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
               "type": "string"
             },
@@ -927,7 +923,6 @@
               "maxItems": 20,
               "type": "array",
               "items": {
-                "maxLength": 128,
                 "type": "string"
               }
             },
@@ -935,7 +930,6 @@
               "maxItems": 20,
               "type": "array",
               "items": {
-                "maxLength": 128,
                 "type": "string"
               }
             },
@@ -957,7 +951,6 @@
                   },
                   "quote": {
                     "minLength": 1,
-                    "maxLength": 1000,
                     "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                     "type": "string"
                   }
@@ -984,7 +977,6 @@
     "properties": {
       "key": {
         "minLength": 1,
-        "maxLength": 120,
         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
         "type": "string"
       },
@@ -1014,7 +1006,6 @@
       },
       "statement": {
         "minLength": 1,
-        "maxLength": 1000,
         "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
         "type": "string"
       },
@@ -1022,7 +1013,6 @@
         "maxItems": 20,
         "type": "array",
         "items": {
-          "maxLength": 128,
           "type": "string"
         }
       },
@@ -1030,7 +1020,6 @@
         "maxItems": 20,
         "type": "array",
         "items": {
-          "maxLength": 128,
           "type": "string"
         }
       },
@@ -1052,7 +1041,6 @@
             },
             "quote": {
               "minLength": 1,
-              "maxLength": 1000,
               "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
               "type": "string"
             }
@@ -1951,7 +1939,6 @@
         "properties": {
           "workingSummary": {
             "minLength": 1,
-            "maxLength": 2000,
             "description": "为后续批次留下的工作摘要；正文事实仍以原文和资产为准。",
             "type": "string"
           },
@@ -1974,7 +1961,6 @@
               "properties": {
                 "key": {
                   "minLength": 1,
-                  "maxLength": 120,
                   "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                   "type": "string"
                 },
@@ -2004,7 +1990,6 @@
                 },
                 "statement": {
                   "minLength": 1,
-                  "maxLength": 1000,
                   "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                   "type": "string"
                 },
@@ -2012,7 +1997,6 @@
                   "maxItems": 20,
                   "type": "array",
                   "items": {
-                    "maxLength": 128,
                     "type": "string"
                   }
                 },
@@ -2020,7 +2004,6 @@
                   "maxItems": 20,
                   "type": "array",
                   "items": {
-                    "maxLength": 128,
                     "type": "string"
                   }
                 },
@@ -2042,7 +2025,6 @@
                       },
                       "quote": {
                         "minLength": 1,
-                        "maxLength": 1000,
                         "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                         "type": "string"
                       }
@@ -2771,7 +2753,6 @@
     "properties": {
       "summary": {
         "minLength": 1,
-        "maxLength": 64000,
         "type": "string"
       }
     }
@@ -3461,7 +3442,6 @@
         "type": "integer"
       },
       "workingSummary": {
-        "maxLength": 2000,
         "type": "string"
       },
       "dataFingerprint": {
@@ -3494,7 +3474,6 @@
     "properties": {
       "key": {
         "minLength": 1,
-        "maxLength": 120,
         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
         "type": "string"
       },
@@ -3524,7 +3503,6 @@
       },
       "statement": {
         "minLength": 1,
-        "maxLength": 1000,
         "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
         "type": "string"
       },
@@ -3532,7 +3510,6 @@
         "maxItems": 20,
         "type": "array",
         "items": {
-          "maxLength": 128,
           "type": "string"
         }
       },
@@ -3540,7 +3517,6 @@
         "maxItems": 20,
         "type": "array",
         "items": {
-          "maxLength": 128,
           "type": "string"
         }
       },
@@ -3562,7 +3538,6 @@
             },
             "quote": {
               "minLength": 1,
-              "maxLength": 1000,
               "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
               "type": "string"
             }
@@ -3628,7 +3603,6 @@
     "properties": {
       "key": {
         "minLength": 1,
-        "maxLength": 120,
         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
         "type": "string"
       },
@@ -3658,7 +3632,6 @@
       },
       "statement": {
         "minLength": 1,
-        "maxLength": 1000,
         "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
         "type": "string"
       },
@@ -3666,7 +3639,6 @@
         "maxItems": 20,
         "type": "array",
         "items": {
-          "maxLength": 128,
           "type": "string"
         }
       },
@@ -3674,7 +3646,6 @@
         "maxItems": 20,
         "type": "array",
         "items": {
-          "maxLength": 128,
           "type": "string"
         }
       },
@@ -3696,7 +3667,6 @@
             },
             "quote": {
               "minLength": 1,
-              "maxLength": 1000,
               "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
               "type": "string"
             }
@@ -3892,7 +3862,6 @@
           },
           "summary": {
             "minLength": 1,
-            "maxLength": 64000,
             "type": "string"
           },
           "firstKeptEntryId": {
@@ -4073,7 +4042,6 @@
             "type": "string"
           },
           "summary": {
-            "maxLength": 2000,
             "type": "string"
           }
         }

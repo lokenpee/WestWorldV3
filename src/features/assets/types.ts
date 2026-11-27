@@ -31,21 +31,25 @@ export interface LegacyRelation { target: string; relation_type: string; relatio
 export interface LocationAsset extends WorldAsset { description?: string }
 export interface EventNode extends BaseAsset {
   name: string; summary: string; process?: string; chapterIndex: string; chapterName: string; quote: string; offset?: number
-  order: number; actors: string[]; targets?: string[]; eventLineIds?: string[]; confidence?: number
-  actorIds?: string[]; targetCharacterIds?: string[]
-  actorBindings?: CharacterBinding[]; targetBindings?: CharacterBinding[]
-  manualActorIds?: string[]; manualTargetCharacterIds?: string[]
-  legacyActorIds?: string[]; legacyTargetCharacterIds?: string[]
+  order: number; actors: string[]; eventLineIds?: string[]; confidence?: number
+  actorIds?: string[]
+  actorBindings?: CharacterBinding[]
+  manualActorIds?: string[]
   quoteStatus?: 'matched' | 'unmatched' | 'empty'
-  locationNames?: string[]; clues?: string[]; world_delta?: string[]; new_facts?: string[]; started_actions?: string[]; time_text?: string; time_hint?: string
+  locationNames?: string[]; clues?: string[]; world_delta?: string[]; new_facts?: string[]; time_text?: string; time_hint?: string
   timeCoord?: string; timePrecision?: string
 }
 export interface EventLine extends BaseAsset {
-  title: string; summary?: string; coreClue?: string; nodeIds: string[]; chapters: string[]; cause: string; process: string; result: string
+  title: string; summary?: string; coreClue?: string; nodeIds: string[]; chapters: string[]
   lineStatus: 'open' | 'closed'; updatedAt: string; timeRange?: string[]
   eventIds?: string[]; outlinePending?: boolean; role?: 'main' | 'sub'; legacyNodeIds?: string[]
 }
-export interface StoryEvent { id: string; bookId: string; title: string; nodeIds: string[]; summary?: string; coreClue?: string; revision: number }
+export interface StoryEvent {
+  id: string; bookId: string; title: string; nodeIds: string[]; revision: number
+  summary?: string
+  latestProgress?: string; unresolved?: string; clues: string[]
+  status?: '进行中' | '暂时搁置' | '已闭环'
+}
 export interface StoryMembership { lineId: string | null; eventId: string | null }
 /** 节点里的称呼绑定：一个原始称呼连同它命中的全部人物编号。 */
 export interface CharacterBinding { mention: string; ids: string[] }
@@ -124,10 +128,10 @@ export interface AssetInput {
   name?: string; title?: string; aliases?: string[]; chapterIndex?: string; manualSourceNote?: string
   identity?: string; ageText?: string; appearance?: string; personality?: string; background?: string; speechStyleSample?: string
   roleWeight?: RoleWeight; description?: string; summary?: string; process?: string; quote?: string
-  actors?: string[]; targets?: string[]; locationNames?: string[]; clues?: string[]; time_text?: string; time_hint?: string; world_delta?: string[]; new_facts?: string[]; started_actions?: string[]
-  actorIds?: string[]; targetCharacterIds?: string[]
+  actors?: string[]; locationNames?: string[]; clues?: string[]; time_text?: string; time_hint?: string; world_delta?: string[]; new_facts?: string[]
+  actorIds?: string[]
   participantIds?: string[]; unlinkedParticipants?: string[]
-  nodeIds?: string[]; cause?: string; result?: string; lineStatus?: 'open' | 'closed'
+  nodeIds?: string[]; lineStatus?: 'open' | 'closed'
 }
 export interface References { actorIds: string[]; ambiguities: { name: string; candidateIds: string[] }[]; missingNames: string[] }
 export interface AssetSnapshot {

@@ -1,0 +1,351 @@
+{
+  "说明": "预期请求和结果，编号及事件划分为隔离测试用，节点描述取自参考大纲并有缩写。样本截至查宅，后文为空。请求的系统消息取 system_markdown 指向文件的全文，工具参数见 agent-contract.md。",
+  "tasks": [
+    {
+      "id": "T35",
+      "system_markdown": "prompts/p3-storyline-link.md",
+      "tools": ["get_detail","search_prior_events","search_storylines","edit_storylines","confirm"],
+      "input": {
+        "event": {
+          "id": "E35",
+          "title": "封账后改查赖宅",
+          "summary": "西府封账，贾珩转查赖宅。",
+          "latestProgress": "查抄赖宅并取得财物。",
+          "unresolved": "",
+          "clues": ["库房账簿","赖宅"],
+          "status": "已闭环",
+          "members": [{"id":"C34-N002","name":"西府封账","chapter":34,"order":2},{"id":"C34-N005","name":"查抄赖宅","chapter":34,"order":5},{"id":"C35-N001","name":"追缴赖家赃银","chapter":35,"order":1}],
+          "position": ["C34-N002","C35-N001"],
+          "assigned_line_ids": []
+        },
+        "preview": [],
+        "candidate_lines": [
+          {
+            "id": "S04",
+            "title": "追回东府公银",
+            "summary": "东府核账查出亏空，开始追缴。",
+            "throughline": "被侵公银能追回多少，余款如何抵偿？",
+            "latestProgress": "账房已核出亏空。",
+            "unresolved": "赃银去向和可抵欠财物待查。",
+            "clues": ["东府账簿","赖宅"],
+            "lineStatus": "open",
+            "eventIds": ["E34"],
+            "members": [{"eventId":"E34","title":"东府核账","position":["C33-N001","C33-N001"],"contribution":"讯问赖大并核对旧账。","evidence_node_ids":["C33-N001"]}],
+            "total": 1
+          },
+          {
+            "id": "S09",
+            "title": "西府另查旧账",
+            "summary": "西府另行查账。",
+            "throughline": "西府自身的亏空能否查明？",
+            "latestProgress": "贾赦封存账簿。",
+            "unresolved": "西府自身账目待核。",
+            "clues": ["西府账簿"],
+            "lineStatus": "open",
+            "eventIds": ["E40"],
+            "members": [{"eventId":"E40","title":"西府封存账簿","position":["C33-N002","C34-N002"],"contribution":"取得查西府账的材料。","evidence_node_ids":["C34-N002"]}],
+            "total": 1
+          }
+        ],
+        "all_lines_listed": true,
+        "doubts": []
+      },
+      "calls": [
+        {
+          "tool": "edit_storylines",
+          "args": {
+            "operations": [
+              {
+                "op": "attach_event",
+                "lineId": "S04",
+                "eventId": "E35",
+                "contribution": "封账后改查赖宅，取得可追缴的财物。",
+                "evidence_node_ids": ["C34-N002","C34-N005","C35-N001"],
+                "reason": "封账和查宅说明追款路径变化，随后追缴的事实见 C35-N001。"
+              },
+              {"op":"update_line","lineId":"S04","fields":{"latestProgress":"查抄赖宅起赃，财物待清点。","unresolved":"入库数额和抵欠安排尚待查清。"},"reason":"E35 的 C35-N001 记载追缴，清点还在后续事件。"}
+            ]
+          },
+          "reply": {
+            "ok": true,
+            "created": {},
+            "changes": [
+              {"op":"attach_event","lineId":"S04","eventId":"E35","contribution":"封账后改查赖宅，取得可追缴的财物。","evidence_node_ids":["C34-N002","C34-N005","C35-N001"]},
+              {"op":"update_line","lineId":"S04"}
+            ],
+            "assigned_line_ids": ["S04"]
+          }
+        },
+        {"tool":"confirm","args":{"result":"assigned"},"reply":{"confirmed":true,"result":"assigned","taskId":"T35","possible_links":[]}}
+      ],
+      "observed": "S04 添入 E35；只确认 E35 一次。"
+    },
+    {
+      "id": "TB",
+      "system_markdown": "prompts/p3-storyline-boundaries.md",
+      "tools": ["get_detail","search_storylines","search_events","edit_storylines","confirm"],
+      "input": {
+        "lines": [
+          {
+            "id": "S04",
+            "title": "追回东府公银",
+            "summary": "东府核账查出亏空，开始追缴。",
+            "throughline": "被侵公银能追回多少，余款如何抵偿？",
+            "latestProgress": "查抄赖宅起赃，财物待清点。",
+            "unresolved": "入库数额和抵欠安排尚待查清。",
+            "clues": ["东府账簿","赖宅"],
+            "lineStatus": "open",
+            "eventIds": ["E34","E35"],
+            "memberEvidence": [
+              {"eventId":"E34","contribution":"讯问赖大并核对旧账。","evidence_node_ids":["C33-N001"]},
+              {"eventId":"E35","contribution":"封账后改查赖宅，取得可追缴的财物。","evidence_node_ids":["C34-N002","C34-N005","C35-N001"]}
+            ]
+          },
+          {
+            "id": "S09",
+            "title": "西府另查旧账",
+            "summary": "西府另行查账。",
+            "throughline": "西府自身的亏空能否查明？",
+            "latestProgress": "贾赦封存账簿。",
+            "unresolved": "西府自身账目待核。",
+            "clues": ["西府账簿"],
+            "lineStatus": "open",
+            "eventIds": ["E40"],
+            "memberEvidence": [{"eventId":"E40","contribution":"取得查西府账的材料。","evidence_node_ids":["C34-N002"]}]
+          }
+        ],
+        "events": [
+          {
+            "id": "E34",
+            "title": "东府核账",
+            "summary": "讯问赖大并核对东府旧账。",
+            "latestProgress": "旧账已有核查结果。",
+            "unresolved": "",
+            "clues": ["旧账"],
+            "status": "已闭环",
+            "members": [{"id":"C33-N001","name":"核对东府旧账","chapter":33,"order":1}],
+            "position": ["C33-N001","C33-N001"]
+          },
+          {
+            "id": "E35",
+            "title": "封账后改查赖宅",
+            "summary": "西府封账，贾珩转查赖宅。",
+            "latestProgress": "查抄赖宅并取得财物。",
+            "unresolved": "",
+            "clues": ["库房账簿","赖宅"],
+            "status": "已闭环",
+            "members": [{"id":"C34-N002","name":"西府封账","chapter":34,"order":2},{"id":"C34-N005","name":"查抄赖宅","chapter":34,"order":5},{"id":"C35-N001","name":"追缴赖家赃银","chapter":35,"order":1}],
+            "position": ["C34-N002","C35-N001"],
+            "assigned_line_ids": ["S04"]
+          },
+          {
+            "id": "E40",
+            "title": "西府封存账簿",
+            "summary": "西府查封账簿。",
+            "status": "进行中",
+            "latestProgress": "账簿已查封。",
+            "unresolved": "账目待核。",
+            "clues": ["西府账簿"],
+            "members": [{"id":"C33-N002","name":"管事求查账","chapter":33,"order":2},{"id":"C34-N002","name":"西府封账","chapter":34,"order":2}],
+            "position": ["C33-N002","C34-N002"]
+          }
+        ],
+        "pending_events": [],
+        "referral": null
+      },
+      "calls": [
+        {
+          "tool": "confirm",
+          "args": {"result":"completed","reason":"封账这一事实分别影响东府追款与西府查账。查宅起赃只推进东府追款，现有两线分界成立。"},
+          "reply": {"confirmed":true,"result":"completed","taskId":"TB"}
+        }
+      ],
+      "observed": "本组已核，派发 S04 和 S09 的逐线任务。"
+    },
+    {
+      "id": "TP",
+      "system_markdown": "prompts/p3-storyline-progress.md",
+      "tools": ["get_detail","search_storylines","search_events","edit_storylines","confirm"],
+      "input": {
+        "line": {
+          "id": "S04",
+          "title": "追回东府公银",
+          "summary": "东府核账查出亏空，开始追缴。",
+          "throughline": "被侵公银能追回多少，余款如何抵偿？",
+          "latestProgress": "查抄赖宅起赃，财物待清点。",
+          "unresolved": "入库数额和抵欠安排尚待查清。",
+          "clues": ["东府账簿","赖宅"],
+          "lineStatus": "open",
+          "eventIds": ["E34","E35"],
+          "memberEvidence": [
+            {"eventId":"E34","contribution":"讯问赖大并核对旧账。","evidence_node_ids":["C33-N001"]},
+            {"eventId":"E35","contribution":"封账后改查赖宅，取得可追缴的财物。","evidence_node_ids":["C34-N002","C34-N005","C35-N001"]}
+          ]
+        },
+        "events": [
+          {
+            "id": "E34",
+            "title": "东府核账",
+            "summary": "讯问赖大并核对东府旧账。",
+            "latestProgress": "旧账已有核查结果。",
+            "unresolved": "",
+            "clues": ["旧账"],
+            "status": "已闭环",
+            "members": [{"id":"C33-N001","name":"核对东府旧账","chapter":33,"order":1}],
+            "position": ["C33-N001","C33-N001"]
+          },
+          {
+            "id": "E35",
+            "title": "封账后改查赖宅",
+            "summary": "西府封账，贾珩转查赖宅。",
+            "latestProgress": "查抄赖宅并取得财物。",
+            "unresolved": "",
+            "clues": ["库房账簿","赖宅"],
+            "status": "已闭环",
+            "members": [{"id":"C34-N002","name":"西府封账","chapter":34,"order":2},{"id":"C34-N005","name":"查抄赖宅","chapter":34,"order":5},{"id":"C35-N001","name":"追缴赖家赃银","chapter":35,"order":1}],
+            "position": ["C34-N002","C35-N001"],
+            "assigned_line_ids": ["S04"]
+          }
+        ],
+        "timeline": [
+          {"id":"C33-N001","name":"核对东府旧账","chapter":33,"order":1},
+          {"id":"C34-N002","name":"西府封账","chapter":34,"order":2},
+          {"id":"C34-N005","name":"查抄赖宅","chapter":34,"order":5},
+          {"id":"C35-N001","name":"追缴赖家赃银","chapter":35,"order":1}
+        ],
+        "doubts": [],
+        "boundary_reason": "查宅起赃只推进东府追款。"
+      },
+      "calls": [
+        {
+          "tool": "get_detail",
+          "args": {"requests":[{"kind":"node","id":"C34-N005","fields":["name","process"]}]},
+          "reply": [{"id":"C34-N005","values":{"name":"查抄赖宅","process":"率人查抄赖宅，拿下赖嬷嬷。"},"unavailable":[]}]
+        },
+        {"tool":"confirm","args":{"result":"completed"},"reply":{"confirmed":true,"result":"completed","taskId":"TP"}}
+      ],
+      "observed": "S04 已复核，显示进行中、财物待清点。S09 的逐线确认仍单独计数。"
+    },
+    {
+      "id": "TP9",
+      "system_markdown": "prompts/p3-storyline-progress.md",
+      "tools": ["get_detail","search_storylines","search_events","edit_storylines","confirm"],
+      "input": {
+        "line": {
+          "id": "S09",
+          "title": "西府另查旧账",
+          "summary": "西府另行查账。",
+          "throughline": "西府自身的亏空能否查明？",
+          "latestProgress": "贾赦封存账簿。",
+          "unresolved": "西府自身账目待核。",
+          "clues": ["西府账簿"],
+          "lineStatus": "open",
+          "eventIds": ["E40"],
+          "memberEvidence": [{"eventId":"E40","contribution":"取得查西府账的材料。","evidence_node_ids":["C34-N002"]}]
+        },
+        "events": [
+          {
+            "id": "E40",
+            "title": "西府封存账簿",
+            "summary": "西府查封账簿。",
+            "status": "进行中",
+            "latestProgress": "账簿已查封。",
+            "unresolved": "账目待核。",
+            "clues": ["西府账簿"],
+            "members": [{"id":"C33-N002","name":"管事求查账","chapter":33,"order":2},{"id":"C34-N002","name":"西府封账","chapter":34,"order":2}],
+            "position": ["C33-N002","C34-N002"]
+          }
+        ],
+        "timeline": [{"id":"C33-N002","name":"管事求查账","chapter":33,"order":2},{"id":"C34-N002","name":"西府封账","chapter":34,"order":2}],
+        "doubts": [],
+        "boundary_reason": "核对西府查账，东府查宅属于另一线。"
+      },
+      "calls": [{"tool":"confirm","args":{"result":"completed"},"reply":{"confirmed":true,"result":"completed","taskId":"TP9"}}],
+      "observed": "两条存续线均已核对，两条线的进展和当前事件归属均已确认，显示故事线整理已完成。"
+    }
+  ],
+  "additional_examples": [
+    {
+      "说明": "单独的收尾样本。E12 已凭一份原文账单归入查账线 L1，另有失踪线 L2。所有其余任务都已完成。",
+      "tool": "confirm",
+      "args": {"result":"assigned","possible_links":[{"line_id":"L2","issue":"交账人是否也是失踪案的证人？","checked_scope":"E12 的交账节点及 L2 的现有成员。","missing":"能够辨认交账人的证词。"}]},
+      "reply": {"confirmed":true,"result":"assigned","taskId":"T12","possible_links":[{"line_id":"L2","issue":"交账人是否也是失踪案的证人？","checked_scope":"E12 的交账节点及 L2 的现有成员。","missing":"能够辨认交账人的证词。"}]},
+      "expected_after_remaining_reviews": {"bookStatus":"已完成","eventId":"E12","assigned_line_ids":["L1"],"report_line_ids":["L2"]}
+    },
+    {
+      "说明": "另一份样本。E13 记载送来一封回信，其首次归属有具体疑问且缺乏足以判断的原文。",
+      "tool": "confirm",
+      "args": {"result":"pending_review","issue":"回信承接哪件在先的请求？","checked_scope":"已核回信节点和两件更早的请求。","missing":"收件人或所回事项。"},
+      "reply": {"confirmed":true,"result":"pending_review","taskId":"T13"},
+      "expected_after_remaining_reviews": {"bookStatus":"待核实","eventId":"E13","assigned_line_ids":[]}
+    },
+    {
+      "说明": "独立的收尾样本。E14 的钥匙已由原主领回，原文里的误会已解开。",
+      "tool": "confirm",
+      "args": {"result":"independent","reason":"认领钥匙的误会已经在本件内解决，现有材料没有留下需要其他事件回答的问题。"},
+      "reply": {"confirmed":true,"result":"independent","taskId":"T14"},
+      "expected_after_remaining_reviews": {"bookStatus":"已完成","eventId":"E14","assigned_line_ids":[]}
+    },
+    {
+      "tool": "search_prior_events",
+      "args": {"groups":[["核账"]]},
+      "reply": {"items":[{"id":"E34","title":"东府核账","summary":"讯问赖大并核对东府旧账。"}],"total":1,"next":null}
+    },
+    {
+      "tool": "search_storylines",
+      "args": {"groups":[["公银"]]},
+      "reply": {"items":[{"id":"S04","title":"追回东府公银","summary":"东府核账查出亏空，开始追缴。"}],"total":1,"next":null}
+    },
+    {
+      "tool": "search_events",
+      "args": {"groups":[["查宅"]]},
+      "reply": {"items":[{"id":"E35","title":"封账后改查赖宅","summary":"西府封账，贾珩转查赖宅。"}],"total":1,"next":null}
+    },
+    {
+      "tool": "edit_storylines",
+      "args": {
+        "operations": [{"op":"attach_event","lineId":"S04","eventId":"E35","contribution":"封账后改查赖宅，取得可追缴的财物。","evidence_node_ids":["C33-N001"],"reason":"核对证据范围"}]
+      },
+      "reply": {"ok":false,"code":"INVALID_EVIDENCE","reason":"C33-N001 不属于 E35。","operationNumber":1,"objectIds":["E35","C33-N001"]}
+    },
+    {
+      "说明": "首件开线示例。在空线库中处理 E34 时，本例原文已经提出亏空须追缴。先建线，再在同一调用挂入首件。",
+      "tool": "edit_storylines",
+      "args": {
+        "operations": [
+          {
+            "op": "create_line",
+            "ref": "recovery",
+            "fields": {
+              "title": "追回东府公银",
+              "summary": "讯问核账后查明东府存在亏空。",
+              "throughline": "被侵公银能追回多少？",
+              "latestProgress": "旧账已经核查。",
+              "unresolved": "款项如何追回？",
+              "clues": ["旧账"],
+              "lineStatus": "open"
+            },
+            "reason": "核出亏空引出了待追缴的问题。"
+          },
+          {
+            "op": "attach_event",
+            "lineId": "$recovery",
+            "eventId": "E34",
+            "contribution": "核出亏空，给追缴提供了依据。",
+            "evidence_node_ids": ["C33-N001"],
+            "reason": "据核账节点可定位起点。"
+          }
+        ]
+      },
+      "reply": {
+        "ok": true,
+        "created": {"recovery":"S04"},
+        "changes": [
+          {"op":"create_line","lineId":"S04"},
+          {"op":"attach_event","lineId":"S04","eventId":"E34","contribution":"核出亏空，给追缴提供了依据。","evidence_node_ids":["C33-N001"]}
+        ],
+        "assigned_line_ids": ["S04"]
+      }
+    }
+  ]
+}

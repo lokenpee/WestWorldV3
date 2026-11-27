@@ -223,7 +223,7 @@ export function convertLegacyRelations(input: LegacyConversionInput): LegacyConv
       for (const row of item.evidence) if (!evidence.some(known => known.chapterIndex === row.chapterIndex && known.quote === row.quote)) evidence.push(row)
       unclear = unclear || item.unclear
     }
-    const invalid = labelsA.length > 20 || labelsB.length > 20 || [...labelsA, ...labelsB].some(label => label.length > 100)
+    const invalid = labelsA.length > 20 || labelsB.length > 20
     const empty = !labelsA.length && !labelsB.length
     if (invalid || empty) {
       for (const item of group) {

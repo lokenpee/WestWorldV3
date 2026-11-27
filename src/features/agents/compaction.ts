@@ -79,18 +79,17 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
     const usage = { input: 0, output: 0, totalTokens: 0, cost: 0 }
     const maxTokens = Math.min(16384, Math.max(128, Math.floor(options.contextWindow / 8)))
     const maxChars = Math.max(64, Math.floor(maxTokens / 2))
-    const outputSchema = { ...summarySchema, properties: { summary: { ...summarySchema.properties.summary, maxLength: maxChars } } }
     for (const part of chunks) {
       options.signal?.throwIfAborted()
       await repo.transaction(false, store => checkLease(store, scope, options.signal))
-      let validation: { code: string; path?: string; actualLength?: number; allowedLength?: number } | undefined
+      let validation: { code: string; path?: string } | undefined
       const outlineGuide = scope.workflow === 'story_pages_v3' && scope.outline
         ? `当期目录、归属和交接事项将从书库重新提供。只摘要仍影响下一批的决定、未决对象及必要回查编号，通常用 ${Math.min(600, maxChars)} 字以内。省去逐页台账、已提交成员清单和重复证据。`
         : ''
-      const result = await options.generate({ role: 'aggregation', context: { systemPrompt: `${compactPrompt}\n本次摘要最多${maxChars}字符。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。${outlineGuide}`, messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: outputSchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
+      const result = await options.generate({ role: 'aggregation', context: { systemPrompt: `${compactPrompt}\n本次摘要建议控制在${maxChars}字符以内。合并重复信息，以条目编号回查长证据，保留仍有效的判断和下一步。${outlineGuide}`, messages: [{ role: 'user', content: `【旧摘要】\n${summary || '无'}\n【需要压缩的原始会话数据】\n${part}`, timestamp: Date.now() }], tools: [{ name: 'submit_result', description: '提交历史会话摘要', parameters: summarySchema, constrainedSampling: { type: 'json_schema', strict: 'prefer' } }] },
         validate(message) {
-          const summaryError = (code: string, detail: string, extra: { actualLength?: number; allowedLength?: number } = {}) => {
-            validation = { code, path: 'summary', ...extra }
+          const summaryError = (code: string, detail: string) => {
+            validation = { code, path: 'summary' }
             return new ModelError('validation', `${code}:${detail}`)
           }
           if (message.stopReason === 'length') throw summaryError('OUTPUT_TRUNCATED', `模型输出被截断，未能返回完整摘要。`)
@@ -100,10 +99,9 @@ export async function compactSession(repo: AgentRepository, scope: Scope, option
           if (!args || typeof args !== 'object' || !Object.hasOwn(args, 'summary')) throw summaryError('SUMMARY_MISSING', '结果缺少summary字段。')
           if (typeof args.summary !== 'string') throw summaryError('SUMMARY_TYPE', `summary须为字符串，实际为${Array.isArray(args.summary) ? 'array' : typeof args.summary}。`)
           if (!args.summary.trim()) throw summaryError('SUMMARY_EMPTY', 'summary内容为空或只有空白。')
-          if (args.summary.length > maxChars) throw summaryError('SUMMARY_TOO_LONG', `summary实际${args.summary.length}字符，允许最多${maxChars}字符。`, { actualLength: args.summary.length, allowedLength: maxChars })
-          try { validate(outputSchema, args, '压缩摘要格式不符。') } catch (error) { throw summaryError('SUMMARY_TYPE', error instanceof Error ? error.message : 'summary结构不符合Schema。') }
+          try { validate(summarySchema, args, '压缩摘要格式不符。') } catch (error) { throw summaryError('SUMMARY_TYPE', error instanceof Error ? error.message : 'summary结构不符合Schema。') }
           return { summary: args.summary }
-        }, repairPrompt: `请仅通过submit_result返回summary，摘要至多${maxChars}字符，合并重复信息，保留判断与回查编号。${outlineGuide}`, signal: options.signal, maxTokens, temperature: 0, trace: trace.hooks, tracePurpose: 'compaction' })
+        }, repairPrompt: `请仅通过submit_result返回summary，摘要建议控制在${maxChars}字符以内，合并重复信息，保留判断与回查编号。${outlineGuide}`, signal: options.signal, maxTokens, temperature: 0, trace: trace.hooks, tracePurpose: 'compaction' })
       await repo.transaction(true, async store => {
         await checkLease(store, scope)
         await appendEntry(store, scope, { type: 'request_trace', attemptId: crypto.randomUUID(), purpose: validation ? 'compaction_repair' : 'compaction', ok: result.ok, errorCode: validation?.code ?? result.error?.kind, validation: validation ?? null, message: result.message ?? null, usage: result.usage, attempts: result.attempts }, { advanceLeaf: false })

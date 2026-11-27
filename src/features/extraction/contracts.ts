@@ -16,13 +16,12 @@ const worldValidation = structuredClone(schemaOf('worldAssets')) as ExtractionSc
 const narrativeValidation = structuredClone(schemaOf('narrativeAssets')) as ExtractionSchema
 const personFields = worldValidation.properties.characters.items.properties
 const nodeFields = narrativeValidation.properties.nodes.items.properties
-const namesSchema = nodeFields.locationNames
 // 模型使用精简格式，验证器仍能接收旧提取响应中的字段。
 Object.assign(personFields, { confidence: {} })
 Object.assign(worldValidation.properties.locations.items.properties, { confidence: {} })
 Object.assign(personFields.profile.properties, { age: { type: 'number' } })
 Object.assign(personFields.relations.items.properties, { direction: { anyOf: relationDirections.map(value => ({ const: value, type: 'string' })) } })
-Object.assign(nodeFields, { confidence: {}, targets: namesSchema, started_actions: namesSchema })
+Object.assign(nodeFields, { confidence: {} })
 
 function normalize(schema: TSchema, value: unknown): unknown {
   const shape = schema as TSchema & { items?: TSchema; properties?: Record<string, TSchema>; required?: string[] }
@@ -53,7 +52,6 @@ export function validateExtraction(step: Substep, message: AssistantMessage): Ex
       const names = node[field]
       if (Array.isArray(names)) node[field] = [...new Set(names.map((name: string) => name.trim()).filter(Boolean))]
     }
-    delete node.started_actions
   }
   if (step === 'worldAssets') for (const character of data.characters ?? []) {
     const profile = character.profile as { age?: number; ageText?: string } | undefined

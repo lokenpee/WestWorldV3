@@ -345,12 +345,15 @@
                           "summary": {
                             "type": "string",
                             "minLength": 1,
-                            "description": "全书复核填写的事件概况，完成说明页前与 coreClue 均须有内容"
+                            "description": "全书复核填写的事件概况，完成说明页前与 clues 均须有内容"
                           },
-                          "coreClue": {
-                            "type": "string",
-                            "minLength": 1,
-                            "description": "有原文依据且推动或联结事件的具体线索，说明其作用"
+                          "clues": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "uniqueItems": true
                           }
                         },
                         "required": [
@@ -371,7 +374,7 @@
                           },
                           {
                             "required": [
-                              "coreClue"
+                              "clues"
                             ]
                           }
                         ]
@@ -642,7 +645,6 @@
                     "properties": {
                       "key": {
                         "minLength": 1,
-                        "maxLength": 120,
                         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                         "type": "string"
                       },
@@ -679,7 +681,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -687,7 +688,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -695,7 +695,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       }
@@ -1115,12 +1114,15 @@
                       "summary": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "全书复核填写的事件概况，完成说明页前与 coreClue 均须有内容"
+                        "description": "全书复核填写的事件概况，完成说明页前与 clues 均须有内容"
                       },
-                      "coreClue": {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "有原文依据且推动或联结事件的具体线索，说明其作用"
+                      "clues": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "uniqueItems": true
                       }
                     },
                     "required": [
@@ -1141,7 +1143,7 @@
                       },
                       {
                         "required": [
-                          "coreClue"
+                          "clues"
                         ]
                       }
                     ]
@@ -1412,7 +1414,6 @@
                 "properties": {
                   "key": {
                     "minLength": 1,
-                    "maxLength": 120,
                     "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                     "type": "string"
                   },
@@ -1449,7 +1450,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -1457,7 +1457,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -1465,7 +1464,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   }

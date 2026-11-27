@@ -1,3 +1,7 @@
+import { readEventTool, editEvents, confirmEvent } from './eventWorkflow'
+import { captureEventDisplay } from './eventTaskOutcome'
+import { historicalEventReply, eventToolReply } from './eventToolReply'
+import { isEventWorkflow } from './eventToolsSchema'
 import { Value } from 'typebox/value'
 import { NarrativeToolError, type NarrativeErrorDetails } from './narrativeErrors'
 import { confirmationInstruction } from './narrativeInput'
@@ -43,7 +47,11 @@ const argumentFields = (schema: TSchema, value: unknown, prefix = '') => {
     (key) => !Object.hasOwn(object, key)
   )
   const paths = [...Value.Errors(schema, value)]
-    .map((error) => error.instancePath)
+    .flatMap(error => {
+      const params = error.params as {requiredProperties?:string[];additionalProperties?:string[]}
+      const keys = params.requiredProperties ?? params.additionalProperties
+      return keys ? keys.map(key => error.instancePath + '/' + key) : [error.instancePath]
+    })
     .filter((path) => path && path !== '/')
   return [...new Set([...required.map((key) => '/' + key), ...paths])]
     .slice(0, 8)
@@ -128,7 +136,7 @@ function details(args: Row, a: NarrativeAssets, visible: Set<string>, eventLayer
     const available = (field: string) =>
       allowed.includes(field) &&
       source[field] !== undefined &&
-      (complete || (field !== 'summary' && field !== 'coreClue'))
+      (complete || (field !== 'summary' && field !== 'coreClue' && field !== 'clues'))
     return {
       id,
       values: Object.fromEntries(
@@ -185,8 +193,14 @@ function directory(args: Row, a: NarrativeAssets, visible: Set<string>, plan: Na
 }
 export function narrativeTools(repo: AgentRepository, scope: Scope, initial: NarrativeTask) {
   let confirmed = false
+  let pendingReview = false
   const currentSchemas = toolDefinitions(initial)
   function checkArguments(name: string, raw: unknown) {
+    // 旧版串联工具曾公开复核参数；恢复旧调用时只确认当前节点。
+    if (initial.mode === 'link_node' && name === 'confirm' && raw && typeof raw === 'object' && Object.hasOwn(raw,'reviewed_event_ids')) {
+      const {reviewed_event_ids: _ignored, ...nodeArgs} = raw as Row
+      raw = nodeArgs
+    }
     type Branch = TSchema & { properties: Record<string, { const?: string }> }
     const schema = currentSchemas[name]
     const validateBranch = (
@@ -194,9 +208,10 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
       key: string,
       value: unknown,
       label: string,
-      index?: number
+      index?: number,
+      listKey = 'operations'
     ) => {
-      const prefix = index === undefined ? '' : '/operations/' + index
+      const prefix = index === undefined ? '' : '/' + listKey + '/' + index
       const position = index === undefined ? {} : { operationNumber: index + 1 }
       const rawValue = value as Row | null
       const branch = branches.find((candidate) => candidate.properties[key].const === rawValue?.[key])
@@ -225,9 +240,10 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
       validate(currentSchemas[name], raw)
     } catch (error) {
       if (name === 'edit_events' || name === 'edit_storylines') {
-        const operations = (raw as Row | null)?.operations
-        const branches = (schema as unknown as { properties: { operations: { items: { oneOf: Branch[] } } } })
-          .properties.operations.items.oneOf
+        const listKey = isEventWorkflow(initial.mode) ? 'changes' : 'operations'
+        const operations = (raw as Row | null)?.[listKey]
+        const branches = (schema as unknown as { properties: Record<string,{items:{oneOf:Branch[]}}> })
+          .properties[listKey].items.oneOf
         if (Array.isArray(operations))
           for (const [index, op] of operations.entries())
             validateBranch(
@@ -235,7 +251,7 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
               'op',
               op,
               '第 ' + (index + 1) + ' 个编辑（' + (text(op?.op) || '缺少 op') + '）。',
-              index
+              index, listKey
             )
       } else if (name === 'manage_doubts' || name === 'get_outline') {
         validateBranch(
@@ -288,8 +304,7 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
     },
     async execute(callId, raw, signal) {
       try {
-        checkArguments(name, raw)
-        const args = raw as Row,
+        const args = checkArguments(name, raw) as Row,
           timestamp = new Date().toISOString()
         const result = await repo.transaction(
           true,
@@ -302,7 +317,9 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
             if (old) {
               if (old.runId !== scope.runId || old.signature !== canonical([name, args]))
                 throw Error('操作键与原请求内容不符。')
-              return old.result
+              return isEventWorkflow(initial.mode)
+                ? historicalEventReply(store,initial,scope.sessionId)(callId,name,args,old.result as Row)
+                : old.result
             }
             const task = plan.active
             if (task?.id !== scope.taskId || task.mode !== initial.mode || task.part !== initial.part)
@@ -316,7 +333,43 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
             let outcome: Outcome | undefined
             let reviewResults: ReturnType<typeof confirmNarrative>
             let value: unknown
-            if (name === 'get_detail') {
+            if (isEventWorkflow(task.mode)) {
+              if (name === 'edit_events') {
+                const keys = records(args.changes).flatMap(change => [
+                  ...(change.event_id ? ['event:'+change.event_id] : []),
+                  ...strings(change.replacement_event_ids).map(id=>'event:'+id),
+                  ...[...strings((change.fields as Row)?.nodeIds), ...strings(change.evidence_node_ids)].map(id=>'node:'+id),
+                ])
+                for (const change of records(args.changes)) {
+                  if (task.mode==='review_boundaries' && change.op==='delete' && seen['read:event:'+change.event_id]!==current['event:'+change.event_id]) throw Error('请用 get_event 核对要撤销事件的最新资料。')
+                  const id = text(change.event_id)
+                  if (change.op==='update' && (change.fields as Row)?.nodeIds &&
+                    !(task.mode==='review_event' && task.ids.includes(id)) && seen['members:event:'+id]!==current['event:'+id])
+                    throw Error('请用 get_event 取得该事件最新完整成员，再替换 nodeIds。')
+                }
+                checkNarrativeVersions(keys,seen,current)
+                value = await editEvents(store,scope.bookId,args,task,plan,a)
+              } else if (name === 'confirm') {
+                checkNarrativeVersions(task.mode === 'review_boundaries' ? task.ids.map(id=>'event:'+id) : task.mode === 'link_node' ? ['node:'+task.ids[0]] :
+                  [task.ids[0],...strings(args.reviewed_event_ids)].map(id=>'event:'+id),seen,current)
+                if (task.mode === 'review_event') for (const id of strings(args.reviewed_event_ids))
+                  if (!task.ids.includes(id) && seen['read:event:'+id]!==current['event:'+id])
+                    throw Error('尚未读全该事件的最新版本，请用 get_event 核对后再连带确认。')
+                confirmEvent(plan,a,args)
+                if (task.mode === 'link_node') outcome = confirmedOutcome(task,plan,a,args)
+                value = {confirmed:true, result:args.result, taskId:task.id}
+              } else {
+                const result = readEventTool(name,args,task,a)
+                if (name === 'get_nodes' || name === 'search_prior_nodes') refreshed = records(result.items).map(n=>'node:'+n.node_id)
+                if (name === 'get_event' && result.status !== 'not_found') {
+                  const key='event:'+result.event_id
+                  refreshed=[key]
+                  seen['members:'+key]=current[key]
+                  seen['read:'+key]=current[key]
+                }
+                value = result
+              }
+            } else if (name === 'get_detail') {
               value = details(args, a, visible, plan.layer === 'event')
               refreshed = records(args.requests).map((r) => r.kind + ':' + r.id)
             } else if (name === 'get_outline') value = directory(args, a, visible, plan)
@@ -497,6 +550,7 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
               }
             }
             const write =
+              !['get_nodes','get_event','search_events','search_nodes','search_prior_nodes'].includes(name) &&
               name !== 'get_detail' &&
               name !== 'get_outline' &&
               !(name === 'manage_doubts' && args.action === 'list')
@@ -511,13 +565,26 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
                   if (after[key] === undefined) delete seen[key]
                   else seen[key] = after[key]
                 }
+              if (isEventWorkflow(task.mode) && name==='edit_events') {
+                const operations = records(args.changes)
+                for (const [index, change] of records((value as Row).changes).entries()) {
+                  const key = 'event:' + change.event_id
+                  const submittedMembers = Array.isArray((operations[index].fields as Row | undefined)?.nodeIds)
+                  for (const prefix of ['members:', 'read:']) {
+                    const proof = prefix + key
+                    const wasCurrent = Object.hasOwn(seen,proof) && seen[proof] === current[key]
+                    if (after[key] && (wasCurrent || (prefix === 'members:' && submittedMembers))) seen[proof] = after[key]
+                    else delete seen[proof]
+                  }
+                }
+              }
               await store.put('pipelineRuns', {
                 ...run,
                 narrative: plan,
                 ...(name === 'confirm'
                   ? {
                       tasks: records(run.tasks).map((t) =>
-                        t.taskId === task.id ? { ...t, status: 'completed', updatedAt: timestamp } : t
+                        t.taskId === task.id ? { ...t, status: args.result === 'pending_review' ? 'partial' : 'completed', updatedAt: timestamp } : t
                       ),
                     }
                   : {}),
@@ -531,7 +598,9 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
                 taskId: scope.taskId,
                 name,
                 signature: canonical([name, args]),
-                result: value,
+                result: isEventWorkflow(task.mode) && (name === 'edit_events' || name === 'confirm')
+                  ? {...value as Row, display:captureEventDisplay(a,task,name,args,value as Row)}
+                  : value,
                 arguments: args,
                 ...(reviewResults ? { reviewResults } : {}),
                 status: 'completed',
@@ -545,13 +614,13 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
                 ...snapshot,
                 observed: seen,
                 ...(outcome ? { outcome } : {}),
-                ...(name === 'confirm' ? { status: 'completed' } : {}),
+                ...(name === 'confirm' ? { status: args.result === 'pending_review' ? 'paused' : 'completed' } : {}),
               })
-            return value
+            return isEventWorkflow(task.mode) ? eventToolReply(name,args,value as Row,task) : value
           },
           { lockKey: 'narrative', owner: scope.owner, runId: scope.runId }
         )
-        if (name === 'confirm') confirmed = true
+        if (name === 'confirm') { confirmed = true; pendingReview = args.result === 'pending_review' }
         return { content: [{ type: 'text', text: JSON.stringify(result) }], details: result }
       } catch (e) {
         const failure = failurePayload(e, name, initial, raw)
@@ -565,6 +634,7 @@ export function narrativeTools(repo: AgentRepository, scope: Scope, initial: Nar
   }))
   return {
     tools,
+    get pendingReview() { return pendingReview },
     get confirmed() {
       return confirmed
     },

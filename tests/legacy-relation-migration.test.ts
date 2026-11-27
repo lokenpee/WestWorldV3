@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import Dexie from 'dexie'
 import { afterEach, describe, expect, it } from 'vitest'
 import { strToU8, zipSync } from 'fflate'
-import { createWorkspace, type DatabaseScope } from '../src/lib/storage/workspace'
+import { BOOK_SCHEMA_VERSION, createWorkspace, type DatabaseScope } from '../src/lib/storage/workspace'
 import { createAssetService } from '../src/features/assets/service'
 import { createLegacyBook, character, legacyRelation, side, type LegacyBookSeed } from './support/legacy-book'
 import { checksumOf, encodeBackup, inspectBackup, restoredTables } from '../src/features/backup/codec'
@@ -54,7 +54,7 @@ async function migratedBaseline() {
 describe('阶段A 历史关系原地升级', () => {
   it('A01/A02 历史7无编辑表可打开，按角色投影且不扩散同名', async () => {
     const { workspace, db } = await migratedBaseline()
-    expect(db.verno).toBe(10)
+    expect(db.verno).toBe(BOOK_SCHEMA_VERSION)
     const archives = await db.table<LegacyRelationRecord>('legacyRelationRecords').toArray()
     expect(archives).toHaveLength(5)
     expect(await db.table('characterRelations').count()).toBe(0)
@@ -123,7 +123,7 @@ describe('阶段A 历史关系原地升级', () => {
       const { workspace, scope } = setup()
       await createLegacyBook(scope, { bookId: 'legacy', characters: [person('A', '甲')], relations: [] }, 7, false)
       const db = workspace.openBook('legacy'); await db.open()
-      expect(db.verno).toBe(10)
+      expect(db.verno).toBe(BOOK_SCHEMA_VERSION)
       expect(await db.table('legacyRelationRecords').count()).toBe(0)
     }
     {
@@ -150,7 +150,7 @@ describe('阶段A 历史关系原地升级', () => {
       expect(await raw.table('characterRelations').count()).toBe(5)
       await raw.close(); workspace.closeBook('legacy')
       const retried = workspace.openBook('legacy'); await retried.open()
-      expect(retried.verno).toBe(10)
+      expect(retried.verno).toBe(BOOK_SCHEMA_VERSION)
       expect(await retried.table('legacyRelationRecords').count()).toBe(5)
     }
     {
@@ -164,7 +164,7 @@ describe('阶段A 历史关系原地升级', () => {
       const retry = new Dexie(`${scope.bookPrefix}legacy`); await retry.open(); await retry.table('pipelineRuns').delete('lease:world'); await retry.close()
       workspace.closeBook('legacy')
       const reopened = workspace.openBook('legacy'); await reopened.open()
-      expect(reopened.verno).toBe(10)
+      expect(reopened.verno).toBe(BOOK_SCHEMA_VERSION)
     }
   })
 
@@ -184,7 +184,7 @@ describe('阶段A 历史关系原地升级', () => {
     expect(edits.find(row => row.pairKey === pairKeyOf('A', 'B'))!.legacyRecordIds?.sort()).toEqual(['R-1', 'R-2'])
   })
 
-  it('A09 单角色只填一向；无角色与超限保留待核对', async () => {
+  it('A09 单角色只填一向，长关系标签完整迁移', async () => {
     const { workspace, scope } = setup()
     const seed = baseline()
     seed.characters.push(person('H', '贾母'), person('I', '宝玉'))
@@ -196,10 +196,10 @@ describe('阶段A 历史关系原地升级', () => {
     const hi = edits.find(row => row.pairKey === pairKeyOf('H', 'I'))!
     expect(hi.aToBLabels).toEqual(['祖母'])
     expect(hi.bToALabels).toEqual([])
-    expect(edits.some(row => row.pairKey === pairKeyOf('H', 'C'))).toBe(false)
+    const longPair = edits.find(row => row.pairKey === pairKeyOf('H', 'C'))!
+    expect([...longPair.aToBLabels,...longPair.bToALabels]).toContain('x'.repeat(101))
     const limit = await db.table<LegacyRelationRecord>('legacyRelationRecords').get('R-LIMIT')
-    expect(limit).toMatchObject({ disposition: 'unresolved' })
-    expect(limit!.issues).toContain('label_limit')
+    expect(limit!.issues).not.toContain('label_limit')
   })
 })
 
@@ -224,8 +224,9 @@ describe('阶段A 备份预检与往返', () => {
       book: { id: 'legacy', title: '旧书', sourceFileName: 'old.txt', createdAt: ts },
       tables: emptyTables(),
     }
-    data.tables.chapters.push({ bookId: 'legacy', chapterIndex: '1', chapterName: '第一章', order: 0, charCount: '抱琴是元春的侍女。'.length })
-    data.tables.chapterTexts.push({ bookId: 'legacy', chapterIndex: '1', text: '抱琴是元春的侍女。' })
+    const chapterText = '抱琴是元春的侍女。'.repeat(1500)
+    data.tables.chapters.push({ bookId: 'legacy', chapterIndex: '1', chapterName: '第一章', order: 0, charCount: chapterText.length })
+    data.tables.chapterTexts.push({ bookId: 'legacy', chapterIndex: '1', text: chapterText })
     data.tables.characters.push(person('A', '抱琴'), person('B', '元春'))
     data.tables.assetLifecycle.push(...['A', 'B'].map(id => ({ key: `character:${id}`, bookId: 'legacy', kind: 'character', originId: id, currentId: id, state: 'live', revision: 1, updatedAt: ts })))
     data.tables.characterRelations.push(relation('R-H', side('A', '抱琴'), side('B', '元春'), { kind: 'service', leftRole: 'servant', rightRole: 'lord', label: '侍女', status: 'active', verification: 'manual' }))
@@ -248,7 +249,7 @@ describe('阶段A 备份预检与往返', () => {
     const tables = emptyTables()
     for (const name of tableNames) tables[name] = await db.table(name).toArray()
     const exported = await encodeBackup({ book: { id: 'legacy', title: '旧书', sourceFileName: 'old.txt', createdAt: ts }, tables })
-    expect(exported.manifest.formatVersion).toBe(12)
+    expect(exported.manifest.formatVersion).toBe(15)
     const inspected = await inspectBackup(exported.bytes)
     expect(inspected.errors).toEqual([])
     expect(inspected.data!.tables.legacyRelationRecords).toHaveLength(5)

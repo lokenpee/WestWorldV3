@@ -1,13 +1,17 @@
+import type { ReviewIndex } from './eventReviewGroups'
+import type { TwoStepState } from './twoStepReview'
+import { scheduleEvent } from './eventWorkflow'
 import { NarrativeToolError } from './narrativeErrors'
 import { partLabel } from './narrativeLabels'
 import { formatNarrativeInput, includesNarrativeDirectory } from './narrativeInput'
 import { canonical, strings, text } from '../agents/contracts'
 import type { AgentStore, Row } from '../agents/repository'
 
+// 第一阶段实书验收期间，暂停故事线调度。
+export const storylinesOnHold = true
+
 export const narrativeDefaults = {
-  nodeBatchSize: 20,
   eventGroupSize: 20,
-  eventReviewInterval: 10,
   lineReviewInterval: 10,
   segmentSize: 20,
   outlineThreshold: 2000,
@@ -16,7 +20,7 @@ export const narrativeDefaults = {
 export type NarrativeConfig = typeof narrativeDefaults
 export type Layer = 'event' | 'line'
 export type Mode =
-  'node_batch' | 'event_cycle' | 'event_review' | 'event_group' | 'line_cycle' | 'line_review'
+  'link_node' | 'review_boundaries' | 'review_sequence' | 'review_event' | 'node_batch' | 'event_cycle' | 'event_review' | 'event_group' | 'line_cycle' | 'line_review'
 export type Part = 'batch' | 'structure' | 'doubts' | 'unassigned' | 'descriptions'
 export type ReviewProgress = { 环节: string; 已核: number; 待核: number }[]
 export interface NarrativeTask {
@@ -26,6 +30,8 @@ export interface NarrativeTask {
   ids: string[]
   prompt: string
   basis: Record<string, string>
+  retrieval?: { degraded?: string; configVersion?: string; sourceFingerprint?: string }
+  orphanIds?: string[]
   singletonSources?: Record<string, string[]>
   reviewProgress?: ReviewProgress
 }
@@ -37,6 +43,10 @@ export interface NarrativePlan {
   config: NarrativeConfig
   layer: Layer
   complete: boolean
+  awaitingStorylines?: boolean
+  reviewOnly?: boolean
+  twoStep?: TwoStepState
+  eventReview?: { checked: Record<string,string>; pending: Record<string, Row[]>; retryIds?: string[] }
   reuseAssigned?: boolean
   active?: NarrativeTask
   nodes: Record<string, string>
@@ -94,26 +104,18 @@ export async function narrativeAssets(store: AgentStore, sessionId: string) {
 }
 export type NarrativeAssets = Awaited<ReturnType<typeof narrativeAssets>>
 export const idsOf = (rows: Row[]) => rows.map((row) => text(row.id))
-export const nodeBrief = (r: Row) => ({
-  id: r.id,
-  name: r.name,
-  summary: r.summary,
-  actors: r.actors,
-  actorIds: r.actorIds,
-  targetCharacterIds: r.targetCharacterIds,
-  targets: r.targets,
-  locations: r.locationNames,
-  chapter: r.chapterIndex,
-  order: r.order,
-})
 export function visibleNodes(
   plan: NarrativePlan,
   task: Pick<NarrativeTask, 'mode' | 'ids'>,
   assets: NarrativeAssets
 ) {
-  return plan.layer === 'line' || task.mode === 'event_review'
+  if (task.mode === 'link_node') {
+    const index = assets.nodes.findIndex(node => node.id === task.ids[0])
+    return new Set([...Object.keys(plan.nodes), ...idsOf(assets.nodes.slice(0,index+1))])
+  }
+  return plan.layer === 'line' || task.mode === 'event_review' || task.mode === 'review_boundaries' || task.mode === 'review_sequence' || task.mode === 'review_event'
     ? new Set(idsOf(assets.nodes))
-    : new Set([...Object.keys(plan.nodes), ...(task.mode === 'node_batch' ? task.ids : [])])
+    : new Set([...Object.keys(plan.nodes), ...task.ids])
 }
 export function catalog(plan: NarrativePlan, assets: NarrativeAssets, visible: Set<string>, expand = true) {
   const events = assets.events.map((row) => ({
@@ -147,40 +149,15 @@ export function catalog(plan: NarrativePlan, assets: NarrativeAssets, visible: S
   }
 }
 function targets(plan: NarrativePlan, a: NarrativeAssets) {
-  const eventLayer = plan.layer === 'event'
-  return {
-    items: eventLayer ? a.nodes : a.events,
-    parents: eventLayer ? a.events : a.lines,
-    key: eventLayer ? 'nodeIds' : 'eventIds',
-    coverage: eventLayer ? plan.nodes : plan.events,
-  }
+  return {items:a.events, parents:a.lines, key:'eventIds', coverage:plan.events}
 }
 export function assignment(plan: NarrativePlan, a: NarrativeAssets, row: Row) {
   const { parents, key } = targets(plan, a)
-  const id = text(row.id),
-    eventLayer = plan.layer === 'event'
-  const belongs = parents.filter((p) => strings(p[key]).includes(id)).map((p) => text(p.id))
-  const doubts = a.notes.filter(
-    (n) =>
-      n.status === 'active' &&
-      n.category === (eventLayer ? 'NODE_ASSIGNMENT' : 'EVENT_ASSIGNMENT') &&
-      strings(n[eventLayer ? 'nodeIds' : 'eventIds']).includes(id)
-  )
-  const retained = eventLayer && plan.retained[id]
-  const basis = canonical([
-    eventLayer
-      ? [nodeBrief(row), row.process, row.clues, row.new_facts, row.actorIds, row.targetCharacterIds]
-      : [row.title, row.nodeIds, row.summary, row.coreClue],
-    belongs,
-    idsOf(doubts),
-    retained || '',
-  ])
-  return {
-    valid: !!(belongs.length || doubts.length || retained),
-    basis,
-    belongs,
-    hasOpenDoubt: doubts.length > 0,
-  }
+  const id = text(row.id)
+  const belongs = parents.filter(p=>strings(p[key]).includes(id)).map(p=>text(p.id))
+  const doubts = a.notes.filter(n=>n.status==='active' && n.category==='EVENT_ASSIGNMENT' && strings(n.eventIds).includes(id))
+  const basis = canonical([[row.title,row.nodeIds,row.summary,row.clues,row.latestProgress,row.unresolved,row.status],belongs,idsOf(doubts),''])
+  return {valid:!!(belongs.length || doubts.length),basis,belongs,hasOpenDoubt:doubts.length>0}
 }
 function singleMemberParents(plan: NarrativePlan, a: NarrativeAssets, id: string) {
   const { parents, key } = targets(plan, a)
@@ -232,7 +209,7 @@ export function reviewBasis(plan: NarrativePlan, a: NarrativeAssets, part: Part,
   return canonical([
     row.title,
     row.summary,
-    row.coreClue,
+    row.clues ?? row.coreClue,
     row.nodeIds,
     row.eventIds,
     row.lineIds,
@@ -307,29 +284,27 @@ function taskInput(
   const overview = rows.map((row) => {
     if (row.absent) return { id: row.id, status: '当前已移出本段范围，以已保存结果确认' }
     if (task.part === 'doubts') return doubtBrief(row)
-    if (task.mode === 'node_batch') return nodeBrief(row)
     if (task.part === 'unassigned') {
-      const eventLayer = plan.layer === 'event'
       const { parents, key } = targets(plan, a)
       const current = parents.filter(parent => strings(parent[key]).includes(text(row.id)))
       const singles = singleMemberParents(plan, a, text(row.id))
       const parentRows = current.map(parent => ({
-        id: parent.id, title: parent.title, [eventLayer ? '单节点事件' : '单事件故事线']: singles.includes(parent),
+        id: parent.id, title: parent.title, 单事件故事线: singles.includes(parent),
       }))
       return {
-        ...(eventLayer ? nodeBrief(row) : { id: row.id, title: row.title, summary: row.summary, coreClue: row.coreClue }),
-        入选原因: singles.length ? (eventLayer ? '所在事件仅含此节点' : '所在故事线仅含此事件') : current.length ? '已调整归属' : (eventLayer ? '未归属' : '未归线'),
-        [eventLayer ? '当前事件' : '当前故事线']: parentRows,
+        ...{ id: row.id, title: row.title, summary: row.summary, clues: strings(row.clues), latestProgress:row.latestProgress, unresolved:row.unresolved, status:row.status },
+        入选原因: singles.length ? '所在故事线仅含此事件' : current.length ? '已调整归属' : '未归线',
+        当前故事线: parentRows,
       }
     }
     if (task.mode === 'event_group')
-      return { id: row.id, title: row.title, summary: row.summary, coreClue: row.coreClue }
+      return { id: row.id, title: row.title, summary: row.summary, clues: strings(row.clues), latestProgress:row.latestProgress, unresolved:row.unresolved, status:row.status }
     return {
       id: row.id,
       title: row.title,
       members:
         plan.layer === 'event' ? strings(row.nodeIds).filter((id) => visible.has(id)) : strings(row.eventIds),
-      ...(task.part === 'descriptions' ? { summary: row.summary, coreClue: row.coreClue } : {}),
+      ...(task.part === 'descriptions' ? { summary: row.summary, ...(Array.isArray(row.clues) ? { clues: row.clues } : { coreClue: row.coreClue }), latestProgress:row.latestProgress, unresolved:row.unresolved, status:row.status } : {}),
     }
   })
   const eventIds = new Set<string>()
@@ -348,7 +323,7 @@ function taskInput(
       id: row.id,
       title: row.title,
       summary: strings(row.nodeIds).every((id) => visible.has(id)) ? short(row.summary, 220) : undefined,
-      coreClue: strings(row.nodeIds).every((id) => visible.has(id)) ? short(row.coreClue, 160) : undefined,
+      clues: strings(row.nodeIds).every((id) => visible.has(id)) ? strings(row.clues) : undefined,
     }))
   const nodes = a.nodes
     .filter((row) => nodeIds.has(text(row.id)) && visible.has(text(row.id)))
@@ -396,23 +371,32 @@ function pendingAssignments(plan: NarrativePlan, a: NarrativeAssets, reuseExisti
   })
 }
 
-export function scheduleNarrative(plan: NarrativePlan, a: NarrativeAssets): NarrativeTask | undefined {
+export function scheduleNarrative(plan: NarrativePlan, a: NarrativeAssets, reviewIndex?:ReviewIndex): NarrativeTask | undefined {
   if (plan.active || plan.complete) return plan.active
+  if (plan.layer === 'event') {
+    const task = scheduleEvent(plan,a,reviewIndex)
+    if (task) {
+      delete plan.awaitingStorylines
+      return task
+    }
+    if (plan.reviewOnly) { plan.complete=true; return undefined }
+    if (storylinesOnHold) {
+      plan.awaitingStorylines = true
+      return undefined
+    }
+    delete plan.awaitingStorylines
+    plan.layer = 'line'
+  }
   const { items, coverage } = targets(plan, a),
-    eventLayer = plan.layer === 'event',
     cfg = plan.config
   const pending = plan.review ? [] : pendingAssignments(plan, a, plan.batches[plan.layer] === 0)
   if (!pending.length && !plan.review) plan.review = { final: true, coverage: {} }
-  let mode: Mode = eventLayer ? 'node_batch' : 'event_group',
+  let mode: Mode = 'event_group',
     part: Part = 'batch'
-  let rows = pending.slice(0, eventLayer ? cfg.nodeBatchSize : cfg.eventGroupSize)
+  let rows = pending.slice(0, cfg.eventGroupSize)
   let reviewProgress: ReviewProgress | undefined
   if (plan.review) {
-    mode = eventLayer
-      ? plan.review.final
-        ? 'event_review'
-        : 'event_cycle'
-      : plan.review.final
+    mode = plan.review.final
         ? 'line_review'
         : 'line_cycle'
     rows = []
@@ -457,11 +441,8 @@ export function scheduleNarrative(plan: NarrativePlan, a: NarrativeAssets): Narr
       plan.period = []
       plan.affected = []
       if (final && !remaining) {
-        if (!eventLayer) {
-          plan.complete = true
-          return undefined
-        }
-        plan.layer = 'line'
+        plan.complete = true
+        return undefined
       }
       return scheduleNarrative(plan, a)
     }
@@ -492,15 +473,7 @@ export function confirmNarrative(plan: NarrativePlan, a: NarrativeAssets, args: 
   const { items, coverage } = targets(plan, a)
   let reviewResults: { target_id: string; outcome: string }[] | undefined
   if (t.part === 'batch') {
-    const ids = plan.layer === 'line' ? [...new Set([...t.ids, ...strings(args.handled_event_ids)])] : t.ids
-    for (const r of (args.retained_unassigned_nodes ?? []) as Row[]) {
-      if (plan.layer !== 'event' || !t.ids.includes(text(r.node_id)) || !text(r.note).trim())
-        throw new NarrativeToolError('INVALID_RETENTION', '独立保留须属于本批并写明依据。', {
-          fields: ['retained_unassigned_nodes'],
-          objectIds: [text(r.node_id)].filter(Boolean),
-        })
-      plan.retained[text(r.node_id)] = text(r.note)
-    }
+    const ids = [...new Set([...t.ids, ...strings(args.handled_event_ids)])]
     const rowsById = new Map(items.map((row) => [text(row.id), row]))
     const unknown = ids.filter((id) => !rowsById.has(id))
     if (unknown.length)
@@ -512,10 +485,7 @@ export function confirmNarrative(plan: NarrativePlan, a: NarrativeAssets, args: 
     if (unassigned.length)
       throw new NarrativeToolError('ASSIGNMENT_REQUIRED', '尚缺有效归属或对应结论 ' + unassigned.join('、'), {
         objectIds: unassigned,
-        hint:
-          plan.layer === 'event'
-            ? '先保存节点归属，或登记归属疑点，或在确认时填写独立保留理由。'
-            : '先保存事件归线，或登记关联该事件的 EVENT_ASSIGNMENT 疑点。',
+        hint: '先保存事件归线，或登记关联该事件的 EVENT_ASSIGNMENT 疑点。',
       })
     for (const { id, state } of states) coverage[id] = state.basis
     ;(plan.periodTasks ??= []).push(t.id)
@@ -524,7 +494,7 @@ export function confirmNarrative(plan: NarrativePlan, a: NarrativeAssets, args: 
     const end = pendingAssignments(plan, a).length === 0
     if (
       end ||
-      count % (plan.layer === 'event' ? plan.config.eventReviewInterval : plan.config.lineReviewInterval) ===
+      count % plan.config.lineReviewInterval ===
         0
     )
       plan.review = { final: end, coverage: {} }
@@ -549,24 +519,17 @@ export function confirmNarrative(plan: NarrativePlan, a: NarrativeAssets, args: 
       else if (!row) outcome = 'repaired'
       else if (part === 'unassigned') {
         const { belongs, hasOpenDoubt } = assignment(plan, a, row)
-        const eventLayer = plan.layer === 'event'
-        const { parents, key } = targets(plan, a)
+          const { parents, key } = targets(plan, a)
         const emptied = t.singletonSources?.[id]?.find(source =>
           parents.some(parent => parent.id === source && !strings(parent[key]).length))
-        if (emptied) throw new NarrativeToolError(eventLayer ? 'EMPTY_SOURCE_EVENT' : 'EMPTY_SOURCE_LINE', '请处理移空的来源' + (eventLayer ? '事件' : '故事线') + '：' + emptied, { objectIds: [emptied] })
+        if (emptied) throw new NarrativeToolError('EMPTY_SOURCE_LINE', '请处理移空的来源故事线：' + emptied, { objectIds: [emptied] })
         if (hasOpenDoubt && (!belongs.length || singleMemberParents(plan, a, id).length)) outcome = 'retained_open'
-        else if (!belongs.length) outcome = eventLayer ? 'independent' : 'unassigned'
+        else if (!belongs.length) outcome = 'unassigned'
         else if (singleMemberParents(plan, a, id).length && reviewBasis(plan, a, part, row) === t.basis[id]) outcome = 'no_change'
         else outcome = 'repaired'
       } else outcome = reviewBasis(plan, a, part, row) === t.basis[id] ? 'no_change' : 'repaired'
       return { target_id: id, outcome }
     })
-    if (part === 'unassigned' && plan.layer === 'event') {
-      for (const { target_id, outcome } of reviewResults) {
-        if (outcome === 'independent') plan.retained[target_id] ||= '复核后独立保留'
-        else delete plan.retained[target_id]
-      }
-    }
     const currentIds = new Set(idsOf(currentRows))
     for (const id of t.ids)
       if (!currentIds.has(id)) plan.review!.coverage[t.part + ':' + id] = '已移出本环节范围'

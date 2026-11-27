@@ -41,28 +41,28 @@ describe('资产人工维护', () => {
     const second = await service.update('a', 'character', 'P1', first.revision, { aliases: ['老沈', '沈先生'] })
     expect(second.verifiedAliases).toEqual(['老沈', '沈先生'])
   })
-  it('统一人物表单保留两类归属、旧对象及事件字段，重复保存后可移除两类关联', async () => {
+  it('统一人物表单保留人物与节点字段，重复保存后可移除人物关联', async () => {
     const { service, db } = await setup()
     const actor = await service.create('a', 'character', { name: '沈青', aliases: ['老沈'], chapterIndex: '1' })
     const target = await service.create('a', 'character', { name: '顾衡', chapterIndex: '2' })
-    const node = await service.create('a', 'node', { name: '交信', summary: '交信', chapterIndex: '1', quote: '沈青收到信。', process: '老沈交出密信。', actors: ['老沈'], targets: ['顾衡', '沈青', '密信', '码头'], world_delta: ['信件易主'], new_facts: ['落款是顾衡'], started_actions: ['沈青开始调查'], time_text: '清晨', time_hint: '翌日' })
+    const node = await service.create('a', 'node', { name: '交信', summary: '交信', chapterIndex: '1', quote: '沈青收到信。', process: '老沈交出密信。', actors: ['老沈', '顾衡'], world_delta: ['信件易主'], new_facts: ['落款是顾衡'], time_text: '清晨', time_hint: '翌日' })
     const line = await service.create('a', 'eventLine', { title: '书信', nodeIds: [node.id] })
     let state = await service.read('a')
     const values = formValues(state.nodes[0], state.characters)
     expect(values.participantIds.split('\n')).toEqual([actor.id, target.id])
     expect(formValues(state.nodes[0], []).participantIds.split('\n')).toEqual([actor.id, target.id])
     expect(values.unlinkedParticipants).toBe('')
-    expect(values.process).toBe('老沈交出密信。\n涉及对象：密信、码头')
+    expect(values.process).toBe('老沈交出密信。')
     let saved = await service.update('a', 'node', node.id, state.nodes[0].revision, formInput('node', values, false))
-    expect(saved).toMatchObject({ actors: ['沈青'], actorIds: [actor.id], quote: node.quote, new_facts: node.new_facts, world_delta: node.world_delta, started_actions: node.started_actions, time_text: '清晨', time_hint: '翌日' })
-    expect([...(saved.targets ?? [])].sort()).toEqual(['顾衡', '沈青', '密信', '码头'].sort())
-    expect([...(saved.targetCharacterIds ?? [])].sort()).toEqual([target.id, actor.id].sort())
+    expect(saved).toMatchObject({ actors: ['沈青', '顾衡'], actorIds: [actor.id, target.id], quote: node.quote, new_facts: node.new_facts, world_delta: node.world_delta, time_text: '清晨', time_hint: '翌日' })
+    expect(saved).not.toHaveProperty('targets')
+    expect(saved).not.toHaveProperty('targetCharacterIds')
     saved = await service.update('a', 'node', node.id, saved.revision, formInput('node', formValues(saved, state.characters), false))
     expect(saved.process).toBe(values.process)
     const removed = formValues(saved, state.characters)
     removed.participantIds = target.id
     saved = await service.update('a', 'node', node.id, saved.revision, formInput('node', removed, false))
-    expect(saved).toMatchObject({ actors: [], actorIds: [], targets: ['顾衡', '密信', '码头'], targetCharacterIds: [target.id] })
+    expect(saved).toMatchObject({ actors: ['顾衡'], actorIds: [target.id] })
     state = await service.read('a')
     expect(state.lineCharacterIds[line.id]).toEqual([target.id])
     expect(await db.table('nodes').get(node.id)).not.toHaveProperty('participantIds')
@@ -108,17 +108,16 @@ describe('资产人工维护', () => {
     const { service, db } = await setup()
     const first = await service.create('a', 'character', { name: '沈青', aliases: ['船夫'], chapterIndex: '1' })
     const other = await service.create('a', 'character', { name: '沈青', chapterIndex: '1' })
-    const node = await service.create('a', 'node', { name: '交信', summary: '交信', chapterIndex: '1', actors: [], targets: ['船夫', '信'] })
+    const node = await service.create('a', 'node', { name: '交信', summary: '交信', chapterIndex: '1', actors: ['船夫'] })
     const legacy = { ...node }
-    legacy.targets = ['船夫', '信']
-    delete legacy.actorIds; delete legacy.targetCharacterIds
+    delete legacy.actorIds
     await db.table('nodes').put(legacy)
     const state = await service.read('a')
     const values = formValues(state.nodes[0], state.characters)
     expect(values.participantIds).toBe(first.id)
     values.participantIds += `\n${other.id}`
     const saved = await service.update('a', 'node', node.id, state.nodes[0].revision, formInput('node', values, false))
-    expect(saved).toMatchObject({ actorIds: [other.id], targetCharacterIds: [first.id], targets: ['沈青', '信'], process: '涉及对象：信' })
+    expect(saved.actorIds?.slice().sort()).toEqual([first.id,other.id].sort())
     expect(formValues(saved, state.characters).participantIds.split('\n').sort()).toEqual([first.id, other.id].sort())
   })
 
@@ -290,16 +289,16 @@ describe('资产人工维护', () => {
     const { service, db } = await setup()
     const first = await service.create('a', 'character', { name: '沈青', aliases: ['老沈'], chapterIndex: '1' })
     const other = await service.create('a', 'character', { name: '顾衡', chapterIndex: '2' })
-    const node = await service.create('a', 'node', { name: '收信', summary: '收信', chapterIndex: '1', quote: '沈青收到信。', actors: ['老沈', '顾衡'], targets: ['老沈', '信'] })
+    const node = await service.create('a', 'node', { name: '收信', summary: '收信', chapterIndex: '1', quote: '沈青收到信。', actors: ['老沈', '顾衡'] })
     expect(node.actorIds).toEqual([first.id, other.id])
     const current = (await service.read('a')).characters.find(row => row.id === first.id)!
     await service.update('a', 'character', first.id, current.revision, { name: '张清' })
     let state = await service.read('a')
-    expect(state.nodes[0]).toMatchObject({ actors: ['张清', '顾衡'], targets: ['张清', '信'], actorIds: [first.id, other.id] })
+    expect(state.nodes[0]).toMatchObject({ actors: ['张清', '顾衡'], actorIds: [first.id, other.id] })
     const renamed = state.characters.find(row => row.id === first.id)!
     await service.remove('a', 'character', first.id, renamed.revision)
     state = await service.read('a')
-    expect(state.nodes[0]).toMatchObject({ actors: ['顾衡'], actorIds: [other.id], targets: ['信'], targetCharacterIds: [], quote: '沈青收到信。' })
+    expect(state.nodes[0]).toMatchObject({ actors: ['顾衡'], actorIds: [other.id], quote: '沈青收到信。' })
     expect(await db.table('chapterTexts').get('1')).toMatchObject({ text: '沈青收到信。沈青把信交给掌柜。' })
   })
 
@@ -308,10 +307,10 @@ describe('资产人工维护', () => {
     const a = await service.create('a', 'character', { name: '张三', chapterIndex: '1' })
     const b = await service.create('a', 'character', { name: '张清', chapterIndex: '1' })
     const c = await service.create('a', 'character', { name: '李四', chapterIndex: '1' })
-    const node = await service.create('a', 'node', { name: '会面', summary: '人物会面', chapterIndex: '1', actors: ['张三', '李四', '张清'], targets: ['张三'] })
+    const node = await service.create('a', 'node', { name: '会面', summary: '人物会面', chapterIndex: '1', actors: ['张三', '李四', '张清'] })
     const state = await service.read('a')
     const mapped = remapCharacterLinks([node], state.characters, state.characters.filter(person => person.id !== a.id), new Map([[a.id, b.id]]))[0]
-    expect(mapped).toMatchObject({ actors: ['张清', '李四'], actorIds: [b.id, c.id], targets: ['张清'], targetCharacterIds: [b.id] })
+    expect(mapped).toMatchObject({ actors: ['张清', '李四'], actorIds: [b.id, c.id] })
   })
 
   it('先建节点后补人物时绑定唯一姓名，之后删除仍能同步清理', async () => {

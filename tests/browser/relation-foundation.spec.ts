@@ -97,7 +97,7 @@ test('旧资料打开修复，地点合并与节点移除可保存，备份副�
   await page.getByRole('button', { name: '确认机械合并', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: '合并完成' })).toBeVisible()
   expect((await readRows(page, bookId, 'characterRelations'))[0]).toEqual(relation)
-  await page.getByRole('button', { name: /^事件节点 1$/ }).click()
+  await page.getByRole('button', { name: /^节点 1$/ }).click()
   await page.getByRole('button', { name: '编辑 回忆', exact: true }).click()
   for (const id of ['P1', 'P3']) await page.getByRole('button', { name: `移除人物 张三 ${id}`, exact: true }).click()
   await page.getByRole('button', { name: '保存', exact: true }).click()

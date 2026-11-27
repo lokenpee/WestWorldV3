@@ -16,7 +16,7 @@ export function selectStoryBatch<T extends Row>(rows: T[], budget = 8000): T[] {
 }
 
 export function storyDigest(row: Row, kind: string): Row {
-  const source = text(row.summary ?? row.statement ?? row.cause)
+  const source = text(row.summary ?? row.statement)
   return { id: text(row.id), kind, title: excerpt(row.name ?? row.title ?? row.key, 80), summary: source.slice(0, 160),
     chapters: (row.chapterIndex ? [text(row.chapterIndex)] : strings(row.chapters)).slice(0, 8),
     nodeIds: strings(row.nodeIds).slice(0, 12), actors: strings(row.actors).slice(0, 8).map(value => value.slice(0, 64)),
@@ -29,15 +29,15 @@ function termsOf(value: string) {
   return [...new Set([...new Intl.Segmenter('zh', { granularity: 'word' }).segment(value)].filter(part => part.isWordLike && part.segment.length >= 2 && !stopWords.has(part.segment)).map(part => part.segment.toLowerCase().slice(0, 64)))]
 }
 export async function searchStoryContext(store: AgentStore, bookId: string, sessionId: string | undefined, args: Row, lightweight = false, outline = false) {
-  const searchable = (row: Row) => [row.name, row.title, row.summary, row.coreClue, row.statement, row.cause, row.result, row.process, ...strings(row.actors), ...strings(row.world_delta),
-    ...(outline ? [...strings(row.clues), ...strings(row.locationNames)] : [...strings(row.targets), ...strings(row.new_facts)])].map(text).join(' ').toLowerCase()
+  const searchable = (row: Row) => [row.name, row.title, row.summary, row.coreClue, row.statement, row.process, ...strings(row.actors), ...strings(row.world_delta),
+    ...(outline ? [...strings(row.clues), ...strings(row.locationNames)] : [...strings(row.new_facts)])].map(text).join(' ').toLowerCase()
   const nodes = (await store.rows('nodes')).filter(row => row.bookId === bookId)
   const lines = (await store.rows('eventLines')).filter(row => row.bookId === bookId)
   const events = outline ? (await store.rows('storyEvents')).filter(row => row.bookId === bookId) : []
   const notes = (await store.rows('storyEditorNotes')).filter(row => row.bookId === bookId && row.sessionId === sessionId && (row.status === 'active' || args.include_resolved === true || args.status === 'resolved'))
   const focus = nodes.filter(row => strings(args.node_ids).includes(text(row.id)))
   const explicit = strings(args.terms).map(value => value.trim().toLowerCase().slice(0, 128)).filter(Boolean)
-  const names = focus.flatMap(row => [...strings(row.actors), ...(!outline ? strings(row.targets) : [])]).filter(value => value.length >= 2).map(value => value.toLowerCase().slice(0, 64))
+  const names = focus.flatMap(row => [...strings(row.actors)]).filter(value => value.length >= 2).map(value => value.toLowerCase().slice(0, 64))
   const clues = outline ? focus.flatMap(row => strings(row.clues).map(value => value.trim().toLowerCase().slice(0, 128))).filter(Boolean) : []
   const terms = [...new Set([...explicit, ...clues, ...names, ...focus.flatMap(row => termsOf([row.name, row.summary, ...strings(row.world_delta), ...(!outline ? strings(row.new_facts) : [])].map(text).join(' ').slice(0, 2000)))])].slice(0, 64)
   const ids = new Set(focus.map(row => text(row.id)))
@@ -82,7 +82,7 @@ export async function searchStoryContext(store: AgentStore, bookId: string, sess
 
 export async function buildStoryContext(store: AgentStore, bookId: string, sessionId: string, rows: Row[], kind: string, includeFuture = false, lightweight = false) {
   const nodeIds = kind === 'node' ? rows.map(row => text(row.id)) : [...new Set(rows.flatMap(row => strings(row.nodeIds)))].slice(0, 20)
-  const terms = rows.flatMap(row => termsOf([row.name, row.title, row.summary, row.statement, row.cause].map(text).join(' ').slice(0, 800))).slice(0, 12)
+  const terms = rows.flatMap(row => termsOf([row.name, row.title, row.summary, row.statement].map(text).join(' ').slice(0, 800))).slice(0, 12)
   const result = await searchStoryContext(store, bookId, sessionId, { node_ids: nodeIds, terms, limit: 12, include_future: includeFuture }, lightweight)
   const assigned = rows.map(row => lightweight || kind === 'node' ? storyView(row, kind) : storyDigest(row, kind))
   const related: Row[] = []; let used = 0
@@ -95,5 +95,5 @@ export async function buildStoryContext(store: AgentStore, bookId: string, sessi
 }
 
 export function lineDigest(row: Row): Row {
-  return { id: text(row.id), title: excerpt(row.title, 120), lineStatus: row.lineStatus, nodeIds: strings(row.nodeIds).slice(0, 20), chapters: strings(row.chapters).slice(0, 20), cause: excerpt(row.cause, 160), result: excerpt(row.result, 160), revision: row.revision, nodeCount: strings(row.nodeIds).length, truncated: strings(row.nodeIds).length > 20 || strings(row.chapters).length > 20 || text(row.cause).length > 160 || text(row.result).length > 160 }
+  return { id: text(row.id), title: excerpt(row.title, 120), lineStatus: row.lineStatus, nodeIds: strings(row.nodeIds).slice(0, 20), chapters: strings(row.chapters).slice(0, 20), summary: excerpt(row.summary, 160), revision: row.revision, nodeCount: strings(row.nodeIds).length, truncated: strings(row.nodeIds).length > 20 || strings(row.chapters).length > 20 || text(row.summary).length > 160 }
 }

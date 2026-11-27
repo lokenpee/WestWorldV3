@@ -1,5 +1,3 @@
-import type { Fact } from './types'
-
 // 完整词匹配保留“林姑父”“宋皇后”等带限定的称呼。
 const contextualNames = new Set([
   '爸爸', '妈妈', '父亲', '母亲', '爹', '娘', '爹爹', '爹娘', '父母', '父母亲', '阿爹', '阿娘', '老爹', '老妈', '父亲大人', '母亲大人',
@@ -11,7 +9,6 @@ const contextualNames = new Set([
   '我', '你', '他', '她', '本宫', '哀家', '朕', '孤', '寡人', '臣妾', '本王', '老夫', '奴婢', '奴才', '儿臣', '妾身', '在下',
 ])
 export const isContextualName = (value: string) => contextualNames.has(value.trim().replace(/\s/g, ''))
-type Names = { name: string; aliases?: string[]; identity?: string; mergeFacts?: Fact[]; sourceChapters?: string[]; chapterIndex?: string }
-export function characterMatchNames(person: Names) {
+export function characterMatchNames<T extends { name: string; aliases?: string[] }>(person: T) {
   return [...new Set([person.name, ...(person.aliases ?? [])].map(name => name.trim()).filter(name => name && !isContextualName(name)))]
 }

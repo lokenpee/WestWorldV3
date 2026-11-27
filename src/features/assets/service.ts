@@ -12,7 +12,8 @@ import { deleteCharacterPair, saveCharacterPair, type PairWriteInput, type PairW
 import { effectivePairs, paginateCharacterPairs, pairFromPerspective, pairView, projectRelations, relationView, syncRelations } from './relations'
 import type { LegacyMigrationReport } from './legacyRelations'
 import type { WorldRun } from '../world/types'
-import { makeAssetPage, type AssetPage, type AssetPageOptions } from './assetPage'
+import { makeAssetPage, pageTables, type PageKind, type AssetPage, type AssetPageOptions } from './assetPage'
+import { searchRelationTables, type SearchRelations } from './narrativeSearch'
 import { versionedTable } from '../local-storage/client'
 import type { Chapter } from '../../lib/storage/workspace'
 import type { SearchAsset } from './search'
@@ -27,12 +28,12 @@ export interface RelationPairInput {
 }
 interface Lease { id: string; bookId: string; recordType?: string; lockKey?: string; resource?: string }
 const worldKinds = new Set<AssetKind>(['character', 'location'])
-const listFields = new Set(['aliases', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'clues', 'world_delta', 'new_facts', 'started_actions', 'nodeIds'])
+const listFields = new Set(['aliases', 'actors', 'actorIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'clues', 'world_delta', 'new_facts', 'nodeIds'])
 const allowed: Record<AssetKind, string[]> = {
   character: ['name', 'aliases', 'chapterIndex', 'manualSourceNote', 'identity', 'ageText', 'appearance', 'personality', 'background', 'speechStyleSample', 'roleWeight'],
   location: ['name', 'aliases', 'chapterIndex', 'manualSourceNote', 'description'],
-  node: ['name', 'summary', 'chapterIndex', 'quote', 'process', 'actors', 'targets', 'actorIds', 'targetCharacterIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'clues', 'time_text', 'time_hint', 'world_delta', 'new_facts', 'started_actions'],
-  eventLine: ['title', 'summary', 'nodeIds', 'cause', 'process', 'result', 'lineStatus'],
+  node: ['name', 'summary', 'chapterIndex', 'quote', 'process', 'actors', 'actorIds', 'participantIds', 'unlinkedParticipants', 'locationNames', 'clues', 'time_text', 'time_hint', 'world_delta', 'new_facts'],
+  eventLine: ['title', 'summary', 'nodeIds', 'lineStatus'],
 }
 const fail = (field: keyof AssetInput, message: string): never => { throw new AssetError('VALIDATION', message, field) }
 const unique = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))]
@@ -252,13 +253,13 @@ export function createAssetService(workspace: Workspace) {
       if (matched) row.offset = source.text.indexOf(quote)
       else delete row.offset
       for (const field of ['process', 'time_text', 'time_hint'] as const) if (input[field] !== undefined) row[field] = input[field]
-      for (const field of ['targets', 'locationNames', 'clues', 'world_delta', 'new_facts', 'started_actions'] as const) if (input[field] !== undefined) row[field] = unique(input[field]!)
+      for (const field of ['locationNames', 'clues', 'world_delta', 'new_facts'] as const) if (input[field] !== undefined) row[field] = unique(input[field]!)
       if (input.participantIds !== undefined || input.unlinkedParticipants !== undefined) {
         const participants = nodeParticipants(row, characters)
         return setNodeParticipants(row, characters, input.participantIds ?? participants.ids, input.unlinkedParticipants ?? participants.names)
       }
-      if (input.actors === undefined && input.targets === undefined && bound?.actorIds !== undefined) return remapCharacterLinks([row], characters, characters)[0]
-      return bindNodeCharacters(row, characters, { actorIds: input.actorIds, targetCharacterIds: input.targetCharacterIds })
+      if (input.actors === undefined && input.actorIds === undefined && bound?.actorIds !== undefined) return remapCharacterLinks([row], characters, characters)[0]
+      return bindNodeCharacters(row, characters, { actorIds: input.actorIds })
     }
     const previous = old as EventLine | undefined
     const title = (input.title ?? previous?.title ?? '').trim() || fail('title', '事件线标题不能为空。')
@@ -267,7 +268,7 @@ export function createAssetService(workspace: Workspace) {
     if (!nodeIds.length && !Array.isArray(previous?.eventIds)) fail('nodeIds', '请至少选择一个事件节点。')
     const nodes = await db.table<EventNode>('nodes').bulkGet(nodeIds)
     if (nodes.some(node => !node || node.bookId !== bookId)) fail('nodeIds', '所选节点已删除或不属于本书，请重新选择。')
-    return { ...previous, ...base, title, ...(input.summary === undefined ? {} : { summary: input.summary }), nodeIds, chapters: previous?.chapters ?? [], cause: input.cause ?? previous?.cause ?? '', process: input.process ?? previous?.process ?? '', result: input.result ?? previous?.result ?? '', lineStatus: input.lineStatus ?? previous?.lineStatus ?? 'open', updatedAt: new Date().toISOString() }
+    return { ...previous, ...base, title, ...(input.summary === undefined ? {} : { summary: input.summary }), nodeIds, chapters: previous?.chapters ?? [], lineStatus: input.lineStatus ?? previous?.lineStatus ?? 'open', updatedAt: new Date().toISOString() }
   }
 
   async function mutate<K extends AssetKind>(bookId: string, kind: K, input: AssetInput | null, id?: string, expectedRevision?: number): Promise<AssetByKind[K] | undefined> {
@@ -420,17 +421,47 @@ export function createAssetService(workspace: Workspace) {
 
   return {
     readContent, readLocks,
-    async readAssetPage(bookId: string, kind: AssetKind, options: AssetPageOptions = {}): Promise<AssetPage> {
+    async eventDetails(bookId: string, id: string) {
+      const db = await database(bookId)
+      return transact(db, 'r', ['storyEvents', 'nodes', 'eventLines', 'chapters', 'pipelineRuns'].map(table => db.table(table)), async db => {
+        const event = await db.table<StoryEvent>('storyEvents').get(id)
+        if (!event) return undefined
+        const [nodes, lines, chapters, receipts] = await Promise.all([
+          db.table<EventNode>('nodes').bulkGet(event.nodeIds),
+          db.table<EventLine>('eventLines').toArray(),
+          db.chapters.toArray(),
+          db.table('pipelineRuns').where('recordType').equals('narrative_receipt').toArray(),
+        ])
+        const order = new Map(chapters.map(chapter => [chapter.chapterIndex, chapter.order]))
+        const grounds:Record<string,{reason:string; evidence:string[]}> = {}
+        for (const receipt of receipts.sort((a,b)=>String(a.startedAt).localeCompare(String(b.startedAt)))) {
+          if (receipt.name !== 'edit_events') continue
+          for (const change of receipt.result?.changes ?? []) {
+            if (change.event_id !== id) continue
+            for (const nodeId of change.added) grounds[nodeId]={reason:change.reason,evidence:change.evidence_node_ids}
+            for (const nodeId of change.removed) delete grounds[nodeId]
+          }
+        }
+        return { event, grounds, nodes: nodes.filter((node): node is EventNode => !!node).sort((a, b) =>
+          (order.get(a.chapterIndex) ?? Infinity) - (order.get(b.chapterIndex) ?? Infinity) || a.order - b.order || a.id.localeCompare(b.id)),
+          lines: lines.filter(line => usesOutline(line) && line.eventIds?.includes(event.id)) }
+      })
+    },
+    async readAssetPage(bookId: string, kind: PageKind, options: AssetPageOptions = {}): Promise<AssetPage> {
       const db = await database(bookId)
       if (workspace.disk) return workspace.disk<AssetPage>({ action: 'assetPage', scope: `book:${bookId}`, kind, options })
-      return transact(db, 'r', [db.table(assetTables[kind]), db.chapters], async db => makeAssetPage(kind, await db.table(assetTables[kind]).toArray() as (SearchAsset & Record<string, unknown>)[], await db.chapters.toArray() as Chapter[], options))
+      const tables = options.query?.trim() ? searchRelationTables(kind, options.field) : []
+      return transact(db, 'r', [db.table(pageTables[kind]), db.chapters, ...tables.map(table => db.table(table))], async db => {
+        const related: SearchRelations = Object.fromEntries(await Promise.all(tables.map(async table => [table, await db.table(table).toArray()])))
+        return makeAssetPage(kind, await db.table(pageTables[kind]).toArray() as (SearchAsset & Record<string, unknown>)[], await db.chapters.toArray() as Chapter[], options, related)
+      })
     },
     async assetCounts(bookId: string) {
       const db = await database(bookId)
-      return transact(db, 'r', [Object.values(assetTables).map(table => db.table(table)), db.table('pipelineRuns')], async db => ({
-        ...Object.fromEntries(await Promise.all(Object.entries(assetTables).map(async ([kind, table]) => [kind, await db.table(table).count()]))),
+      return transact(db, 'r', [Object.values(pageTables).map(table => db.table(table)), db.table('pipelineRuns')], async db => ({
+        ...Object.fromEntries(await Promise.all(Object.entries(pageTables).map(async ([kind, table]) => [kind, await db.table(table).count()]))),
         manualMerges: await db.table('pipelineRuns').where('stage').equals('manual_merge').count(),
-      }) as Record<AssetKind | 'manualMerges', number>)
+      }) as Record<PageKind | 'manualMerges', number>)
     },
     async readMergeHistory(bookId: string) { return (await (await database(bookId)).table<ManualMergeRun>('pipelineRuns').where('stage').equals('manual_merge').toArray()).sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id)) },
     async read(bookId: string): Promise<AssetSnapshot> {

@@ -2,10 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BookRepository } from '../../lib/storage/workspace'
 import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import type { AssetService } from './service'
-import { assetLabels, assetName, assetTables, roleWeights, type Asset, type AssetKind } from './types'
+import { assetLabels, assetName, roleWeights, type Asset } from './types'
 import type { AssetEditorHandle } from './AssetEditor'
 import { AssetDetails, AssetNetwork, AssetMergeHistory } from './AssetViews'
-import type { AssetPage } from './assetPage'
+import { pageTables, type AssetPage, type PageKind } from './assetPage'
+import { narrativeFields, searchRelationTables } from './narrativeSearch'
+import { StoryEventDetails } from '../story/StoryEventDetails'
+
+const tabLabels = { character: '人物', location: '地点', node: '节点', event: '事件', eventLine: '故事线' }
 import { setLeaveGuard } from './leaveGuard'
 import './AssetsPanel.css'
 import { MergeDialog } from './MergeDialog'
@@ -13,7 +17,7 @@ import { LegacyRelationReport } from './LegacyRelationReport'
 import { OutlineView } from '../story/OutlineViews'
 
 export function AssetsPanel({ bookId, repository, service, kind, onKindChange, organizeDisabled, organizeDisabledReason, resumeCharacterId, onAutoTier, onOrganizeCharacter, onContinueCharacter }: {
-  bookId: string; repository: BookRepository; service: AssetService; kind: AssetKind; onKindChange: (kind: AssetKind) => void
+  bookId: string; repository: BookRepository; service: AssetService; kind: PageKind; onKindChange: (kind: PageKind) => void
   organizeDisabled?: boolean; organizeDisabledReason?: string; resumeCharacterId?: string
   onAutoTier?: () => Promise<{ total: number; changed: number; manual: number }>
   onOrganizeCharacter?: (characterId: string, mode: 'profile' | 'relations') => Promise<void> | void
@@ -23,8 +27,10 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
   const editorRef = useRef<AssetEditorHandle>(null)
   const [pendingLeave, setPendingLeave] = useState<{ action: () => void }>()
   const [queryText, setQueryText] = useState('')
+  const [field, setField] = useState('all')
+  const fields = kind === 'character' || kind === 'location' ? undefined : narrativeFields[kind]
   const [offset, setOffset] = useState(0)
-  const [lastPage, setLastPage] = useState<{ bookId: string; kind: AssetKind; value: AssetPage }>()
+  const [lastPage, setLastPage] = useState<{ bookId: string; kind: PageKind; value: AssetPage }>()
   const [role, setRole] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [mergeMode, setMergeMode] = useState(false)
@@ -48,11 +54,11 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
     } catch (error) { setTierError(error instanceof Error ? error.message : '人物自动分层失败，请重试。') }
     finally { tierPending.current = false; setTiering(false); setAttempt(value => value + 1) }
   }
-  const query = useCallback(() => service.readAssetPage(bookId, kind, { query: queryText, role, offset, limit: 100, selectedIds: mergeIds }), [service, bookId, kind, queryText, role, offset, mergeIds])
+  const query = useCallback(() => service.readAssetPage(bookId, kind, { query: queryText, field: fields ? field : undefined, role, offset, limit: 100, selectedIds: mergeIds }), [service, bookId, kind, queryText, field, fields, role, offset, mergeIds])
   const chapterQuery = useCallback(() => repository.listChapters(bookId), [repository, bookId])
-  const data = useLiveResult(query, attempt, bookInterests(bookId, [assetTables[kind], 'chapters']))
+  const data = useLiveResult(query, attempt, bookInterests(bookId, [pageTables[kind], 'chapters', ...searchRelationTables(kind, queryText.trim() ? field : undefined)]))
   const countsQuery = useCallback(() => service.assetCounts(bookId), [service, bookId])
-  const counts = useLiveResult(countsQuery, attempt, [...bookInterests(bookId, Object.values(assetTables)), { scope: `book:${bookId}`, tables: ['pipelineRuns'], category: 'merge' }])
+  const counts = useLiveResult(countsQuery, attempt, [...bookInterests(bookId, Object.values(pageTables)), { scope: `book:${bookId}`, tables: ['pipelineRuns'], category: 'merge' }])
   if (data.status === 'ready' && lastPage?.value !== data.value) setLastPage({ bookId, kind, value: data.value })
   const page = data.status === 'ready' ? data.value : lastPage?.bookId === bookId && lastPage.kind === kind ? lastPage.value : undefined
   const locksQuery = useCallback(() => service.readLocks(bookId), [service, bookId])
@@ -93,6 +99,26 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
   if (!page || chapters.status !== 'ready') return <p role="status" className="muted">正在读取资产…</p>
   const rows = page.items, visible = rows
   const normalized = queryText.trim().toLowerCase()
+  const tabs = <div className="asset-tabs" aria-label="资产类型">{(Object.keys(tabLabels) as PageKind[]).map(tab => <button key={tab} aria-pressed={kind === tab} onClick={() => navigate(() => { onKindChange(tab); setField('all'); setNetworkView(false); setSelection(undefined); setQueryText(''); setRole(''); setOffset(0); setMergeMode(false); setMergeIds([]); setPreviewOpen(false); setMergeMessage('') })}>{tabLabels[tab]} <span>{counts.status === 'ready' ? counts.value[tab] : '…'}</span></button>)}</div>
+  const fieldInput = fields && <select aria-label="检索字段" value={field} onChange={e => { setField(e.target.value); setOffset(0) }}>
+    <option value="all">综合</option>{Object.entries(fields).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+  </select>
+  if (kind === 'event') {
+    const current = selection && selection !== 'new' && rows.some(row => row.id === selection.id) ? selection.id : rows[0]?.id
+    return <section ref={panelRef} className="assets-panel has-editor" aria-label="资产管理">{tabs}
+      <div className="asset-toolbar">{fieldInput}<input aria-label="搜索资产" placeholder="搜索事件" value={queryText} onChange={e => { setQueryText(e.target.value); setOffset(0) }} /></div>
+      <div className="assets-layout-grid has-editor">
+        <div className="asset-results"><p className="result-count">匹配 {page.matched} / {page.total} 个事件</p>
+          {data.status === 'error' && <p role="alert">{data.message}<button onClick={() => setAttempt(value => value + 1)}>重试</button></p>}
+          {rows.length ? <ul className="asset-list">{rows.map(row => <li key={row.id}><button aria-current={row.id === current ? 'true' : undefined} className={row.id === current ? 'selected' : ''} onClick={() => setSelection({ id: row.id })}><strong>{row.label}</strong><span>{row.preview}</span></button></li>)}</ul>
+            : <p className="asset-empty">{page.total ? '没有匹配的事件。' : '本书暂无事件。'}</p>}
+          {page.matched > page.limit && <div className="story-history-pages"><button disabled={!page.offset} onClick={() => setOffset(page.offset - page.limit)}>上一页</button>
+            <span>第 {1 + Math.floor(page.offset / page.limit)} / {Math.ceil(page.matched / page.limit)} 页</span><button disabled={page.offset + page.limit >= page.matched} onClick={() => setOffset(page.offset + page.limit)}>下一页</button></div>}
+        </div>
+        {current && <StoryEventDetails key={current} bookId={bookId} id={current} service={service} onNode={id => { onKindChange('node'); setField('all'); setQueryText(''); setOffset(0); setSelection({ id }) }} />}
+      </div>
+    </section>
+  }
   const locked = (locks.status === 'ready' ? locks.value : { world: true, narrative: true })[kind === 'character' || kind === 'location' ? 'world' : 'narrative']
   const worldKind = kind === 'character' || kind === 'location' ? kind : undefined
   const eventNetworkVisible = networkView && (kind === 'node' || kind === 'eventLine')
@@ -102,8 +128,8 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
   const editorVisible = !!selection || kind === 'character'
 
   return <section ref={panelRef} className={`assets-panel${editorVisible ? ' has-editor' : ''}${eventNetworkVisible ? ' has-network' : ''}`} aria-label="资产管理">
-    <div className="asset-tabs" aria-label="资产类型">{(Object.keys(assetLabels) as AssetKind[]).map(tab => <button key={tab} aria-pressed={kind === tab} onClick={() => navigate(() => { onKindChange(tab); setSelection(undefined); setQueryText(''); setRole(''); setOffset(0); setMergeMode(false); setMergeIds([]); setPreviewOpen(false); setMergeMessage('') })}>{assetLabels[tab]} <span>{counts.status === 'ready' ? counts.value[tab] : '…'}</span></button>)}</div>
-    <div className="asset-toolbar"><input hidden={characterNetworkVisible} aria-label="搜索资产" placeholder={kind === 'character' ? '搜索姓名或别名' : '搜索名称、别名、内容或编号'} value={queryText} onChange={event => { setQueryText(event.target.value); setOffset(0) }} />{kind === 'character' && <select aria-label="筛选人物层级" value={role} onChange={event => { setRole(event.target.value); setOffset(0) }}><option value="">全部层级</option>{roleWeights.map(value => <option key={value}>{value}</option>)}</select>}{kind === 'character' && onAutoTier && <button className="secondary-button" disabled={locked || organizeDisabled || tiering} onClick={() => navigate(() => { void autoTier() })}>{tiering ? '正在分层…' : '人物自动分层'}</button>}<button className="primary-button" disabled={locked} onClick={() => navigate(() => setSelection('new'))}>新增{assetLabels[kind]}</button>{kind === 'character' ? <div className="asset-view-switch" aria-label="展示方式"><button className="secondary-button" aria-pressed={characterView === 'list'} onClick={() => setCharacterView('list')}>人物列表</button><button className="secondary-button" aria-pressed={characterView === 'network'} onClick={() => setCharacterView('network')}>人物网络</button></div> : !worldKind && <div className="asset-view-switch" aria-label="展示方式"><button className="secondary-button" aria-pressed={!eventNetworkVisible} onClick={() => setNetworkView(false)}>列表</button><button className="secondary-button" aria-pressed={eventNetworkVisible} onClick={() => { setNetworkOpened(true); setNetworkView(true) }}>事件网络</button></div>}</div>
+    {tabs}
+    <div className="asset-toolbar">{fieldInput}<input hidden={characterNetworkVisible} aria-label="搜索资产" placeholder={kind === 'character' ? '搜索姓名或别名' : fields ? '输入检索内容' : '搜索名称、别名、内容或编号'} value={queryText} onChange={event => { setQueryText(event.target.value); setOffset(0) }} />{kind === 'character' && <select aria-label="筛选人物层级" value={role} onChange={event => { setRole(event.target.value); setOffset(0) }}><option value="">全部层级</option>{roleWeights.map(value => <option key={value}>{value}</option>)}</select>}{kind === 'character' && onAutoTier && <button className="secondary-button" disabled={locked || organizeDisabled || tiering} onClick={() => navigate(() => { void autoTier() })}>{tiering ? '正在分层…' : '人物自动分层'}</button>}<button className="primary-button" disabled={locked} onClick={() => navigate(() => setSelection('new'))}>新增{assetLabels[kind]}</button>{kind === 'character' ? <div className="asset-view-switch" aria-label="展示方式"><button className="secondary-button" aria-pressed={characterView === 'list'} onClick={() => setCharacterView('list')}>人物列表</button><button className="secondary-button" aria-pressed={characterView === 'network'} onClick={() => setCharacterView('network')}>人物网络</button></div> : !worldKind && <div className="asset-view-switch" aria-label="展示方式"><button className="secondary-button" aria-pressed={!eventNetworkVisible} onClick={() => setNetworkView(false)}>列表</button><button className="secondary-button" aria-pressed={eventNetworkVisible} onClick={() => { setNetworkOpened(true); setNetworkView(true) }}>事件网络</button></div>}</div>
     {kind === 'character' && tierMessage && <p className="merge-success" role="status">{tierMessage}</p>}
     {kind === 'character' && tierError && <p className="field-error" role="alert">{tierError}</p>}
     <div className="merge-toolbar">
@@ -120,7 +146,7 @@ export function AssetsPanel({ bookId, repository, service, kind, onKindChange, o
         ? <AssetNetwork key={`${bookId}:${kind}`} bookId={bookId} service={service} kind={kind} chapters={chapters.value} selectedId={selection && selection !== 'new' ? selection.id : undefined} onNavigate={navigate} onSelect={id => setSelection({ id })} onClear={() => setSelection(undefined)} />
         : <div className="asset-results">{networkOpened && <AssetNetwork key={bookId} bookId={bookId} service={service} kind={kind === 'eventLine' ? 'eventLine' : 'node'} active={eventNetworkVisible} chapters={chapters.value} selectedId={kind === 'node' && selection && selection !== 'new' ? selection.id : undefined} onNavigate={navigate} onSelect={id => setSelection({ id })} onClear={() => setSelection(undefined)} />}<div hidden={eventNetworkVisible} className="asset-list-view">
           {kind === 'eventLine' && <details open={outlineOpen} onToggle={event => setOutlineOpen(event.currentTarget.open)}><summary>剧情大纲</summary>{outlineOpen && <OutlineView key={bookId} bookId={bookId} service={service} onNode={id => navigate(() => { onKindChange('node'); setSelection({ id }); setQueryText(''); setOffset(0) })} />}</details>}
-          <p className="result-count">显示 {visible.length} / {page.total} 条 · {normalized ? '按相关度排列' : kind === 'character' ? '按层级与姓名排列' : '按名称排列'}{data.status === 'loading' ? ' · 正在查询…' : ''}</p>
+          <p className="result-count">显示 {visible.length} / {page.total} 条 · {normalized && !fields ? '按相关度排列' : kind === 'node' ? '按原文排列' : kind === 'character' ? '按层级与姓名排列' : '按名称排列'}{data.status === 'loading' ? ' · 正在查询…' : ''}</p>
           {data.status === 'error' && <p role="alert">{data.message}<button onClick={() => setAttempt(value => value + 1)}>重试</button></p>}
           {visible.length === 0 ? <p className="asset-empty">{page.total ? '没有匹配的资产，请调整搜索或筛选。' : `还没有${assetLabels[kind]}，可以点击上方按钮新增。`}</p> : <ul className="asset-list">{visible.map(row => <li key={row.id}>{mergeMode ? <label className="merge-selection"><input type="checkbox" aria-label={`选择合并 ${row.label} ${row.id}`} checked={mergeIds.includes(row.id)} onChange={event => setMergeIds(ids => event.target.checked ? [...ids, row.id] : ids.filter(id => id !== row.id))} /><span><strong>{row.label}</strong><small>{row.id} · {row.chapterName || '人工来源'}</small></span></label> : <button className={selection && selection !== 'new' && selection.id === row.id ? 'selected' : ''} aria-label={`编辑 ${row.label}`} onClick={() => navigate(() => setSelection({ id: row.id }))}><strong>{row.label}</strong><span>{row.preview}</span><small>{row.createdBy === 'manual' ? '人工' : '提取'} · {row.chapterName || (kind === 'eventLine' ? '事件线' : '无章节来源')} · 修订 {row.revision}</small><code>{row.id}</code></button>}</li>)}</ul>}
           {page.matched > page.limit && <div className="story-history-pages" aria-label="资产列表分页"><button className="text-button" disabled={!page.offset || data.status === 'loading'} onClick={() => setOffset(Math.max(0, page.offset - page.limit))}>上一页资产</button><span>第 {Math.floor(page.offset / page.limit) + 1} / {Math.ceil(page.matched / page.limit)} 页 · 匹配 {page.matched} 条</span><button className="text-button" disabled={page.offset + page.limit >= page.matched || data.status === 'loading'} onClick={() => setOffset(page.offset + page.limit)}>下一页资产</button></div>}

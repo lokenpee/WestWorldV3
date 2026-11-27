@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { useLiveResult, bookInterests } from '../../hooks/useLiveResult'
 import { NarrativeExecutionPanel } from './NarrativeExecutionPanel'
 import { labels, partLabel } from './narrativeLabels'
+import { storylinesOnHold } from './narrativePlan'
 import type { StoryExecutionPhase } from '../agents/executionPagingTypes'
 import { SessionHistory } from './SessionHistory'
 import type { StoryService } from './service'
@@ -9,19 +10,43 @@ import type { StoryService } from './service'
 export function NarrativePanel({
   bookId,
   service,
-  historical,
+  createCopy,
 }: {
   bookId: string
   service: StoryService
-  historical: ReactNode
+  createCopy?: (bookId:string)=>Promise<string>
 }) {
   const api = service.narrative
-  const historicalKey = 'p3-history-open:' + bookId
-  const [showHistorical, setShowHistorical] = useState(() => sessionStorage.getItem(historicalKey) === 'true')
+  const [showTest,setShowTest]=useState(false)
+  const [preparing, setPreparing] = useState(false)
+  const [copyError, setCopyError] = useState('')
+  async function start() {
+    setShowTest(false)
+    setPreparing(true)
+    setCopyError('')
+    try {
+      let id = bookId
+      if (await api.requiresCopy(bookId)) {
+        if (!createCopy) throw Error('重建副本入口不可用。')
+        id = await createCopy(bookId)
+      }
+      await api.start(id)
+    } catch (error) { setCopyError(error instanceof Error ? error.message : String(error)) }
+    finally { setPreparing(false) }
+  }
+  async function startReview() {
+    setShowTest(true)
+    setPreparing(true)
+    setCopyError('')
+    try { await api.start(bookId,true) }
+    catch (error) { setCopyError(error instanceof Error ? error.message : String(error)) }
+    finally { setPreparing(false) }
+  }
   const [tick, refresh] = useState(0),
-    [trace, setTrace] = useState<{ runId: string; phase: StoryExecutionPhase; reviewOnly?: boolean }>(),
+    [trace, setTrace] = useState<{ runId: string; phase: StoryExecutionPhase; eventReview?: boolean; reviewOnly?: boolean; reviewStage?:'review_boundaries'|'review_sequence' }>(),
     [history, setHistory] = useState(false)
-  useEffect(() => api.subscribe(() => refresh((t) => t + 1)), [api])
+  const running = useSyncExternalStore(api.subscribe, () => api.running(bookId))
+  const runningMessage = useSyncExternalStore(api.subscribe, () => api.message(bookId))
   const current = useLiveResult(
     useCallback(() => api.read(bookId), [api, bookId]),
     tick,
@@ -34,6 +59,9 @@ export function NarrativePanel({
       'eventLines',
     ])
   )
+  const testRun=useLiveResult(useCallback(()=>api.read(bookId,true),[api,bookId]),tick,
+    bookInterests(bookId,['pipelineRuns','nodes','storyEvents']))
+  const test=testRun.status==='ready' ? testRun.value : undefined
   const gate = useLiveResult(
     useCallback(() => api.eligibility(bookId), [api, bookId]),
     tick,
@@ -45,38 +73,44 @@ export function NarrativePanel({
     const timer = setTimeout(() => refresh((t) => t + 1), 30000)
     return () => clearTimeout(timer)
   }, [reason, tick])
-  const status = current.status === 'ready' ? current.value : undefined
+  const main = current.status === 'ready' ? current.value : undefined
+  const viewingTest=!!test && (showTest || !main)
+  const status = viewingTest ? test : main
   const plan = status?.plan,
     task = plan?.active,
-    running = api.running(bookId),
-    message = api.message(bookId) || status?.error
+    waiting = storylinesOnHold && status?.status === 'paused' && !!plan?.awaitingStorylines,
+    heldStoryline = storylinesOnHold && plan?.layer === 'line' && ['paused', 'running'].includes(status!.status),
+    message = runningMessage || status?.error
   return (
     <section className="story-panel narrative-panel" aria-label="P3 叙事大纲">
       <div className="story-heading">
         <h2>P3 叙事大纲</h2>
-        {!running && (
+        {!running && !main?.plan.awaitingStorylines && main?.plan.layer!=='line' && (
           <button
             className="primary-button"
-            disabled={current.status !== 'ready' || running || gate.status !== 'ready' || !!reason}
-            onClick={() => void api.start(bookId)}
+            disabled={preparing || current.status !== 'ready' || running || gate.status !== 'ready' || !!reason}
+            onClick={() => void start()}
           >
-            {status?.status === 'completed' || status?.status === 'cancelled'
-              ? '重新整理大纲'
-              : plan
+            {main?.status === 'completed' || main?.status === 'cancelled'
+              ? '在副本中重建大纲'
+              : main?.plan
                 ? '继续整理大纲'
                 : '开始整理大纲'}
           </button>
         )}
+        <button className="secondary-button" disabled={running || preparing || testRun.status!=='ready'}
+          onClick={()=>void startReview()}>{test?.status==='paused' || test?.status==='running' ? '继续事件复核' : test?.status==='cancelled' ? '重新开始事件复核' : '事件复核'}</button>
         {running && (
           <button className="primary-button" onClick={() => void api.stop(bookId)}>
             暂停
           </button>
         )}
-        {(running || status?.status === 'paused') && (
-          <button className="secondary-button" onClick={() => void api.stop(bookId, true)}>
+        {(running || [main?.status,test?.status].some(s=>s==='paused' || s==='running')) && (
+          <button className="secondary-button" onClick={() => void api.stop(bookId, true).catch(error=>setCopyError(error instanceof Error ? error.message : String(error)))}>
             取消 P3
           </button>
         )}
+        {test && main && !running && <button className="text-button" onClick={()=>setShowTest(!showTest)}>{showTest ? '查看主流程' : '查看独立复核'}</button>}
         {plan && (
           <button
             className="text-button"
@@ -84,6 +118,8 @@ export function NarrativePanel({
               setTrace({
                 runId: status!.runId,
                 phase: plan.layer === 'line' ? 'global_review' : 'window_link',
+                eventReview: !!(waiting || plan.reviewOnly || plan.twoStep?.phase==='micro' || task?.mode.startsWith('review_')),
+                reviewStage:task?.mode==='review_sequence' || plan.twoStep?.phase==='micro' ? 'review_sequence':'review_boundaries',
               })
             }
           >
@@ -92,12 +128,20 @@ export function NarrativePanel({
         )}
       </div>
       <div className="story-body">
-        {(message || reason) && <p role="status">{running ? message : reason || message}</p>}
+        {copyError && <p role="alert">{copyError}</p>}
+        {waiting
+          ? <p role="status">第一阶段已完成，已在故事线整理前暂停。</p>
+          : heldStoryline ? <p role="status">第一阶段测试期间，故事线整理已暂停。</p>
+          : (message || (!viewingTest && reason)) && <p role="status">{message || reason}</p>}
         {status && (
           <>
+            {plan?.twoStep && <p role="status">
+              宏观已确认 {status.stats.macroDone} 组 · 微观已主审 {status.stats.microDone}/{status.stats.totalEvents} 件
+              {task && ' · 当前'+labels[task.mode]+' '+task.ids.join('、')}
+            </p>}
             <p>
               节点归入事件 {status.stats.assignedNodes}/{status.stats.totalNodes} · 事件归入故事线{' '}
-              {status.stats.assignedEvents}/{status.stats.totalEvents} · 已复核 {status.stats.reviewed} 项次
+              {status.stats.assignedEvents}/{status.stats.totalEvents}{!plan?.twoStep && ' · 已复核 '+status.stats.reviewed+' 项次'}
             </p>
             <details>
               <summary>会话疑点清单（{status.stats.doubts.length}）</summary>
@@ -115,6 +159,10 @@ export function NarrativePanel({
                 <p>尚未登记疑点。</p>
               )}
             </details>
+            {plan?.twoStep?.macroIssue && <div><strong>宏观分组待核实</strong><ul>{plan.twoStep.macroIssue.map((p,i)=>
+              <li key={i}>{String(p.issue)} · {String(p.checked_scope)} · {String(p.reason)}</li>)}</ul></div>}
+            {Object.entries(plan?.twoStep?.pending ?? plan?.eventReview?.pending ?? {}).map(([id, issues]) =>
+              <div key={id}><strong>待核实 · {id}</strong><ul>{issues.map((p,i)=><li key={i}>{String(p.issue)} · {String(p.checked_scope)} · {String(p.reason)}</li>)}</ul></div>)}
             {!!status.stats.independentReasons.length && (
               <details>
                 <summary>独立保留依据（{status.stats.independentReasons.length}）</summary>
@@ -127,23 +175,24 @@ export function NarrativePanel({
             )}
           </>
         )}
+        {testRun.status === 'error' && <p role="alert">{testRun.message}</p>}
         {current.status === 'error' && <p role="alert">{current.message}</p>}
         {plan && (
           <>
-            <p>
+            {!plan.reviewOnly && <><p>
               {plan.complete
-                ? '全书复核完成'
+                ? '事件复核完成'
                 : task
-                  ? labels[task.mode] + ' · ' + partLabel(plan.layer === 'event', task.part)
+                  ? plan.layer === 'event' ? labels[task.mode] : labels[task.mode] + ' · ' + partLabel(false, task.part)
                   : plan.layer === 'event'
-                    ? '节点整理'
+                    ? waiting ? '事件复核完成' : '节点整理'
                     : '事件归线'}{' '}
               · 节点已处理 {Object.keys(plan.nodes).length} · 事件已处理 {Object.keys(plan.events).length}
             </p>
             <p>
-              节点批次已确认 {plan.batches.event} · 归线批次已确认 {plan.batches.line}
+              节点已确认 {plan.batches.event} · 归线批次已确认 {plan.batches.line}
               {task && ' · 当前范围 ' + task.ids.join('、')}
-            </p>
+            </p></>}
             <button
               className="secondary-button"
               onClick={() =>
@@ -151,6 +200,7 @@ export function NarrativePanel({
                   runId: status!.runId,
                   phase: plan.layer === 'line' ? 'global_review' : 'window_link',
                   reviewOnly: true,
+                  reviewStage: plan.twoStep?.phase==='micro' ? 'review_sequence' : 'review_boundaries',
                 })
               }
             >
@@ -159,8 +209,7 @@ export function NarrativePanel({
             <details>
               <summary>运行参数与复核记录</summary>
               <p>
-                每批 {plan.config.nodeBatchSize} 个节点，每组 {plan.config.eventGroupSize} 个事件。每{' '}
-                {plan.config.eventReviewInterval} 个节点批次、{plan.config.lineReviewInterval}{' '}
+                逐节点串联完成后，先按疑似组复核边界，再逐事件核对经过。归线每组 {plan.config.eventGroupSize} 个事件，每 {plan.config.lineReviewInterval}{' '}
                 个归线组复核一次，每段最多 {plan.config.segmentSize} 项。
               </p>
               {plan.reviews?.map((r, i) => (
@@ -191,22 +240,12 @@ export function NarrativePanel({
           bookId={bookId}
           runId={trace.runId}
           initialPhase={trace.phase}
+          initialEventReview={trace.eventReview}
+          reviewStage={trace.reviewStage}
           reviewOnly={trace.reviewOnly}
           service={service}
           onClose={() => setTrace(undefined)}
         />
-      )}
-      {!plan && (
-        <details
-          open={showHistorical}
-          onToggle={(e) => {
-            setShowHistorical(e.currentTarget.open)
-            sessionStorage.setItem(historicalKey, String(e.currentTarget.open))
-          }}
-        >
-          <summary>旧版串联与复核</summary>
-          {historical}
-        </details>
       )}
     </section>
   )

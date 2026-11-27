@@ -13,7 +13,7 @@ import { ImportPanel } from './features/import/ImportPanel'
 import { ImportRecovery } from './features/import/ImportRecovery'
 import type { ImportService } from './lib/storage/importService'
 import type { AssetService } from './features/assets/service'
-import type { AssetKind } from './features/assets/types'
+import type { PageKind } from './features/assets/assetPage'
 import type { BackupService } from './features/backup/service'
 import { BackupPanel } from './features/backup/BackupPanel'
 import { BookDialogs, type BookAction } from './features/backup/BookDialogs'
@@ -32,7 +32,7 @@ export default function App({ repository, importer, assets, backups, models, ext
   const [attempt, setAttempt] = useState(0)
   const [importBusy, setImportBusy] = useState(false)
   const [pendingSelection, setPendingSelection] = useState<string | null>(null)
-  const [assetKind, setAssetKind] = useState<AssetKind>('character')
+  const [assetKind, setAssetKind] = useState<PageKind>('character')
   const [bookAction, setBookAction] = useState<BookAction>()
   const [bookMessage, setBookMessage] = useState('')
   const query = useCallback(() => repository.listBooks(), [repository])
@@ -63,7 +63,7 @@ export default function App({ repository, importer, assets, backups, models, ext
         {books.status === 'loading' && <div className="page-feedback" role="status"><span className="loading-dot" />正在读取本地书架…</div>}
         {books.status === 'error' && <section className="page-feedback error-panel" role="alert"><h1>无法读取书架</h1><p>{books.message}</p><p>已有资料不会被自动清除。请恢复存储访问后重试。</p><button className="secondary-button" onClick={() => setAttempt(value => value + 1)}>重新读取书架</button></section>}
         {books.status === 'ready' && <><Bookshelf books={books.value} repository={repository} selectedId={showImport ? null : bookId} onSelect={selectBook} onImport={() => setShowImport(true)} busy={importBusy} backups={backups} onExport={book => { setBookMessage(''); setBookAction({ kind: 'export', book }) }} onDelete={book => { setBookMessage(''); setBookAction({ kind: 'delete', book }) }} /><div className="workspace-content">
-          {pendingSelection ? <p role="status">正在打开新导入的书籍…</p> : showImport || books.value.length === 0 ? <ImportPanel hasBooks={books.value.length > 0} importer={importer} onBusyChange={setImportBusy} onImported={book => { setPendingSelection(book.id); setShowImport(false) }} /> : selectedBook ? <BookOverview key={selectedBook.id} book={selectedBook} repository={repository} assets={assets} extraction={extraction} world={world} story={story} assetKind={assetKind} onAssetKindChange={setAssetKind} /> : <p role="status">正在选择书籍…</p>}
+          {pendingSelection ? <p role="status">正在打开新导入的书籍…</p> : showImport || books.value.length === 0 ? <ImportPanel hasBooks={books.value.length > 0} importer={importer} onBusyChange={setImportBusy} onImported={book => { setPendingSelection(book.id); setShowImport(false) }} /> : selectedBook ? <BookOverview createNarrativeCopy={async id => { const copy = await backups.createNarrativeCopy(id); setPendingSelection(copy.id); return copy.id }} key={selectedBook.id} book={selectedBook} repository={repository} assets={assets} extraction={extraction} world={world} story={story} assetKind={assetKind} onAssetKindChange={setAssetKind} /> : <p role="status">正在选择书籍…</p>}
         </div></>}
       </>}
       {activeView === 'settings' && <section className="placeholder-page"><p className="eyebrow">设置</p><h1>模型与存储设置</h1><p className="muted">管理模型连接和本地资料的地方。</p><ModelSettings service={models} diskStorage={!!storageTools} />{storageTools}<BackupPanel service={backups} books={books.status === 'ready' ? books.value : []} selectedId={bookId} onExport={book => setBookAction({ kind: 'export', book })} onRestored={book => setPendingSelection(book.id)} /></section>}

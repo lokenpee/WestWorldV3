@@ -18,7 +18,7 @@ export function OutlineView({ bookId, service, onNode }: { bookId: string; servi
     return <small>章节 {values.chapters.join('、') || '—'} · 人物 {[...new Set(people)].join('、') || '—'} · 地点 {values.locationNames.join('、') || '—'}</small>
   }
   const links = (group: EventNode[]) => <ul>{group.map(node => <li key={node.id}><button type="button" className="text-button" onClick={() => onNode(node.id)}>{node.chapterName} · {node.name}</button></li>)}</ul>
-  const showEvent = (event: StoryEvent) => <details key={event.id}><summary>{event.title}</summary><p><strong>概况：</strong>{event.summary || '待全书复核'}</p><p><strong>核心关键线索：</strong>{event.coreClue || '待全书复核'}</p>{statistics(members(event.nodeIds))}{links(members(event.nodeIds))}</details>
+  const showEvent = (event: StoryEvent) => <details key={event.id}><summary>{event.title}</summary><p><strong>概况：</strong>{event.summary || '待全书复核'}</p><p><strong>核心关键线索：</strong>{event.clues?.join('、') || '待全书复核'}</p>{statistics(members(event.nodeIds))}{links(members(event.nodeIds))}</details>
   const referenced = new Set(lines.filter(usesOutline).flatMap(line => line.eventIds ?? []))
   const unassigned = events.filter(event => !referenced.has(event.id))
   return <div aria-label="剧情大纲内容">

@@ -6,10 +6,10 @@ import type { AgentStore, Row } from '../agents/repository'
 import { storyNodeFields } from './outlineToolSchema'
 import { usesOutline } from './outline'
 
-export const lineSummary = (row: Row) => typeof row.summary === 'string' ? row.summary : [...new Set([row.cause, row.process, row.result].map(text).filter(Boolean))].join('\n\n')
+export const lineSummary = (row: Row) => text(row.summary)
 export function storyView(row: Row, kind: string, outline = false): Row {
   if (kind === 'node') return { id: row.id, kind, name: row.name ?? row.title, chapterIndex: text(row.chapterIndex) || strings(row.chapters)[0] || '', ...(outline && typeof row.unassigned === 'boolean' ? { unassigned: row.unassigned } : {}) }
-  if (kind === 'event') return { id: row.id, kind, title: row.title, ...Object.fromEntries(['summary', 'coreClue', 'nodeIds', 'lineIds', 'lineId', 'lineTitle', 'lineCount', 'eventId', 'eventTitle', 'memberCount', 'evidenceNodes'].filter(key => row[key] !== undefined).map(key => [key, row[key]])) }
+  if (kind === 'event') return { id: row.id, kind, title: row.title, ...Object.fromEntries(['summary', 'clues', 'nodeIds', 'lineIds', 'lineId', 'lineTitle', 'lineCount', 'eventId', 'eventTitle', 'memberCount', 'evidenceNodes'].filter(key => row[key] !== undefined).map(key => [key, row[key]])) }
   if (kind === 'eventLine') {
     const active = usesOutline(row)
     return { id: row.id, kind, title: row.title, ...(outline && active ? { summary: text(row.summary), coreClue: text(row.coreClue) } : { summary: lineSummary(row), nodeIds: strings(row.nodeIds), ...(typeof row.coreClue === 'string' ? { coreClue: row.coreClue } : {}) }), lineStatus: row.lineStatus ?? row.status ?? 'open', ...(outline ? { eventIds: strings(row.eventIds), outlinePending: !active } : {}) }

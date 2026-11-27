@@ -52,11 +52,10 @@ export function migrateCharacterRelations(characters: Character[], lifecycle: Li
   return relations
 }
 
-/** 旧节点把显示称呼变成初始绑定项，已有编号进入旧资料编号字段。 */
+/** 旧节点把显示称呼变成初始绑定项，已有的独立人物编号作为明确关联保存。 */
 export function migrateNodeBindings(nodes: EventNode[], characters: Character[]): EventNode[] {
   return nodes.map(node => node.actorBindings !== undefined ? node : bindNodeCharacters({
     ...node,
-    legacyActorIds: node.legacyActorIds ?? node.actorIds ?? [],
-    legacyTargetCharacterIds: node.legacyTargetCharacterIds ?? node.targetCharacterIds ?? [],
+    manualActorIds: node.manualActorIds ?? (node.actorBindings ? [] : node.actorIds) ?? [],
   }, characters))
 }

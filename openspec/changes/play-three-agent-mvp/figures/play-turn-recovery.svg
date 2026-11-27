@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1436" viewBox="0 0 1280 1436" role="img" aria-labelledby="title desc" lang="zh-CN"><title id="title">回合恢复与末轮改写</title><desc id="desc">发送、申诉、重试与改写分别从哪一轮重新计算，结果何时替换当前生效版本。</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#54665f"/></marker></defs><style>text{font-family:'Microsoft YaHei','PingFang SC',sans-serif;fill:#20372f} .body{font-size:17px}.minor{font-size:15px;fill:#50635b}.head{font-size:21px;font-weight:700}.section{font-size:26px;font-weight:700}.title{font-size:35px;font-weight:700}.edge{fill:none;stroke:#54665f;stroke-width:2.2;stroke-linejoin:round;marker-end:url(#arrow)}</style><rect width="100%" height="100%" fill="#f8f7f3"/>
+<text x="48" y="55" class="title">回合恢复与末轮改写</text>
+<text x="48" y="92" class="body">同一存档内，程序按请求编号找这条玩家操作，按执行编号区分首次执行与重试。重新打开聊天时，先读已保存的进度。</text>
+<path d="M48 113 H1232" stroke="#cdd4cc"/>
+<text x="48" y="159" class="section">生成中，玩家还能做什么？</text>
+<g><rect x="48" y="187" width="361" height="169" rx="12" fill="#fdf3df" stroke="#ae8a4c" stroke-width="1.5"/>
+<text x="66" y="220" class="head">取消本轮／模型或存储故障</text>
+<text x="66" y="251" class="body">取消时核对执行编号。格式、依据或</text>
+<text x="66" y="277" class="body">变更前的值有误时，先让相应角色修正。</text>
+<text x="66" y="303" class="body">修正后仍失败或玩家取消，结束本次执行。</text>
+</g>
+<g><rect x="458" y="187" width="361" height="169" rx="12" fill="#fdf3df" stroke="#ae8a4c" stroke-width="1.5"/>
+<text x="476" y="220" class="head">刷新、返回、切档或换标签</text>
+<text x="476" y="251" class="body">读取玩家此时选中的存档。之前发出的</text>
+<text x="476" y="277" class="body">行动仍归原书、原档。若进度已过时，</text>
+<text x="476" y="303" class="body">先刷新，由玩家决定是否重新发送。</text>
+</g>
+<g><rect x="869" y="187" width="363" height="169" rx="12" fill="#fdf3df" stroke="#ae8a4c" stroke-width="1.5"/>
+<text x="887" y="220" class="head">查资料或查看行动记录</text>
+<text x="887" y="251" class="body">玩家从节点详情手动打开对应章节。</text>
+<text x="887" y="277" class="body">行动记录可看玩家输入、公开理由和进度。</text>
+<text x="887" y="303" class="body">只读查看不会调用模型或新增版本。</text>
+</g>
+<g><rect x="48" y="408" width="361" height="161" rx="12" fill="#e6eef7" stroke="#879fb8" stroke-width="1.5"/>
+<text x="66" y="441" class="head">停止这次执行，作废执行编号</text>
+<text x="66" y="472" class="body">停止接收此次执行的结果，撤下预览。</text>
+<text x="66" y="498" class="body">本次中断或失败的原因可供查看。</text>
+<text x="66" y="524" class="body">恢复发送，保留输入全文和上次进度。</text>
+</g>
+<g><rect x="458" y="408" width="361" height="161" rx="12" fill="#fff" stroke="#a3b3a7" stroke-width="1.5"/>
+<text x="476" y="441" class="head">程序查这条请求处理到哪一步</text>
+<text x="476" y="472" class="body">已完成 → 读取已提交的版本。</text>
+<text x="476" y="498" class="body">另一页仍持有执行权 → 显示进度。</text>
+<text x="476" y="524" class="body">执行期限已到 → 确认仍是同一执行，</text>
+<text x="476" y="550" class="body">结束中断的执行，显示原输入和「重试」。</text>
+</g>
+<g><rect x="869" y="408" width="363" height="161" rx="12" fill="#fff" stroke="#a3b3a7" stroke-width="1.5"/>
+<text x="887" y="441" class="head">返回原页面</text>
+<text x="887" y="472" class="body">聊天只显示当前剧情经历过的回合。</text>
+<text x="887" y="498" class="body">可回看自己已改写的旧行动。看原文</text>
+<text x="887" y="524" class="body">不会新增消息或改变任何人物所知。</text>
+</g>
+<path d="M228 356 V407" class="edge"/>
+<path d="M639 356 V407" class="edge"/>
+<path d="M1050 356 V407" class="edge"/>
+<g><rect x="48" y="633" width="771" height="161" rx="12" fill="#fff" stroke="#a3b3a7" stroke-width="1.5"/>
+<text x="66" y="666" class="head">玩家点击重试 · 检查这条请求启动后，存档进度有没有改变</text>
+<text x="66" y="697" class="body">条件仍成立 → 保留请求编号，换一个执行编号，清除上次未提交的结果，从原先的版本重算。</text>
+<text x="66" y="723" class="body">若上次是在处理申诉时出错 → 用当时的说明重试，申诉机会仍算已用。迟来的旧执行结果无效。</text>
+<text x="66" y="749" class="body">本档已被另一次行动推进 → 保留玩家最初输入的全文，玩家可以在新局面下另发一条行动。</text>
+</g>
+<path d="M228 569 V632" class="edge"/>
+<path d="M639 569 V632" class="edge"/>
+<text x="650" y="609" class="minor">已中断，玩家选择重试</text>
+<g><rect x="869" y="633" width="363" height="161" rx="12" fill="#e9f2ee" stroke="#78a48e" stroke-width="1.5"/>
+<text x="887" y="666" class="head">回到对应任务</text>
+<text x="887" y="697" class="body">行动／申诉／改写回到行动导演。</text>
+<text x="887" y="723" class="body">开局已选卡 → 用原卡重试开场写手。</text>
+<text x="887" y="749" class="body">开局未选卡且推荐失败 → 重做推荐。</text>
+</g>
+<path d="M819 715 H868" class="edge"/>
+<path d="M48 832 H1232" stroke="#cdd4cc"/>
+<text x="48" y="881" class="section">已结算，玩家想把最后一次「留厅」改成「告辞」</text>
+<g><rect x="48" y="912" width="361" height="164" rx="12" fill="#fdf3df" stroke="#ae8a4c" stroke-width="1.5"/>
+<text x="66" y="945" class="head">末条行动回复 · 改写本轮</text>
+<text x="66" y="976" class="body">提出新方向“我告辞，离开官厅”。</text>
+<text x="66" y="1002" class="body">仍可查看当时输入的全文。若曾申诉</text>
+<text x="66" y="1028" class="body">成功，读回原解释和实际采用的行动。</text>
+</g>
+<g><rect x="458" y="912" width="361" height="164" rx="12" fill="#fff" stroke="#a3b3a7" stroke-width="1.5"/>
+<text x="476" y="945" class="head">单独登记这次改写请求</text>
+<text x="476" y="976" class="body">V1 是当前生效的留厅回复。</text>
+<text x="476" y="1002" class="body">从留厅前的 V0 重新计算。保存时须</text>
+<text x="476" y="1028" class="body">确认当前仍是 V1。重算时保留旧回复。</text>
+</g>
+<g><rect x="869" y="912" width="363" height="164" rx="12" fill="#e9f2ee" stroke="#78a48e" stroke-width="1.5"/>
+<text x="887" y="945" class="head">按行动主图重新裁定</text>
+<text x="887" y="976" class="body">导演收到原输入、改写方向和 V0 状态。</text>
+<text x="887" y="1002" class="body">若能离厅，写手按动作链写贾珩告辞、</text>
+<text x="887" y="1028" class="body">走出官厅，停在厅外等玩家决定去向。</text>
+</g>
+<path d="M409 994 H457" class="edge"/>
+<path d="M819 994 H868" class="edge"/>
+<g><rect x="458" y="1151" width="361" height="194" rx="12" fill="#e6eef7" stroke="#879fb8" stroke-width="1.5"/>
+<text x="476" y="1184" class="head">成功 · 整轮保存为新版 V1b</text>
+<text x="476" y="1215" class="body">留厅 V1 和离厅 V1b 都接在 V0 之后。</text>
+<text x="476" y="1241" class="body">V1b 记录离厅和两人当时知道的事。</text>
+<text x="476" y="1267" class="body">续玩时跳过 V1。由追问才获知的事</text>
+<text x="476" y="1293" class="body">和引用 V1 的摘要都退出这局剧情。</text>
+</g>
+<g><rect x="869" y="1151" width="363" height="194" rx="12" fill="#f8eae3" stroke="#be9681" stroke-width="1.5"/>
+<text x="887" y="1184" class="head">驳回、取消或最终失败</text>
+<text x="887" y="1215" class="body">当前仍是 V1，玩家可以按原先</text>
+<text x="887" y="1241" class="body">留厅追问后的局面继续。再次重试前，</text>
+<text x="887" y="1267" class="body">须确认进度仍停在原先的版本。</text>
+</g>
+<path d="M987 1076 V1114 H639 V1150" class="edge"/>
+<path d="M1104 1076 V1150" class="edge"/>
+<text x="48" y="1400" class="body">改写入口只出现在最后一条已结算的行动回复。开场、较早回合以及正在生成的预览均不能从此处改写。</text>
+</svg>

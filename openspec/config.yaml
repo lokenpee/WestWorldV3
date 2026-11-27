@@ -5,6 +5,7 @@ context: |
   需求及整体状态从 openspec/需求池.md 进入；按 AGENTS.md 保存讨论结论及核对独立接手条件。
   WestWorldV3 是本地小说资产工作台，使用 React、TypeScript、Vite、Dexie 和 Pi。
   功能在 src/features/，共享存储在 src/lib/storage/；依赖版本以根目录锁文件为准。
+  所有方案文档及附件按 AGENTS.md 用直白中文说明行为，必要专名在首次出现处解释并列入 proposal.md 的术语入口。
   中文编写产物，OpenSpec 结构标题和 SHALL、WHEN、THEN 标记保持英文。
   根据 AGENTS.md 选择 project-local 或 project-full；小修改采用其简化路径。
 rules:

@@ -47,7 +47,6 @@
           "properties": {
             "summary": {
               "minLength": 1,
-              "maxLength": 64000,
               "type": "string"
             }
           }

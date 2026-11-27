@@ -28,6 +28,8 @@ function summarizeFields(rows: ReturnType<typeof records>, result: boolean) {
 
 function describeCall(call: Call) {
   const args = call.arguments
+  if (call.name === 'search_prior_nodes') return JSON.stringify(args.groups)
+  if (call.name === 'edit_events' && Array.isArray(args.changes)) return records(args.changes).map(op => [op.op,op.event_id].filter(Boolean).join(' ')).join('、')
   if (call.name === 'get_detail') return summarizeFields(records(args.requests), false)
   if (call.name === 'get_outline')
     return [catalogNames[text(args.kind)] ?? args.kind, args.id, args.offset ? '偏移 ' + args.offset : '']
@@ -56,11 +58,15 @@ function describeResult(call: Call, reply: Reply) {
   } catch {
     return '已返回，正文已省略'
   }
+  if (call.name === 'search_prior_nodes')
+    return '共 ' + result.total + ' 项，返回节点 ' + records(result.items).map(row => row.node_id).join('、')
   if (call.name === 'get_detail')
     return '已返回 ' + summarizeFields(records(result), true) + '，字段正文已省略'
   if (call.name === 'get_outline')
     return '本页 ' + records(result.rows).length + ' 项，共 ' + result.total + ' 项，目录正文已省略'
   if (Array.isArray(result)) return '已返回 ' + result.length + ' 项，正文已省略'
+  if (call.name === 'edit_events' && Array.isArray(result?.created))
+    return JSON.stringify(result)
   if (result?.changes)
     return (
       '已保存 ' +
@@ -75,7 +81,7 @@ function describeResult(call: Call, reply: Reply) {
     .join(' ')
 }
 
-export function narrativeContext(messages: Message[], keep: number, saved: Record<string, string>) {
+export function narrativeContext(messages: Message[], keep: number, saved: Record<string, string>, mode?: string) {
   // 请求准备器可能传回上一轮已投影的消息；恢复运行时则会传入原始记录。
   const fixed = new Set(Object.values(saved))
   const isPlaceholder = (m: Message) =>
@@ -100,7 +106,11 @@ export function narrativeContext(messages: Message[], keep: number, saved: Recor
       index++
     }
     const calls = assistant.content.filter((part) => part.type === 'toolCall')
+    const hasReviewEvidence = mode === 'review_boundaries' && replies.some(reply =>
+      !reply.isError && (reply.toolName === 'get_nodes' || reply.toolName === 'get_event')
+    )
     if (
+      hasReviewEvidence ||
       round > total - keep ||
       calls.some((call) => !replies.some((reply) => reply.toolCallId === call.id))
     ) {

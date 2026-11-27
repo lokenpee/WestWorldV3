@@ -163,9 +163,9 @@ it('明确反向与对称称呼保持原样；旧编号与另一个称呼来源�
   expect(legacyRelationLabels({ ...base, relation_label: '女儿' })).toMatchObject({ reverseLabel: '父母', direction: 'directed' })
   expect(legacyRelationLabels({ ...base, relation_label: 'constructor' })).toMatchObject({ reverseLabel: 'constructor', direction: 'unspecified' })
   const person: Character = { id: 'P1', bookId: 'a', name: '沈青', aliases: ['老沈'], revision: 1, confidence: 1, createdBy: 'P1' }
-  const node = bindNodeCharacters({ id: 'N1', bookId: 'a', actors: ['沈青', '老沈'], legacyActorIds: ['P1'] } as EventNode, [person])
+  const node = bindNodeCharacters({ id: 'N1', bookId: 'a', actors: ['沈青', '老沈'], manualActorIds: ['P1'] } as EventNode, [person])
   const kept = setNodeParticipants(node, [person], [], ['老沈'])
-  expect(kept.legacyActorIds).toEqual([])
+  expect(kept.manualActorIds).toBeUndefined()
   expect(kept.actorIds).toEqual(['P1'])
   expect(kept.actorBindings).toEqual([{ mention: '老沈', ids: ['P1'] }])
 })

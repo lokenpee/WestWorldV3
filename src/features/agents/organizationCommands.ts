@@ -103,9 +103,18 @@ async function mergeNodes(store: AgentStore, scope: Scope, members: EventNode[],
   const keep = members.find(row => row.id === keepId)!
   const union = (field: keyof EventNode) => [...new Set(members.flatMap(row => Array.isArray(row[field]) ? row[field] as string[] : []))]
   const clues = [...new Set([...union('clues'), ...strings(patch.clues)].map(value => value.trim()).filter(Boolean))]
+  const mentions = new Map<string, Set<string>>()
+  for (const node of members) for (const binding of node.actorBindings ?? []) {
+    const ids = mentions.get(binding.mention) ?? new Set<string>()
+    for (const id of binding.ids) ids.add(id)
+    mentions.set(binding.mention, ids)
+  }
+  const manualActorIds = union('manualActorIds')
   const next: EventNode = {
     ...keep, ...patch, id: keepId, bookId: scope.bookId,
-    actors: union('actors'), targets: union('targets'), actorIds: union('actorIds'), targetCharacterIds: union('targetCharacterIds'),
+    actors: union('actors'), actorIds: union('actorIds'),
+    actorBindings: Array.from(mentions, ([mention, ids]) => ({ mention, ids: [...ids] })),
+    ...(manualActorIds.length ? { manualActorIds } : {}),
     ...(clues.length || patch.clues !== undefined ? { clues } : {}),
     eventLineIds: union('eventLineIds'), revision: keep.revision + 1, updatedAt: timestamp,
   } as EventNode

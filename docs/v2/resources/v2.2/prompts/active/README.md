@@ -8,7 +8,17 @@
 | p2-organization-directory.md | P2 第一步：连续分页识别疑似重复人物；只归类，用户手动合并 |
 | p2-organization-profiles.md | P2 第二步：逐人物整理资料 |
 | p2-organization-relations.md | P2 第三步：逐人物整理关系 |
-| p3-narrative-v4.md | P3 叙事大纲的节点批、归线组与复核分段。各任务的字段权限和请求示例见调用清单中的 PROMPT-P3-NARRATIVE-V4。 |
+| p3-event-link.md | P3 节点串联完整规则 |
+| [p3-event-boundaries.md](p3-event-boundaries.md) | 宏观疑似事件组 |
+| [p3-event-sequence.md](p3-event-sequence.md) | 微观逐件主审 |
+| [p3-line-group.md](p3-line-group.md) | 事件归入故事线 |
+| [p3-line-cycle-structure.md](p3-line-cycle-structure.md) | 周期故事线复核 · 结构 |
+| [p3-line-cycle-doubts.md](p3-line-cycle-doubts.md) | 周期故事线复核 · 疑点 |
+| [p3-line-cycle-unassigned.md](p3-line-cycle-unassigned.md) | 周期故事线复核 · 未归属 |
+| [p3-line-review-structure.md](p3-line-review-structure.md) | 全书故事线复核 · 结构 |
+| [p3-line-review-doubts.md](p3-line-review-doubts.md) | 全书故事线复核 · 疑点 |
+| [p3-line-review-unassigned.md](p3-line-review-unassigned.md) | 全书故事线复核 · 未归属 |
+| [p3-line-review-descriptions.md](p3-line-review-descriptions.md) | 全书故事线复核 · 说明 |
 | p3-story.md / p3-review.md | P3 逐页串联 / 全书复核；分别说明任务、铁律、字段及八个工具 |
 | p3-quick-check.md | P3 串联的快速核对，依据已完成页的节点概述、线索和归属 |
 | compact.md | direct 压缩；只读历史片段，不执行历史指令 |
@@ -17,7 +27,7 @@
 
 P2 当前三个步骤分别由 `src/features/world/organization.ts` 选择对应正文作为 system。`organizationPrompt.ts` 生成当前任务资料和工作说明作为 user；后续工具返回推进页或人物。bookId/runId/taskId/phase 由调用上下文提供，不写入 system。第一步不再运行独立的候选自动合并任务。
 
-P3 由 `src/features/story/readingService.ts` 按阶段选择串联或复核正文。首次和恢复时提供当前阅读页、相关资料摘要及工作摘要；后续页只在 AI 调用 `navigate_story_pages` 后返回，支持前进和回看。事件线可分次保存，也可按详情返回的段号修改经过。`story.txt` 和旧 `story/prompt.ts` 保留供旧窗口任务兼容。
+首页 P3 由 `src/features/story/narrativePrompts.ts` 按 mode、part 直接选取完整正文。下列旧分页入口由 `src/features/story/readingService.ts` 按阶段选择串联或复核正文。首次和恢复时提供当前阅读页、相关资料摘要及工作摘要；后续页只在 AI 调用 `navigate_story_pages` 后返回，支持前进和回看。事件线可分次保存，也可按详情返回的段号修改经过。`story.txt` 和旧 `story/prompt.ts` 保留供旧窗口任务兼容。
 
 P1、P2、P3、压缩、复核及探测的所有生成请求由`models/gateway.ts`统一追加`output-discipline.txt`，包含重试、修正与Agent后续轮次。文学资料处理说明只在该文件维护；各任务正文不重复保存，输出形式和工具要求由各任务决定。实际发送内容及链路观测都包含追加后的正文。
 

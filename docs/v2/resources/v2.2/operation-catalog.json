@@ -347,7 +347,7 @@
       "label": "保存事件线",
       "page": "线详情",
       "event": "click保存",
-      "inputs": "title/cause/process/result",
+      "inputs": "title/summary",
       "guard": "当前行存在、expectedRevision一致、必要字段/引用有效；本地saving禁用；同书对应资产域锁未被阶段占有",
       "reads": [
         "局部values"

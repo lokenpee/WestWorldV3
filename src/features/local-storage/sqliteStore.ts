@@ -7,9 +7,11 @@ import type { RecordQuery } from './schema.ts'
 import { executionBody, executionPage } from './executionQueries.ts'
 import type { ExecutionQuery } from '../agents/executionPagingTypes.ts'
 import { assetPageFields, makeAssetPage, pageTables, type AssetPageOptions, type PageKind } from '../assets/assetPage.ts'
+import { searchRelationTables, type SearchRelations } from '../assets/narrativeSearch.ts'
+import { migrateStoredNarrativeFields } from './migrateNarrativeFields.ts'
 import type { SearchAsset } from '../assets/search.ts'
 
-const schemaVersion = 1
+const schemaVersion = 2
 const uniqueFields: Record<string, string[][]> = {
   pipelineRuns: [['lockKey']], storyEditorNotes: [['sessionId', 'key']], storySessionEntries: [['sessionId', 'ordinal']],
 }
@@ -33,6 +35,16 @@ export class SqliteRecordStore {
       if (version > schemaVersion) throw new Error('本机数据库由较新版本创建，请使用对应版本打开。')
       this.database.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;')
       if (!version) this.upgradeInitialSchema()
+      if (version < 2) {
+        this.database.exec('BEGIN IMMEDIATE')
+        try {
+          if (Number(this.database.prepare('PRAGMA user_version').get()?.user_version) < 2) {
+            migrateStoredNarrativeFields(this.database)
+            this.database.exec('PRAGMA user_version=2')
+          }
+          this.database.exec('COMMIT')
+        } catch (error) { this.database.exec('ROLLBACK'); throw error }
+      }
       this.database.exec(`
         CREATE INDEX IF NOT EXISTS records_session ON records(scope,tableName,json_extract(body,'$.sessionId'));
         CREATE INDEX IF NOT EXISTS records_type ON records(scope,tableName,json_extract(body,'$.type'));
@@ -147,7 +159,17 @@ export class SqliteRecordStore {
     // 缺失字段不投影成null，保持原搜索的字段分支与数组默认值。
     for (const row of rows) for (const key of Object.keys(row)) if (row[key] === null) delete row[key]
     const chapters = kind === 'node' || options.query?.trim() ? this.database.prepare("SELECT json_extract(body,'$.chapterIndex') AS chapterIndex,json_extract(body,'$.order') AS 'order' FROM records WHERE scope=? AND tableName='chapters'").all(scope) as unknown as { chapterIndex: string; order: number }[] : []
-    return makeAssetPage(kind, rows, chapters, options)
+    const related: SearchRelations = {}
+    if (options.query?.trim()) {
+      for (const table of searchRelationTables(kind, options.field)) {
+        const fields = table === 'characters' ? ['id', 'name', 'aliases', 'verifiedAliases']
+          : table === 'storyEvents' ? ['id', 'title', 'nodeIds']
+          : ['id', 'name', 'actors', 'actorIds', 'actorBindings']
+        const projection = fields.map(key => `'${key}',json_extract(body,'$.${key}')`).join(',')
+        related[table] = this.database.prepare(`SELECT json_object(${projection}) AS value FROM records WHERE scope=? AND tableName=?`).all(scope, table).map(row => JSON.parse(String(row.value)))
+      }
+    }
+    return makeAssetPage(kind, rows, chapters, options, related)
   }
   notificationFields(scope: string, table: string, key: string): StoredValue | undefined { return this.database.prepare("SELECT json_extract(body,'$.type') AS type,json_extract(body,'$.recordType') AS recordType,json_extract(body,'$.stage') AS stage FROM records WHERE scope=? AND tableName=? AND recordKey=?").get(scope, table, key) }
   executionBody(scope: string, options: ExecutionQuery & { requestId: string; eventKey?: string }) { return executionBody(this.database, scope, options) }

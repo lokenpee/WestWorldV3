@@ -55,7 +55,7 @@ it('格式12保留共享历史快照和原输入指纹，两个恢复副本分�
   const data = await sample(), before = structuredClone(data)
   expect(await validateBookData(data)).toEqual([])
   const exported = await encodeBackup(data)
-  expect(exported.manifest.formatVersion).toBe(12)
+  expect(exported.manifest.formatVersion).toBe(15)
   expect(exported.manifest.contents).toEqual(expect.arrayContaining(['extractionTasks', 'extractionInputs']))
   expect(data).toEqual(before)
   const { workspace, service } = destination()

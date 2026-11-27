@@ -17,7 +17,7 @@ function chapterNodes(nodes: Row[]) {
 const reviewPageNames: Record<string, string> = { directory_open: '全书目录初查', directory_final: '全书目录复查', member_batch: '批量成员核对', line_structure: '故事线归属', node_page: '散落节点', line_segment: '成员复核', event_summary: '事件说明', line_summary: '故事线说明', note_page: '待复核事项' }
 function presentReviewPage(brief: Row, page: Row, position: Row) {
   const type = text(page.type), line = brief.line as Row | undefined, event = brief.event as Row | undefined, previous = brief.previousNode as Row | undefined
-  const description = (row: Row) => ({ 编号: row.id, 名称: row.title, 概况: row.summary ?? '', 核心关键线索: row.coreClue ?? '' })
+  const description = (row: Row) => ({ 编号: row.id, 名称: row.title, 概况: row.summary ?? '', 核心关键线索: Array.isArray(row.clues) ? row.clues : row.coreClue ?? '' })
   const nodeSummary = (row: Row) => ({ 编号: row.id, 名称: row.name, 章节索引: row.chapterIndex })
   return { 阶段: '全书复核', 本页: { ...position, 类型: reviewPageNames[type], ...(page.segment ? { 成员分段: page.segment, 总分段数: page.totalSegments } : {}) },
     ...(brief.outline ? { 目录核对要求: '逐线辨认上层大事。若已有两条线是同一大事的起点、准备、阻碍或结果，批量移接到能覆盖整件事的线，再处理空线。若一个事件标题串列不同的行动，查看成员后拆为线内事件。最后检查当前实际目录。', 全书大纲目录: presentDirectory(brief.outline as Row, true), 散落节点索引: records(brief.workItems).map(row => ({ 编号: row.id, 名称: row.name, 章节索引: row.chapterIndex })),

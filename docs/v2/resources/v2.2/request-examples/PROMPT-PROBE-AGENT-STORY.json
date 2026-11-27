@@ -83,7 +83,6 @@
                       "type": "integer"
                     },
                     "workingSummary": {
-                      "maxLength": 2000,
                       "type": "string"
                     },
                     "dataFingerprint": {
@@ -125,7 +124,6 @@
                       },
                       "key": {
                         "minLength": 1,
-                        "maxLength": 120,
                         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                         "type": "string"
                       },
@@ -155,7 +153,6 @@
                       },
                       "statement": {
                         "minLength": 1,
-                        "maxLength": 1000,
                         "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                         "type": "string"
                       },
@@ -163,7 +160,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -171,7 +167,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -291,7 +286,6 @@
                   "type": "integer"
                 },
                 "workingSummary": {
-                  "maxLength": 2000,
                   "type": "string"
                 },
                 "dataFingerprint": {
@@ -333,7 +327,6 @@
                   },
                   "key": {
                     "minLength": 1,
-                    "maxLength": 120,
                     "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                     "type": "string"
                   },
@@ -363,7 +356,6 @@
                   },
                   "statement": {
                     "minLength": 1,
-                    "maxLength": 1000,
                     "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                     "type": "string"
                   },
@@ -371,7 +363,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -379,7 +370,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },

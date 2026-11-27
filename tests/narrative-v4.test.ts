@@ -1,40 +1,36 @@
 import {
-  formatNarrativeInput,
   narrativeSystemPrompt,
-  reviewMaterialSections,
-} from '../src/features/story/narrativeInput'
+} from '../src/features/story/narrativePrompts'
 import { receiptOutcome } from '../src/features/story/narrativeOutcome'
 import { narrativeMaterial } from './support/agent-protocol'
 import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import {
   newNarrativePlan,
-  refreshNarrativeTaskInput,
   scheduleNarrative,
   confirmNarrative,
   narrativeDefaults,
-  visibleNodes,
   type NarrativeAssets,
   type Mode,
   type NarrativeTask,
 } from '../src/features/story/narrativePlan'
 import { validate } from '../src/features/agents/contracts'
 import type { Row } from '../src/features/agents/repository'
-import { toolDefinitions, narrativeTools } from '../src/features/story/narrativeTools'
-import { narrativeVersions } from '../src/features/story/narrativeBasis'
-import { createMemoryAgentRepository } from '../src/features/agents/repository'
-import type { Scope } from '../src/features/agents/queries'
+import { toolDefinitions } from '../src/features/story/narrativeTools'
 import { narrativeContext } from '../src/features/story/narrativeContext'
 import type { Message } from '@earendil-works/pi-ai'
 
-const template = readFileSync('docs/v2/resources/v2.2/prompts/active/p3-narrative-v4.md', 'utf8')
 
-it.each(['node_batch', 'event_cycle', 'event_review', 'event_group', 'line_cycle', 'line_review'] as Mode[])(
+it.each([
+  ['event_group', 'event_group'],
+  ['line_cycle', 'line_cycle-unassigned'],
+  ['line_review', 'line_review-descriptions'],
+] as const)(
   '%s 只给本阶段的编辑参数',
-  (mode) => {
+  (mode, exampleId) => {
     const event = ['node_batch', 'event_cycle', 'event_review'].includes(mode)
     const example = JSON.parse(
-      readFileSync('docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-' + mode + '.json', 'utf8')
+      readFileSync('docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-' + exampleId + '.json', 'utf8')
     )
     const part = example.input.part as NarrativeTask['part']
     const defs = toolDefinitions({ mode, part } as NarrativeTask),
@@ -45,7 +41,7 @@ it.each(['node_batch', 'event_cycle', 'event_review', 'event_group', 'line_cycle
       )
     ).toEqual(defs)
     expect(narrativeMaterial(example.context.messages[1].content)).toMatchObject(example.input)
-    expect(example.context.messages[0].content).toContain(narrativeSystemPrompt(template, { mode, part }))
+    expect(example.context.messages[0].content).toContain(narrativeSystemPrompt({ mode, part }))
     const instructions =
       example.context.messages[0].content +
       example.context.tools.find((t: { name: string }) => t.name === 'confirm').description
@@ -92,75 +88,53 @@ it.each(['node_batch', 'event_cycle', 'event_review', 'event_group', 'line_cycle
       ).toThrow()
   }
 )
-it('六种模式按当前环节组装十六种指令，确认工具只暴露可用结论', () => {
-  const prompts = new Set<string>()
-  for (const mode of [
-    'node_batch',
-    'event_group',
-    'event_cycle',
-    'event_review',
-    'line_cycle',
-    'line_review',
-  ] as const) {
-    const cycle = mode.endsWith('_cycle')
-    const final = mode.endsWith('_review')
-    const event = mode === 'node_batch' || (mode.startsWith('event_') && mode !== 'event_group')
-    const sections: NarrativeTask['part'][] =
-      cycle || final ? ['structure', 'doubts', 'unassigned'] : ['batch']
-    if (final) sections.push('descriptions')
-    for (const part of sections) {
-      const task = { mode, part } as NarrativeTask
-      const prompt = narrativeSystemPrompt(template, task)
-      prompts.add(prompt)
-      expect(prompt).toContain(event ? 'A→B→A' : '发现匪情、调兵、剿匪、善后')
-      expect(prompt).not.toContain(event ? 'edit_storylines' : 'edit_events')
-      if (cycle) expect(prompt).toContain('本周期')
-      if (final) expect(prompt).toContain('分段覆盖全书')
-      const payload = JSON.parse(
-        formatNarrativeInput({
-          mode,
-          part,
-          targets: [{ id: 'test' }],
-          outline: { marker: 'directory' },
-          config: { marker: 'configuration' },
-          openDoubts: [{ id: 'other' }],
-          evidence: { nodes: [{ id: 'unrelated' }] },
-          reviewProgress: [{ 环节: '检查', 已核: 0, 待核: 1 }],
-        })
-      )
-      const directoryKey = event ? '事件与可见节点目录' : '故事线与事件目录'
-      expect(Object.hasOwn(payload, directoryKey)).toBe(part === 'batch' || part === 'structure' || part === 'unassigned')
-      if (part === 'doubts' || part === 'unassigned') {
-        expect(Object.keys(payload)).toEqual(['任务说明', ...(part === 'unassigned' ? [directoryKey] : []), (part === 'unassigned' ? (event ? '本段未归属节点和单节点事件' : '本段未归线事件和单事件故事线') : reviewMaterialSections[part])])
-      }
-      const tools = toolDefinitions(task)
-      const edit = tools[event ? 'edit_events' : 'edit_storylines']
-      const idKey = event ? 'eventId' : 'lineId'
-      const prefix = event ? 'event' : 'line'
-      const write = (op: Row) => () => validate(edit, { operations: [op] })
-      expect(write({ op: 'update_' + prefix, [idKey]: 'X', summary: '概况' })).not.toThrow()
-      const remove = write({ op: 'delete_' + prefix, [idKey]: 'X' })
-      if (part === 'descriptions') {
-        expect(remove).toThrow()
-        expect(write({ op: 'update_' + prefix, [idKey]: 'X', title: '新标题' })).toThrow()
-      } else expect(remove).not.toThrow()
-      if (part === 'batch') continue
-      expect(prompt).toContain('confirm({})')
-      expect(prompt).not.toContain('review_results')
-      expect(tools.confirm).toMatchObject({ properties: {}, required: [] })
-      expect(() => validate(tools.confirm, {})).not.toThrow()
-      expect(write({ op: 'update_' + prefix, [idKey]: 'X', summary: '一句概况', reason: '压缩重复叙述' })).not.toThrow()
+it.each(['link_node','review_boundaries','review_sequence'] as const)('%s 请求示例和运行时一致', mode => {
+  const example = JSON.parse(readFileSync('docs/v2/resources/v2.2/request-examples/PROMPT-P3-NARRATIVE-V4-'+mode+'.json','utf8'))
+  const tools = toolDefinitions(example.input)
+  expect(Object.keys(tools).sort()).toEqual(['confirm','edit_events','get_event','get_nodes','search_events',mode === 'link_node' ? 'search_prior_nodes' : 'search_nodes'])
+  expect(example.context.tools.map((t:Row)=>t.parameters)).toEqual(Object.values(tools))
+  expect(example.context.messages[0].content).toContain(narrativeSystemPrompt(example.input))
+  const content = example.context.messages[1].content
+  const ruleFile = {link_node:'p3-event-link.md',review_boundaries:'p3-event-boundaries.md',review_sequence:'p3-event-sequence.md'}[mode]
+  const rule = readFileSync('docs/v2/resources/v2.2/prompts/active/'+ruleFile,'utf8').trim()
+  expect(narrativeSystemPrompt(example.input)).toBe(rule)
+  if (mode !== 'link_node') {
+    const material=JSON.parse(content)
+    expect(Object.keys(material)[0]).toBe('资料说明')
+    const eventRead = example.context.tools.find((tool:Row)=>tool.name==='get_event').description
+    for (const field of ['event_id','name','overview','latest_progress','unresolved','clues','status']) {
+      expect(material.资料说明).toContain(field)
+      expect(eventRead).toContain(field)
     }
+    if (mode==='review_boundaries') {
+      const merge=JSON.parse(rule.split('```json')[1].split('```')[0])
+      expect(()=>validate(tools.edit_events,merge)).not.toThrow()
+      expect(merge.changes.map((change:Row)=>change.op)).toEqual(['update','delete'])
+    }
+    for (const key of mode==='review_sequence'?['主审事件','成员时间表']:['本组事件','节点时间表']) {
+      expect(material).toHaveProperty(key)
+      expect(rule).toContain(key)
+    }
+    expect(material).not.toHaveProperty('全书事件目录')
+    expect(()=>validate(tools.confirm,{result:'completed'})).not.toThrow()
+    expect(()=>validate(tools.confirm,{result:'completed',reviewed_event_ids:['E1']})).toThrow()
   }
-  expect(prompts.size).toBe(16)
+  if (mode === 'link_node') {
+    const system = example.context.messages[0].content
+    for (const heading of ['一、身份与定义','二、任务','三、Q&A','四、字段要求','五、工具使用约定','六、核心规则'])
+      expect(system).toContain('## '+heading)
+    expect(system).toContain('6. **按事实维护状态**')
+    expect(system).not.toContain('search_nodes')
+    expect(system).not.toContain('每次完整复核当前一个事件')
+    expect(Object.keys(example.context.tools.find((t:Row)=>t.name==='confirm').parameters.properties)).toEqual(['result','unassigned_reason'])
+    expect([...content.matchAll(/【(.+?)开始】/g)].map(m => m[1])).toEqual(['当前节点概览','后文节拍概览','排序召回事件','本轮任务'])
+    expect(narrativeMaterial(content).material.当前节点).toEqual(example.input.material.当前节点)
+  } else expect(JSON.parse(content)).toEqual(example.input.material)
+  expect(()=>validate(tools.confirm,{})).toThrow()
 })
-
 it('全书故事线整段确认后带入仅关联故事线的疑点', () => {
   const a = sceneBook(1)
   a.notes.push({ id: 'D', category: 'OTHER', status: 'active', statement: '篇章结尾待查', lineIds: ['S'] })
-  const plan = newNarrativePlan()
-  const first = narrativeMaterial(scheduleNarrative(plan, a)!.prompt)
-  expect(first.openDoubts[0]).not.toHaveProperty('lineIds')
   const lines = newNarrativePlan()
   lines.layer = 'line'
   scheduleNarrative(lines, a)
@@ -192,105 +166,6 @@ it('孤立项的归属或未决结论须有已保存的成员或关联疑点', (
   expect(orphan.part).toBe('unassigned')
   a.notes.push({ id: 'D', category: 'EVENT_ASSIGNMENT', status: 'active', eventIds: ['E0'] })
   expect(confirmNarrative(plan, a, {})).toEqual([{ target_id: 'E0', outcome: 'retained_open' }])
-})
-
-it('全书复核修订产生的孤点进入当前阶段，冻结前必须逐项确认', () => {
-  const a = sceneBook(2),
-    plan = newNarrativePlan()
-  scheduleNarrative(plan, a)
-  confirmNarrative(plan, a, {})
-  scheduleNarrative(plan, a)
-  a.events[0].nodeIds = []
-  confirmNarrative(plan, a, {})
-  const orphan = scheduleNarrative(plan, a)!
-  expect(orphan).toMatchObject({ mode: 'event_review', part: 'unassigned', ids: ['N0', 'N1'] })
-  expect(Object.keys(JSON.parse(orphan.prompt))).toEqual(['任务说明', '事件与可见节点目录', '本段未归属节点和单节点事件'])
-  expect(JSON.parse(orphan.prompt).本段未归属节点和单节点事件).toContainEqual(
-    expect.objectContaining({ id: 'N0', name: '一幕', summary: '核对过的场景' })
-  )
-  expect(confirmNarrative(plan, a, {})).toEqual([
-    {target_id:'N0', outcome:'independent'}, {target_id:'N1', outcome:'no_change'},
-  ])
-  scheduleNarrative(plan, a)
-  confirmNarrative(plan, a, {})
-  expect(scheduleNarrative(plan, a)?.mode).toBe('event_group')
-  expect(plan.batches.event).toBe(1)
-})
-it('周期按本期和受影响事件筛选单节点；全书再检查，移动与保留必须对应实际归属', () => {
-  const a = sceneBook(4)
-  const plan = newNarrativePlan()
-  plan.nodes = { N0: '已读', N1: '已读', N2: '已读' }
-  plan.period = ['N1']
-  plan.affected = ['E0', 'E3']
-  plan.review = { final: false, coverage: {} }
-  const finishStructure = () => {
-    const task = scheduleNarrative(plan, a)!
-    expect(task.part).toBe('structure')
-    confirmNarrative(plan, a, {})
-  }
-  finishStructure()
-  const cycle = scheduleNarrative(plan, a)!
-  expect(cycle.ids).toEqual(['N0','N1'])
-  const material = narrativeMaterial(cycle.prompt)
-  expect(material.targets[0]).toMatchObject({入选原因:'所在事件仅含此节点', 当前事件:[{id:'E0', title:'事件 0'}]})
-  expect(material.outline.nodes.map((n: Row) => n.id)).toEqual(['N0','N1','N2'])
-  a.events[0].nodeIds = []
-  a.events[2].nodeIds = ['N2','N0']
-  expect(() => confirmNarrative(plan, a, {})).toThrow(/移空/)
-  a.events.shift()
-  expect(confirmNarrative(plan, a, {})).toContainEqual({target_id:'N0', outcome:'repaired'})
-  expect(plan.retained.N1).toBeUndefined()
-  plan.review = {final:true, coverage:{}}
-  finishStructure()
-  expect(scheduleNarrative(plan,a)).toMatchObject({part:'unassigned', ids:['N1','N3']})
-})
-
-it('恢复旧未归属分段先完成原目标，后续补查共享节点所在的单节点事件', () => {
-  const a = sceneBook(3)
-  a.events[0].nodeIds = []
-  a.events[2].nodeIds = ['N1', 'N2']
-  const plan = newNarrativePlan()
-  plan.review = {final:true, coverage:{}}
-  scheduleNarrative(plan,a)
-  confirmNarrative(plan,a, {})
-  const old = scheduleNarrative(plan,a)!
-  old.ids = ['N0']
-  delete old.singletonSources
-  refreshNarrativeTaskInput(plan,a,old)
-  expect(narrativeMaterial(old.prompt).outline.events).toHaveLength(3)
-  confirmNarrative(plan,a, {})
-  const next = scheduleNarrative(plan,a)!
-  expect(next.ids).toEqual(['N1'])
-  expect(narrativeMaterial(next.prompt).targets[0].当前事件).toHaveLength(2)
-})
-
-it('两阶段目录常带名称，复核只附当前分段的查证材料', () => {
-  const a = sceneBook(40)
-  const plan = newNarrativePlan({ ...narrativeDefaults, outlineThreshold: 1 })
-  const batch = narrativeMaterial(scheduleNarrative(plan, a)!.prompt)
-  expect(batch.outline.nodes).toHaveLength(20)
-  expect(batch.outline.nodes[0]).toEqual({ id: 'N0', name: '一幕' })
-  expect(batch.outline.events[0]).toEqual({ id: 'E0', title: '事件 0', nodeIds: ['N0'] })
-  expect(batch.outline.events[25]).toEqual({ id: 'E25', title: '事件 25', nodeIds: [] })
-  confirmNarrative(plan, a, {})
-  scheduleNarrative(plan, a)
-  confirmNarrative(plan, a, {})
-  const structure = scheduleNarrative(plan, a)!
-  expect(structure.part).toBe('structure')
-  const raw = JSON.parse(structure.prompt)
-  expect(raw.本段结构核对表).toHaveLength(20)
-  expect(raw.本段待复核疑点表).toBeUndefined()
-  expect(raw.事件与可见节点目录.nodes).toHaveLength(40)
-  expect(raw.事件与可见节点目录).not.toHaveProperty('unassignedNodeIds')
-  expect(raw.本段查证材料.nodes).toHaveLength(20)
-  expect(raw.本段查证材料.nodes[0]).toMatchObject({ id: 'N0', name: '一幕', summary: '核对过的场景' })
-
-  const lines = newNarrativePlan({ ...narrativeDefaults, outlineThreshold: 10000 })
-  lines.layer = 'line'
-  const group = narrativeMaterial(scheduleNarrative(lines, a)!.prompt)
-  expect(group.outline.lines[0]).toMatchObject({ id: 'S', title: '故事线' })
-  expect(group.outline.events[0]).toMatchObject({ id: 'E0', title: '事件 0', nodeIds: ['N0'] })
-  expect(group.outline.nodes[0]).toMatchObject({ id: 'N0', name: '一幕' })
 })
 
 it.each(['batch', 'cycle', 'final'])('第二阶段 %s 目录超过默认阈值只发故事线和相关事件名称', (phase) => {
@@ -333,45 +208,12 @@ it.each(['batch', 'cycle', 'final'])('第二阶段 %s 目录超过默认阈值�
   )
 })
 
-it.each(['event', 'line'] as const)('快速整理 %s 跨原批凑满 20 个未分配项', (layer) => {
-  const a = sceneBook(100)
-  const assigned = (i: number) => i < 17 || (i >= 20 && i < 35)
-  if (layer === 'event')
-    a.events.forEach((event, i) => {
-      if (!assigned(i)) event.nodeIds = []
-    })
-  else a.lines[0].eventIds = a.events.filter((_, i) => assigned(i)).map((event) => event.id)
-  const plan = { ...newNarrativePlan(), reuseAssigned: true, layer }
-  const task = scheduleNarrative(plan, a)!
-  const prefix = layer === 'event' ? 'N' : 'E'
-  expect(task.ids).toEqual(
-    [17, 18, 19, 35, 36, 37, 38, 39, ...Array.from({ length: 12 }, (_, i) => 40 + i)].map((i) => prefix + i)
-  )
-  expect(Object.keys(layer === 'event' ? plan.nodes : plan.events)).toHaveLength(32)
-  expect(plan.batches[layer]).toBe(0)
+it('既有归线组按未分配事件切组', () => {
+  const a=sceneBook(30)
+  a.lines[0].eventIds=['E0','E1']
+  const plan={...newNarrativePlan(),reuseAssigned:true,layer:'line' as const}
+  expect(scheduleNarrative(plan,a)?.ids).toEqual(a.events.slice(2,22).map(e=>e.id))
 })
-
-it.each(['event', 'line'] as const)('快速整理 %s 已全部分配时直接进入全书复核', (layer) => {
-  const a = sceneBook(2)
-  const plan = { ...newNarrativePlan(), reuseAssigned: true, layer }
-  const task = scheduleNarrative(plan, a)!
-  expect(task).toMatchObject({ mode: layer === 'event' ? 'event_review' : 'line_review', part: 'structure' })
-  expect(task.ids).toEqual(layer === 'event' ? ['E0', 'E1'] : ['S'])
-  expect(plan.batches[layer]).toBe(0)
-})
-
-it('P3 编辑工具允许一次提交 41 个操作及中文临时编号', () => {
-  const task = { mode: 'node_batch', part: 'batch' } as NarrativeTask
-  const rules = toolDefinitions(task)
-  const operations = Array.from({ length: 41 }, (_, index) => ({
-    op: 'create_event',
-    ref: '事件' + index,
-    title: '一幕',
-    nodeIds: ['N' + index],
-  }))
-  expect(() => validate(rules.edit_events, { operations })).not.toThrow()
-})
-
 it.each([false, true])('故事线复查单事件线并只重开成员有变化的线（全书 %s）', final => {
   const a = sceneBook(6)
   a.lines = [
@@ -456,199 +298,6 @@ function sceneBook(size: number): NarrativeAssets {
     notes: [],
   }
 }
-it('二十个未修改事件用空参确认，重发同一确认只推进一次', async () => {
-  const a = sceneBook(20)
-  const plan = newNarrativePlan()
-  plan.review = { final: true, coverage: {} }
-  const task = scheduleNarrative(plan, a)!
-  expect(task).toMatchObject({ mode: 'event_review', part: 'structure' })
-  const scope: Scope = {
-    bookId: 'b', runId: 'r', sessionId: 's', owner: 'owner', taskId: task.id,
-    profile: 'story_editor', phase: 'window_link', workflow: 'narrative_v4', workItemIds: [],
-  }
-  const expiresAt = Date.now() + 90000
-  const repo = createMemoryAgentRepository('b', {
-    nodes: a.nodes, storyEvents: a.events, eventLines: a.lines,
-    pipelineRuns: [
-      { bookId: 'b', id: 'r', narrative: plan },
-      { bookId: 'b', id: task.id, observed: narrativeVersions(a, visibleNodes(plan, task, a), true) },
-      { bookId: 'b', id: 'lease:narrative', owner: 'owner', runId: 'r', expiresAt },
-    ],
-    storySessions: [{ bookId: 'b', id: 's', leaseOwner: 'owner', leaseUntil: expiresAt }],
-  })
-  const tool = narrativeTools(repo, scope, task).tools.find(tool => tool.name === 'confirm')!
-  expect(tool.parameters).toMatchObject({ properties: {}, required: [] })
-  for (let attempt = 0; attempt < 2; attempt++)
-    expect((await tool.execute('confirmation', {})).details).toMatchObject({ confirmed: true })
-  const receipt = await repo.transaction(false, store => store.get('pipelineRuns', task.id + ':confirmation'))
-  expect(receipt?.arguments).toEqual({})
-  expect(receipt?.reviewResults).toEqual(task.ids.map(target_id => ({target_id, outcome:'no_change'})))
-})
-
-it('401 个节点与事件各触发两个周期，尾批并入全书复核', () => {
-  const a = sceneBook(401),
-    plan = newNarrativePlan(),
-    cycles = new Set<string>()
-  for (let i = 0; i < 500; i++) {
-    const task = scheduleNarrative(plan, a)
-    if (!task) break
-    const payload = narrativeMaterial(task.prompt)
-    if (task.mode.endsWith('_cycle')) {
-      cycles.add(task.mode + ':' + plan.batches[plan.layer])
-      if (plan.batches[plan.layer] === 20 && task.part === 'structure')
-        expect(payload.periodIds[0]).toBe(plan.layer === 'event' ? 'N200' : 'E200')
-    }
-    confirmNarrative(plan, a, task.mode === 'event_group' ? { handled_event_ids: task.ids } : {})
-  }
-  expect(plan.complete).toBe(true)
-  expect(plan.batches).toEqual({ event: 21, line: 21 })
-  expect(cycles).toEqual(new Set(['event_cycle:10', 'event_cycle:20', 'line_cycle:10', 'line_cycle:20']))
-})
-it('疑点以20、20、5分段，未决状态随每段空参确认保存', () => {
-  const a = sceneBook(0)
-  a.notes = Array.from({ length: 45 }, (_, i) => ({ id: 'D' + i, status: 'active' }))
-  const plan = newNarrativePlan(),
-    counts = []
-  for (let i = 0; i < 3; i++) {
-    const t = scheduleNarrative(plan, a)!
-    counts.push(t.ids.length)
-    expect(t.reviewProgress).toContainEqual({
-      环节: '处理待复核疑点',
-      已核: i * 20,
-      待核: 45 - i * 20,
-    })
-    expect(confirmNarrative(plan, a, {})).toEqual(t.ids.map(target_id => ({target_id, outcome:'retained_open'})))
-  }
-  expect(counts).toEqual([20, 20, 5])
-})
-it('首批保留旧事件及后批成员，越界整笔失败，重复确认只推进一次', async () => {
-  const a = sceneBook(2)
-  a.events[0].nodeIds = ['N1']
-  a.events[1].nodeIds = []
-  const plan = newNarrativePlan({ ...narrativeDefaults, nodeBatchSize: 1 }),
-    t = scheduleNarrative(plan, a)!
-  expect(t.prompt).toContain('事件 0')
-  expect(t.prompt).not.toContain('N1')
-  const scope: Scope = {
-    bookId: 'b',
-    runId: 'r',
-    sessionId: 's',
-    owner: 'owner',
-    taskId: t.id,
-    profile: 'story_editor',
-    phase: 'window_link',
-    workflow: 'narrative_v4',
-    workItemIds: [],
-  }
-  const repo = createMemoryAgentRepository('b', {
-    nodes: a.nodes,
-    storyEvents: a.events,
-    chapters: [{ bookId: 'b', chapterIndex: '1', order: 0 }],
-    pipelineRuns: [
-      { bookId: 'b', id: 'r', narrative: plan },
-      { bookId: 'b', id: t.id, observed: narrativeVersions(a, visibleNodes(plan, t, a), true) },
-      { bookId: 'b', id: 'lease:narrative', owner: 'owner', runId: 'r', expiresAt: Date.now() + 90000 },
-    ],
-    storySessions: [{ bookId: 'b', id: 's', leaseOwner: 'owner', leaseUntil: Date.now() + 90000 }],
-  })
-  const api = narrativeTools(repo, scope, t),
-    call = async (n: string, id: string, args: object) =>
-      api.tools.find((x) => x.name === n)!.execute(id, args)
-  expect(
-    (
-      await call('edit_events', 'bad', {
-        operations: [
-          { op: 'update_event', eventId: 'E0', title: '误改' },
-          { op: 'delete_event', eventId: 'E0' },
-        ],
-      })
-    ).isError
-  ).toBe(true)
-  expect(await repo.transaction(false, (s) => s.get('storyEvents', 'E0'))).toMatchObject({ title: '事件 0' })
-  expect(
-    (await call('get_detail', 'read', { requests: [{ kind: 'node', id: 'N1', fields: ['*'] }] })).details
-  ).toEqual([{ id: 'N1', values: {}, unavailable: ['*'], message: '该编号没有本任务可读取的资料。' }])
-  expect(
-    (
-      await call('edit_events', 'one', {
-        operations: [
-          { op: 'update_event', eventId: 'E0', summary: '加入本批后更新概况' },
-          { op: 'attach_nodes', eventId: 'E0', nodeIds: ['N0'] },
-        ],
-      })
-    ).isError
-  ).not.toBe(true)
-  const read = await call('get_detail', 'alias', {
-    requests: [{ kind: 'node', id: 'N0', fields: ['chapter', 'locations'] }],
-  })
-  expect(JSON.parse((read.content[0] as { text: string }).text)[0]).toMatchObject({
-    values: { chapter: '1' },
-    unavailable: ['locations'],
-  })
-  const badField = await call('get_detail', 'wrong-field', {
-    requests: [
-      { kind: 'node', id: 'N0', fields: ['text', 'name'] },
-      { kind: 'node', id: 'missing', fields: ['summary'] },
-    ],
-  })
-  expect(badField.isError).not.toBe(true)
-  expect(badField.details).toMatchObject([
-    {
-      id: 'N0',
-      values: { name: '一幕' },
-      unavailable: ['text'],
-      message: expect.stringContaining('原文摘录用 quote'),
-    },
-    { id: 'missing', values: {}, unavailable: ['summary'] },
-  ])
-  const getOutline = api.tools.find((tool) => tool.name === 'get_outline')!
-  expect(() => getOutline.prepareArguments!({ kind: 'unassigned_nodes', id: 'E0' })).toThrow(/目录查询/)
-  const doubts = api.tools.find((tool) => tool.name === 'manage_doubts')!
-  expect(() => doubts.prepareArguments!({ action: 'resolve', id: 'D' })).toThrow(/reason/)
-  const created = await call('manage_doubts', 'create', {
-    action: 'create',
-    statement: '资料遗留',
-    eventIds: ['E1'],
-  })
-  expect(created.isError).not.toBe(true)
-  await repo.transaction(true, (store) => store.remove('storyEvents', 'E1'))
-  const removed = await call('manage_doubts', 'delete', { action: 'delete', id: (created.details as Row).id })
-  expect(removed).toMatchObject({ details: { action: 'delete' } })
-  const edit = api.tools.find((tool) => tool.name === 'edit_events')!
-  expect(() =>
-    edit.prepareArguments!({
-      operations: [{ op: 'update_event', eventId: 'E0', summary: '概况', nodeIds: ['N0'] }],
-    })
-  ).toThrow(/第 1 个编辑（update_event）。.*nodeIds/)
-  expect(() =>
-    api.tools.find((t) => t.name === 'confirm')!.prepareArguments!({ handled_event_ids: ['E0'] })
-  ).toThrow(/handled_event_ids.*confirm\(\{\}\)/)
-  const invalidNode = await call('edit_events', 'hidden', {
-    operations: [{ op: 'attach_nodes', eventId: 'E0', nodeIds: ['N1'] }],
-  })
-  expect(invalidNode.details).toMatchObject({
-    tool: 'edit_events',
-    code: 'OBJECT_OUT_OF_SCOPE',
-    fields: ['nodeIds'],
-    objectIds: ['N1'],
-    reason: '节点尚未开放。',
-  })
-  const misplaced = await call('edit_events', 'unknown', {
-    operations: [{ op: 'update_event', eventId: 'none', title: '未知对象' }],
-  })
-  expect(misplaced.details).toMatchObject({ code: 'SCOPE', operationNumber: 1, objectIds: ['none'] })
-  const args = {}
-  expect((await call('confirm', 'finish', args)).isError).not.toBe(true)
-  expect((await call('confirm', 'finish', args)).isError).not.toBe(true)
-  expect(await repo.transaction(false, (s) => s.get('storyEvents', 'E0'))).toMatchObject({
-    nodeIds: ['N0', 'N1'],
-    summary: '加入本批后更新概况',
-    coreClue: '核心线索',
-  })
-  expect(await repo.transaction(false, (s) => s.get('pipelineRuns', 'r'))).toMatchObject({
-    narrative: { batches: { event: 1, line: 0 } },
-  })
-})
 it('旧批次从写入回执回放成员与当时的标题', () => {
   const task = {
     mode: 'node_batch',
@@ -699,4 +348,28 @@ it('同一任务老轮次稳定，保留最近两轮，未配齐的调用保持�
   expect(ten.messages.filter((message) => message.role === 'assistant')).toHaveLength(2)
   expect(ten.messages.filter((message) => message.role === 'toolResult')).toHaveLength(2)
   expect(narrativeContext([messages[0], ...messages.slice(2)], 2, {}).messages[0].role).toBe('assistant')
+})
+
+it('当前 P3 每种调度任务独占一份已登记的提示词正文',()=>{
+  const base='docs/v2/resources/'
+  const prefix='PROMPT-P3-NARRATIVE-V4-'
+  const manifest=JSON.parse(readFileSync(base+'v2.2/prompt-call-manifest.json','utf8'))
+  const registered=(manifest.calls as {id:string;prompt:string}[]).filter(c=>c.id.startsWith(prefix))
+  const parts: Partial<Record<Mode,NarrativeTask['part'][]>>={
+    link_node:['batch'],review_boundaries:['structure'],review_sequence:['structure'],
+    event_group:['batch'],line_cycle:['structure','doubts','unassigned'],line_review:['structure','doubts','unassigned','descriptions'],
+  }
+  const used=new Set<string>()
+  for(const [key,stages] of Object.entries(parts)){
+    const mode=key as Mode
+    for(const part of stages){
+      const qualified=mode==='line_review' || mode==='line_cycle'
+      const id=prefix+mode+(qualified ? '-'+part : '')
+      const route=registered.find(c=>c.id===id)!
+      expect(used.has(route.prompt)).toBe(false)
+      used.add(route.prompt)
+      expect(narrativeSystemPrompt({mode,part})).toBe(readFileSync(base+route.prompt,'utf8').trim())
+    }
+  }
+  expect(used.size).toBe(registered.length)
 })

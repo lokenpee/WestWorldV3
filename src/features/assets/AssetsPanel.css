@@ -49,8 +49,16 @@
 .editor-heading h3 { margin: 0 0 7px; font-size: 15px; }
 .editor-heading small { font-size: 10px; color: var(--muted); overflow-wrap: anywhere; }
 .asset-field { margin-bottom: 14px; }
-.asset-field > label { display: block; font-size: 12px; margin-bottom: 7px; font-weight: 500; }
-.asset-field input, .asset-field textarea, .asset-field select { width: 100%; background: white; border: 1px solid #d4d4d4; border-radius: 5px; padding: 9px 10px; font-size: 12px; color: var(--ink); }
+.asset-field > label, .asset-readonly-fields dt { display: block; font-size: 12px; margin-bottom: 7px; font-weight: 500; }
+.asset-field input, .asset-field textarea, .asset-field select, .asset-readonly-fields dd { width: 100%; background: white; border: 1px solid #d4d4d4; border-radius: 5px; padding: 9px 10px; font-size: 12px; color: var(--ink); }
+.asset-readonly-fields { margin: 0; }
+.asset-readonly-fields dd { margin: 0; white-space: pre-line; line-height: 1.7; overflow-wrap: anywhere; }
+.asset-member-chapter h4 { margin: 12px 0 4px; font-size: 12px; }
+.asset-member-chapter ol { margin: 0; padding-left: 22px; font-size: 12px; }
+.asset-member-chapter li { padding: 4px 0 8px; }
+.asset-member-chapter .text-button { text-align: left; padding: 3px 0; font-weight: 600; }
+.asset-member-chapter .field-help { margin: 2px 0 5px; }
+.asset-member-chapter summary { cursor: pointer; }
 .asset-field textarea { resize: vertical; line-height: 1.7; }
 .asset-field small, .field-help { display: block; font-size: 11px; color: var(--muted); line-height: 1.7; margin: 6px 0 14px; }
 .field-error { font-size: 12px; line-height: 1.8; color: #b91c1c; margin: 6px 0; overflow-wrap: anywhere; }

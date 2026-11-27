@@ -1,4 +1,8 @@
 export const labels = {
+  link_node: '节点串联',
+  review_event: '旧版事件复核',
+  review_boundaries: '宏观边界复核',
+  review_sequence: '逐事件主审',
   node_batch: '按幕整理节点',
   event_cycle: '周期事件复核',
   event_review: '全书事件复核',

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1800" viewBox="0 0 1200 1800" role="img" aria-labelledby="title desc" lang="zh-CN">
+<title id="title">开局生成与历史摘要的调用流程</title>
+<desc id="desc">建立存档时保存书中资料。导演提供起点，玩家选卡确认，程序将可写的动作和接话位置交给写手生成开场正文。为下一轮挑选的历史预计超过可用容量时，程序根据已完成的回合另行整理摘要，核对来源后再使用。</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#516963" stroke-width="1.6"/></marker></defs>
+<style>
+text{font-family:'Microsoft YaHei','Noto Sans CJK SC','PingFang SC',sans-serif;fill:#23322e}
+.title{font-size:38px;font-weight:700}.section{font-size:26px;font-weight:700}.sub{font-size:19px;fill:#52615c}
+.h{font-size:21px;font-weight:700}.body{font-size:18px}.op{font-size:17px;fill:#2e5c54}
+.main{fill:#ffffff;stroke:#b8cbc2}.actor{fill:#edf5f1;stroke:#a7c4b8}.decision{fill:#fff6e5;stroke:#dabb88}.aux{fill:#fffdf7;stroke:#cfc4ab}.cache{fill:#edf4f7;stroke:#b0c8d0}
+rect{stroke-width:1.5}.edge{fill:none;stroke:#516963;stroke-width:2;marker-end:url(#arrow);stroke-linecap:round;stroke-linejoin:round}
+</style><rect width="1200" height="1800" fill="#f8f7f3"/>
+<text class="title" x="44" y="62">开局生成与历史摘要</text>
+<text class="sub" x="46" y="100">开场成功后，程序保存第 0 版（V0），玩家就能行动。回合多了，可把早先的经历整理成摘要。</text>
+<text class="op" x="46" y="128">工具名　browse_play_sources 查资料目录，read_play_source 读指定资料，submit_result 交付本次结果。</text>
+<text class="section" x="44" y="161">从准备开局到玩家第一次输入</text>
+<g data-box="玩家选择资产包，点击「新建存档」"><rect class="main" x="44" y="190" width="684" height="100" rx="11"/>
+<text class="h" x="64" y="221">玩家选择资产包，点击「新建存档」</text>
+<text class="body" x="64" y="249">程序把这局会使用的书中资料另存到 playSaves.assetBaseline。</text>
+<text class="body" x="64" y="274">同时在 playAttempts 登记开局请求；开场成功前还没有第 0 版。</text>
+</g>
+<g data-box="已有开场的存档 · 点击「继续」"><rect class="aux" x="787" y="190" width="370" height="100" rx="11"/>
+<text class="h" x="807" y="221">已有开场的存档 · 点击「继续」</text>
+<text class="body" x="807" y="249">读取该档上次结算的场景和聊天。</text>
+<text class="body" x="807" y="274">直接恢复上次进度，无需重新生成。</text>
+</g>
+<path class="edge" d="M386 290V318"/>
+<g data-box="开局导演　play-opening"><rect class="actor" x="44" y="322" width="684" height="150" rx="11"/>
+<text class="h" x="64" y="353">开局导演　play-opening</text>
+<text class="body" x="64" y="381">输入　按发生顺序排列的书中事件、可能的主角和地点、可查资料目录。</text>
+<text class="op" x="64" y="406">工具　browse_play_sources、read_play_source、submit_result。</text>
+<text class="body" x="64" y="431">输出　可选起点及依据、初始状态变化、可见动作和接话位置。</text>
+<text class="body" x="64" y="456">程序检查起点和依据，将开局卡保存在 playAttempts，等待玩家选择。</text>
+</g>
+<path class="edge" d="M728 365H783"/>
+<g data-box="资料不足，或推荐阶段失败"><rect class="aux" x="787" y="322" width="370" height="150" rx="11"/>
+<text class="h" x="807" y="353">资料不足，或推荐阶段失败</text>
+<text class="body" x="807" y="381">找不到可靠的起点时，提示缺哪些资料。</text>
+<text class="body" x="807" y="406">玩家可补齐素材再建新档。</text>
+<text class="body" x="807" y="431">推荐阶段遇到技术故障时，</text>
+<text class="body" x="807" y="456">可在这个尚未开场的存档里重试。</text>
+</g>
+<path class="edge" d="M386 472V500"/>
+<g data-box="玩家选卡并点击「开始」"><rect class="decision" x="44" y="504" width="684" height="126" rx="11"/>
+<text class="h" x="64" y="535">玩家选卡并点击「开始」</text>
+<text class="body" x="64" y="563">程序一次保存整张已选卡、依据、主角、起点和卡号 selectedOptionId。</text>
+<text class="body" x="64" y="588">分配执行编号 runId，记录执行页面及期限，显示「正在生成开场」。</text>
+<text class="body" x="64" y="613">玩家关闭准备页后再返回，可恢复未确认的候选卡。</text>
+</g>
+<path class="edge" d="M728 553H783"/>
+<g data-box="两个页面同时点击「开始」"><rect class="aux" x="787" y="504" width="370" height="126" rx="11"/>
+<text class="h" x="807" y="535">两个页面同时点击「开始」</text>
+<text class="body" x="807" y="563">先保存成功的选择生效。</text>
+<text class="body" x="807" y="588">又点同卡，显示进度或已提交的版本。</text>
+<text class="body" x="807" y="613">点了别的卡，提示已选起点。</text>
+</g>
+<path class="edge" d="M386 630V658"/>
+<g data-box="程序取出已选卡，交给开场写手"><rect class="main" x="44" y="662" width="684" height="126" rx="11"/>
+<text class="h" x="64" y="693">程序取出已选卡，交给开场写手</text>
+<text class="body" x="64" y="721">卡内有起点事实、在场人物、开场可见的动作与接话位置。</text>
+<text class="body" x="64" y="746">官厅样例　官厅已谈过翠华山匪情。云光和贾珩仍在厅里，贾珩可以开口。</text>
+<text class="body" x="64" y="771">程序核对资料，并把写手可以引用的出处随所选动作一起交给写手。</text>
+</g>
+<path class="edge" d="M386 788V816"/>
+<g data-box="开场写手　play-write / opening"><rect class="actor" x="44" y="820" width="684" height="126" rx="11"/>
+<text class="h" x="64" y="851">开场写手　play-write / opening</text>
+<text class="body" x="64" y="879">输入　开局可写的剧情步骤、接话位置、人物口吻及可见事实。此时没有上文。</text>
+<text class="op" x="64" y="904">工具　submit_result。</text>
+<text class="body" x="64" y="929">输出　按剧情步骤排列的正文段落和依据，暂存在 playAttempts。</text>
+</g>
+<path class="edge" d="M728 874H783"/>
+<g data-box="确认后取消、写作或保存失败"><rect class="aux" x="787" y="820" width="370" height="126" rx="11"/>
+<text class="h" x="807" y="851">确认后取消、写作或保存失败</text>
+<text class="body" x="807" y="879">保留整张已选卡，撤下正文预览。</text>
+<text class="body" x="807" y="904">玩家重试时，沿用当时确认的卡，</text>
+<text class="body" x="807" y="929">重新准备写手资料并生成开场。</text>
+</g>
+<path class="edge" d="M386 946V974"/>
+<g data-box="程序统一提交第 0 版，开放输入框"><rect class="decision" x="44" y="978" width="684" height="126" rx="11"/>
+<text class="h" x="64" y="1009">程序统一提交第 0 版，开放输入框</text>
+<text class="body" x="64" y="1037">playVersions 保存开场正文、动作链、初始状态及所用书中资料。</text>
+<text class="body" x="64" y="1062">playSaves.headVersionId 和本次 playAttempts 都记下已保存的版本 V0。</text>
+<text class="body" x="64" y="1087">程序结束这次开场任务，玩家看到开场，可以输入第一句话。</text>
+</g>
+<g data-box="怎样查看这次开场的记录"><rect class="cache" x="787" y="978" width="370" height="126" rx="11"/>
+<text class="h" x="807" y="1009">怎样查看这次开场的记录</text>
+<text class="body" x="807" y="1037">玩家可查看所选卡和已公开的开场。</text>
+<text class="body" x="807" y="1062">playRuns 另记模型请求、工具和结果，</text>
+<text class="body" x="807" y="1087">供执行诊断按请求和角色核查。</text>
+</g>
+<path d="M44 1145 H1157" stroke="#cad4cb" stroke-width="2"/>
+<text class="section" x="44" y="1205">准备下一轮资料时，怎样摘录存档里的旧回合</text>
+<text class="sub" x="44" y="1240">这里处理下一次请求要从存档带入的旧事。程序先挑相关回合，仍超出可用篇幅时才摘录。</text>
+<g data-box="程序选取这局实际经历的一段连续回合"><rect class="main" x="44" y="1271" width="684" height="101" rx="11"/>
+<text class="h" x="64" y="1302">程序选取这局实际经历的一段连续回合</text>
+<text class="body" x="64" y="1330">先缩短资料目录、分批取材，再按需选取起止回合、行动、正文及依据。</text>
+<text class="body" x="64" y="1355">例如从开场 V0 到追问 V1。记录版本号，按输入内容算出校验值，供以后核对。</text>
+</g>
+<g data-box="Pi 的会话压缩处理什么"><rect class="aux" x="787" y="1271" width="370" height="101" rx="11"/>
+<text class="h" x="807" y="1302">Pi 的会话压缩处理什么？</text>
+<text class="body" x="807" y="1330">现有整理会话压缩模型对话和工具历史。</text>
+<text class="body" x="807" y="1355">左侧摘录的是本局已保存的剧情。</text>
+</g>
+<path class="edge" d="M386 1372V1400"/>
+<g data-box="导演的独立摘要任务　play-compact"><rect class="actor" x="44" y="1404" width="684" height="150" rx="11"/>
+<text class="h" x="64" y="1435">导演的独立摘要任务　play-compact</text>
+<text class="body" x="64" y="1463">输入　起止版本、各轮已提交的行动和正文、出处及可用的上次摘要。</text>
+<text class="op" x="64" y="1488">工具　submit_result。</text>
+<text class="body" x="64" y="1513">输出　发生过哪些事、谁相信什么、还有哪些事未解决，以及各条依据。</text>
+<text class="body" x="64" y="1538">程序核对来源，将摘要、涉及的版本及输入内容的校验值存入 playRuns.output。</text>
+</g>
+<path class="edge" d="M728 1470H783"/>
+<g data-box="摘要失败或原始记录已变化"><rect class="aux" x="787" y="1404" width="370" height="150" rx="11"/>
+<text class="h" x="807" y="1435">摘要失败或原始记录已变化</text>
+<text class="body" x="807" y="1463">程序分批读取本局已发生的回合。</text>
+<text class="body" x="807" y="1488">仍放不下必要资料时，保留玩家输入</text>
+<text class="body" x="807" y="1513">全文和原版本，显示原因及重试入口。</text>
+<text class="body" x="807" y="1538">刷新页面不会自动重跑摘要。</text>
+</g>
+<path class="edge" d="M386 1554V1582"/>
+<g data-box="下一次读摘要前，先检查它写的是哪几轮"><rect class="cache" x="44" y="1586" width="684" height="153" rx="11"/>
+<text class="h" x="64" y="1617">下一次读摘要前，先检查它写的是哪几轮</text>
+<text class="body" x="64" y="1645">从当前版本倒查，各轮须连续且属于本局；输入内容的校验值和资料出处须相符。</text>
+<text class="body" x="64" y="1670">例如 V1 改写为 V1b，原先写到 V1 的摘要不能用于这次续玩。</text>
+<text class="body" x="64" y="1695">若一份摘要只写到双方共同的开场 V0，核对来源后仍可使用。</text>
+<text class="body" x="64" y="1720">本局事实和人物所知以已结算回合为准，摘要保留出处供后续查阅。</text>
+</g>
+</svg>

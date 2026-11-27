@@ -8,20 +8,14 @@
   },
   "characterLinks": {
     "authority": [
-      "actorIds",
-      "targetCharacterIds"
+      "actorIds"
     ],
     "provenance": [
       "actorBindings",
-      "targetBindings",
-      "manualActorIds",
-      "manualTargetCharacterIds",
-      "legacyActorIds",
-      "legacyTargetCharacterIds"
+      "manualActorIds"
     ],
     "display": [
-      "actors",
-      "targets"
+      "actors"
     ],
     "delete": "remove-ID-and-display-name-from-associated-nodes",
     "rename": "keep-ID-update-display-name",
@@ -29,7 +23,7 @@
     "originalChapterAndQuote": "unchanged",
     "transaction": "world-change-and-associated-node-update-atomic",
     "narrativeLease": "allows-deterministic-link-maintenance; model submissions still compare node revisions",
-    "homonyms": "every-complete-main-name-or-alias-hit-is-bound; manual-and-legacy-IDs-kept-independently",
+    "homonyms": "every-complete-main-name-or-alias-hit-is-bound; explicit IDs survive renames and merges",
     "lineCharacterIds": "derived-from-current-node-links"
   }
 }

@@ -253,7 +253,7 @@ async function applyStory(store: AgentStore, scope: Scope, payload: Row, readSet
     lineIds.push(id)
     const chapterOrder = new Map((await store.rows('chapters')).map(row => [text(row.chapterIndex), Number(row.order)]))
     nodes.sort((a, b) => (chapterOrder.get(text(a?.chapterIndex)) ?? 0) - (chapterOrder.get(text(b?.chapterIndex)) ?? 0) || Number(a?.order) - Number(b?.order) || text(a?.id).localeCompare(text(b?.id)))
-    const content = { title: op.title ?? old?.title, nodeIds: nodes.map(row => text(row?.id)), chapters: [...new Set(nodes.map(row => text(row?.chapterIndex)))], cause: op.cause, process: op.process, result: op.result, lineStatus: op.line_status, ...(op.summary === undefined ? {} : { summary: op.summary }) }
+    const content = { title: op.title ?? old?.title, nodeIds: nodes.map(row => text(row?.id)), chapters: [...new Set(nodes.map(row => text(row?.chapterIndex)))], lineStatus: op.line_status, ...(op.summary === undefined ? {} : { summary: op.summary }) }
     if (old && !strings(op.merge_line_ids).length && canonical(content) === canonical(Object.fromEntries(Object.keys(content).map(key => [key, old[key]])))) continue
     changed = true
     await store.put('eventLines', { ...old, ...content, id, bookId: scope.bookId, revision: Number(old?.revision ?? 0) + 1, createdBy: old?.createdBy ?? 'P3', updatedAt: timestamp })

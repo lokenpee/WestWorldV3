@@ -1,3 +1,4 @@
+import { eventDescriptions, eventToolsSchema, isEventWorkflow } from './eventToolsSchema.ts'
 import { outlineOperations } from './outlineToolSchema.ts'
 import { confirmationInstruction } from './narrativeInput.ts'
 import type { TSchema } from 'typebox'
@@ -12,17 +13,13 @@ export const detailFields = {
     'summary',
     'process',
     'actors',
-    'targets',
     'actorBindings',
-    'targetBindings',
     'manualActorIds',
-    'manualTargetCharacterIds',
     'confidence',
     'quoteStatus',
     'timeCoord',
     'timePrecision',
     'actorIds',
-    'targetCharacterIds',
     'locationNames',
     'chapterIndex',
     'chapterName',
@@ -32,11 +29,10 @@ export const detailFields = {
     'clues',
     'new_facts',
     'world_delta',
-    'started_actions',
     'time_text',
     'time_hint',
   ] satisfies (keyof EventNode)[],
-  event: ['id', 'title', 'nodeIds', 'summary', 'coreClue'] satisfies (keyof StoryEvent)[],
+  event: ['id', 'title', 'nodeIds', 'summary', 'latestProgress','unresolved','clues','status'] satisfies (keyof StoryEvent)[],
   line: [
     'id',
     'title',
@@ -59,8 +55,6 @@ export function readableFields(kind: DetailKind): string[] {
 }
 
 const narrativeDescriptions: Record<string, string> = {
-  edit_events:
-    '按顺序原子编辑事件和节点成员。create_event、update_event 可分别填写 summary（概况）、coreClue（核心关键线索），省略的已有说明保留。拆合可在同次调用创建、迁移成员、删除。ref 在本次调用用 $ref 引用。',
   edit_storylines:
     '按顺序原子编辑故事线和事件成员。create_line、update_line 可分别填写 summary（概况）、coreClue（核心关键线索），省略的已有说明保留。拆合可在同次调用创建、迁移、删除。',
   get_detail:
@@ -70,23 +64,27 @@ const narrativeDescriptions: Record<string, string> = {
     '管理本会话疑点。create 提交陈述，归属疑点带对应节点或事件编号。resolve 提交解决依据。按 action 的参数填写。',
 }
 export function narrativeToolDescription(name: string, task: Pick<NarrativeTask, 'mode' | 'part'>) {
+  if (task.mode === 'link_node' && name === 'get_nodes') return '按 node_ids 读取当前、前序或后文概览中的节点，默认返回名称和详细经过；用 return_fields 按需读取引文 quote、位置 source_position 或归属 event_ids。'
+  if ((task.mode === 'review_boundaries' || task.mode === 'review_sequence') && name === 'get_event')
+    return '按 event_id 返回 event_id、name、overview、latest_progress、unresolved、clues、status 和 members（每项 node_id、name）。任务中的事件卡和时间表已提供这些资料，可直接据此编辑。用于展开组外事件，或核对已变动的资料。查节点详细经过请用 get_nodes。'
+  if (task.mode === 'review_sequence' && name === 'edit_events') return '只允许 update 当前主审事件。nodeIds 是修改后的完整成员列表。拆并或新建请转回宏观。'
+  if (task.mode === 'review_boundaries' && name === 'edit_events') return '同一批 changes 可新建、更新、撤销事件，每项写 reason。合并时 update 保留卡（nodeIds 为完整成员），delete 重复卡并用 replacement_event_ids 指向保留卡。组内成员已完整提供。修改组外成员或撤销组外卡前用 get_event 读取。先保存新建事件再引用其 ID。'
+  if (task.mode === 'link_node' && name === 'edit_events') return '整批新建或修改事件。每项写明理由，可附证据节点。nodeIds 提交完整非空列表并保留原成员，仅追加当前或早期节点；clues 整组替换。候选卡的完整成员可直接使用。新建由程序分配编号。'
+  if (isEventWorkflow(task.mode)) return name === 'confirm' ? confirmationInstruction(task) : eventDescriptions[name]
   if (name === 'confirm') return confirmationInstruction(task)
-  if (task.part === 'descriptions' && (name === 'edit_events' || name === 'edit_storylines'))
+  if (task.part === 'descriptions' && name === 'edit_storylines')
     return (
       '填写本段对象的说明。使用 ' +
-      (name === 'edit_events' ? 'update_event 和 eventId' : 'update_line 和 lineId') +
+      'update_line 和 lineId' +
       '，每项可填 summary（概况）或 coreClue（核心关键线索），省略的已有说明保留。'
     )
   if (name === 'get_outline' && task.part === 'unassigned')
     return '仅在需要寻找归属候选时查询事件或故事线；指定 id 可展开候选成员，offset 按对象分页。'
-  if (name === 'get_outline' && ['node_batch', 'event_cycle', 'event_review'].includes(task.mode))
-    return '查当前事件目录或未归属节点。指定事件 id 展开可见节点，offset 按对象分页。'
   return narrativeDescriptions[name]
 }
 
 export interface NarrativeRules {
   common: Record<string, TSchema>
-  eventOps: string[]
   lineOps: string[]
 }
 export function narrativeToolSchemas(
@@ -94,14 +92,10 @@ export function narrativeToolSchemas(
   rules: NarrativeRules,
   spec: TSchema
 ) {
-  const eventLayer = ['node_batch', 'event_cycle', 'event_review'].includes(task.mode)
-  const edit = eventLayer ? 'edit_events' : 'edit_storylines'
+  if (isEventWorkflow(task.mode)) return eventToolsSchema(task.mode)
+  if (!['event_group','line_review','line_cycle'].includes(task.mode)) throw Error('旧整理任务请在副本重建。')
   const descriptionOnly = task.part === 'descriptions'
-  const ops = descriptionOnly
-    ? [eventLayer ? 'update_event' : 'update_line']
-    : eventLayer
-      ? rules.eventOps
-      : rules.lineOps
+  const ops = descriptionOnly ? ['update_line'] : rules.lineOps
   const operations = outlineOperations(spec)
     .filter((rule) => ops.includes(rule.properties.op.const))
     .map((rule) => {
@@ -114,8 +108,6 @@ export function narrativeToolSchemas(
         delete op.properties[key]
         op.required = op.required.filter((k) => k !== key)
       }
-      if (rule.properties.op.const === 'create_event') remove('lineId')
-      if (rule.properties.op.const === 'delete_event') remove('expectedLineIds')
       if (op.properties.ref) op.properties.ref = { type: 'string', minLength: 1 }
       if (task.part !== 'batch') op.properties.reason = { type: 'string', description: '本次修改的简短原因。' }
       if (descriptionOnly) {
@@ -123,7 +115,7 @@ export function narrativeToolSchemas(
         remove('role')
         op.anyOf = [{ required: ['summary'] }, { required: ['coreClue'] }]
       }
-      if (['create_event', 'update_event', 'create_line', 'update_line'].includes(rule.properties.op.const)) {
+      if (['create_line', 'update_line'].includes(rule.properties.op.const)) {
         op.properties.summary = { type: 'string', minLength: 1, description: '用一句短句概括主要行动和结果。' }
         op.properties.coreClue = {
           type: 'string',
@@ -145,22 +137,15 @@ export function narrativeToolSchemas(
     required: string[]
   }
   if (task.part === 'batch') {
-    if (eventLayer) delete confirmation.properties.handled_event_ids
-    else {
-      delete confirmation.properties.retained_unassigned_nodes
-      confirmation.properties.handled_event_ids = {
-        ...(confirmation.properties.handled_event_ids as object), description: '可选，另行确认已处理的组外事件编号。',
-      }
+    confirmation.properties.handled_event_ids = {
+      ...(confirmation.properties.handled_event_ids as object), description: '可选，另行确认已处理的组外事件编号。',
     }
   } else {
     delete confirmation.properties.handled_event_ids
-    delete confirmation.properties.retained_unassigned_nodes
     confirmation.required = []
   }
   const outline = common.get_outline as unknown as { properties: Record<string, object> }
-  const outlineKinds = eventLayer
-    ? ['events', 'unassigned_nodes']
-    : ['lines', 'events', 'unassigned_nodes', 'unassigned_events']
+  const outlineKinds = ['lines', 'events', 'unassigned_nodes', 'unassigned_events']
   common.get_outline = {
     type: 'object',
     oneOf: outlineKinds
@@ -179,11 +164,7 @@ export function narrativeToolSchemas(
   const note = common.manage_doubts as unknown as {
     properties: Record<string, object> & { category: { enum: string[] } }
   }
-  if (eventLayer) {
-    note.properties.category.enum = ['NODE_ASSIGNMENT', 'OTHER']
-    delete note.properties.lineIds
-  }
-  const targets = ['category', 'statement', 'nodeIds', 'eventIds', ...(eventLayer ? [] : ['lineIds'])]
+  const targets = ['category', 'statement', 'nodeIds', 'eventIds', 'lineIds']
   const actions = [
     { action: 'list', required: [], optional: ['id', 'offset'] },
     { action: 'create', required: ['statement'], optional: targets },
@@ -213,7 +194,7 @@ export function narrativeToolSchemas(
   Object.assign(requests, { minItems: 1 })
   const item = requests.items
   if (!('properties' in item)) throw Error('查字段基础契约缺少请求对象。')
-  const kinds: DetailKind[] = eventLayer ? ['node', 'event'] : ['node', 'event', 'line']
+  const kinds: DetailKind[] = ['node', 'event', 'line']
   requests.items = {
     oneOf: kinds.map((kind) => ({
       ...item,
@@ -229,5 +210,5 @@ export function narrativeToolSchemas(
     })),
   }
   if (task.part !== 'batch' && task.part !== 'unassigned') delete common.get_outline
-  return { [edit]: schema, ...common }
+  return { edit_storylines: schema, ...common }
 }

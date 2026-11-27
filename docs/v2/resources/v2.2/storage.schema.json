@@ -407,8 +407,7 @@
                           },
                           "quote": {
                             "type": "string",
-                            "minLength": 1,
-                            "maxLength": 1000
+                            "minLength": 1
                           }
                         },
                         "required": [
@@ -986,13 +985,21 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["target_id", "outcome"],
+            "required": [
+              "target_id",
+              "outcome"
+            ],
             "properties": {
-              "target_id": { "type": "string" },
-              "outcome": { "type": "string" }
+              "target_id": {
+                "type": "string"
+              },
+              "outcome": {
+                "type": "string"
+              }
             }
           }
         },
+        "initialNodeAssigned": { "type": "boolean" },
         "taskInputVersion": {
           "type": "integer",
           "minimum": 1
@@ -1787,13 +1794,6 @@
             "type": "string"
           }
         },
-        "targets": {
-          "description": "对象 / 承受者。例：[\"王熙凤\"]",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "world_delta": {
           "description": "世界状态因此改变了什么。例：[\"贾琏手头多出大笔银子\"]",
           "type": "array",
@@ -1803,13 +1803,6 @@
         },
         "new_facts": {
           "description": "新出现的信息。例：[\"贾琏近期有大笔来路不明的钱\"]",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "started_actions": {
-          "description": "谁开始了什么行动（尚未完成）。例：[\"贾琏开始变卖田产\"]",
           "type": "array",
           "items": {
             "type": "string"
@@ -1912,13 +1905,6 @@
           },
           "description": "行动人物的稳定编号，删除和合并时同步维护。"
         },
-        "targetCharacterIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "涉及对象中属于人物的稳定编号。"
-        },
         "quoteStatus": {
           "enum": [
             "matched",
@@ -1952,56 +1938,7 @@
             }
           }
         },
-        "targetBindings": {
-          "type": "array",
-          "items": {
-            "additionalProperties": false,
-            "type": "object",
-            "required": [
-              "mention",
-              "ids"
-            ],
-            "properties": {
-              "mention": {
-                "type": "string",
-                "minLength": 1
-              },
-              "ids": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "uniqueItems": true
-              }
-            }
-          }
-        },
         "manualActorIds": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
-        },
-        "manualTargetCharacterIds": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
-        },
-        "legacyActorIds": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          },
-          "uniqueItems": true
-        },
-        "legacyTargetCharacterIds": {
           "type": "array",
           "items": {
             "type": "string",
@@ -2035,9 +1972,6 @@
         "title",
         "nodeIds",
         "chapters",
-        "cause",
-        "process",
-        "result",
         "lineStatus",
         "updatedAt",
         "revision",
@@ -2084,18 +2018,6 @@
           "items": {
             "type": "string"
           }
-        },
-        "cause": {
-          "description": "起因",
-          "type": "string"
-        },
-        "process": {
-          "description": "经过",
-          "type": "string"
-        },
-        "result": {
-          "description": "结果",
-          "type": "string"
         },
         "lineStatus": {
           "description": "这条线在逻辑上是否已经讲完。已结束的线之后若发现新节点，允许重新打开。",
@@ -2838,7 +2760,6 @@
       "properties": {
         "key": {
           "minLength": 1,
-          "maxLength": 120,
           "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
           "type": "string"
         },
@@ -2875,7 +2796,6 @@
           "maxItems": 20,
           "type": "array",
           "items": {
-            "maxLength": 128,
             "type": "string"
           }
         },
@@ -2883,7 +2803,6 @@
           "maxItems": 20,
           "type": "array",
           "items": {
-            "maxLength": 128,
             "type": "string"
           }
         },
@@ -2983,7 +2902,6 @@
           "maxItems": 20,
           "type": "array",
           "items": {
-            "maxLength": 128,
             "type": "string"
           }
         },
@@ -3356,7 +3274,6 @@
             },
             "summary": {
               "minLength": 1,
-              "maxLength": 64000,
               "type": "string"
             },
             "firstKeptEntryId": {
@@ -3559,7 +3476,6 @@
               "type": "string"
             },
             "summary": {
-              "maxLength": 2000,
               "type": "string"
             },
             "contextId": {
@@ -3793,7 +3709,9 @@
                 "rawBodies": {
                   "type": "object",
                   "description": "各次传输尝试的原始请求正文，以尝试编号为键",
-                  "additionalProperties": { "type": "string" }
+                  "additionalProperties": {
+                    "type": "string"
+                  }
                 }
               },
               "additionalProperties": true
@@ -4403,62 +4321,115 @@
       "additionalProperties": false
     },
     "LineDigest": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "nodeIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "chapters": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "lineStatus": {
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "nodeCount": {
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "nodeIds",
+            "chapters",
+            "lineStatus",
+            "revision"
+          ],
+          "additionalProperties": false
         },
-        "title": {
-          "type": "string"
-        },
-        "nodeIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "chapters": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "lineStatus": {
-          "enum": [
-            "open",
-            "closed"
-          ]
-        },
-        "cause": {
-          "type": "string",
-          "maxLength": 100
-        },
-        "result": {
-          "type": "string",
-          "maxLength": 100
-        },
-        "revision": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "nodeCount": {
-          "type": "integer"
-        },
-        "truncated": {
-          "type": "boolean"
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "nodeIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "chapters": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "lineStatus": {
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
+            "cause": {
+              "type": "string"
+            },
+            "result": {
+              "type": "string"
+            },
+            "revision": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "nodeCount": {
+              "type": "integer"
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "nodeIds",
+            "chapters",
+            "lineStatus",
+            "cause",
+            "result",
+            "revision"
+          ],
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "id",
-        "title",
-        "nodeIds",
-        "chapters",
-        "lineStatus",
-        "cause",
-        "result",
-        "revision"
-      ],
-      "additionalProperties": false
+      ]
     },
     "Window": {
       "type": "object",
@@ -5121,8 +5092,7 @@
         },
         "reason": {
           "type": "string",
-          "minLength": 1,
-          "maxLength": 1000
+          "minLength": 1
         }
       },
       "required": [
@@ -5519,8 +5489,7 @@
                             },
                             "quote": {
                               "type": "string",
-                              "minLength": 1,
-                              "maxLength": 1000
+                              "minLength": 1
                             },
                             "memberIds": {
                               "type": "array",
@@ -5596,8 +5565,7 @@
                                   },
                                   "quote": {
                                     "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 1000
+                                    "minLength": 1
                                   }
                                 },
                                 "required": [
@@ -5718,9 +5686,6 @@
                           "op",
                           "line_id",
                           "node_ids",
-                          "cause",
-                          "process",
-                          "result",
                           "line_status",
                           "confidence",
                           "reason",
@@ -5783,6 +5748,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       },
@@ -5793,9 +5761,6 @@
                           "op",
                           "title",
                           "node_ids",
-                          "cause",
-                          "process",
-                          "result",
                           "line_status",
                           "confidence",
                           "reason",
@@ -5858,6 +5823,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       },
@@ -5868,9 +5836,6 @@
                           "op",
                           "line_id",
                           "node_ids",
-                          "cause",
-                          "process",
-                          "result",
                           "line_status",
                           "confidence",
                           "reason",
@@ -5928,6 +5893,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       },
@@ -5939,9 +5907,6 @@
                           "keep_line_id",
                           "merge_line_ids",
                           "node_ids",
-                          "cause",
-                          "process",
-                          "result",
                           "line_status",
                           "confidence",
                           "reason",
@@ -6006,6 +5971,9 @@
                             "items": {
                               "type": "string"
                             }
+                          },
+                          "summary": {
+                            "type": "string"
                           }
                         }
                       }
@@ -6133,7 +6101,6 @@
                         "properties": {
                           "key": {
                             "minLength": 1,
-                            "maxLength": 120,
                             "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                             "type": "string"
                           },
@@ -6163,7 +6130,6 @@
                           },
                           "statement": {
                             "minLength": 1,
-                            "maxLength": 1000,
                             "description": "简短结论、待核事项或解决说明，不保存长篇推理。",
                             "type": "string"
                           },
@@ -6171,7 +6137,6 @@
                             "maxItems": 20,
                             "type": "array",
                             "items": {
-                              "maxLength": 128,
                               "type": "string"
                             }
                           },
@@ -6179,7 +6144,6 @@
                             "maxItems": 20,
                             "type": "array",
                             "items": {
-                              "maxLength": 128,
                               "type": "string"
                             }
                           },
@@ -6201,7 +6165,6 @@
                                 },
                                 "quote": {
                                   "minLength": 1,
-                                  "maxLength": 1000,
                                   "description": "该章节中连续存在的逐字原句，不要改写、拼接或增加标点。",
                                   "type": "string"
                                 }
@@ -6460,9 +6423,6 @@
                               "action",
                               "title",
                               "nodeIds",
-                              "cause",
-                              "process",
-                              "result",
                               "lineStatus"
                             ],
                             "additionalProperties": false
@@ -6752,6 +6712,9 @@
                                   ],
                                   "additionalProperties": false
                                 }
+                              },
+                              "summary": {
+                                "type": "string"
                               }
                             },
                             "required": [
@@ -6929,7 +6892,6 @@
                     "properties": {
                       "key": {
                         "minLength": 1,
-                        "maxLength": 120,
                         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                         "type": "string"
                       },
@@ -6966,7 +6928,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -6974,7 +6935,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -7000,6 +6960,13 @@
                               "type": "string"
                             }
                           }
+                        }
+                      },
+                      "eventIds": {
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
                         }
                       }
                     }
@@ -7362,6 +7329,12 @@
                           "coreClue": {
                             "type": "string",
                             "description": "全书复核填写的事件核心关键线索"
+                          },
+                          "clues": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
                           }
                         },
                         "required": [
@@ -7383,6 +7356,11 @@
                           {
                             "required": [
                               "coreClue"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "clues"
                             ]
                           }
                         ]
@@ -8047,7 +8025,7 @@
       "properties": {
         "pairKey": {
           "type": "string",
-          "minLength": 2
+          "minLength": 1
         },
         "bookId": {
           "type": "string",
@@ -8890,7 +8868,7 @@
       "properties": {
         "pairKey": {
           "type": "string",
-          "minLength": 2
+          "minLength": 1
         },
         "fingerprint": {
           "type": "string"
@@ -10306,7 +10284,8 @@
         "bookId",
         "title",
         "nodeIds",
-        "revision"
+        "revision",
+        "clues"
       ],
       "properties": {
         "id": {
@@ -10325,9 +10304,28 @@
           "type": "string",
           "description": "全书复核填写的事件概况"
         },
-        "coreClue": {
+        "latestProgress": {
           "type": "string",
-          "description": "全书复核填写的事件核心关键线索"
+          "minLength": 1
+        },
+        "unresolved": {
+          "type": "string"
+        },
+        "clues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "进行中",
+            "暂时搁置",
+            "已闭环"
+          ]
         },
         "nodeIds": {
           "type": "array",
@@ -10376,6 +10374,10 @@
         },
         "mode": {
           "enum": [
+            "link_node",
+            "review_event",
+            "review_boundaries",
+            "review_sequence",
             "node_batch",
             "event_cycle",
             "event_review",
@@ -10404,20 +10406,49 @@
         "prompt": {
           "type": "string"
         },
+        "retrieval": {
+          "type": "object",
+          "properties": {
+            "sourceFingerprint": { "type": "string" },
+            "configVersion": { "type": "string" },
+            "degraded": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "orphanIds": {"type":"array","items":{"type":"string"}},
         "singletonSources": {
           "type": "object",
-          "additionalProperties": { "type": "array", "items": { "type": "string" } }
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
         "reviewProgress": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["环节", "已核", "待核"],
+            "required": [
+              "环节",
+              "已核",
+              "待核"
+            ],
             "properties": {
-              "环节": { "type": "string" },
-              "已核": { "type": "integer", "minimum": 0 },
-              "待核": { "type": "integer", "minimum": 0 }
+              "环节": {
+                "type": "string"
+              },
+              "已核": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "待核": {
+                "type": "integer",
+                "minimum": 0
+              }
             }
           }
         },
@@ -10426,6 +10457,13 @@
           "additionalProperties": {
             "type": "string"
           }
+        },
+        "eventStep": {
+          "type": "string",
+          "enum": [
+            "node",
+            "event"
+          ]
         }
       },
       "required": [
@@ -10441,6 +10479,224 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "reviewOnly": {"type":"boolean"},
+        "twoStep": {
+          "type": "object",
+          "properties": {
+            "phase": {
+              "enum": [
+                "macro",
+                "micro"
+              ]
+            },
+            "pairs": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "checked": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "orphans": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "pending": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "issue": {
+                      "type": "string"
+                    },
+                    "checked_scope": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "issue",
+                    "checked_scope",
+                    "reason"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "answers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "question": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "version",
+                  "reason",
+                  "question"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "referral": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "nodes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ids",
+                "nodes",
+                "reason"
+              ],
+              "additionalProperties": false
+            },
+            "macroIssue": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "issue": {
+                    "type": "string"
+                  },
+                  "checked_scope": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "issue",
+                  "checked_scope",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "retryIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "retryMacro": {
+              "type": "boolean"
+            },
+            "pausedGroup": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "orphanIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "ids"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "phase",
+            "pairs",
+            "checked",
+            "pending",
+            "answers"
+          ],
+          "additionalProperties": false
+        },
+        "awaitingStorylines": {
+          "type": "boolean",
+          "description": "节点串联和事件复核均已完成，运行暂停在故事线整理之前。"
+        },
+        "eventReview": {
+          "type": "object",
+          "required": [
+            "checked",
+            "pending"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "retryIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "checked": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "pending": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "issue",
+                    "checked_scope",
+                    "reason"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "issue": {
+                      "type": "string"
+                    },
+                    "checked_scope": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "config": {
           "type": "object",
           "additionalProperties": false,
@@ -10475,9 +10731,7 @@
             }
           },
           "required": [
-            "nodeBatchSize",
             "eventGroupSize",
-            "eventReviewInterval",
             "lineReviewInterval",
             "segmentSize",
             "outlineThreshold",
@@ -10612,6 +10866,12 @@
               "counts"
             ]
           }
+        },
+        "eventWorkflow": {
+          "const": 1
+        },
+        "eventChecks": {
+          "type": "object"
         }
       },
       "required": [

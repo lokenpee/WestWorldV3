@@ -40,6 +40,20 @@ afterEach(async () => {
 })
 
 describe('完整书籍备份与恢复', () => {
+  it('副本保留事件进展、状态与多条线索，并可读取只有旧核心线索的事件', async () => {
+    const { workspace, service, assets, book, db } = await setup()
+    const node = await assets.create(book.id, 'node', { name: '申冤', summary: '许诺查案', chapterIndex: '1' })
+    const base = { bookId: book.id, title: '为范仪申冤', revision: 1, nodeIds: [node.id] }
+    const events = [{ ...base, id: 'E1', coreClue: '申冤' }, { ...base, id: 'E2', status: '进行中',
+      latestProgress: '已在朝堂说明案情并请查办', unresolved: '等待派员核对案情与证据', clues: ['范仪', '申冤'] }]
+    await db.table('storyEvents').bulkPut(events)
+    const backup = await service.exportBook(book.id)
+    expect((await service.inspectBackup(backup.bytes)).errors).toEqual([])
+    const copy = await service.importBackup(backup.bytes)
+    expect(copy.id).not.toBe(book.id)
+    expect(await workspace.openBook(copy.id).table('storyEvents').toArray()).toEqual(events.map(event => ({ ...event, bookId: copy.id })))
+    expect(await db.table('storyEvents').toArray()).toEqual(events)
+  })
   it('全表快照导回独立书，原文、稳定关联、来源和合并报告完整，凭据与目录排除', async () => {
     const { workspace, service, assets, book, db } = await setup()
     const first = await assets.create(book.id, 'character', { name: '沈青', chapterIndex: '1' })
@@ -62,7 +76,7 @@ describe('完整书籍备份与恢复', () => {
     await workspace.settings.appSettings.put({ key: 'assets.exportDirectory', value: { name: 'private-directory' } })
     const backup = await service.exportBook(book.id)
     const files = unzipSync(backup.bytes)
-    expect(backup.manifest.formatVersion).toBe(12)
+    expect(backup.manifest.formatVersion).toBe(15)
     expect(Object.keys(files)).not.toContain('data/credentials.json')
     expect(Object.values(files).map(value => strFromU8(value)).join('')).not.toMatch(/never-export-this-secret|private-directory/)
     const inspected = await service.inspectBackup(backup.bytes)
@@ -225,7 +239,7 @@ describe('格式7人物对编辑结果', () => {
     await assets.deleteRelationPair(book.id, { fromId: a.id, toId: c.id, forwardLabels: [], reverseLabels: [], reason: '原文不支持', expectedFingerprint: active.fingerprint })
     expect(await db.table('characterRelationEdits').count()).toBe(2)
     const exported = await service.exportBook(book.id)
-    expect(exported.manifest.formatVersion).toBe(12)
+    expect(exported.manifest.formatVersion).toBe(15)
     const inspected = await service.inspectBackup(exported.bytes)
     expect(inspected.errors).toEqual([])
     expect(inspected.data?.tables.characterRelationEdits).toHaveLength(2)

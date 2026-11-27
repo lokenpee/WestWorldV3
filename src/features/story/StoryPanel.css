@@ -46,3 +46,17 @@
 .narrative-review li + li { margin-top: 4px; }
 .narrative-review td p { margin: 4px 0 0; }
 .narrative-review td summary { cursor: pointer; }
+.event-outcome-card { margin-block: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; }
+.event-outcome-card h4 { margin: 0; font-size: 14px; }
+.event-outcome-card p { margin: 4px 0; }
+.event-task-outcome summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 24px; list-style: none; cursor: pointer; }
+.event-task-outcome summary::-webkit-details-marker { display: none; }
+.event-task-outcome summary::after { content: ''; flex: 0 0 auto; width: 7px; height: 7px; margin-inline: auto 4px; border: solid currentColor; border-width: 1.5px 1.5px 0 0; transform: rotate(45deg); }
+.event-task-outcome details[open] > summary::after { transform: rotate(135deg); }
+.event-task-outcome summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.event-task-outcome h3 { margin: 0; font-size: 15px; }
+.event-result-state { font-size: 12px; font-weight: normal; }
+.event-outcome-card > details { margin-top: 8px; }
+.event-outcome-card .event-outcome-members { margin-block: 6px; }
+.event-member-id { color: var(--text-secondary, #525b66); }
+.event-change-label { margin-inline-start: 6px; padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLiveResult } from '../../hooks/useLiveResult'
 import type { ModelService } from './service'
 import { defaultConfig, type CallMode, type CallProgress, type CallResult, type ModelConfig, type ModelConnection, type ModelSettings as SavedSettings } from './types'
+import { RetrievalModelSettings } from './RetrievalModelSettings'
 import { ModelPicker } from './ModelPicker'
 import { AgentProbePanel } from '../agents/AgentProbePanel'
 import './ModelSettings.css'
@@ -138,6 +139,9 @@ export function ModelSettings({ service, diskStorage = false }: { service: Model
       </div>
       <details className="model-advanced" open={advanced} onToggle={event => setAdvanced(event.currentTarget.open)}><summary>高级设置（可选）</summary><p className="model-help">常见服务已自动匹配连接方式。平台有特殊要求时再调整。</p><div className="model-form-grid"><div className="model-field"><label htmlFor="model-provider">服务商标识</label><input id="model-provider" value={form.providerId} disabled={saving} onChange={event => update('providerId', event.target.value)} /></div><div className="model-field"><label htmlFor="model-api">调用协议</label><select id="model-api" value={form.api} disabled={saving} onChange={event => update('api', event.target.value)}><option value="openai-completions">通用兼容模式（Chat Completions）</option><option value="openai-responses">OpenAI 原生响应模式（Responses）</option><option value="anthropic-messages">Claude 原生消息模式（Messages）</option></select></div></div><div className="model-field"><label htmlFor="model-context-window">整理模型上下文容量</label><input id="model-context-window" type="number" min={8192} step={1024} placeholder="自动" value={form.aggregationContextWindow} disabled={saving} onChange={event => update('aggregationContextWindow', event.target.value)} /><small>留空使用模型资料；自定义模型可按平台说明填写。</small></div></details>
     </form>
+    <section aria-labelledby="retrieval-heading"><h3 id="retrieval-heading">P3 事件检索</h3>
+      <div className="model-cards"><RetrievalModelSettings role="embedding" service={service} /><RetrievalModelSettings role="rerank" service={service} /></div>
+    </section>
     <AgentProbePanel service={service} enabled={connectionReady && !!form.aggregationModel.trim() && !saving} dirty={dirty} prepare={async () => !dirty || !!await save()} />
   </section>
 }

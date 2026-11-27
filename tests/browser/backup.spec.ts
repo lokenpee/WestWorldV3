@@ -37,7 +37,7 @@ test('真实下载、预检取消与副本恢复，刷新后保留原文与人�
   await page.getByRole('button', { name: '资产', exact: true }).click()
   await expect(page.getByRole('heading', { name: '资产书架 3' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '青石镇来信（导入）', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: /^事件节点 \d/ }).click()
+  await page.getByRole('button', { name: /^节点 \d/ }).click()
   await page.getByRole('button', { name: '编辑 码头收信', exact: true }).click()
   await expect(page.getByLabel('已选人物')).toContainText('沈青')
   await expect(page.getByLabel('已选人物')).toContainText('顾衡')

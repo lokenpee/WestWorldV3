@@ -12,6 +12,7 @@ export function compactOutlineParameters(schema: TSchema, quick = false): TSchem
   const operations = outlineOperations(schema).filter(rule => quick ? quickOutlineOps.includes(rule.properties.op.const) : !['activate_legacy_line', 'rename_event'].includes(rule.properties.op.const))
   const fields = Object.assign({}, ...operations.map(rule => rule.properties)) as Record<string, unknown>
   delete fields.summary
+  delete fields.clues
   delete fields.coreClue
   return { ...schema, properties: { reason: parameters.reason, operations: { ...parameters.operations,
     items: { type: 'object', additionalProperties: false, required: ['op'], properties: { ...fields, op: { enum: operations.map(rule => rule.properties.op.const) } } } } } } as TSchema

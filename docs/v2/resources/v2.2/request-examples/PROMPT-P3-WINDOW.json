@@ -264,7 +264,6 @@
                     "properties": {
                       "key": {
                         "minLength": 1,
-                        "maxLength": 120,
                         "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                         "type": "string"
                       },
@@ -301,7 +300,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -309,7 +307,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       },
@@ -317,7 +314,6 @@
                         "maxItems": 20,
                         "type": "array",
                         "items": {
-                          "maxLength": 128,
                           "type": "string"
                         }
                       }
@@ -638,7 +634,6 @@
                 "properties": {
                   "key": {
                     "minLength": 1,
-                    "maxLength": 120,
                     "description": "稳定的工作主题键；更新或解决同一事项时复用该键。",
                     "type": "string"
                   },
@@ -675,7 +670,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -683,7 +677,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   },
@@ -691,7 +684,6 @@
                     "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "maxLength": 128,
                       "type": "string"
                     }
                   }

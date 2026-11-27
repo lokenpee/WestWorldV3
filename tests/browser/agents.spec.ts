@@ -22,7 +22,7 @@ test('设置页保存当前配置，Pi依次完成两套工具读写与提交确
     expect(body.model).toBe('probe-agent')
     expect(await route.request().headerValue('authorization')).toBe('Bearer agent-browser-fixture')
     const names = body.tools.map((tool: { function: { name: string } }) => tool.function.name)
-    if (count > 3) expect(names).toEqual([['get_editor_memory'], ['commit_story_changes'], ['submit_result']][count - 4])
+    if (count > 3) expect(names).toEqual(['get_nodes','get_event','search_events','search_prior_nodes','edit_events','confirm'])
     else expect(names).toHaveLength(6)
     await route.fulfill({ contentType: 'text/event-stream', body: await agentResponse(body).text() })
   })
@@ -53,7 +53,7 @@ test('叙事探针失败时在设置页显示当前步骤和工具错误', async
   const panel = page.getByRole('region', { name: '智能体工具测试', exact: true })
   await expect(panel).toContainText('世界资产 · 通过')
   await expect(panel).toContainText('叙事资产 · 失败')
-  await expect(panel.getByRole('alert')).toContainText('读取工作记忆')
+  await expect(panel.getByRole('alert')).toContainText('读取节点')
   await expect(panel.getByRole('alert')).toContainText('get_tools')
 })
 test('普通文本回复不能冒充工具成功，取消终止余下套件', async ({ page }) => {

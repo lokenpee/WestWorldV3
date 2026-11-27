@@ -7,7 +7,7 @@ import { relationLines } from './relationLabels'
 
 interface LabelEditorProps { labels: string[]; onChange: (labels: string[]) => void; placeholder: string }
 function LabelEditor({ labels, onChange, placeholder }: LabelEditorProps) {
-  return <div className="relation-labels">{labels.map((label, index) => <div key={index} className="relation-label-row"><input aria-label={`${placeholder} ${index + 1}`} placeholder="如妹妹、兄长、朋友；不确定填未知" value={label} maxLength={100} onChange={event => onChange(labels.map((value, at) => at === index ? event.target.value : value))} /><button type="button" className="text-button" onClick={() => onChange(labels.filter((_, at) => at !== index))}>移除</button></div>)}<button type="button" className="secondary-button" disabled={labels.length >= 20} onClick={() => onChange([...labels, ''])}>增加标签</button><button type="button" className="text-button" onClick={() => onChange(['未知'])}>设为未知</button></div>
+  return <div className="relation-labels">{labels.map((label, index) => <div key={index} className="relation-label-row"><input aria-label={`${placeholder} ${index + 1}`} placeholder="如妹妹、兄长、朋友；不确定填未知" value={label} onChange={event => onChange(labels.map((value, at) => at === index ? event.target.value : value))} /><button type="button" className="text-button" onClick={() => onChange(labels.filter((_, at) => at !== index))}>移除</button></div>)}<button type="button" className="secondary-button" disabled={labels.length >= 20} onClick={() => onChange([...labels, ''])}>增加标签</button><button type="button" className="text-button" onClick={() => onChange(['未知'])}>设为未知</button></div>
 }
 
 export interface RelationEditorHandle { isDirty: () => boolean; save: () => Promise<boolean>; discard: () => void }

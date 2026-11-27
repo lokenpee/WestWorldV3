@@ -10,11 +10,11 @@ import { ChapterBrowser } from './ChapterBrowser'
 import './BookOverview.css'
 import { AssetsPanel } from '../assets/AssetsPanel'
 import type { AssetService } from '../assets/service'
-import type { AssetKind } from '../assets/types'
+import type { PageKind } from '../assets/assetPage'
 import { ExtractionPanel } from '../extraction/ExtractionPanel'
 import type { ExtractionService } from '../extraction/service'
 
-export function BookOverview({ book, repository, assets, extraction, world, story, assetKind, onAssetKindChange }: { book: Book; repository: BookRepository; assets: AssetService; extraction?: ExtractionService; world?: WorldService; story?: StoryService; assetKind: AssetKind; onAssetKindChange: (kind: AssetKind) => void }) {
+export function BookOverview({ book, repository, assets, extraction, world, story, createNarrativeCopy, assetKind, onAssetKindChange }: { book: Book; repository: BookRepository; assets: AssetService; extraction?: ExtractionService; world?: WorldService; story?: StoryService; createNarrativeCopy?: (id:string)=>Promise<string>; assetKind: PageKind; onAssetKindChange: (kind: PageKind) => void }) {
   const [attempt, setAttempt] = useState(0)
   const [focusRunId, setFocusRunId] = useState<string>()
   const [worldRunning, setWorldRunning] = useState(false)
@@ -46,7 +46,7 @@ export function BookOverview({ book, repository, assets, extraction, world, stor
         </section>
         {extraction && <ExtractionPanel bookId={book.id} service={extraction} />}
         {world && <WorldPanel key={`world:${book.id}`} bookId={book.id} service={world} assets={assets} focusRunId={focusRunId} />}
-        {story && <StoryPanel key={`story:${book.id}`} bookId={book.id} service={story} />}
+        {story && <StoryPanel createCopy={createNarrativeCopy} key={`story:${book.id}`} bookId={book.id} service={story} />}
         <div className="asset-metrics">{metrics.map(([key, label]) => <div className="metric-card" key={key}><span>{label}</span><strong>{summary.value.counts[key]}</strong><small>当前记录</small></div>)}</div>
         <AssetsPanel bookId={book.id} repository={repository} service={assets} kind={assetKind} onKindChange={onAssetKindChange} organizeDisabled={worldRunning || otherAiRunning} organizeDisabledReason={worldRunning ? '人物整理正在运行' : otherAiRunning ? '本书已有其他 AI 任务运行' : undefined} resumeCharacterId={resumeCharacterId} onAutoTier={world ? () => world.updateOrganizationStatistics(book.id) : undefined} onOrganizeCharacter={world ? async (id, mode) => { setFocusRunId(await world.startCharacterOrganization(book.id, id, mode)) } : undefined} onContinueCharacter={world ? async id => { await world.continueCharacterOrganization(book.id, id) } : undefined} />
         <div className="next-stage-note"><span aria-hidden="true">○</span><div><strong>原文与资产保存在本地</strong><p>选择资产查看或编辑，点击章节名称查看完整原文。</p></div></div>

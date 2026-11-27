@@ -95,11 +95,9 @@ export async function clearReExtractData(db: Database, scope: ReExtractScope, ch
     for (const node of nodes) {
       const next: EventNode = {
         ...node,
-        actorIds: strip(node.actorIds) ?? [], targetCharacterIds: strip(node.targetCharacterIds) ?? [],
-        manualActorIds: strip(node.manualActorIds), manualTargetCharacterIds: strip(node.manualTargetCharacterIds),
-        legacyActorIds: strip(node.legacyActorIds), legacyTargetCharacterIds: strip(node.legacyTargetCharacterIds),
+        actorIds: strip(node.actorIds) ?? [],
+        manualActorIds: strip(node.manualActorIds),
         actorBindings: node.actorBindings?.map(group => ({ ...group, ids: group.ids.filter(id => !removedIds.has(id)) })),
-        targetBindings: node.targetBindings?.map(group => ({ ...group, ids: group.ids.filter(id => !removedIds.has(id)) })),
       }
       if (JSON.stringify(next) !== JSON.stringify(node)) {
         await db.table('nodes').put({ ...next, revision: node.revision + 1 })

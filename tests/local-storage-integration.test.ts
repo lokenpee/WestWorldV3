@@ -141,7 +141,7 @@ test('P1 精简字段与旧字段同库存入 SQLite，并通过书籍备份恢�
   const oldPerson = await assets.create(book.id, 'character', { name: '老船工', chapterIndex: '1' })
   await db.table('characters').update(oldPerson.id, { profile: { age: 46 } })
   const oldNode = await assets.create(book.id, 'node', {
-    name: '保留旧账册', summary: '老船工拿出账册', chapterIndex: '1', targets: ['旧账册'], started_actions: ['核账'],
+    name: '保留旧账册', summary: '老船工拿出账册', chapterIndex: '1', process: '旧账册用于核账',
   })
 
   const fetcher = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
@@ -173,14 +173,14 @@ test('P1 精简字段与旧字段同库存入 SQLite，并通过书籍备份恢�
     expect(stored('characters', 'C1-P001')).not.toHaveProperty('confidence')
     expect(stored('locations', 'C1-L001')).not.toHaveProperty('confidence')
     expect(stored('characters', oldPerson.id)).toMatchObject({ profile: { age: 46 }, confidence: 0.5 })
-    expect(stored('nodes', oldNode.id)).toMatchObject({ targets: ['旧账册'], started_actions: ['核账'] })
+    expect(stored('nodes', oldNode.id)).toMatchObject({ process: '旧账册用于核账' })
   } finally { persisted.close() }
 
   const backups = createBackupService(workspace, importer)
   const { bytes } = await backups.exportBook(book.id)
   const restored = workspace.openBook((await backups.importBackup(bytes)).id)
   expect(await restored.table('nodes').get(node!.id)).toMatchObject({ clues: ['顾衡来信'] })
-  expect(await restored.table('nodes').get(oldNode.id)).toMatchObject({ targets: ['旧账册'], started_actions: ['核账'] })
+  expect(await restored.table('nodes').get(oldNode.id)).toMatchObject({ process: '旧账册用于核账' })
   expect(await restored.table('characters').get(oldPerson.id)).toMatchObject({ profile: { age: 46 }, confidence: 0.5 })
   expect(await restored.table('characterRelations').toArray()).toMatchObject([{ direction: 'bidirectional', forwardLabel: '朋友', reverseLabel: '朋友' }])
 })
@@ -311,6 +311,29 @@ test('事件节点列表先按章节和章内顺序排序再分页，保留缺�
   expect(first).toEqual(makeAssetPage('node', nodes, chapters, options))
   expect(first.items.map(item => item.id)).toEqual(['C9-N004', 'C9-N007'])
   expect((await read(2)).items.map(item => item.id)).toEqual(['C3-N001'])
+})
+
+test('磁盘查询在分页前匹配参与人物别名，按真实成员贯通节点、事件和故事线', async () => {
+  const { workspace } = fixture(), id = 'story-field-search', db = workspace.openBook(id)
+  await workspace.settings.books.put({ id, title: '字段检索样本', sourceFileName: '样本.txt', createdAt: new Date().toISOString() })
+  await db.table('characters').put({ id: 'P1', name: '范仪', aliases: ['范先生'] })
+  await db.table('nodes').bulkPut([
+    { id: 'N1', name: '许诺', actorIds: ['P1'], actors: ['范仪'] },
+    { id: 'N2', name: '他事', summary: '提到范先生', targets: ['账册'] },
+  ])
+  await db.table('storyEvents').bulkPut(['E1', 'E2'].map(id => ({ id, title: id, nodeIds: ['N1'] })))
+  await db.table('eventLines').put({ id: 'L1', title: '案件', eventIds: ['E1', 'E2'] })
+  const assets = createAssetService(workspace)
+  const opts = { query: '范先生', field: 'people', limit: 1 }
+  expect((await assets.readAssetPage(id, 'node', opts)).items.map(r => r.id)).toEqual(['N1'])
+  expect((await assets.readAssetPage(id, 'node', { ...opts, field: 'summary' })).items.map(r => r.id)).toEqual(['N2'])
+  expect((await assets.readAssetPage(id, 'event', { ...opts, offset: 1 })).items.map(r => r.id)).toEqual(['E2'])
+  expect((await assets.readAssetPage(id, 'eventLine', opts)).matched).toBe(1)
+  expect((await assets.readAssetPage(id, 'node', { ...opts, query: '账册' })).matched).toBe(0)
+  await db.table('characters').put({ id: 'P1', name: '范员外', aliases: ['范仪'] })
+  expect((await assets.readAssetPage(id, 'eventLine', { ...opts, query: '范员外' })).matched).toBe(1)
+  await db.table('eventLines').put({ id: 'L1', title: '案件', eventIds: [] })
+  expect((await assets.readAssetPage(id, 'eventLine', { ...opts, query: '范员外' })).matched).toBe(0)
 })
 
 test('automatic backup failure stays visible without undoing saved data and can be retried', async () => {

@@ -1,19 +1,54 @@
 {
-  "id": "PROMPT-P3-NARRATIVE-V4-line_cycle",
+  "id": "PROMPT-P3-NARRATIVE-V4-line_review-descriptions",
   "kind": "synthetic-target-request-not-a-recording",
   "mode": "agent",
   "inputSchema": "prompt-inputs.schema.json#/$defs/NarrativeBrief",
   "input": {
-    "mode": "line_cycle",
-    "part": "unassigned",
+    "mode": "line_review",
+    "part": "descriptions",
     "targets": [
       {
-        "id": "E005",
-        "title": "村口交信",
-        "summary": "信使交信",
-        "coreClue": "封印完整"
+        "id": "S001",
+        "title": "送信",
+        "members": [
+          "E005"
+        ],
+        "summary": "",
+        "coreClue": ""
       }
-    ]
+    ],
+    "reviewProgress": [
+      {
+        "环节": "核对结构",
+        "已核": 0,
+        "待核": 0
+      },
+      {
+        "环节": "核对疑点",
+        "已核": 0,
+        "待核": 0
+      },
+      {
+        "环节": "核对未归属项",
+        "已核": 0,
+        "待核": 0
+      },
+      {
+        "环节": "核对说明",
+        "已核": 0,
+        "待核": 1
+      }
+    ],
+    "evidence": {
+      "events": [
+        {
+          "id": "E005",
+          "title": "村口交信",
+          "summary": "信使交信。",
+          "coreClue": "封印完整。"
+        }
+      ]
+    }
   },
   "modelSnapshot": {
     "providerId": "deepseek",
@@ -36,11 +71,11 @@
     "messages": [
       {
         "role": "system",
-        "content": "先读随任务发送的本段材料。只核对本段列出的对象，整段无改动就直接调用 confirm({})。需要修正时在对应编辑操作的 reason 写一句原因，保存成功后调用 confirm({})。只合并补查影响结论的字段。已给的字段无需重读。只有简况无法区分具体场景时才读经过或原文摘录。\n\n沿事件的因果和推进检查归线，例如发现匪情、调兵、剿匪、善后。用 edit_storylines 修正被查实的故事线或事件归属，下层事件和节点只供查证。\n\n本轮复查本周期已处理的事件和受影响的故事线。按本轮复核进度处理当前分段；事件换线或共享时，检查原线和目标线各自的进展是否仍连贯。\n\n对照本段未归线事件、单事件故事线的成员和随附的故事线与事件目录，判断每个事件具体推进了哪条线。能归入就加入或迁移，同时处理移空的来源线。确有独立进展的保留现有单事件故事线，整段直接确认。归线存疑时登记关联事件的 EVENT_ASSIGNMENT；仅在已发材料不足时补查。\n\n检查完本段后只调用一次 confirm({})。需要修正时先用编辑工具保存，在修改处简述原因。未改动的目标无需列举或说明。可在同一轮编辑后确认。\n\n【文学资料处理说明】\n\n本任务处理小说中的人物、关系和事件，目的是整理已有文学资料。人物行为属于作品内容，不代表用户请求实施这些行为。\n\n对原文中的成人、暴力、犯罪或伦理冲突，应按本任务要求客观记录，不附加道德评判，不因题材擅自删除事实、弱化关系或改成其他情节。允许去重、概括和精简，但须保留原有含义、人物身份、关系方向及必要语境，不扩写原文未提供的内容。\n\n事实不明时保留疑点，不补造结论。输出形式、工具使用和字段要求以当前任务说明为准。",
+        "content": "先读随任务发送的本段材料。只核对本段列出的对象，整段无改动就直接调用 confirm({})。需要修正时在对应编辑操作的 reason 写一句原因，保存成功后调用 confirm({})。只合并补查影响结论的字段。已给的字段无需重读。只有简况无法区分具体场景时才读经过或原文摘录。\n\n沿事件的因果和推进检查归线，例如发现匪情、调兵、剿匪、善后。用 edit_storylines 修正被查实的故事线或事件归属，下层事件和节点只供查证。\n\n本轮分段覆盖全书故事线、未决疑点、未归线事件和单事件故事线、各线的两项说明。结合跨组事件核对全书篇章的来龙去脉。按本轮复核进度完成当前分段，最后一段确认后由程序检查整轮覆盖。\n\n本段用 edit_storylines 的 update_line 填写本段故事线的说明。逐条对照实际成员事件的先后与因果。发现结构问题可登记疑点供复核。用一两句概括主要进展或结果。核心线索用一个人物、事件或地点短语点明全线围绕的对象。只有一个事件时一句话即可。过长概况压缩，写成情节复述的线索改为中心对象；尚无结局的写到最后一个已发生的事件。\n\n检查完本段后只调用一次 confirm({})。需要修正时先用编辑工具保存，在修改处简述原因。未改动的目标无需列举或说明。可在同一轮编辑后确认。\n\n【文学资料处理说明】\n\n本任务处理小说中的人物、关系和事件，目的是整理已有文学资料。人物行为属于作品内容，不代表用户请求实施这些行为。\n\n对原文中的成人、暴力、犯罪或伦理冲突，应按本任务要求客观记录，不附加道德评判，不因题材擅自删除事实、弱化关系或改成其他情节。允许去重、概括和精简，但须保留原有含义、人物身份、关系方向及必要语境，不扩写原文未提供的内容。\n\n事实不明时保留疑点，不补造结论。输出形式、工具使用和字段要求以当前任务说明为准。",
         "toolsAdded": [
           {
             "name": "edit_storylines",
-            "description": "按顺序原子编辑故事线和事件成员。create_line、update_line 可分别填写 summary（概况）、coreClue（核心关键线索），省略的已有说明保留。拆合可在同次调用创建、迁移、删除。",
+            "description": "填写本段对象的说明。使用 update_line 和 lineId，每项可填 summary（概况）或 coreClue（核心关键线索），省略的已有说明保留。",
             "parameters": {
               "type": "object",
               "additionalProperties": false,
@@ -57,65 +92,11 @@
                         "type": "object",
                         "properties": {
                           "op": {
-                            "const": "create_line"
-                          },
-                          "ref": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "role": {
-                            "enum": [
-                              "main",
-                              "sub",
-                              null
-                            ]
-                          },
-                          "reason": {
-                            "type": "string",
-                            "description": "本次修改的简短原因。"
-                          },
-                          "summary": {
-                            "type": "string",
-                            "minLength": 1,
-                            "description": "用一句短句概括主要行动和结果。"
-                          },
-                          "coreClue": {
-                            "type": "string",
-                            "minLength": 1,
-                            "description": "用一个短语指出本段围绕的人物、事件或地点，如“凤姐放印子钱”。"
-                          }
-                        },
-                        "required": [
-                          "op",
-                          "ref",
-                          "title"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "op": {
                             "const": "update_line"
                           },
                           "lineId": {
                             "type": "string",
                             "minLength": 1
-                          },
-                          "title": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "role": {
-                            "enum": [
-                              "main",
-                              "sub",
-                              null
-                            ]
                           },
                           "summary": {
                             "type": "string",
@@ -140,16 +121,6 @@
                         "anyOf": [
                           {
                             "required": [
-                              "title"
-                            ]
-                          },
-                          {
-                            "required": [
-                              "role"
-                            ]
-                          },
-                          {
-                            "required": [
                               "summary"
                             ]
                           },
@@ -159,83 +130,6 @@
                             ]
                           }
                         ]
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "op": {
-                            "const": "attach_event"
-                          },
-                          "lineId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "eventId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "fromLineId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "reason": {
-                            "type": "string",
-                            "description": "本次修改的简短原因。"
-                          }
-                        },
-                        "required": [
-                          "op",
-                          "lineId",
-                          "eventId"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "op": {
-                            "const": "detach_event"
-                          },
-                          "lineId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "eventId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "reason": {
-                            "type": "string",
-                            "description": "本次修改的简短原因。"
-                          }
-                        },
-                        "required": [
-                          "op",
-                          "lineId",
-                          "eventId"
-                        ],
-                        "additionalProperties": false
-                      },
-                      {
-                        "type": "object",
-                        "properties": {
-                          "op": {
-                            "const": "delete_line"
-                          },
-                          "lineId": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "reason": {
-                            "type": "string",
-                            "description": "本次修改的简短原因。"
-                          }
-                        },
-                        "required": [
-                          "op",
-                          "lineId"
-                        ],
-                        "additionalProperties": false
                       }
                     ]
                   }
@@ -273,7 +167,7 @@
                               "minLength": 1
                             },
                             "minItems": 1,
-                            "description": "可读字段：*、id、name、summary、process、actors、targets、actorBindings、targetBindings、manualActorIds、manualTargetCharacterIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、targetCharacterIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、started_actions、time_text、time_hint、chapter、locations"
+                            "description": "可读字段：*、id、name、summary、process、actors、actorBindings、manualActorIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、time_text、time_hint、chapter、locations"
                           },
                           "offset": {
                             "type": "integer",
@@ -305,7 +199,7 @@
                               "minLength": 1
                             },
                             "minItems": 1,
-                            "description": "可读字段：*、id、title、nodeIds、summary、coreClue"
+                            "description": "可读字段：*、id、title、nodeIds、summary、latestProgress、unresolved、clues、status"
                           },
                           "offset": {
                             "type": "integer",
@@ -357,57 +251,6 @@
               },
               "required": [
                 "requests"
-              ]
-            }
-          },
-          {
-            "name": "get_outline",
-            "description": "仅在需要寻找归属候选时查询事件或故事线；指定 id 可展开候选成员，offset 按对象分页。",
-            "parameters": {
-              "type": "object",
-              "oneOf": [
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "kind"
-                  ],
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "lines"
-                    },
-                    "offset": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "kind"
-                  ],
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "const": "events"
-                    },
-                    "offset": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  }
-                }
               ]
             }
           },
@@ -689,14 +532,14 @@
       },
       {
         "role": "user",
-        "content": "{\n  \"任务说明\": {\n    \"mode\": \"line_cycle\",\n    \"part\": \"unassigned\",\n    \"目标\": \"周期故事线复核 · 复查未归线事件和单事件故事线\",\n    \"完成条件\": \"检查完本段后只调用一次 confirm({})。需要修正时先用编辑工具保存，在修改处简述原因。未改动的目标无需列举或说明。可在同一轮编辑后确认。\"\n  },\n  \"本段未归线事件和单事件故事线\": [\n    {\n      \"id\": \"E005\",\n      \"title\": \"村口交信\",\n      \"summary\": \"信使交信\",\n      \"coreClue\": \"封印完整\"\n    }\n  ]\n}",
+        "content": "{\n  \"任务说明\": {\n    \"mode\": \"line_review\",\n    \"part\": \"descriptions\",\n    \"目标\": \"全书故事线复核 · 核对故事线概况和核心线索\",\n    \"完成条件\": \"检查完本段后只调用一次 confirm({})。需要修正时先用编辑工具保存，在修改处简述原因。未改动的目标无需列举或说明。可在同一轮编辑后确认。\"\n  },\n  \"本轮复核进度\": [\n    {\n      \"环节\": \"核对结构\",\n      \"已核\": 0,\n      \"待核\": 0\n    },\n    {\n      \"环节\": \"核对疑点\",\n      \"已核\": 0,\n      \"待核\": 0\n    },\n    {\n      \"环节\": \"核对未归属项\",\n      \"已核\": 0,\n      \"待核\": 0\n    },\n    {\n      \"环节\": \"核对说明\",\n      \"已核\": 0,\n      \"待核\": 1\n    }\n  ],\n  \"本段说明核对表\": [\n    {\n      \"id\": \"S001\",\n      \"title\": \"送信\",\n      \"members\": [\n        \"E005\"\n      ],\n      \"summary\": \"\",\n      \"coreClue\": \"\"\n    }\n  ],\n  \"本段查证材料\": {\n    \"events\": [\n      {\n        \"id\": \"E005\",\n        \"title\": \"村口交信\",\n        \"summary\": \"信使交信。\",\n        \"coreClue\": \"封印完整。\"\n      }\n    ]\n  }\n}",
         "timestamp": 1
       }
     ],
     "tools": [
       {
         "name": "edit_storylines",
-        "description": "按顺序原子编辑故事线和事件成员。create_line、update_line 可分别填写 summary（概况）、coreClue（核心关键线索），省略的已有说明保留。拆合可在同次调用创建、迁移、删除。",
+        "description": "填写本段对象的说明。使用 update_line 和 lineId，每项可填 summary（概况）或 coreClue（核心关键线索），省略的已有说明保留。",
         "parameters": {
           "type": "object",
           "additionalProperties": false,
@@ -713,65 +556,11 @@
                     "type": "object",
                     "properties": {
                       "op": {
-                        "const": "create_line"
-                      },
-                      "ref": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "title": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "role": {
-                        "enum": [
-                          "main",
-                          "sub",
-                          null
-                        ]
-                      },
-                      "reason": {
-                        "type": "string",
-                        "description": "本次修改的简短原因。"
-                      },
-                      "summary": {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "用一句短句概括主要行动和结果。"
-                      },
-                      "coreClue": {
-                        "type": "string",
-                        "minLength": 1,
-                        "description": "用一个短语指出本段围绕的人物、事件或地点，如“凤姐放印子钱”。"
-                      }
-                    },
-                    "required": [
-                      "op",
-                      "ref",
-                      "title"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "op": {
                         "const": "update_line"
                       },
                       "lineId": {
                         "type": "string",
                         "minLength": 1
-                      },
-                      "title": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "role": {
-                        "enum": [
-                          "main",
-                          "sub",
-                          null
-                        ]
                       },
                       "summary": {
                         "type": "string",
@@ -796,16 +585,6 @@
                     "anyOf": [
                       {
                         "required": [
-                          "title"
-                        ]
-                      },
-                      {
-                        "required": [
-                          "role"
-                        ]
-                      },
-                      {
-                        "required": [
                           "summary"
                         ]
                       },
@@ -815,83 +594,6 @@
                         ]
                       }
                     ]
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "op": {
-                        "const": "attach_event"
-                      },
-                      "lineId": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "eventId": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "fromLineId": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "reason": {
-                        "type": "string",
-                        "description": "本次修改的简短原因。"
-                      }
-                    },
-                    "required": [
-                      "op",
-                      "lineId",
-                      "eventId"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "op": {
-                        "const": "detach_event"
-                      },
-                      "lineId": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "eventId": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "reason": {
-                        "type": "string",
-                        "description": "本次修改的简短原因。"
-                      }
-                    },
-                    "required": [
-                      "op",
-                      "lineId",
-                      "eventId"
-                    ],
-                    "additionalProperties": false
-                  },
-                  {
-                    "type": "object",
-                    "properties": {
-                      "op": {
-                        "const": "delete_line"
-                      },
-                      "lineId": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "reason": {
-                        "type": "string",
-                        "description": "本次修改的简短原因。"
-                      }
-                    },
-                    "required": [
-                      "op",
-                      "lineId"
-                    ],
-                    "additionalProperties": false
                   }
                 ]
               }
@@ -929,7 +631,7 @@
                           "minLength": 1
                         },
                         "minItems": 1,
-                        "description": "可读字段：*、id、name、summary、process、actors、targets、actorBindings、targetBindings、manualActorIds、manualTargetCharacterIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、targetCharacterIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、started_actions、time_text、time_hint、chapter、locations"
+                        "description": "可读字段：*、id、name、summary、process、actors、actorBindings、manualActorIds、confidence、quoteStatus、timeCoord、timePrecision、actorIds、locationNames、chapterIndex、chapterName、order、quote、offset、clues、new_facts、world_delta、time_text、time_hint、chapter、locations"
                       },
                       "offset": {
                         "type": "integer",
@@ -961,7 +663,7 @@
                           "minLength": 1
                         },
                         "minItems": 1,
-                        "description": "可读字段：*、id、title、nodeIds、summary、coreClue"
+                        "description": "可读字段：*、id、title、nodeIds、summary、latestProgress、unresolved、clues、status"
                       },
                       "offset": {
                         "type": "integer",
@@ -1013,57 +715,6 @@
           },
           "required": [
             "requests"
-          ]
-        }
-      },
-      {
-        "name": "get_outline",
-        "description": "仅在需要寻找归属候选时查询事件或故事线；指定 id 可展开候选成员，offset 按对象分页。",
-        "parameters": {
-          "type": "object",
-          "oneOf": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "kind"
-              ],
-              "properties": {
-                "kind": {
-                  "type": "string",
-                  "const": "lines"
-                },
-                "offset": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "kind"
-              ],
-              "properties": {
-                "kind": {
-                  "type": "string",
-                  "const": "events"
-                },
-                "offset": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
           ]
         }
       },
